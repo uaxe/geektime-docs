@@ -1,0 +1,5 @@
+![](https://static001.geekbang.org/resource/image/1d/30/1d29bf1eb0f943a91fd233105f06c830.jpg?wh=1242*978)![](https://static001.geekbang.org/resource/image/be/0e/bec42567b46fe69e4e4d4e427f625c0e.jpg?wh=1242*1780)![](https://static001.geekbang.org/resource/image/5a/fd/5a48f52da754b201ff4ca1ab831875fd.jpg?wh=1242*2372)![](https://static001.geekbang.org/resource/image/96/e2/96c2368e46d049dd60f85b82c7cbb1e2.jpg?wh=1242*3932)![](https://static001.geekbang.org/resource/image/4f/52/4fc17ea8b6877c8a3fe7cbb906575e52.jpg?wh=1242*3112)![](https://static001.geekbang.org/resource/image/5f/f5/5f5d850a0eb1998da4005a378078a7f5.jpg?wh=1242*3528)![](https://static001.geekbang.org/resource/image/7f/99/7f42798b9aa414fe10bd240963854e99.jpg?wh=1242*2542)
+
+[![unpreview](https://static001.geekbang.org/resource/image/00/f2/00f868b7654dcb50ae2c91fd7688d2f2.jpg?wh=1242*526)](time://mall?url=https%3A%2F%2Fj.youzan.com%2FG69gDi)
+
+限量发售中，仅限5000份，3大体系，22个模块，定位工作中80%的高频问题。
