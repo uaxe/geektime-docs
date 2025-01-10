@@ -35,7 +35,7 @@ cd geektime-docs
 pip install -r requirements.txt
 
 # -i 参数是你需要生成pdf课程的目录
-python3 main.py pdf -i 后端-架构/etcd实战课
+python3 main.py pdf -i 后端-架构/etcd实战课 -o 后端-架构/etcd实战课.pdf
 
 # 执行完成后，确认最终的pdf是否正常，尤其关注图片
 # 建议对照markdown文档检查，如果有问题，欢迎提交 issue

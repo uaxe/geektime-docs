@@ -116,7 +116,7 @@ def http_head(uri) -> None:
 @click.option(
     "-o",
     "--output",
-    default="logs",
+    default=os.getcwd(),
     help="output is dir",
 )
 @click.option(
@@ -266,7 +266,7 @@ def make_all_pdf(source, output, timeout, compress, power, port):
 @click.option(
     "-o",
     "--output",
-    default="logs",
+    default=os.getcwd(),
     help="output is dir",
 )
 @click.option(
@@ -371,7 +371,9 @@ def make_pdf(source, output, timeout, compress, power, port):
     for (pdf, name, text, images) in pdfs:
         merger.append(pdf)
 
-    pdf_path = os.path.join(output, os.path.basename(source) + ".pdf")
+    pdf_path = output if output.endswith(".pdf") else os.path.join(output, os.path.basename(source) + ".pdf")
+    if not os.path.exists(os.path.dirname(pdf_path)):
+        os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
     merger.write(pdf_path)
     print(f"writing pdf {pdf_path}")
     merger.close()
