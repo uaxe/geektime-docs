@@ -4,7 +4,6 @@
 
 ----
 
-
 * 看 markdown文档，推荐: https://github.com/uaxe/geektime-docs 🌟🌟🌟
 * 看 pdf文档，推荐: https://github.com/uaxe/geektime-pdfs 🌟🌟🌟
 * 看 音视频，推荐: https://github.com/zkep/mygeektime 🌟🌟🌟🌟🌟
@@ -41,3 +40,5 @@ python3 main.py pdf -i 后端-架构/etcd实战课
 # 执行完成后，确认最终的pdf是否正常，尤其关注图片
 # 建议对照markdown文档检查，如果有问题，欢迎提交 issue
 ```
+
+### 本项目markdown文档全部由[mygeektime](https://github.com/zkep/mygeektime)生成
