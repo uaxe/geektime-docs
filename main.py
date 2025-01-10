@@ -97,7 +97,7 @@ def worker(driver, uri, timeout):
         )
         return base64.b64decode(result["data"])
 
-def head(uri):
+def http_head(uri) -> None:
     try:
         resp = requests.head(uri, timeout=3, headers={'User-Agent': 'Mozilla/5.0'})
         print(f'head status_code: {resp.status_code}, {uri}')
@@ -123,7 +123,7 @@ def head(uri):
     "-t",
     "--timeout",
     type=int,
-    default=3,
+    default=6,
     help="get url with browser timeout",
 )
 @click.option(
@@ -187,7 +187,7 @@ def make_all_pdf(source, output, timeout, compress, power, port):
                         if not isinstance(nav, str):
                             raise ValueError(dirname + nav)
                         base_name = os.path.splitext(nav)[0]
-                        target = os.path.join(part_dir, base_name.replace('%', "")  + ".pdf")
+                        target = os.path.join(part_dir, base_name+".pdf")
                         uri = host if base_name == "index" else host + html.escape(base_name)
                         mk_path = os.path.join(dirname, "docs", base_name+'.md')
                         mk_data = open(mk_path).read()
@@ -199,12 +199,14 @@ def make_all_pdf(source, output, timeout, compress, power, port):
                             match = match if match.count(')') <= 0 else match[:match.index(')')]
                             images.append(match)
 
-                        if os.path.exists(target):
+                        if os.path.exists(target) and round(os.path.getsize(target)/1024, 2) > 10:
                             pdfs.append((target, base_name, mk_data, images))
                             continue
+
                         with ThreadPoolExecutor(max_workers=3) as executor:
-                            for img_url in images:
-                                executor.submit(head, img_url)
+                            futures = [executor.submit(http_head, img_url) for img_url in images]
+                            for future in futures:
+                                print(future.result())
 
                         result = worker(driver, uri, timeout)
                         if compress:
@@ -328,7 +330,7 @@ def make_pdf(source, output, timeout, compress, power, port):
     navs = data.get('nav')
     for nav in navs:
         base_name = os.path.splitext(nav)[0]
-        target = os.path.join(part_dir, base_name.replace('%', "") + ".pdf")
+        target = os.path.join(part_dir, base_name + ".pdf")
         uri = host if base_name == "index" else host + html.escape(base_name)
         mk_path = os.path.join(source, "docs", nav)
         mk_data = open(mk_path).read()
@@ -338,7 +340,7 @@ def make_pdf(source, output, timeout, compress, power, port):
             if 'static001.geekbang.org' not in match:
                 continue
             match = match if match.count(')') <= 0 else match[:match.index(')')]
-            if os.path.exists(target):
+            if os.path.exists(target) and round(os.path.getsize(target) / 1024, 2) > 10:
                 images.append(match)
             else:
                 try:
