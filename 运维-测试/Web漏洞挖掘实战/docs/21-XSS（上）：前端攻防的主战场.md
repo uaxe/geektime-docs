@@ -36,7 +36,7 @@ XSS攻击的原理为， **浏览器将用户输入的恶意内容当做脚本�
 
 ```
 
-由于页面中没有对我们的输入进行限制，导致了我们可以直接在First name中输入<script>alert(1)</script>，在Last name中随意输入任何字符串例如abc，这样就能导致XSS攻击。
+由于页面中没有对我们的输入进行限制，导致了我们可以直接在First name中输入`<script>alert(1)</script>`，在Last name中随意输入任何字符串例如abc，这样就能导致XSS攻击。
 
 ![图片](https://static001.geekbang.org/resource/image/13/eb/130b6cf8a5c81fc9b8e16a368aaaefeb.png?wh=1741x765)
 
@@ -58,7 +58,7 @@ XSS攻击的原理为， **浏览器将用户输入的恶意内容当做脚本�
 
 上面例子中的行为，看似是我们自己在攻击自己，但事实上也可以攻击别人，使得别人在访问一个页面时受到我们发起的XSS攻击。 **你可以想一想要如何利用反射型XSS攻击别人？**
 
-事实上，我们发送的First name以及Last name都是通过GET方式上传的参数，而在之前的学习中，我们知道以GET方式上传的参数会出现在链接中，例如我们将First name设为<script>alert(1)</script>，将Last name设为abc，那么对应的恶意链接就如下所示：
+事实上，我们发送的First name以及Last name都是通过GET方式上传的参数，而在之前的学习中，我们知道以GET方式上传的参数会出现在链接中，例如我们将First name设为`<script>alert(1)</script>`，将Last name设为abc，那么对应的恶意链接就如下所示：
 
 ```plain
 http://1e2b92939584409b89297897efdf1599.app.mituan.zone/xss_get.php?firstname=%3Cscript%3Ealert%281%29%3C%2Fscript%3E&lastname=abc&form=submit
@@ -110,7 +110,7 @@ http://1e2b92939584409b89297897efdf1599.app.mituan.zone/xss_get.php?firstname=%3
 
 ![图片](https://static001.geekbang.org/resource/image/a7/f7/a7836a122478aec3498b2b471994b0f7.png?wh=1619x548)
 
-在这个示例中，Web应用选择的为一个博客，我们可以在此输入一个恶意命令作为博客，并且进行上传。例如我们输入<script>alert(1)</script>点击上传，之后页面会刷新，并且弹出警告框1，之后这个页面每次被访问，都会引起恶意命令的执行。
+在这个示例中，Web应用选择的为一个博客，我们可以在此输入一个恶意命令作为博客，并且进行上传。例如我们输入`<script>alert(1)</script>`点击上传，之后页面会刷新，并且弹出警告框1，之后这个页面每次被访问，都会引起恶意命令的执行。
 
 从结果我们知道，我们的恶意命令成功执行，这代表了我们的恶意输入被上传到数据库中，并且Web应用读取了它，将它解析出来。
 

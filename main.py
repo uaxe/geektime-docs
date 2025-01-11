@@ -19,6 +19,7 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support.expected_conditions import staleness_of
 from webdriver_manager.chrome import ChromeDriverManager
+from webdriver_manager.core.download_manager import WDMDownloadManager
 from selenium.webdriver.common.by import By
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -72,8 +73,8 @@ def worker(driver, uri, timeout):
     temp_height = 0
     while True:
         driver.execute_script("window.scrollBy(0,100)")
-        driver.implicitly_wait(0.2)
-        time.sleep(0.1)
+        driver.implicitly_wait(0.3)
+        time.sleep(0.3)
         check_height = driver.execute_script(
             "return document.documentElement.scrollTop || window.pageYOffset || document.body.scrollTop;",
         )
@@ -99,9 +100,9 @@ def worker(driver, uri, timeout):
         )
         return base64.b64decode(result["data"])
 
-def http_head(uri) -> None:
+def http_head(uri, timeout) -> None:
     try:
-        resp = requests.head(uri, timeout=3, headers={'User-Agent': 'Mozilla/5.0'})
+        resp = requests.head(uri, timeout=timeout, headers={'User-Agent': 'Mozilla/5.0'})
         print(f'head status_code: {resp.status_code}, {uri}')
     except Exception as e:
         print(f'head error: {e}, {uri}')
@@ -125,7 +126,7 @@ def http_head(uri) -> None:
     "-t",
     "--timeout",
     type=int,
-    default=6,
+    default=9,
     help="get url with browser timeout",
 )
 @click.option(
@@ -159,7 +160,13 @@ def make_all_pdf(source, output, timeout, compress, power, port):
     webdriver_options.add_argument("--disable-dev-shm-usage")
     webdriver_options.experimental_options["prefs"] = webdriver_prefs
 
-    service = Service(ChromeDriverManager().install())
+    http_client = requests.Session()
+    http_client.proxies = {
+        "http": "http://127.0.0.1:1087",
+        "https": "http://127.0.0.1:1087",
+    }
+    download_manager = WDMDownloadManager(http_client=http_client)
+    service = Service(ChromeDriverManager(download_manager=download_manager).install())
     host = f"http://127.0.0.1:{port}/"
     for dirname, _, file_lst in os.walk(source):
         for fname in file_lst:
@@ -180,7 +187,7 @@ def make_all_pdf(source, output, timeout, compress, power, port):
                         ["mkdocs", "serve", "--no-livereload", "-a", f"127.0.0.1:{port}"],
                              cwd=dirname,  stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
-                    part_dir = os.path.join(parts_dir, dirname)
+                    part_dir = os.path.join(parts_dir, os.path.basename(dirname))
                     if not os.path.exists(part_dir):
                         os.makedirs(part_dir, exist_ok=True)
 
@@ -199,14 +206,26 @@ def make_all_pdf(source, output, timeout, compress, power, port):
                             if 'static001.geekbang.org' not in match:
                                 continue
                             match = match if match.count(')') <= 0 else match[:match.index(')')]
+                            if match.count('('):
+                                match = match[match.index('(') + 1:]
                             images.append(match)
 
                         if os.path.exists(target) and round(os.path.getsize(target)/1024, 2) > 10:
-                            pdfs.append((target, base_name, mk_data, images))
-                            continue
+                            verifyImage = True
+                            for page in PdfReader(target).pages:
+                                if not verifyImage:
+                                    break
+                                for img in page.images:
+                                    if img.image.size == (28, 32):
+                                        print(f'image not verify: {target}')
+                                        verifyImage = False
+                                        break
+                            if verifyImage:
+                                pdfs.append((target, base_name, mk_data, images))
+                                continue
 
                         with ThreadPoolExecutor(max_workers=3) as executor:
-                            [executor.submit(http_head, img_url) for img_url in images]
+                            [executor.submit(http_head, img_url, timeout) for img_url in images]
 
                         result = worker(driver, uri, timeout)
                         if compress:
@@ -221,30 +240,48 @@ def make_all_pdf(source, output, timeout, compress, power, port):
 
                     proc.kill()
                     os.popen("lsof -i:" + str(port) + " | grep -v 'PID' | awk '{print $2}' |  xargs kill -9")
-                    merger = PdfWriter()
-                    for (pdf, name, text, images) in pdfs:
-                        merger.append(pdf)
-                    pdf_name = f"{os.path.basename(dirname)}.pdf"
-                    pdf_path = os.path.join(dirname, pdf_name)
-                    merger.write(pdf_path)
-                    print(f"writing pdf {pdf_path}")
-                    merger.close()
-                    output_path = f'{output}/{os.path.basename(os.path.dirname(dirname))}/{pdf_name}'
-                    if not os.path.exists(os.path.dirname(output_path)):
-                        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-                    print(output_path)
-                    os.rename(pdf_path, output_path)
-                    with PdfWriter() as writer:
-                        with open(output_path, "rb") as fd:
-                            writer.append(fd)
-                            count = 0
-                            for (pdf, name, text, images) in pdfs:
-                                with PdfReader(pdf) as reader:
-                                    page = reader.get_num_pages()
-                                    writer.add_outline_item(title=name, page_number=count, parent=None)
-                                    count += page
-                            writer.write(output_path)
-                            print(f"writing pdf {output_path}")
+
+                    output_dir = f'{output}/{os.path.basename(os.path.dirname(dirname))}'
+                    if not os.path.exists(output_dir):
+                        os.makedirs(output_dir, exist_ok=True)
+
+                    merger_pdfs = []
+                    if len(pdfs) < 200:
+                        pdf_name = f"{os.path.basename(dirname)}.pdf"
+                        pdf_fpath = os.path.join(dirname, pdf_name)
+                        output_file = os.path.join(output_dir, pdf_name)
+                        merger_pdfs.append((pdf_fpath, output_file, pdfs))
+                    else:
+                        pdf_name = f"{os.path.basename(dirname)}-上.pdf"
+                        pdf_fpath = os.path.join(dirname, pdf_name)
+                        output_file = os.path.join(output_dir, pdf_name)
+                        merger_pdfs.append((pdf_fpath, output_file, pdfs[0:100]))
+                        pdf_name = f"{os.path.basename(dirname)}-下.pdf"
+                        pdf_fpath = os.path.join(dirname, pdf_name)
+                        output_file = os.path.join(output_dir, pdf_name)
+                        merger_pdfs.append((pdf_fpath, output_file, pdfs[100:]))
+
+                    for pdf_path, output_path, merger_pdf in merger_pdfs:
+                        merger = PdfWriter()
+                        for (pdf, name, text, images) in merger_pdf:
+                            merger.append(pdf)
+
+                        merger.write(pdf_path)
+                        print(f"writing pdf {pdf_path}")
+                        merger.close()
+
+                        os.rename(pdf_path, output_path)
+                        with PdfWriter() as writer:
+                            with open(output_path, "rb") as fd:
+                                writer.append(fd)
+                                count = 0
+                                for (pdf, name, text, images) in merger_pdf:
+                                    with PdfReader(pdf) as reader:
+                                        page = reader.get_num_pages()
+                                        writer.add_outline_item(title=name, page_number=count, parent=None)
+                                        count += page
+                                writer.write(output_path)
+                                print(f"writing pdf {output_path}")
                     break
                 except Exception as e:
                     print(f"exception: {e}, traceback: {traceback.format_exc()}")
@@ -273,7 +310,7 @@ def make_all_pdf(source, output, timeout, compress, power, port):
     "-t",
     "--timeout",
     type=int,
-    default=3,
+    default=9,
     help="get url with browser timeout",
 )
 @click.option(
@@ -307,91 +344,117 @@ def make_pdf(source, output, timeout, compress, power, port):
     webdriver_options.add_argument("--disable-dev-shm-usage")
     webdriver_options.experimental_options["prefs"] = webdriver_prefs
 
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=webdriver_options)
-
+    http_client = requests.Session()
+    http_client.proxies = {
+        "http": "http://127.0.0.1:1087",
+        "https": "http://127.0.0.1:1087",
+    }
+    download_manager = WDMDownloadManager(http_client=http_client)
+    service = Service(ChromeDriverManager(download_manager=download_manager).install())
     host = f"http://127.0.0.1:{port}/"
-    parts_dir = os.path.join(source, "parts")
-    pattern = r'https?://[^\s]+'
-    fpath = os.path.join(source, "mkdocs.yml")
-    data = yaml.safe_load(open(fpath))
+    source = os.path.abspath(source)
+    basename = os.path.basename(source)
+    for i in range(9):
+        os.popen("lsof -i:" + str(port) + " | grep -v 'PID' | awk '{print $2}' |  xargs kill -9")
+        driver = webdriver.Chrome(service=service, options=webdriver_options)
+        try:
+            parts_dir = os.path.join(source, "parts")
+            pattern = r'https?://[^\s]+'
+            fpath = os.path.join(source, "mkdocs.yml")
+            data = yaml.safe_load(open(fpath))
+            print(f'basename: {basename}')
+            navs = data.get('nav')
+            proc = subprocess.Popen(
+                ["mkdocs", "serve", "--no-livereload", "-a", f"127.0.0.1:{port}"],
+                cwd=source, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
-    proc = subprocess.Popen(["mkdocs", "serve", "--no-livereload"],
-                            cwd=source,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT,
-                            )
+            part_dir = os.path.join(parts_dir, basename)
+            if not os.path.exists(part_dir):
+                os.makedirs(part_dir, exist_ok=True)
 
-    part_dir = os.path.join(parts_dir, source)
-    if not os.path.exists(part_dir):
-        os.makedirs(part_dir, exist_ok=True)
-
-    pdfs = []
-    navs = data.get('nav')
-    for nav in navs:
-        base_name = os.path.splitext(nav)[0]
-        target = os.path.join(part_dir, base_name.replace("%", "") + ".pdf")
-        uri = host if base_name == "index" else host + html.escape(base_name)
-        mk_path = os.path.join(source, "docs", nav)
-        mk_data = open(mk_path).read()
-        matches = re.findall(pattern, mk_data)
-        images = []
-        for match in matches:
-            if 'static001.geekbang.org' not in match:
-                continue
-            match = match if match.count(')') <= 0 else match[:match.index(')')]
-            if os.path.exists(target) and round(os.path.getsize(target) / 1024, 2) > 10:
-                images.append(match)
-            else:
-                try:
-                    resp = requests.head(match, timeout=3, headers={'User-Agent': 'Mozilla/5.0'})
-                    print(f'head status_code: {resp.status_code}, {match}')
+            pdfs = []
+            for nav in navs:
+                if not isinstance(nav, str):
+                    raise ValueError(source + nav)
+                base_name = os.path.splitext(nav)[0]
+                target = os.path.join(part_dir, base_name.replace("%", "") + ".pdf")
+                uri = host if base_name == "index" else host + html.escape(base_name)
+                mk_path = os.path.join(source, "docs", base_name + '.md')
+                mk_data = open(mk_path).read()
+                matches = re.findall(pattern, mk_data)
+                images = []
+                for match in matches:
+                    if 'static001.geekbang.org' not in match:
+                        continue
+                    match = match if match.count(')') <= 0 else match[:match.index(')')]
+                    if match.count('('):
+                        match = match[match.index('(') + 1:]
                     images.append(match)
-                except Exception as e:
-                    print(f'head error: {e}, {match}')
 
-        if os.path.exists(target):
-            pdfs.append((target, base_name, mk_data, images))
-            continue
+                if os.path.exists(target) and round(os.path.getsize(target) / 1024, 2) > 10:
+                    verifyImage = True
+                    for page in PdfReader(target).pages:
+                        if not verifyImage:
+                            break
+                        for img in page.images:
+                            if img.image.size == (28, 32):
+                                print(f'image not verify: {target}')
+                                verifyImage = False
+                                break
+                    if verifyImage:
+                        pdfs.append((target, base_name, mk_data, images))
+                        continue
 
-        result = worker(driver, uri, timeout)
-        if compress:
-            __compress(result, target, power)
-            print(f"__compress {target}")
-        else:
-            with open(target, "wb") as file:
-                file.write(result)
-                print(f"writing {target}")
-        pdfs.append((target, base_name, mk_data, images))
+                with ThreadPoolExecutor(max_workers=3) as executor:
+                    [executor.submit(http_head, img_url, timeout) for img_url in images]
 
+                result = worker(driver, uri, timeout)
+                if compress:
+                    __compress(result, target, power)
+                    print(f"__compress {target}")
+                else:
+                    with open(target, "wb") as file:
+                        file.write(result)
+                        print(f"writing {target}")
+                pdfs.append((target, base_name, mk_data, images))
 
-    proc.kill()
-
-    merger = PdfWriter()
-    for (pdf, name, text, images) in pdfs:
-        merger.append(pdf)
-
-    pdf_path = output if output.endswith(".pdf") else os.path.join(output, os.path.basename(source) + ".pdf")
-    if not os.path.exists(os.path.dirname(pdf_path)):
-        os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
-    merger.write(pdf_path)
-    print(f"writing pdf {pdf_path}")
-    merger.close()
-
-    with PdfWriter() as writer:
-        with open(pdf_path, "rb") as fd:
-            writer.append(fd)
-            count = 0
+            proc.kill()
+            os.popen("lsof -i:" + str(port) + " | grep -v 'PID' | awk '{print $2}' |  xargs kill -9")
+            merger = PdfWriter()
             for (pdf, name, text, images) in pdfs:
-                print(f"merging {name}")
-                with PdfReader(pdf) as reader:
-                    page = reader.get_num_pages()
-                    writer.add_outline_item(title=name, page_number=count, parent=None)
-                    count += page
-                    print(count, page)
-
-            writer.write(pdf_path)
+                merger.append(pdf)
+            pdf_name = f"{os.path.basename(source)}.pdf"
+            pdf_path = os.path.join(source, pdf_name)
+            merger.write(pdf_path)
             print(f"writing pdf {pdf_path}")
+            merger.close()
+            output_path = f'{output}/{os.path.basename(os.path.dirname(source))}/{pdf_name}'
+            if not os.path.exists(os.path.dirname(output_path)):
+                os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            print(output_path)
+            os.rename(pdf_path, output_path)
+            with PdfWriter() as writer:
+                with open(output_path, "rb") as fd:
+                    writer.append(fd)
+                    count = 0
+                    for (pdf, name, text, images) in pdfs:
+                        with PdfReader(pdf) as reader:
+                            page = reader.get_num_pages()
+                            writer.add_outline_item(title=name, page_number=count, parent=None)
+                            count += page
+                    writer.write(output_path)
+                    print(f"writing pdf {output_path}")
+            break
+        except Exception as e:
+            print(f"exception: {e}, traceback: {traceback.format_exc()}")
+            if 'No such file or directory' in str(e):
+                driver.quit()
+                os.popen("lsof -i:" + str(port) + " | grep -v 'PID' | awk '{print $2}' |  xargs kill -9")
+                break
+        finally:
+            driver.quit()
+
+
 
 @click.group(invoke_without_command=True)
 @click.pass_context
