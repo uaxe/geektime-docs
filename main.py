@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 import re
+import time
 import traceback
 import click
 import yaml
@@ -72,6 +73,7 @@ def worker(driver, uri, timeout):
     while True:
         driver.execute_script("window.scrollBy(0,100)")
         driver.implicitly_wait(0.2)
+        time.sleep(0.1)
         check_height = driver.execute_script(
             "return document.documentElement.scrollTop || window.pageYOffset || document.body.scrollTop;",
         )
@@ -187,7 +189,7 @@ def make_all_pdf(source, output, timeout, compress, power, port):
                         if not isinstance(nav, str):
                             raise ValueError(dirname + nav)
                         base_name = os.path.splitext(nav)[0]
-                        target = os.path.join(part_dir, base_name+".pdf")
+                        target = os.path.join(part_dir, base_name.replace("%", "")+".pdf")
                         uri = host if base_name == "index" else host + html.escape(base_name)
                         mk_path = os.path.join(dirname, "docs", base_name+'.md')
                         mk_data = open(mk_path).read()
@@ -204,9 +206,7 @@ def make_all_pdf(source, output, timeout, compress, power, port):
                             continue
 
                         with ThreadPoolExecutor(max_workers=3) as executor:
-                            futures = [executor.submit(http_head, img_url) for img_url in images]
-                            for future in futures:
-                                print(future.result())
+                            [executor.submit(http_head, img_url) for img_url in images]
 
                         result = worker(driver, uri, timeout)
                         if compress:
@@ -330,7 +330,7 @@ def make_pdf(source, output, timeout, compress, power, port):
     navs = data.get('nav')
     for nav in navs:
         base_name = os.path.splitext(nav)[0]
-        target = os.path.join(part_dir, base_name + ".pdf")
+        target = os.path.join(part_dir, base_name.replace("%", "") + ".pdf")
         uri = host if base_name == "index" else host + html.escape(base_name)
         mk_path = os.path.join(source, "docs", nav)
         mk_data = open(mk_path).read()
