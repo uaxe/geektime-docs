@@ -27,6 +27,7 @@ mkdocs serve
 <img src="md.png" width="800px"/>
 
 ### 根据markdown文档本地生成pdf文档
+查看已经生成校对过的 [PDF文档](https://github.com/uaxe/geektime-pdfs)
 ```shell
 git clone https://github.com/uaxe/geektime-docs.git
 
