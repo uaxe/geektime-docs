@@ -191,7 +191,6 @@ def make_all_pdf(source, output, timeout, compress, power, port):
             if not fname in ["mkdocs.yml"]:
                 continue
             for i in range(9):
-                driver = webdriver.Chrome(service=service, options=webdriver_options)
                 try:
                     os.popen("lsof -i:" + str(port) + " | grep -v 'PID' | awk '{print $2}' |  xargs kill -9")
                     parts_dir = os.path.join(dirname, "parts")
@@ -236,7 +235,6 @@ def make_all_pdf(source, output, timeout, compress, power, port):
                             with ThreadPoolExecutor(max_workers=6) as executor:
                                 futures = [executor.submit(http_get_base64, img_url, timeout) for img_url in images]
                                 for future in futures:
-                                    driver.refresh()
                                     bs, im_uri = future.result()
                                     if bs and im_uri:
                                         format = parse.urlparse(im_uri).path.split('.')[1]
@@ -247,7 +245,6 @@ def make_all_pdf(source, output, timeout, compress, power, port):
                             with open(mk_path, "w") as wm:
                                 wm.write(mk_data)
 
-                            driver.refresh()
 
                         proc = subprocess.Popen(
                             ["mkdocs", "serve", "--no-livereload", "-a", f"127.0.0.1:{port}"],
@@ -279,6 +276,7 @@ def make_all_pdf(source, output, timeout, compress, power, port):
 
                             for j in range(9):
                                 try:
+                                    driver = webdriver.Chrome(service=service, options=webdriver_options)
                                     result = worker(driver, uri, timeout)
                                     if compress:
                                         __compress(result, target, power)
@@ -290,7 +288,9 @@ def make_all_pdf(source, output, timeout, compress, power, port):
                                     break
                                 except Exception as e:
                                     print(f"url {uri}, {tmpdir}, error: {e}, traceback: {traceback.format_exc()}")
-                                    time.sleep(1)
+                                    time.sleep(0.5)
+                                finally:
+                                    driver.close()
 
                             pdfs.append((target, base_name, mk_data))
 
@@ -344,7 +344,6 @@ def make_all_pdf(source, output, timeout, compress, power, port):
                     print(f"exception: {e}, traceback: {traceback.format_exc()}")
                 finally:
                     os.popen("lsof -i:" + str(port) + " | grep -v 'PID' | awk '{print $2}' |  xargs kill -9")
-                    driver.close()
 
 
 @click.command("pdf")
