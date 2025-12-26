@@ -14163,7 +14163,7 @@
 <p>那严格遵守MESI协议的CPU会有什么样的性能问题呢？我们又可以怎么来解决这些问题呢？今天我们就来仔细分析一下。搞清楚了这些问题，你会对C++内存模型和Java内存模型有更加深入的理解，在分析并发问题时能够做到有的放矢。</p>
 <h2 id="mesicpu">严守MESI协议的CPU会有啥问题？</h2>
 <p>我们上节课说过，MESI代表的是Modified、Exclusive、Shared、Invalid这四种缓存状态，遵守MESI协议的CPU缓存会在这四种状态之间相互切换。这种CPU缓存之间的关系是这样的：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1d/57/1dabf3dccd6113d76b29c05dd3ea3c57.jpg?wh=2284x1407" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1d/57/1dabf3dccd6113d76b29c05dd3ea3c57.jpg?wh=2284x1407" /></p>
 <p>从上面这张图你可以看到，Cache和主内存(Memory)是直接相连的。一个CPU的所有写操作都会按照真实的执行顺序同步到主存和其他CPU的cache中。</p>
 <p>严格遵守MESI协议的CPU设计，在它的某一个核在写一块缓存时，它需要通知所有的同伴：我要写这块缓存了，如果你们谁有这块缓存的副本，请把它置成Invalid状态。Invalid状态意味着该缓存失效，如果其他CPU再访问这一缓存区时，就会从主存中加载正确的值。</p>
 <p><strong>发起写请求的CPU中的缓存状态可能是Exclusive、Modified和Share，每个状态下的处理是不一样的。</strong></p>
@@ -14177,7 +14177,7 @@
 <p>cache这个词，往往意味着它所存储的信息是副本。cache中的数据即使丢失了，也可以从内存中找到原始数据（不考虑脏数据的情况），<strong>cache存在的意义是加速查找</strong>。</p>
 <p><strong>但是buffer更像是蓄水池</strong>，你可以理解成它是一个收作业的课代表，课代表会把所有同学的作业都收集齐以后再一次性地交到老师那里。buffer中的数据没有副本，一旦丢失就彻底丢失了。store buffer也是同样的道理，它会收集多次写操作，然后在合适的时机进行提交。</p>
 <p>增加了store buffer以后的CPU缓存结构是这样的：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fd/a0/fdd8b173b8cea302fb1884a897fbaea0.jpg?wh=2284x1716" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fd/a0/fdd8b173b8cea302fb1884a897fbaea0.jpg?wh=2284x1716" /></p>
 <p>在这样的结构里，如果CPU的某个核再要对一个变量进行赋值，它就不必等到所有的同伴都确认完，而是直接把新的值放入store buffer，然后再由store buffer慢慢地去做核间同步，并且将新的值刷入到cache中去就好了。而且，每个核的store buffer都是私有的，其他核不可见。</p>
 <p>为了让你更好理解核间同步的问题，我们现在来举个例子。我们使用两个CPU，分别叫做CPU0和CPU1，其中CPU0负责写数据，而CPU1负责读数据，我们看看在增加了store buffer这个结构以后，它们在进行核间同步时会遇到什么问题。</p>
 <p>假如CPU0刚刚更新了变量a的值，并且将它放到了store buffer中，CPU0自己接着又要读取a的值，此时，它会在自己的store buffer中读到正确的值。</p>
@@ -14233,7 +14233,7 @@
 <p>而且，由于store buffer的存在提升了写入速度，那么invalid消息确认速度相比起来就慢了，这就带来了速度的不匹配，很容易导致store buffer的内容还没有及时更新到cache里，自己的容量就被撑爆了，从而失去了加速的作用。</p>
 <p>为了解决这个问题，CPU设计者又引入了<strong>“invalid queue”</strong>，也就是失效队列这个结构。加入了这个结构后，收到Invalid消息的CPU，比如我们称它为CPU1，在收到Invalid消息时立即向CPU0发回确认消息，但这个时候CPU1并没有把自己的cache由Share置为Invalid，而是把这个失效的消息放到一个队列中，等到空闲的时候再去处理失效消息，这个队列就是invalid queue。</p>
 <p>经过这样的改进后，CPU1响应失效消息的速度大大提升了，带有invalid queue的缓存结构是这样的：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/27/17/277a9efe9e9431c76499813b4f629317.jpg?wh=2284x1803" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/27/17/277a9efe9e9431c76499813b4f629317.jpg?wh=2284x1803" /></p>
 <p>我们还是以前面CPU0和CPU1中的例子来做说明。</p>
 <p>假如，CPU0和CPU1的缓存中都有变量a的副本，也就是说变量a所对应的缓存行在CPU0和CPU1中都是Share状态。CPU1中没有变量b的副本，b所对应缓存在CPU0中是Exclusive状态。</p>
 <p>当CPU0在将变量a写入缓存的时候，会产生Invalid消息，这个消息到达CPU1以后，CPU1不再立即处理它了，而是将这个消息放入invalid queue，并且立即向CPU0回复了invalid acknowledgement消息。</p>
@@ -14312,7 +14312,7 @@
 <a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>}
 </code></pre></div>
 <p>其实，除此之外，上面这段代码还有一种改法。我给你一个小提示，就是使用volatile关键字。我们会在第17课对volatile关键字进行讲解，如果你有兴趣也可以提前预习一下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3d/5f/3da3d49a6f7f24889ff20902b2a0425f.jpg?wh=2284x1176" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3d/5f/3da3d49a6f7f24889ff20902b2a0425f.jpg?wh=2284x1176" /></p>
 <p>欢迎你把这节课分享给更多对MESI协议和内存屏障感兴趣的人。我是海纳，我们下节课见。</p>
 <div><strong>精选留言（15）</strong></div>
 <ul>
@@ -14452,8 +14452,6 @@ assert(a == 1);
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

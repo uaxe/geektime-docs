@@ -14676,7 +14676,7 @@
 
 <p>你好，我是唐扬。</p>
 <p>通过上一节课，我们在电商系统中增加了消息队列对峰值写流量做削峰填谷，对次要的业务逻辑做异步处理，对不同的系统模块做解耦合。因为业务逻辑从同步代码中移除了，所以我们也要有相应的队列处理程序来处理消息、执行业务逻辑，<strong>这时你的系统架构变成了下面的样子：</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c9/a6/c9f44acbc4025b2ff1f0a4b9fd0941a6.jpg?wh=1142%2A634" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c9/a6/c9f44acbc4025b2ff1f0a4b9fd0941a6.jpg?wh=1142%2A634" /></p>
 <p>这是一个简化版的架构图，实际上，随着业务逻辑越来越复杂，会引入更多的外部系统和服务来解决业务上的问题。比如我们会引入Elasticsearch来解决商品和店铺搜索的问题，也会引入审核系统对售卖的商品、用户的评论做自动的和人工的审核，你会越来越多地使用消息队列与外部系统解耦合以及提升系统性能。</p>
 <p>比如你的电商系统需要上一个新的红包功能：用户在购买一定数量的商品之后，由你的系统给用户发一个现金的红包鼓励用户消费。由于发放红包的过程不应该在购买商品的主流程之内，所以你考虑使用消息队列来异步处理。<strong>这时你发现了一个问题：</strong>如果消息在投递的过程中发生丢失，那么用户就会因为没有得到红包而投诉。相反，如果消息在投递的过程中出现了重复，你的系统就会因为发送两个红包而损失。</p>
 <p>那么我们如何保证产生的消息一定会被消费到并且只被消费一次呢？这个问题虽然听起来很浅显、很好理解，但是实际上却藏着很多玄机，本节课我就带你深入探讨。</p>
@@ -14687,7 +14687,7 @@
 <li>消息在消息队列中的存储场景；</li>
 <li>消息被消费者消费的过程。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/87/ea/876fe51e24a49b9751588cc0f8e106ea.png?wh=2510x938" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/87/ea/876fe51e24a49b9751588cc0f8e106ea.png?wh=2510x938" /></p>
 <p>接下来我就针对每一个场景详细地剖析一下，这样你可以针对不同的场景选择合适的减少消息丢失的解决方案。</p>
 <h4 id="1">1.在消息生产的过程中丢失消息</h4>
 <p>在这个环节中主要有两种情况。</p>
@@ -14701,12 +14701,12 @@
 <p>来看一个形象的比喻：假如你经营一个图书馆，读者每还一本书你都要去把图书归位，不仅工作量大而且效率低下，但是如果你可以选择每隔3小时或者图书达到一定数量的时候再把图书归位，这样可以把同一类型的书一起归位，节省了查找图书位置的时间，可以提高效率。</p>
 <p>不过如果发生机器掉电或者机器异常重启，Page Cache中还没有来得及刷盘的消息就会丢失了。<strong>那么怎么解决呢？</strong></p>
 <p>你可能会把刷盘的间隔设置很短或者设置累积一条消息就就刷盘，但这样频繁刷盘会对性能有比较大的影响，而且从经验来看，出现机器宕机或者掉电的几率也不高，<strong>所以我不建议你这样做。</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6c/43/6c667c8c21baf27468c314105e522243.jpg?wh=1142%2A625" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6c/43/6c667c8c21baf27468c314105e522243.jpg?wh=1142%2A625" /></p>
 <p>如果你的电商系统对消息丢失的容忍度很低，<strong>你可以考虑以集群方式部署Kafka服务，通过部署多个副本备份数据保证消息尽量不丢失。</strong></p>
 <p>那么它是怎么实现的呢？</p>
 <p>Kafka集群中有一个Leader负责消息的写入和消费，可以有多个Follower负责数据的备份。Follower中有一个特殊的集合叫做ISR（in-sync replicas），当Leader故障时，新选举出来的Leader会从ISR中选择，默认Leader的数据会异步地复制给Follower，这样在Leader发生掉电或者宕机时，Kafka会从Follower中消费消息，减少消息丢失的可能。</p>
 <p>由于默认消息是异步地从Leader复制到Follower的，所以一旦Leader宕机，那些还没有来得及复制到Follower的消息还是会丢失。为了解决这个问题，Kafka为生产者提供一个选项叫做“acks”，当这个选项被设置为“all”时，生产者发送的每一条消息除了发给Leader外还会发给所有的ISR，并且必须得到Leader和所有ISR的确认后才被认为发送成功。这样，只有Leader和所有的ISR都挂了消息才会丢失。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/64/3f/648951000b3c7e969f8d04e42da6ac3f.jpg?wh=1142%2A628" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/64/3f/648951000b3c7e969f8d04e42da6ac3f.jpg?wh=1142%2A628" /></p>
 <p>从上面这张图来看，当设置“acks=all”时，需要同步执行1、3、4三个步骤，对于消息生产的性能来说也是有比较大的影响的，所以你在实际应用中需要仔细地权衡考量。<strong>我给你的建议是：</strong></p>
 <p>1.如果你需要确保消息一条都不能丢失，那么建议不要开启消息队列的同步刷盘，而是用集群的方式来解决，可以配置当所有ISR Follower都接收到消息才返回成功。</p>
 <p>2.如果对消息的丢失有一定的容忍度，那么建议不部署集群，即使以集群方式部署，也建议配置只发送给一个Follower就可以返回成功了。</p>
@@ -14728,7 +14728,7 @@
 <p>消息在生产和消费的过程中都可能会产生重复，所以你要做的是在生产过程和消费过程中增加消息幂等性的保证，这样就可以认为从“最终结果上来看”消息实际上是只被消费了一次的。</p>
 <p><strong>在消息生产过程中，</strong>在Kafka0.11版本和Pulsar中都支持“producer idempotency”的特性，翻译过来就是生产过程的幂等性，这种特性保证消息虽然可能在生产端产生重复，但是最终在消息队列存储时只会存储一份。</p>
 <p>它的做法是给每一个生产者一个唯一的ID，并且为生产的每一条消息赋予一个唯一ID，消息队列的服务端会存储&lt;生产者ID，最后一条消息ID&gt;的映射。当某一个生产者产生新的消息时，消息队列服务端会比对消息ID是否与存储的最后一条ID一致，如果一致就认为是重复的消息，服务端会自动丢弃。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/aa/bd/aab832cee23258972c41e03493b8e0bd.jpg?wh=1142%2A497" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/aa/bd/aab832cee23258972c41e03493b8e0bd.jpg?wh=1142%2A497" /></p>
 <p><strong>而在消费端，幂等性的保证会稍微复杂一些，你可以从通用层和业务层</strong>两个层面来考虑。</p>
 <p>在通用层面，你可以在消息被生产的时候使用发号器给它生成一个全局唯一的消息ID，消息被处理之后把这个ID存储在数据库中，在处理下一条消息之前先从数据库里面查询这个全局ID是否被消费过，如果被消费过就放弃消费。</p>
 <p>你可以看到，无论是生产端的幂等性保证方式还是消费端通用的幂等性保证方式，它们的共同特点都是为每一个消息生成一个唯一的ID，然后在使用这个消息的时候，先比对这个ID是否已经存在，如果存在则认为消息已经被使用过。所以这种方式是一种标准的实现幂等的方式，<strong>你在项目之中可以拿来直接使用，</strong>它在逻辑上的伪代码就像下面这样：</p>
@@ -14893,8 +14893,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

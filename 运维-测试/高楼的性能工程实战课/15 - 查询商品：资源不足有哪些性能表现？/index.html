@@ -6252,11 +6252,11 @@
 <p>话不多说，我们直接开始今天的内容。</p>
 <h2 id="_1">压力场景数据</h2>
 <p>对于查询商品接口，我们第一次试执行性能场景的结果如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/75/a2/75ef8d040cdbcef4556bbfa7fd7098a2.png?wh=1820%2A658" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/75/a2/75ef8d040cdbcef4556bbfa7fd7098a2.png?wh=1820%2A658" /></p>
 <p>你看，TPS只有250左右，并且响应时间也明显随着压力的增加而增加了，看起来瓶颈已经出现了，对吧？根据哥的逻辑，下一步就是看架构图啦。</p>
 <h2 id="_2">先看架构图</h2>
 <p>我们用APM工具来看看这个接口的架构。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6b/70/6bcbe3236d91fd7628fa5a6186243870.png?wh=1873%2A465" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6b/70/6bcbe3236d91fd7628fa5a6186243870.png?wh=1873%2A465" /></p>
 <p>你看，从压力机到Gateway服务、到Search服务、再到ES-Client，这个APM工具也只能帮我们到这里了。因为我们用的是ElasticSearch 7来做的搜索服务的支撑，而这个skywalking工具也没有对应的Agent，所以后面并没有配置skywalking。</p>
 <p>在这里，我要多啰嗦几句。现在的APM工具大多是基于应用层来做的，有些运维APM采集的数据会更多一些，但也是响应时间、吞吐量等这样的信息。对于性能分析而言，现在的APM工具有减少排查时间的能力，但是在组件级的细化定位上还有待提高。虽然AI OPS也被提到了台面，但是也没见过哪个公司上了AIOPS产品后，就敢不让人看着。</p>
 <p>总之，从细化分析的角度，我们在定位问题的根本原因时，手头有什么工具就可以用什么工具，即使什么工具都没有，撸日志也是照样能做到的，所以我建议你不要迷信工具，要“迷信”思路。</p>
@@ -6269,27 +6269,27 @@
 </ul>
 <!--THE END-->
 
-<p><img alt="" src="https://static001.geekbang.org/resource/image/dc/0d/dc64c9e8ace689c86d6584b64f9f230d.png?wh=278%2A180" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dc/0d/dc64c9e8ace689c86d6584b64f9f230d.png?wh=278%2A180" /></p>
 <ul>
 <li>Search服务上的响应时间：</li>
 </ul>
 <!--THE END-->
 
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a6/c9/a6dc83d1b51445464d3db3e5421798c9.png?wh=300%2A196" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a6/c9/a6dc83d1b51445464d3db3e5421798c9.png?wh=300%2A196" /></p>
 <ul>
 <li>ES Client的响应时间：</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0b/81/0b168cdd73f30b5565c52a6d97b45081.png?wh=767%2A770" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0b/81/0b168cdd73f30b5565c52a6d97b45081.png?wh=767%2A770" /></p>
 <p>一层层看过之后，我们发现查询商品这个接口的响应时间消耗在了ES client上面。而在我们这个查询的路径上，在gateway/search服务上，我们并没有做什么复杂的动作。</p>
 <p>既然知道了响应时间消耗在哪里，下面我们就来定位它，看能不能把TPS优化起来。</p>
 <h2 id="_4">全局监控</h2>
 <p>根据高老师的经验，我们还是从全局监控开始，看全局监控可以让我们更加有的放矢。在分析的过程中，经常有人往下走了几步之后，就开始思维混乱、步伐飘逸。因为数据有很多，所以分析时很容易从一个数据走到不重要的分支上去了。而这时候，如果你心里有全局监控数据，思路就会更清晰，不会在无关的分支上消耗时间。</p>
 <p>回到我们这个例子中，从下面的k8s worker（也就是k8s中的node，在我们的环境中我习惯叫成worker，就是为了体现：在我的地盘，我爱叫啥就叫啥）的数据上来看，似乎没有一个worker的资源使用率是特别高的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/25/e5/25bb0386561be19b9615a4b0130fe4e5.png?wh=1816%2A433" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/25/e5/25bb0386561be19b9615a4b0130fe4e5.png?wh=1816%2A433" /></p>
 <p>请你注意，在k8s中看资源消耗，一定不要只看worker这个层面，因为这个层面还不够，一个worker上可能会运行多个pod。从上图来看，由于worker层面没有资源消耗，但是时间又明显是消耗在ES client上的，所以，接下来我们要看一下每一个pod的资源使用情况。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/13/f3/13f919d42a29f2d37f699036658006f3.png?wh=1809%2A788" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/13/f3/13f919d42a29f2d37f699036658006f3.png?wh=1809%2A788" /></p>
 <p>咦，有红色。你看，有两个与ES相关的POD，它们的CPU都飘红了，这下可有得玩了。既然是与ES相关的POD，那我们就把ES所有的POD排个序看看。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/62/bd/624d7bc2fe25f731aa42037d8d9f29bd.png?wh=1797%2A268" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/62/bd/624d7bc2fe25f731aa42037d8d9f29bd.png?wh=1797%2A268" /></p>
 <p>从上图的数据来看，有一个ES Client 消耗了67%的CPU，有两个ES Data消耗了99%的CPU，ES本来就是吃CPU的大户，所以我们接下来要着重分析它。</p>
 <p>这里我再说明一点，我们从前面的worker资源使用率一步一步走到这里，在分析方向上是合情合理的，因为这些都是属于我提到的全局监控的内容。</p>
 <h2 id="_5">定向分析</h2>
@@ -6307,7 +6307,7 @@
 </code></pre></div>
 <p>现在就比较清晰了，可以看到，在整个namespace中有两个ES client，三个ES data，三个ES master。</p>
 <p>我们来画一个细一点的架构图，以便在脑子里记下这个逻辑：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2e/0f/2e8a4fe8b5e214a8463d918dea8cyy0f.jpg?wh=2000%2A868" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2e/0f/2e8a4fe8b5e214a8463d918dea8cyy0f.jpg?wh=2000%2A868" /></p>
 <p>再结合我们在全局分析中看到的资源使用率图，现在判断至少有两个问题：</p>
 <ol>
 <li>ES client请求不均衡；</li>
@@ -6417,10 +6417,10 @@
 <p>哟，现在刷出来两条iptables规则了，看来之前在我们不断折腾的部署过程中，ES client一直是有问题的。</p>
 <p>在上面的iptables规则里，那两条iptables的上一条中有一个关键词“——probability 0.50000000000”。我们知道，iptables的匹配规则是从上到下的，既然上一条的匹配是随机0.5，也就是说只有50%的请求会走第一条规则，那下一条自然也是随机0.5了，因为总共只有两条规则嘛。这样一来就均衡了。</p>
 <p>我们再接着做这个接口的压力场景，看到如下信息：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/40/67/408592f11401e1yyb1c06ef48f3f8167.png?wh=1804%2A319" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/40/67/408592f11401e1yyb1c06ef48f3f8167.png?wh=1804%2A319" /></p>
 <p>看起来ES client均衡了，对不对？</p>
 <p>它对应的TPS，如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/61/99/614e849f975cf983747e080329c0d699.png?wh=1803%2A659" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/61/99/614e849f975cf983747e080329c0d699.png?wh=1803%2A659" /></p>
 <p>明显TPS提升了60左右。</p>
 <p>ES client请求不均衡的问题解决了，现在，我们还要来看一下ES data单节点CPU高的问题。</p>
 <h3 id="es-data-cpu">ES Data CPU使用率高</h3>
@@ -6428,7 +6428,7 @@
 <li><strong>第一阶段：加一个CPU</strong></li>
 </ul>
 <p>在TPS提升之后，我们再来看一下全局监控数据。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2e/79/2ec7cce680e81f57717c642cf7834279.png?wh=1815%2A485" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2e/79/2ec7cce680e81f57717c642cf7834279.png?wh=1815%2A485" /></p>
 <p>看起来比一开始好多了。基于前面分析ES client的经验，我们就先来查一下ES data的iptables规则：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>-- 查看下有哪些ES data的POD
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>[root@k8s-master-1 ~]# kubectl get pods -o wide | grep data
@@ -6476,23 +6476,23 @@
 <p>而在这一部分，我们主要是看nat表以及其上的链。对于其他的部分，如果你想学习，可自行查阅iptables相关知识。毕竟，我还时刻记得自己写的是一个性能专栏，而不是计算机基础知识专栏，哈哈。</p>
 </blockquote>
 <p>从上面的信息可以看到，我们的这个集群中有三个ES data服务，对应着三条转发规则，其中，第一条规则的匹配比例是：0.33333333349；第二条比例：0.50000000000；第三条是1。而这三条转发规则对应的POD IP和端口分别是：10.100.18.197:9200、10.100.251.67:9200、10.100.5.5:9200，这也就意味着，通过这三条iptables规则可以实现负载均衡，画图理解如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5e/88/5e9c08e967c62d9e9a84084d8c2de888.jpg?wh=2000%2A868" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5e/88/5e9c08e967c62d9e9a84084d8c2de888.jpg?wh=2000%2A868" /></p>
 <p>我们假设有30个请求进来，那ES Data 0上就会有30x0.33333333349=10个请求；对于剩下的20个请求，在ES Data 1上就会有20x0.50000000000=10个请求；而最后剩下的10个请求，自然就到了ES Data 2上。这是一个非常均衡的逻辑，只是在iptables规则中，我看着这几个数据比例，实在是觉得别扭。</p>
 <p>既然明白了这个逻辑，下面我们还是把查询商品接口的场景压起来看一下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/06/49/06eb3b24a57226cd9a6717cd1e3f6049.png?wh=1794%2A405" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/06/49/06eb3b24a57226cd9a6717cd1e3f6049.png?wh=1794%2A405" /></p>
 <p>从数据上来看，经常会出现ES data 某个节点消耗CPU高的情况。可是，对应到我们前面看到的全局worker监控界面中，并没有哪个worker的CPU很高。所以，在这里，我们要查一下ES Data中的cgroup配置，看它的限制是多少。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8y/3c/8yyd469d83c9a346aff8c659f6c4ae3c.png?wh=588%2A152" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8y/3c/8yyd469d83c9a346aff8c659f6c4ae3c.png?wh=588%2A152" /></p>
 <p>也就是说，ES data的每个POD都是配置了一颗CPU，难怪CPU使用率动不动就红了。</p>
 <p>还有一点你要记住，前面我们在查看data列表的时候发现，ES data 0 在worker-5上，ES data 1 在worker-7上，ES data 2 在worker-9上。而我们现在看到的却是，它们都各自分到了一个CPU。既然如此，那我们就再添加一个CPU，然后再回去看一下worker-5/7/9的反应。为什么只加一个CPU呢？因为从worker-7上来看，现在的CPU使用率已经在50%左右了，要是加多了，我怕它吃不消。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f5/01/f57acfca05yy43bd882a57404ea50d01.png?wh=463%2A108" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f5/01/f57acfca05yy43bd882a57404ea50d01.png?wh=463%2A108" /></p>
 <p>看一下压力场景执行的效果：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/29/9c/299bbd39759ca90bdc4953334bc0c39c.png?wh=1811%2A652" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/29/9c/299bbd39759ca90bdc4953334bc0c39c.png?wh=1811%2A652" /></p>
 <p>似乎……不怎么样？TPS并没有增加。</p>
 <ul>
 <li><strong>第二阶段：加副本</strong></li>
 </ul>
 <p>我们再看加了CPU之后的全局POD监控：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/92/94/925d14923a3bfac75ef84b9b21622294.png?wh=1811%2A334" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/92/94/925d14923a3bfac75ef84b9b21622294.png?wh=1811%2A334" /></p>
 <p>还是只有一个ES data的CPU使用率高，所以我想查一下ES中的数据分布。因为负载均衡的问题解决了，并且知道有三个ES data节点。现在我们就要知道是不是每个节点都被访问到了。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>pms                               0 p 10.100.18.199 _w   32   17690 18363   6.7mb  7820 true  true  8.5.1 false
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>pms                               0 p 10.100.18.199 _15  41    2110     0 465.7kb  5500 true  true  8.5.1 true
@@ -6536,7 +6536,7 @@
 <a id="__codelineno-10-28" name="__codelineno-10-28" href="#__codelineno-10-28"></a>pms                               0 r 10.100.140.10 _1a  46    1904     0   423kb  5500 true  true  8.5.1 true
 </code></pre></div>
 <p>我们接着压起来，看看POD的资源：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/11/cc/11ayy743164f36a8d0b04bc76af52ccc.png?wh=1792%2A392" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/11/cc/11ayy743164f36a8d0b04bc76af52ccc.png?wh=1792%2A392" /></p>
 <p>现在看着是不是开心多了？data节点的CPU都用起来了。</p>
 <p>我们再看一下worker的资源：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>[root@k8s-master-1 ~]# kubectl get pods -o wide | grep data
@@ -6545,10 +6545,10 @@
 <a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>elasticsearch-data-2                        1/1     Running   0          18m     10.100.140.9     k8s-worker-2   &lt;none&gt;           &lt;none&gt;
 </code></pre></div>
 <p>现在ES Data的POD分布到2、5、9三这个worker上去了，我们查看下全局监控：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/53/b1/53a522a2754d7fcea550fde05cd791b1.png?wh=1812%2A479" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/53/b1/53a522a2754d7fcea550fde05cd791b1.png?wh=1812%2A479" /></p>
 <p>嗯，不错，ES data的POD把资源用起来了。其实这里要想继续调，还可以把CPU加大，ES本来就是吃CPU、内存的大户。不过，我们前面在配置的时候，给ES data的CPU也确实太小了。这个问题，并不是我故意设计出来的，而是当时在部署的时候，没考虑到这些。</p>
 <p>最后，我们来看优化后的效果：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1f/24/1fb93ff5yycfc2bb6049244820e73b24.png?wh=1824%2A666" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1f/24/1fb93ff5yycfc2bb6049244820e73b24.png?wh=1824%2A666" /></p>
 <p>呀呀呀，你看TPS压都压不住呀，很快涨到900左右了！这个优化结果很好。</p>
 <p>现在回过头来看第一个阶段，我们加CPU没有效果，主要还是因为副本数量太少。其实，在ES的优化中，还有很多细节可以玩。只不过，在我们这个课程中，我希望给你的是一个整体的分析思路和逻辑，而不是纠结于每个细节上的参数。所以，在这里，我们就不再说具体参数的调整了。</p>
 <p>如果你想在ES上做更多的优化，可以在分析完业务之后，确定一下ES的架构、数据索引、分片等信息，然后再来设计一个合理的ES部署。</p>
@@ -6690,8 +6690,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

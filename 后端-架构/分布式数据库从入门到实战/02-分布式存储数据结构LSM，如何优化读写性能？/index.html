@@ -13991,13 +13991,13 @@
 <p>第二种，<strong>Merge-On-Read</strong>。数据写入的时候直接写入新的文件，所以读取的时候可能需要Merge多个文件来获取最新版的数据。这种模式对写入友好，但是读取的代价较高，因此适合写多读少的场景。</p>
 <p>当然还有一些如Delta-Store、Delete-And-Insert也在平衡读写的性能，基本都是牺牲一些写入的性能，构建一些索引、排序后让读取性能提升。</p>
 <p>而我们今天要说的LSM（Log-Structured Merge-Tree，日志结构合并树），利用了MOR（Merge-On-Read）写入的优点，同时又通过Compact来避免了MOR读取时需要读取多个文件的缺点，被很多存储引擎用来提升写入性能。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/26/ba/267ecb49f5b1e022b9aca5d2835e90ba.jpg?wh=2136x1026" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/26/ba/267ecb49f5b1e022b9aca5d2835e90ba.jpg?wh=2136x1026" /></p>
 <p><strong>理解了LSM，一定会让你更快速地定位各种问题原因</strong>，比如写入放大、读取延迟或者合并策略配置不当，甚至你也可以在你自己的一些应用设计中采用类似的架构，用各种手段平衡读写、平衡时间与空间、平衡性能与准确性等等。</p>
 <p>接下来，我们就详细说说HBase是怎么用LSM提升读写性能的。</p>
 <h2 id="lsm">LSM怎么提升读写性能？</h2>
 <p>LSM树的出现是为了解决磁盘随机I/O速度过慢的问题，将数据的随机磁盘I/O读写都转化为内存的读写，然后通过批量写入磁盘和延迟合并操作来提高写入性能。</p>
 <p>我们先看下LSM的架构。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/83/b9/8332995375106483daa8fd431e854db9.png?wh=1870x1203" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/83/b9/8332995375106483daa8fd431e854db9.png?wh=1870x1203" /></p>
 <p>你看，HBase数据写入的时候，无论是新增数据还是更新删除数据，都会先写入内存中称之为MemStore的组件。而MemStore在内存中会使用一个有序的数据结构，比如跳表，给这些写入的数据排好序。</p>
 <p>当MemStore的大小达到配置的阈值或者经过一定时间后，MemStore就会将数据刷新输出到磁盘。</p>
 <p>这里会是一个磁盘的批量顺序写入，所以速度很快。又因为数据已经排好序了，所以后续数据的读取也能够基于索引去做二分查找等等这样的快速读取。</p>
@@ -14086,7 +14086,7 @@
 <a id="__codelineno-0-57" name="__codelineno-0-57" href="#__codelineno-0-57"></a>}
 </code></pre></div>
 <p>代码执行如下图所示。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0d/b0/0d38e8c1be6cf9c500c9c54fb4b776b0.png?wh=791x182" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0d/b0/0d38e8c1be6cf9c500c9c54fb4b776b0.png?wh=791x182" /></p>
 <p>从结果我们也可以看出，这个策略挑出了待合并文件中的小文件，过滤掉了大文件。也就是从文件列表 L=[8200, 4300, 160, 150, 80, 70, 30, 20, 5] 中过滤掉了8200、4300这两个大文件，而挑出其他剩下的小文件做了合并。</p>
 <p><strong>你可能注意到了，Compact过程中其实存在一定的写放大，尤其是刚才提到的Minor Compact和Major Compact这种分层的设计。</strong></p>
 <p>我来详细解释一下。在一行数据从MemStore刷新输出到StoreFile后，Minor Compact会将这行数据从一个StoreFile文件读取出来，合并后写入一个稍大的StoreFile文件，然后继续经过多次合并，最后在Major Compact过程中，所有的文件又被合并成为一个总的StoreFile。</p>
@@ -14100,7 +14100,7 @@
 <p><strong>至于这个“排他目录”，就是布隆过滤器</strong>。使用了布隆过滤器后，HBase的每个StoreFile里面都会存储一个“排他目录”。图书馆一系列的快速检查，其实就是对“这本书”进行一系列的hash函数计算得到一个对应的值，然后再检查hash表上对应的桶是否存在已经写入的值。</p>
 <p>布隆过滤器可以非常快速地检查出一个元素是否在一个集合中。不过要注意一点，当布隆过滤器说某样东西不在集合里时，它是100%正确的；但当它说某样东西可能在集合里时，它可能是错误的，这种情况称为“假阳性”。</p>
 <p>换句话说，就是有时布隆过滤器会告诉你某样东西可能存在，但实际上并不存在，就像“排他目录”可能错误地暗示一本书是在图书馆里，还需要你亲自去书架上确认有没有这本书一样。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/45/38/450c63e1c032136a5eyy75114e348838.png?wh=1836x1036" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/45/38/450c63e1c032136a5eyy75114e348838.png?wh=1836x1036" />
 那为什么会出现这种情况呢？我们看上面这张图，布隆过滤器使用一个位图作为数据存储结构。</p>
 <p>以一个基于行键的布隆过滤器为例。</p>
 <p>数据写入的时候，用数据的行键，这里是“行键1”进行了一系列的hash计算，比如图中进行了Hash1、Hash2、Hash3总计3个函数计算，将每个hash函数计算结果映射到了位图的一个bit位或者说hash桶。这里我让“行键1”映射到了下标为2、5、7的3个bit位。</p>
@@ -14286,8 +14286,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

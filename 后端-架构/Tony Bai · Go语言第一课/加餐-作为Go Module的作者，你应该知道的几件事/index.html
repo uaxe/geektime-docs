@@ -15170,7 +15170,7 @@
 <h2 id="go-module_1">作废特定版本的Go Module</h2>
 <p>我们先来看看如果发布了错误的module版本会对module的使用者带去什么影响。</p>
 <p>我们直接来看一个例子。假设bitbucket.org/bigwhite/m1是我维护的一个Go Module，它目前已经演进到v1.0.1版本了，并且有两个使用者c1和c2，你可以看下这个示意图，能更直观地了解m1当前的状态：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/23/0a/23931514c6ea70debaeb9e5709cec20a.jpg?wh=1920x861" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/23/0a/23931514c6ea70debaeb9e5709cec20a.jpg?wh=1920x861" /></p>
 <p>某一天，我一不小心，就把一个处于broken状态的module版本，m1@v1.0.2发布出去了！此时此刻，m1的v1.0.2版本还只存在于它的源仓库站点上，也就是bitbucket/bigwhite/m1中，在任何一个GoProxy服务器上都还没有这个版本的缓存。</p>
 <p>这个时候，依赖m1的两个项目c1和c2依赖的仍然是m1@v1.0.1版本。也就是说，如果没有显式升级m1的版本，c1和c2的构建就不会受到处于broken状态的module v1.0.2版本的影响，这也是Go Module最小版本选择的优点。</p>
 <p>而且，由于m1@v1.0.2还没有被GoProxy服务器缓存，在GOPROXY环境变量开启的情况下，go list是查不到m1有可升级的版本的：</p>
@@ -15185,7 +15185,7 @@
 <a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>bitbucket.org/bigwhite/m1 v1.0.1 [v1.0.2]
 </code></pre></div>
 <p>之后，如果某个m1的消费者，比如c2，通过go get bitbucket.org/bigwhite/m1@v1.0.2对m1的依赖版本进行了显式更新，那就会触发GOPROXY对m1@v1.0.2版本的缓存。这样一通操作后，module proxy以及m1的消费者的当前的状态就会变成这样：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/85/31/85fyy48dd62570758dd21666a4646631.jpg?wh=1920x972" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/85/31/85fyy48dd62570758dd21666a4646631.jpg?wh=1920x972" /></p>
 <p>由于Goproxy服务已经缓存了m1的v1.0.2版本，这之后，m1的其他消费者，比如c1就能够在GOPROXY开启的情况下查询到m1存在新版本v1.0.2，即便它是broken的：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>// 以c1为例：
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>$go list -m -u all
@@ -15194,7 +15194,7 @@
 </code></pre></div>
 <p>但是，一旦broken的m1版本（v1.0.2）进入到GoProxy的缓存，那么它的“危害性”就会“大肆传播”开。这时module m1的新消费者都将受到影响！</p>
 <p>比如这里我们引入一个新的消费者c3，c3的首次构建就会因m1的损坏而报错：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/73/00/737eb3121d9fa70387742de128eba500.jpg?wh=1920x1252" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/73/00/737eb3121d9fa70387742de128eba500.jpg?wh=1920x1252" /></p>
 <p>到这里，糟糕的情况已经出现了！那我们怎么作废掉m1@v1.0.2版本来修复这个问题呢？</p>
 <p>如果在GOPATH时代，废掉一个之前发的包版本是分分钟的事情，因为那时包消费者依赖的都是latest commit。包作者只要fix掉问题、提交并重新发布就可以了。</p>
 <p>但是在Go Module时代，作废掉一个已经发布了的Go Module版本还真不是一件能轻易做好的事情。这很大程度是源于大量Go Module代理服务器的存在，Go Module代理服务器会将已发布的broken的module缓存起来。下面我们来看看可能的问题解决方法。</p>
@@ -15205,7 +15205,7 @@
 <p>但现实的情况时，现在大家都是通过Goproxy服务来获取module的。</p>
 <p>所以，一旦一个module版本被发布，当某个消费者通过他配置的goproxy获取这个版本时，这个版本就会在被缓存在对应的代理服务器上。后续m1的消费者通过这个goproxy服务器获取那个版本的m1时，请求不会再回到m1所在的源代码托管服务器。</p>
 <p>这样，即便m1的源服务器上的v1.0.2版本得到了重新发布，散布在各个goproxy服务器上的broken v1.0.2也依旧存在，并且被“传播”到各个m1消费者的开发环境中，而重新发布后的v1.0.2版本却得不到“传播”的机会，我们还是用一张图来直观展示下这种“窘境”：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c0/2b/c07fba8655615046c49110fb91bb662b.jpg?wh=1920x1252" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c0/2b/c07fba8655615046c49110fb91bb662b.jpg?wh=1920x1252" /></p>
 <p>因此，从消费者的角度看，m1的v1.0.2版本依旧是那个broken的版本，这种解决措施无效！</p>
 <p>那你可能会问，如果m1的作者删除了bitbucket上的v1.0.2这个发布版本，各大goproxy服务器上的broken v1.0.2版本是否也会被同步删除呢？</p>
 <p>遗憾地告诉你：不会。</p>
@@ -15214,7 +15214,7 @@
 <p>那这种问题该怎么解决呢？这种情况下，Go社区更为常见的解决方式就是<strong>发布module的新patch版本</strong></p>
 <h3 id="modulepatch">发布module的新patch版本</h3>
 <p>我们依然以上面的m1为例，现在我们废除掉v1.0.2，在本地修正问题后，直接打v1.0.3标签，并发布push到远程代码服务器上。这样m1的消费者以及module proxy的整体状态就变成这个样子了：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b7/35/b74c8b9182f3f195c11ff2e20964ed35.jpg?wh=1920x1045" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b7/35/b74c8b9182f3f195c11ff2e20964ed35.jpg?wh=1920x1045" /></p>
 <p>在这样的状态下，我们分别看看m1的消费者的情况：</p>
 <ul>
 <li>对于依赖m1@v1.0.1版本的c1，在未手工更新依赖版本的情况下，它仍然可以保持成功的构建；</li>
@@ -15302,7 +15302,7 @@
 <p>etcd项目对旗下的Go Module的统一版本发布，就是用的这种方式。如果翻看一下etcd的项目，你会发现etcd只会建立少量的像release-3.4、release-3.5这样的major分支，基于这些分支，etcd会统一发布moduleName/v3.4.x和moduleName/v3.5.x版本。</p>
 <p><strong>第二个情况：repo下的module各自独立进行版本发布。</strong></p>
 <p>在这种情况下，简单创建一个major号分支来维护module的方式，就会显得不够用了，我们很可能需要建立major分支矩阵。假设我们的一个repo下管理了多个module，从m1到mN，那么major号需要升级时，我们就需要将major版本号与module做一个组合，形成下面的分支矩阵：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/89/64/8932b28df291e7efbc537d4843cfc464.jpeg?wh=1453x860" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/89/64/8932b28df291e7efbc537d4843cfc464.jpeg?wh=1453x860" /></p>
 <p>以m1为例，当m1的major版本号需要升级到2时，我们建立v2_m1 major分支专门用于维护和发布m1 module的v2.x.x版本。</p>
 <p>当然上述的矩阵是一个全矩阵(所有项中都有值)，实际项目中可能采用的是稀疏矩阵，也就是并非所有的表格项中都有值，因为repo下各个module的major号升级并不是同步的，有些module的major号可能已经升级到了4，但有些module的major号可能还停留在2。</p>
 <h2 id="_1">小结</h2>
@@ -15430,8 +15430,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

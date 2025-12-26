@@ -6084,7 +6084,7 @@
 <h2 id="elasticsearch">Elasticsearch 的职能和架构</h2>
 <p>Elasticsearch 的核心职能就是对外提供搜索服务，所以<strong>搜索请求的吞吐和延迟</strong>是非常关键的，搜索是靠底层的索引实现的，所以<strong>索引的性能指标</strong>也非常关键，Elasticsearch 由一个或多个节点组成集群，<strong>集群自身是否健康</strong>也是需要我们监控的。</p>
 <p>ElasticSearch 的架构非常简单，一个节点就可以对外提供服务，不过单点的集群显然有容灾问题，如果挂掉了就万事皆休了。一般生产环境，至少搭建一个三节点的集群。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/06/01/06dfyy8f73ae4cfe9b2f071ee2646d01.jpg?wh=1500x450" title="Elasticsearch架构图" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/06/01/06dfyy8f73ae4cfe9b2f071ee2646d01.jpg?wh=1500x450" title="Elasticsearch架构图" /></p>
 <p>三个节点分别部署三个 Elasticsearch 进程，这三个进程把 cluster.name 都设置成相同的值，就可以组成一个集群。Elasticsearch 会自动选出一个 master 节点，负责管理集群范围内所有的变更，整个选主过程是自动的，不用我们操心。</p>
 <p>架构图里绿色的 P0、P1、P2 表示三个分片，R0、R1、R2 代表分片副本，每个分片有两个副本，也就是说 P0 对应两个 R0，P1 对应两个 R1，P2 对应两个 R2。这些分片和副本是否成功分配到 Node 上并落盘写入，也是一个重要的监控指标。</p>
 <p>我们知道 Elasticsearch 哪些方面的指标比较关键了，下面再来看一下这些指标是怎么获取的。</p>
@@ -6116,11 +6116,11 @@
 <h2 id="_1">获取节点统计信息</h2>
 <p>获取节点统计信息可以使用两个接口，<code>/_nodes/stats</code> 会返回集群中所有节点的信息，<code>/_nodes/_local/stats</code> 则只返回请求的那个节点的信息。</p>
 <p>这样的设计，从监控角度就有两种采集方式，一种是在中心部署监控采集器，连上某一台 Elasticsearch 节点，从这个节点获取所有其他节点的信息，你可以看一下架构图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7c/99/7c9a200d6bebba9d69705678ea06b799.png?wh=1798x1004" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7c/99/7c9a200d6bebba9d69705678ea06b799.png?wh=1798x1004" /></p>
 <p>另一种方式，是把监控采集器部署在所有节点上，调用各自节点上 ES 进程的 local 接口，你可以看一下架构图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/yy/a9/yy228e4d6378f7ffc7bac3765b5525a9.png?wh=2308x1364" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/yy/a9/yy228e4d6378f7ffc7bac3765b5525a9.png?wh=2308x1364" /></p>
 <p><code>/_nodes/stats</code> 接口返回的内容非常丰富，我们看一个样例。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/aa/fd/aa98cf47e4067d8584547d83a6683cfd.png?wh=842x1434" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/aa/fd/aa98cf47e4067d8584547d83a6683cfd.png?wh=842x1434" /></p>
 <p>nodes 字段是个大 map，map 的 key 是 node_id，map 的 value 就是各类统计指标，其中最关键的是<strong>indices</strong>，也就是索引相关的。除此之外，还有 os 操作系统相关的、process 进程相关的、jvm 相关的、thread_pool 线程池相关的、fs 文件系统相关的、transport 网络吞吐相关的、http 各个接口请求相关的各类指标。我们可以通过在 URL 中传参的方式告诉 ES 只返回某些特定数据，比如：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="err">/_</span><span class="kc">n</span><span class="err">odes/s</span><span class="kc">tats</span><span class="err">/i</span><span class="kc">n</span><span class="err">dices</span><span class="p">,</span><span class="err">os</span>
 </code></pre></div>
@@ -6193,7 +6193,7 @@
 <p><strong>merges</strong> 包括了 Lucene 段合并相关的信息。它会告诉你目前在运行几个合并，合并涉及的文档数量，正在合并的段的总大小，以及在合并操作上消耗的总时间。合并要消耗大量的磁盘 I/O 和 CPU 资源，如果 merge 操作耗费太多资源，也会被限制，即 total_throttled_time_in_millis 指标。</p>
 <p>除了索引信息之外， 还直接在 HTTP 接口中暴露了操作系统、进程、JVM相关的指标，下面我们也简单看一下。</p>
 <p>操作系统层面的指标，我们既可以使用 Elasticsearch 自己暴露的数据，也可以使用监控采集器直接采集的数据，比如 Categraf 默认会采集 CPU、内存、磁盘、IO、网络、进程等多种信息。这里要解决的关键问题是，<strong>如何通过相同的大盘变量过滤Elasticsearch的指标和操作系统的指标？</strong>从 Elasticsearch 接口采集到的指标，会带有一个 node_host 标签，放置的是机器的 IP，一般都是使用这个标签过滤数据，比如下面这个样例。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/26/9d/26395b87fefdba2025068214e666329d.png?wh=978x496" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/26/9d/26395b87fefdba2025068214e666329d.png?wh=978x496" /></p>
 <p>要想使用机器 IP 过滤操作系统的指标，就需要在采集器上报数据的时候，同时把机器 IP 作为标签上报。如果是 Categraf 的话，hostname 要配置为 <code>"$ip"</code>，如果是 Telegraf 的话，就需要手工配置写死本机 IP 了。当然，如果不使用监控采集器采集的操作系统指标，直接复用Elasticsearch接口中吐出的那些指标，就没有这个过滤问题了，因为 Elasticsearch 的数据标签天然就是统一的。</p>
 <p>JVM 相关的指标，上一讲 Kafka 监控我们已经介绍过了，不过当时是采用 JMX 方式获取的，Elasticsearch 则更为简单，在 <code>/_nodes/stats</code> 接口中直接暴露了 JVM 指标，GC、内存池等数据都有，只是最终的指标命名方式和 Kafka 不同。下面是 JVM 相关指标的样例，供你参考。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">{</span>
@@ -6301,11 +6301,11 @@
 </code></pre></div>
 <p>node_stats 用来选择拉取节点的哪些信息，就是 <code>/_nodes/stats/indices,os</code> 接口最后面那部分参数。默认配置就够用了，里边有个 HTTP 部分，指标非常多，不建议采集，默认配置里也没有。</p>
 <p>其他的配置不是很关键，就不过多介绍了，我把这些关键指标做成了一个<a href="https://github.com/flashcatcloud/categraf/blob/main/inputs/elasticsearch/dashboard.json">监控大盘</a>，你可以看一下效果图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d1/0b/d11aaeeaf950179e02026fe4f5915d0b.png?wh=2994x1450" /><img alt="" src="https://static001.geekbang.org/resource/image/0c/8c/0c34c70a6a2571ea0b3e849f7797088c.png?wh=2988x1242" /></p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/d1/0b/d11aaeeaf950179e02026fe4f5915d0b.png?wh=2994x1450" /><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0c/8c/0c34c70a6a2571ea0b3e849f7797088c.png?wh=2988x1242" />}{:referrerpolicy="no-referrer"</p>
 <h2 id="_3">小结</h2>
 <p>Elasticsearch 的核心职能就是提供搜索服务，搜索的数据要提前建立索引，为了支持海量数据，Elasticsearch 还能组成集群，所以<strong>搜索性能、索引性能、集群健康状况以及集群中各个节点的健康状况，就是我们要监控的核心指标。</strong></p>
 <p>Elasticsearch 暴露指标的方式非常简单，就是几个 HTTP 接口，返回 JSON 数据，直接拉取解析即可，比 JMX 方式简单得多。我们要关注的核心是 <code>/_cluster/health</code> 和 <code>/_nodes/stats</code> 这两个接口，一个用来获取整个集群的监控数据，一个用来获取节点粒度的监控数据。 <code>/_nodes/stats</code> 接口返回的数据非常丰富，不但有索引类指标，还有 OS、JVM、Process、ThreadPool 指标，重点关注索引相关的指标和 JVM 相关的指标。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/dd/a0/dd6c9e2770e228674223681470bf02a0.jpg?wh=4167x3158" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dd/a0/dd6c9e2770e228674223681470bf02a0.jpg?wh=4167x3158" /></p>
 <h2 id="_4">互动时刻</h2>
 <p>学完这一讲的内容，相信你对 Elasticsearch 的关键指标已经有了一些了解，让我们一起来攒一下 Elasticsearch 的告警规则吧，欢迎留言分享你认为应该作为告警规则的 PromQL，也欢迎你把今天的内容分享给你身边的朋友，邀他一起学习。我们下一讲再见！</p>
 <div><strong>精选留言（4）</strong></div>
@@ -6428,8 +6428,6 @@ Q4：&quot;indices&quot;列出的指标怎么看起来和索引没有什么关�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -14045,11 +14045,11 @@
 <p>对你来说，理解MySQL XA，不仅能理解数据层分布式事务的原理，还能在实际系统中更加深刻的理解二阶段提交协议，这样一来，当你在实际工作中，遇到多个MySQL数据库的事务需求时，就知道如何通过MySQL XA来处理了。</p>
 <p>老规矩，咱们先来看一道思考题。</p>
 <p>假设两个数据库A、B（位于不同的服务器节点上），我们需要实现多个数据库更新（比如，UPDATE executed_table SET status = true WHERE id=100）和插入操作（比如，INSERT into operation_table SET id = 100, op = ‘get-cdn-log’）的事务，那么在MySQL中如何实现呢？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/92/e4/92164eafa6604e334b22d245d1543ce4.jpg?wh=1142%2A531" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/92/e4/92164eafa6604e334b22d245d1543ce4.jpg?wh=1142%2A531" /></p>
 <p>带着这个问题，我们进入今天的学习。不过因为MySQL通过XA规范实现分布式事务的，所以你有必要先来了解一下XA规范。</p>
 <h2 id="xa">什么是XA？</h2>
 <p>提到XA规范，就不得不说DTP模型（ Distributed Transaction Processing），因为XA规范约定的是DTP模型中2个模块（事务管理器和资源管理器）的通讯方式，那DTP，就是分布式事务处理，就像下图的样子：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a0/93/a08794d4a09101fdc0789496a50db193.jpg?wh=1142%2A604" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a0/93/a08794d4a09101fdc0789496a50db193.jpg?wh=1142%2A604" /></p>
 <p>为了帮助你更好的理解DTP模型，我来解释一下DTP各模块的作用。</p>
 <ul>
 <li>AP：应用程序（Aplication Program），一般指事务的发起者（比如数据库客户端或者访问数据库的程序），定义事务对应的操作（比如更新操作UPDATE executed_table SET status = true WHERE id=100）。</li>
@@ -14058,7 +14058,7 @@
 </ul>
 <p>你是不是觉得这个架构看起来很复杂？其实在我看来，你可以这么理解这个架构：应用程序访问、使用资源管理器的资源，并通过事务管理器的事务接口（TX interface）定义需要执行的事务操作，然后事务管理器和资源管理器会基于XA规范，执行二阶段提交协议。</p>
 <p>那么，XA规范是什么样子的呢？它约定了事务管理器和资源管理器之间双向通讯的接口规范，并实现了二阶段提交协议：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4e/ed/4e6d8e0104c4b22e58c5a400323e94ed.jpg?wh=1142%2A865" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4e/ed/4e6d8e0104c4b22e58c5a400323e94ed.jpg?wh=1142%2A865" /></p>
 <p>为了帮你更好地理解这个过程，咱们一起走下流程，加深下印象：</p>
 <ol>
 <li>AP（应用程序）联系TM（事务管理器）发起全局事务；</li>
@@ -14080,11 +14080,11 @@
 <p>那么讲了这么多，我们该如何通过MySQL XA实现分布式事务呢？</p>
 <h2 id="mysql-xa">如何通过MySQL XA实现分布式事务呢？</h2>
 <p>首先，你需要创建一个唯一的事务ID（比如xid），来唯一标识事务，并调用“XA START”和“XA END”来定义事务分支对应的操作（比如INSERT into operation_table SET id = 100, op = ‘get-cdn-log’）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/76/ca/76c1110506c7409c748f20e17ea23bca.jpg?wh=1142%2A627" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/76/ca/76c1110506c7409c748f20e17ea23bca.jpg?wh=1142%2A627" /></p>
 <p>接着，你需要执行“XA PREPARE”命令，来执行二阶段提交协议的提交请求阶段。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/28/30/285e440ff3bee6b6c74eeaaa2b37c430.jpg?wh=1142%2A546" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/28/30/285e440ff3bee6b6c74eeaaa2b37c430.jpg?wh=1142%2A546" /></p>
 <p>最后，你需要调用“XA COMMIT”来提交事务（或者“XA ROLLBACK”回滚事务）。这样你就实现了全局事务的一致性了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/16/93/169ae090f2b55c6e520ecf7424c0f293.jpg?wh=1142%2A520" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/16/93/169ae090f2b55c6e520ecf7424c0f293.jpg?wh=1142%2A520" /></p>
 <p>从上面的流程中，你可以看到，客户端在扮演事务管理器的角色，而MySQL数据库就在扮演资源管理器的角色。另外，你要注意，上面流程中的xid必须是唯一值。</p>
 <p>另外，我想补充的是，如果你要开启MySQL的XA功能，必须设置存储引擎为 InnoDB，也就是说，在MySQL中，只有InnoDB引擎支持XA规范。</p>
 <p>当然了，可能有些同学对MySQL XA有这样的疑问，能否将“XA END”和“XA PREPARE”合并到一起呢？<strong>答案是不能，因为在“XA END”之后，是可以直接执行“XA COMMIT”的，也就是一阶段提交（比如当共享资源变更只涉及到一个RM时）。</strong></p>
@@ -14224,8 +14224,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

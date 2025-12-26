@@ -14252,7 +14252,7 @@
 <p>我们在<a href="https://time.geekbang.org/column/article/431400">第2节课</a>中详细介绍了中断机制和IDT的结构，并且在介绍中断向量时提到过页中断的向量是14。所以，操作系统在启动以后，它会把处理页中断的程序入口地址，设置到IDT的14号中断描述符里。在Linux系统上，页中断服务程序的名称是do_page_fault。</p>
 <p>当中断发生以后，CPU会自动地在栈里存放一个错误码，来区分页中断的类型，还会把发生页中断的虚拟地址放到CR2寄存器，这样，中断服务程序就可以清楚地知道是什么原因导致的中断，然后才能做出相应的处理。</p>
 <p>根据中断来源的不同，页中断大致可以分为以下几种类型：
-<img alt="" src="https://static001.geekbang.org/resource/image/0f/fb/0f11c2f9f54988728aacc57c461f3ffb.jpg?wh=2284x1574" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0f/fb/0f11c2f9f54988728aacc57c461f3ffb.jpg?wh=2284x1574" /></p>
 <p>从这个表格里，你会发现，页中断服务程序根据不同的情况，兢兢业业地为整个系统的内存管理，默默做着贡献。接下来，我们就带着这节课开头提出的三个问题，来看看页中断是怎么工作的。我们先从第一个问题，fork的原理是什么开始吧。</p>
 <h2 id="fork">fork原理：写保护中断与写时复制</h2>
 <p>我们前面说，父进程和子进程不仅可以访问共有的变量，还可以各自修改这个变量，并且这个修改对方都看不见。这其实是fork的一种写时复制机制，这一点我们在<a href="https://time.geekbang.org/column/article/435493">第5节课</a>中模糊提到过，而里面起关键作用的就是写保护中断。下面我们来看看这到底是怎么一回事。</p>
@@ -14270,13 +14270,13 @@
 </code></pre></div>
 <p><strong>在操作系统内核里，fork的第一个动作是把PCB复制一份，但类似于物理页等进程资源不会被复制</strong>。这样的话，父进程与子进程的代码段、数据段、堆和栈都是相同的，这是因为它们拥有相同的页表，自然也有相同的虚拟空间布局和对物理内存的映射。如果父进程在fork子进程之前创建了一个变量，打开了一个文件，那么父子进程都能看到这个变量和文件。</p>
 <p><strong>fork的第二个动作是复制页表和PCB中的vma数组，并把所有当前正常状态的数据段、堆和栈空间的虚拟内存页，设置为不可写，然后把已经映射的物理页面的引用计数加1</strong>。这一步只需要复制页表和修改PTE中的写权限位可以了，并不会真的为子进程的所有内存空间分配物理页面，修改映射，所以它的效率是非常高的。这时，父子进程的页表的情况如下图所示：
-<img alt="" src="https://static001.geekbang.org/resource/image/b2/99/b251f885955dd063df54f5e452f61999.jpg?wh=2284x1230" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b2/99/b251f885955dd063df54f5e452f61999.jpg?wh=2284x1230" /></p>
 <p>在上图中，物理页括号中的数字代表该页被多少个进程所引用。Linux中用于管理物理页面，和维护物理页的引用计数的结构是mem_map和page struct。</p>
 <p>这两个动作执行完后，fork调用就结束了。此时，由于有父进程和子进程两个PCB，操作系统就会把两个进程都加入到调度队列中。当父进程得到执行，它的IP寄存器还是指向fork调用中，所以它会从这个调用中返回，只不过返回值是子进程的PID。当子进程得到执行时，它的IP寄存器也是停在fork调用中，它从这个调用中返回，其返回值是0。</p>
 <p>接下来，就是写保护中断要发挥作用的地方了。不管是父进程还是子进程，它们接下来都有可能发生写操作，但我们知道在fork的第二步操作中，已经将所有原来可写的地方都变成不可写了，所以这时必然会发生写保护中断。</p>
 <p>我们刚才说，Linux系统的页中断的入口地址是do_page_fault，在这个函数里，它会继续判断中断的类型。由于发生中断的虚拟地址在vma中是可写的，在PTE中却是只读的，可以断定这是一次写保护中断。这时候，内核就会转而调用do_wp_page来处理这次中断，wp是write protection的缩写。</p>
 <p>在do_wp_page中，系统会首先判断发生中断的虚拟地址所对应的物理地址的引用计数，如果大于1，就说明现在存在多个进程共享这一块物理页面，那么它就需要为发生中断的进程再分配一个物理页面，把老的页面内容拷贝进这个新的物理页，最后把发生中断的虚拟地址映射到新的物理页。这就完成了一次写时复制(Copy On Write， COW）。具体过程如下图所示：
-<img alt="" src="https://static001.geekbang.org/resource/image/73/57/739cbddb3d1e64ab203ecf55b9c9ce57.jpg?wh=2284x1175" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/73/57/739cbddb3d1e64ab203ecf55b9c9ce57.jpg?wh=2284x1175" /></p>
 <p>在上图中，当子进程发生写保护中断后，系统就会为它分配新的物理页，然后复制页面，再修改页表映射。这时老的物理页的引用计数就变为1，同时子进程中的PTE的权限也从只读变为读写。</p>
 <p>当父进程再访问到这个地址时，也会触发一次写保护中断，这时系统发现物理页的引用计数为1，那就只要把父进程PTE中的权限，简单地从只读变为读写就可以了。这个过程比较简单，我就不画图了，你可以自己思考一下。</p>
 <p>fork之后如果要执行新的程序，那么就需要执行execve这个系统调用。它的主要作用是加载可执行程序并运行。接下来我们就看看这个函数背后的故事。</p>
@@ -14320,7 +14320,7 @@
 <p>在内核中，如果有一个进程打开了一个文件，PCB中就会有一个struct file结构与这个文件对应。struct file结构是与进程相关，假如进程A与进程B都打开了文件f，那么进程A中就会有一个struct file结构，进程B中也会有一个。</p>
 <p>Linux的文件系统中有一个叫做inode的结构，这个结构与具体的磁盘上的文件是一一对应的，也就是说对于同一个文件，整个内核中只会有一个inode结构。所以进程A与进程B的file struct结构都有一个指针指向inode结构，这就将file struct与inode结构联系起来了。</p>
 <p>在inode结构中，有一个哈希表，以文件的页号为key，以物理内存页为value。当进程A打开了文件f，然后读取了它的第4页，这时，内核就会把4和这个物理页，放入这个哈希表中。当进程B再打开文件f，要读取它的第4页时，因为f的第4页的内容已经被加载到物理页中了，所以就不用再加载一次了。只需要将B的虚拟地址与这个物理页建立映射就可以了，如下图所示：
-<img alt="" src="https://static001.geekbang.org/resource/image/63/df/63c6871c463136c98561489a2dfb09df.jpg?wh=2284x1110" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/63/df/63c6871c463136c98561489a2dfb09df.jpg?wh=2284x1110" /></p>
 <p>我要提醒你的是，<strong>哈希表在现代的Linux内核中，已经被优化成了Radix tree和最小堆的一种优化的数据结构，它们比哈希表有更好的时间效率，所以你在阅读不同版本的Linux内核代码时要注意这个变化</strong>。</p>
 <p>如果文件是只读的话，那这个文件在物理页的层面上其实是共享的。也就是进程A和进程B都有一页虚拟内存被映射到了相同的物理页上。但如果要写文件的时候，因为这一段内存区域的属性是私有的，所以内核就会做一次写时复制，为写文件的进程单独地创建一份副本。这样，一个进程在写文件时，并不会影响到其他进程的读。</p>
 <p>对于共享库文件，代码段的私有属性其实并不影响它在所有进程间共享；但如果数据段在执行的过程发生变化，内核就可以通过写时复制机制为每个进程创建一个副本。这就是对于共享库文件要选择私有文件映射的根本原因。</p>
@@ -14370,7 +14370,7 @@
 <a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>return 0;
 <a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>}
 </code></pre></div>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/32/f2/321edbbc5877bc44f4e5397c18847cf2.jpg?wh=2284x1370" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/32/f2/321edbbc5877bc44f4e5397c18847cf2.jpg?wh=2284x1370" /></p>
 <p>好啦，这节课到这就结束啦。欢迎你把这节课分享给更多对计算机内存感兴趣的朋友。我是海纳，我们下节课再见！</p>
 <div><strong>精选留言（11）</strong></div>
 <ul>
@@ -14496,8 +14496,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

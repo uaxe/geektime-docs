@@ -14111,7 +14111,7 @@
 <p>很多问题需要不断加日志试探，三天左右才能摸出眉目。为了更高效地排查线上故障，我们需要一些工具辅助提高排查问题效率，于是我和几个伙伴合作实现了一个分布式链路跟踪的系统。</p>
 <p>由于那时候，我<strong>只有两台4核8G内存服务器</strong>，可用硬件资源不多，所以分布式链路跟踪的存储和计算的功能是通过C++ 11实现的。这个项目最大的挑战就是<strong>如何在有限的资源下，记录下所有请求过程，并能够实时统计监控线上故障，辅助排查问题。</strong></p>
 <p>要想做一个这样的系统，主要分为几个关键功能：日志采集、日志传输、日志存储、日志查询、实时性能统计展示以及故障线索收集。经过讨论，我们确定了具体项目实现思路，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/2d/53/2dbd85131506728beb91ae29fba0d153.jpg?wh=1920x1095" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2d/53/2dbd85131506728beb91ae29fba0d153.jpg?wh=1920x1095" /></p>
 <p>链路跟踪的第一步就是收集日志。当时我看了链路跟踪的相关资料后，决定按分布式链路跟踪思路去设计实现。因为这样做，可以通过每次请求入口产生的的TraceID，汇集一次请求的所有相关日志。</p>
 <p>但是具体收集什么日志，才对排查问题更有帮助呢？如果链路跟踪只记录接口的性能，实际就只能辅助我们分析性能问题，对排查逻辑问题意义并不大。</p>
 <p>经过进一步讨论，我们决定给分级日志和异常日志都带上TraceID，方便我们获取更多业务过程状态。另外，我们在请求其他服务的请求Header内也加上TraceID和RPCID，并且记录了API、SQL请求的参数、返回内容和性能数据。综合这些，就能实现完整的全量日志监控跟踪系统，性能问题和逻辑缺陷都能排查。</p>
@@ -14119,11 +14119,11 @@
 <h2 id="_2">抓取、采集与传输</h2>
 <p>日志采集在我们的系统里怎么实现呢？</p>
 <p>相信你多少能猜到大致做法：一般来说，我们需要在接口被请求时，接收传递过来的TraceID以及RPCID，如果没有传递过来的TraceID，那么自己可以用UUID生成一个，用于标识后续在请求期间所有的日志。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/11/a1/1163f2ff47ce943ab0e406ddc4e8c0a1.jpg?wh=1920x668" title="埋点监控示意图" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/11/a1/1163f2ff47ce943ab0e406ddc4e8c0a1.jpg?wh=1920x668" title="埋点监控示意图" /></p>
 <p>服务被请求时，建议记录一条被调用的访问日志，具体可以记录当前被请求的参数以及接口最后返回的结果、httpcode、耗时。通过这个日志，后续可以方便我们分析服务的性能和故障。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/40/bf/406874a5f211e10a700cd9c54b4b9dbf.jpg?wh=1920x1462" title="所有非本地的依赖资源都要记录日志" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/40/bf/406874a5f211e10a700cd9c54b4b9dbf.jpg?wh=1920x1462" title="所有非本地的依赖资源都要记录日志" /></p>
 <p>而对于被请求期间的业务所产生的业务日志、错误日志，以及请求其他资源的日志，都需要做详细记录，比如SQL查询记录、API请求记录以及这些请求的参数、返回、耗时。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f4/4d/f4b32af6bc55681424c6900de294ba4d.jpg?wh=1920x1079" title="直接请求、中间件以及 AOP 的切面效果" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f4/4d/f4b32af6bc55681424c6900de294ba4d.jpg?wh=1920x1079" title="直接请求、中间件以及 AOP 的切面效果" /></p>
 <p>无论我们想做链路跟踪还是统计系统服务状态，都需要做类似AOP切面拦截，通过切面编程抓取所有操作数据库或API请求前后的数据。为了更好理解这里给你提供一个AOP的<a href="https://github.com/137-rick/laravel-aop-trace/tree/master">实现样例</a>，这是我之前在生产环境中使用的。</p>
 <p>记录了项目的请求依赖资源部分之后，我用了两个传输方式来传输生成的日志：一个是通过memcache的长链接协议，将日志推送到我们日志收集服务上，这种推送日志请求超时超过200ms就会丢弃，这样能避免拖慢接口的性能。</p>
 <p>另外一个方式是落地到本地磁盘，通过Filebeat实时抓取推送，将日志收集汇总起来。当然，第二种方式最稳定，但是由于我们公共服务器集群不让登录的限制，有一部分系统只能使用第一种方式来传递日志。</p>
@@ -14132,7 +14132,7 @@
 <p>为此，我们选择了用Kafka来传输日志，Kafka通过对同一个topic数据做多个分区动态调配来实现负载均衡及动态扩容，当我们流量超过其承受能力时，可以随时通过给服务器群组增加服务器来扩容，从而提供更好的吞吐量。可以说多系统之间的实时高吞吐传输同步，几乎都是使用Kafka实现的。</p>
 <h2 id="_3">可动态扩容的分组消费</h2>
 <p>那么Kafka是如何帮助业务动态扩容消费性能的呢？</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/97/ab/97829c36450ca74a15203ab99a9c09ab.jpg?wh=1920x1462" title="Kafka 分组消费，不同的进程个数，分配的消费分区不同" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/97/ab/97829c36450ca74a15203ab99a9c09ab.jpg?wh=1920x1462" title="Kafka 分组消费，不同的进程个数，分配的消费分区不同" /></p>
 <p>在Kafka消费这里使用的是Consumer Group分组消费，分组消费是一个很棒的实现，我们可以让多个服务同时消费一组数据，比如：启动两个进程消费20个分区的数据，也就是一个服务负责消费10个区的数据。</p>
 <p>如果服务运转期间消费能力不够了，消息出现堆积，我们可以找两台服务器新启动2个消费进程，此时Kafka会对consumer进程自动重新调度（rebalance），让四个消费进程平分20个分区，即自动调度成每个消费进程消费5个分区的数据。</p>
 <p>通过这个功能，我们可以动态扩容消费服务器的能力，比如随时增加消费进程数来提高消费能力，甚至一些消费服务可以随时重启。</p>
@@ -14164,11 +14164,11 @@
 <p>虽然之前我使用C++实现链路跟踪，但现在技术发展得很快，如果放在今天，我是不推荐你也用同样方法做这个服务的。实践的时候，你可以考虑使用Java、GO、Rust等语言去尝试，相信这样会让你节省大量的时间。</p>
 <h2 id="_5">总结</h2>
 <p>这节课我和你分享了我用C++实现链路跟踪的实践方案，其中的技术要点你可以参考下图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/dd/85/dd3bf6334a5375180807f6dd7f2f7085.jpg?wh=1920x690" title="监控跟踪的对应思路" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dd/85/dd3bf6334a5375180807f6dd7f2f7085.jpg?wh=1920x690" title="监控跟踪的对应思路" /></p>
 <p>写多读少的系统，普遍会用分布式的队列服务（类似Kafka）汇总数据，配合多台服务器或分片来消费加工数据，通过这样的架构来应对数据洪流。</p>
 <p>这一章我们详细分析了写多读少系统的几种方案，你会发现它们各有千秋。为了方便你对比学习，我引入了MySQL作为参考。</p>
 <p>你也可以参考后面这张表格的思路，把技术实现的关键点（比如数据传输、写入、分片、扩容、查询等等）列出来，通过这种方式，可以帮你快速分析出哪种技术实现更匹配自己项目的业务需要。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ba/cf/ba8aff75700d1863911b08903c3750cf.jpg?wh=3666x2952" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ba/cf/ba8aff75700d1863911b08903c3750cf.jpg?wh=3666x2952" /></p>
 <h2 id="_6">思考题</h2>
 <p>今天我给你准备了两道思考题。</p>
 <p>第一题，如何解决Kafka消费偶发乱序以及小概率消费重复问题？</p>
@@ -14291,8 +14291,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -14411,7 +14411,7 @@
 <h2 id="_1">进程和线程</h2>
 <p>我们先从Linux的进程谈起，操作系统要运行一个可执行程序，首先要将程序文件加载到内存，然后CPU去读取和执行程序指令，而一个进程就是“一次程序的运行过程”，内核会给每一个进程创建一个名为<code>task_struct</code>的数据结构，而内核也是一段程序，系统启动时就被加载到内存中了。</p>
 <p>进程在运行过程中要访问内存，而物理内存是有限的，比如16GB，那怎么把有限的内存分给不同的进程使用呢？跟CPU的分时共享一样，内存也是共享的，Linux给每个进程虚拟出一块很大的地址空间，比如32位机器上进程的虚拟内存地址空间是4GB，从0x00000000到0xFFFFFFFF。但这4GB并不是真实的物理内存，而是进程访问到了某个虚拟地址，如果这个地址还没有对应的物理内存页，就会产生缺页中断，分配物理内存，MMU（内存管理单元）会将虚拟地址与物理内存页的映射关系保存在页表中，再次访问这个虚拟地址，就能找到相应的物理内存页。每个进程的这4GB虚拟地址空间分布如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d7/86/d78cd0faf850c4efdbe00c63659e0f86.png?wh=442%2A689" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d7/86/d78cd0faf850c4efdbe00c63659e0f86.png?wh=442%2A689" /></p>
 <p>进程的虚拟地址空间总体分为用户空间和内核空间，低地址上的3GB属于用户空间，高地址的1GB是内核空间，这是基于安全上的考虑，用户程序只能访问用户空间，内核程序可以访问整个进程空间，并且只有内核可以直接访问各种硬件资源，比如磁盘和网卡。那用户程序需要访问这些硬件资源该怎么办呢？答案是通过系统调用，系统调用可以理解为内核实现的函数，比如应用程序要通过网卡接收数据，会调用Socket的read函数：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ssize_t read(int fd,void *buf,size_t nbyte)
 </code></pre></div>
@@ -14423,11 +14423,11 @@
 <h2 id="_2">阻塞与唤醒</h2>
 <p>我们知道当用户线程发起一个阻塞式的read调用，数据未就绪时，线程就会阻塞，那阻塞具体是如何实现的呢？</p>
 <p>Linux内核将线程当作一个进程进行CPU调度，内核维护了一个可运行的进程队列，所有处于<code>TASK_RUNNING</code>状态的进程都会被放入运行队列中，本质是用双向链表将<code>task_struct</code>链接起来，排队使用CPU时间片，时间片用完重新调度CPU。所谓调度就是在可运行进程列表中选择一个进程，再从CPU列表中选择一个可用的CPU，将进程的上下文恢复到这个CPU的寄存器中，然后执行进程上下文指定的下一条指令。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b6/e8/b6794ae547bccdf71c0f6ea4e93012e8.png?wh=754%2A207" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b6/e8/b6794ae547bccdf71c0f6ea4e93012e8.png?wh=754%2A207" /></p>
 <p>而阻塞的本质就是将进程的<code>task_struct</code>移出运行队列，添加到等待队列，并且将进程的状态的置为<code>TASK_UNINTERRUPTIBLE</code>或者<code>TASK_INTERRUPTIBLE</code>，重新触发一次CPU调度让出CPU。</p>
 <p>那线程怎么唤醒呢？线程在加入到等待队列的同时向内核注册了一个回调函数，告诉内核我在等待这个Socket上的数据，如果数据到了就唤醒我。这样当网卡接收到数据时，产生硬件中断，内核再通过调用回调函数唤醒进程。唤醒的过程就是将进程的<code>task_struct</code>从等待队列移到运行队列，并且将<code>task_struct</code>的状态置为<code>TASK_RUNNING</code>，这样进程就有机会重新获得CPU时间片。</p>
 <p>这个过程中，内核还会将数据从内核空间拷贝到用户空间的堆上。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2e/b8/2e27945eee139201de846e6a58c031b8.png?wh=519%2A689" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2e/b8/2e27945eee139201de846e6a58c031b8.png?wh=519%2A689" /></p>
 <p>当read系统调用返回时，CPU又从内核态切换到用户态，继续执行read调用的下一行代码，并且能从用户空间上的Buffer读到数据了。</p>
 <h2 id="_3">小结</h2>
 <p>今天我们谈到了一次Socket read系统调用的过程：首先CPU在用户态执行应用程序的代码，访问进程虚拟地址空间的用户空间；read系统调用时CPU从用户态切换到内核态，执行内核代码，内核检测到Socket上的数据未就绪时，将进程的<code>task_struct</code>结构体从运行队列中移到等待队列，并触发一次CPU调度，这时进程会让出CPU；当网卡数据到达时，内核将数据从内核空间拷贝到用户空间的Buffer，接着将进程的<code>task_struct</code>结构体重新移到运行队列，这样进程就有机会重新获得CPU时间片，系统调用返回，CPU又从内核态切换到用户态，访问用户空间的数据。</p>
@@ -14557,8 +14557,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

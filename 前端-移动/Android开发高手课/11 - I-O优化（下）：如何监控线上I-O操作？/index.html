@@ -6459,18 +6459,18 @@
 <p><strong>3. 监控内容</strong></p>
 <p>在实现I/O跟踪后，我们需要进一步思考需要监控哪些I/O信息。假设读取一个文件，我们希望知道这个文件的名字、原始大小、打开文件的堆栈、使用了什么线程这些基本信息。</p>
 <p>接着我们还希望得到这一次操作一共使用了多长时间，使用的Buffer是多大的。是一次连续读完的，还是随机的读取。通过上面Hook的四个接口，我们可以很容易的采集到这些信息。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ba/3c/ba36f8e259427bde06bc44861905c63c.png?wh=1140%2A584" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ba/3c/ba36f8e259427bde06bc44861905c63c.png?wh=1140%2A584" /></p>
 <p>下面是一次I/O操作的基本信息，在主线程对一个大小为600KB的“test.db”文件。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/07/ae/0732644e3734490825c896fa559bcaae.png?wh=1282%2A170" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/07/ae/0732644e3734490825c896fa559bcaae.png?wh=1282%2A170" /></p>
 <p>使用了4KB的Buffer，连续读取150次，一次性把整个文件读完，整体的耗时是10ms。因为连读读写时间和打开文件的总时间相同，我们可以判断出这次read()操作是一气呵成的，中间没有间断。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/aa/fb/aab6899b0b7a91f466e187333337dcfb.png?wh=1278%2A176" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/aa/fb/aab6899b0b7a91f466e187333337dcfb.png?wh=1278%2A176" /></p>
 <p>因为I/O操作真的非常频繁，采集如此多的信息，对应用程序的性能会造成多大的影响呢？我们可以看看是否使用Native Hook的耗时数据。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f0/5f/f0394337bee26e8bf105cfd1eda37a5f.png?wh=1276%2A366" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f0/5f/f0394337bee26e8bf105cfd1eda37a5f.png?wh=1276%2A366" /></p>
 <p>你可以看到采用Native Hook的监控方法性能损耗基本可以忽略，这套方案可以用于线上。</p>
 <h2 id="_1">线上监控</h2>
 <p>通过Native Hook方式可以采集到所有的I/O相关的信息，但是采集到的信息非常多，我们不可能把所有信息都上报到后台进行分析。</p>
 <p>对于I/O的线上监控，我们需要进一步抽象出规则，明确哪些情况可以定义为不良情况，需要上报到后台，进而推动开发去解决。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9c/3a/9c408d0ec409771c2a036f0208cadf3a.png?wh=1238%2A868" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9c/3a/9c408d0ec409771c2a036f0208cadf3a.png?wh=1238%2A868" /></p>
 <p><strong>1. 主线程I/O</strong></p>
 <p>我不止一次说过，有时候I/O的写入会突然放大，即使是几百KB的数据，还是尽量不要在主线程上操作。在线上也会经常发现一些I/O操作明明数据量不大，但是最后还是ANR了。</p>
 <p>当然如果把所有的主线程I/O都收集上来，这个数据量会非常大，所以我会添加“连续读写时间超过100毫秒”这个条件。之所以使用连续读写时间，是因为发现有不少案例是打开了文件句柄，但不是一次读写完的。</p>
@@ -6495,11 +6495,11 @@
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>echo 3 &gt; /proc/sys/vm/drop_caches
 <a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>time dd if=/data/data/com.sample.io/files/iotest of=/dev/null bs=4096
 </code></pre></div>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f8/7e/f8dc9ca5d2b45f278e881cc2cd50317e.png?wh=1282%2A542" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f8/7e/f8dc9ca5d2b45f278e881cc2cd50317e.png?wh=1282%2A542" /></p>
 <p>通过上面的数据大致可以看出来，Buffer的大小对文件读写的耗时有非常大的影响。耗时的减少主要得益于系统调用与内存拷贝的优化，Buffer的大小一般我推荐使用4KB以上。</p>
 <p>在实际应用中，ObjectOutputStream和ZipOutputStream都是一个非常经典的例子，ObjectOutputStream使用的buffer size非常小。而ZipOutputStream会稍微复杂一些，如果文件是Stored方式存储的，它会使用上层传入的buffer size。如果文件是Deflater方式存储的，它会使用DeflaterOutputStream的buffer size，这个大小默认是512Byte。</p>
 <p><strong>你可以看到，如果使用BufferInputStream或者ByteArrayOutputStream后整体性能会有非常明显的提升。</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/81/f5/81fa5cac7b7c91e0687c11fb83e35df5.png?wh=1296%2A454" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/81/f5/81fa5cac7b7c91e0687c11fb83e35df5.png?wh=1296%2A454" /></p>
 <p>正如我上一期所说的，准确评估磁盘真实的读写次数是比较难的。磁盘内部也会有很多的策略，例如预读。它可能发生超过你真正读的内容，预读在有大量顺序读取磁盘的时候，readahead可以大幅提高性能。但是大量读取碎片小文件的时候，可能又会造成浪费。</p>
 <p>你可以通过下面的这个文件查看预读的大小，一般是128KB。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>/sys/block/[disk]/queue/read_ahead_kb
@@ -6550,7 +6550,7 @@
 <li>存储结构和算法的优化。是否可以通过算法或者数据结构的优化，让我们可以尽量的少I/O甚至完全没有I/O。比如一些配置文件从启动完全解析，改成读取时才解析对应的项；替换掉XML、JSON这些格式比较冗余、性能比较较差的数据结构，当然在接下来我还会对数据存储这一块做更多的展开。</li>
 </ul>
 <p>2013年我在做Multidex优化的时候，发现代码中会先将classes2.dex从APK文件中解压出来，然后再压缩到classes2.zip文件中。classes2.dex做了一次无用的解压和压缩，其实根本没有必要。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e7/7e/e73a4aa5919f991df734b7d39fec447e.png?wh=946%2A820" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e7/7e/e73a4aa5919f991df734b7d39fec447e.png?wh=946%2A820" /></p>
 <p>那个时候通过研究ZIP格式的源码，我发现只要能构造出一个符合ZIP格式的文件，那就可以直接将classses2.dex的压缩流搬到classes2.zip中。整个过程没有任何一次解压和压缩，这个技术也同样应用到<a href="https://github.com/Tencent/tinker/tree/master/third-party/tinker-ziputils">Tinker的资源合成</a>中。</p>
 <h2 id="_2">总结</h2>
 <p>今天我们学习了如何在应用层面监控I/O的使用情况，从实现上尝试了Java Hook和Native Hook两种方案，最终考虑到性能和兼容性，选择了Native Hook方案。</p>
@@ -6689,8 +6689,6 @@ return target.path_ == path_
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

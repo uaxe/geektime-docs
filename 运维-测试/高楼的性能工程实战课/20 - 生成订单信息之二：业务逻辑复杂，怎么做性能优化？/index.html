@@ -6329,7 +6329,7 @@
 <h3 id="_3">定向监控分析</h3>
 <p>要想知道Order服务的时间消耗，那显然，我们得知道Order应用中的线程都在做什么动作，所以我们先直接来分析Order的栈。</p>
 <p>通过Spring Boot Admin，我们可以查看到线程的整体状态：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fe/d7/fe51f9e6ec935017ccf71a3fa4d834d7.png?wh=1700%2A576" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fe/d7/fe51f9e6ec935017ccf71a3fa4d834d7.png?wh=1700%2A576" /></p>
 <p>你看，线程确实比较繁忙。至于这些线程在做什么，我们通过栈的内容可以知道，然后再进一步确定优化的方向。</p>
 <p>但是，由于系统资源还没有用到上限，我们得先调整一下Tomcat的线程数，把它加大一些，争取让Order应用把硬件资源用起来。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>原值：
@@ -6338,7 +6338,7 @@
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>max: 100
 </code></pre></div>
 <p>我们看一下调整后的结果：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3c/c4/3c9493c583ecf38ed9e0b96fe18494c4.png?wh=1830%2A830" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3c/c4/3c9493c583ecf38ed9e0b96fe18494c4.png?wh=1830%2A830" /></p>
 <p>没想到，性能更差了……这乱七八糟的曲线和想像中的优美曲线完全不一致呀！</p>
 <p>事实证明，偷懒是绕不过去坑的，我们只有再次查看响应时间消耗到了哪里。</p>
 <p>于是，通过用各个服务的日志拆分响应时间，我发现在Member服务上有这样的日志（为了让你看清楚点，我截取了一些时间消耗比较大的日志，请注意一下哦，这是我们改了Order的Tomcat线程池之后的结果）：</p>
@@ -6360,7 +6360,7 @@
 <p>显然，这个Member服务的响应时间太长了。而在生成订单信息这个接口中，也确实调用了Member服务，因为要使用Token嘛。既然是Order的Tomcat线程池加大了，导致Member服务响应如此之慢，那我们就有理由作出判断：Order之所以消耗时间长，是因为Member服务不能提供Order请求时的快速响应。通俗点讲，就是Member的性能差。</p>
 <p>要想分析Member性能为什么差，我们其实可以直接到Member上打印栈信息来看看，这是高老师有时候偷懒的做法。</p>
 <p>而我们一直在讲，完整的分析逻辑应该是先看全局监控数据，再看定向监控数据。所以，高老师在这里，勤快一点。我们通过全局监控数据来看看整体的资源消耗：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/64/78/6405e04c8bd17315060485857336d078.png?wh=1830%2A467" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/64/78/6405e04c8bd17315060485857336d078.png?wh=1830%2A467" /></p>
 <p>worker-8的CPU资源居然用到了这么高！这说明我们在前面增加Order的Tomcat线程数是有价值的。现在，瓶颈点到了另一个地方，也就是我们的Member服务。</p>
 <p>既然worker-8的资源使用率高，那我们就来看看它上面有什么Pod，不难看出Member就在worker8上：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>[root@k8s-master-2 ~]# kubectl get pods -o wide | grep k8s-worker-8
@@ -6439,11 +6439,11 @@
 <a id="__codelineno-5-63" name="__codelineno-5-63" href="#__codelineno-5-63"></a>6381 root      20   0 7782400 491476  15928 S   1.7  3.0 441:08.96 java -Dapp.id=svc-mall-demo -
 </code></pre></div>
 <p>从sy cpu高的top数据来看，这个节点显然在不断地调度系统资源，通过top中的rcu_sched/softirq等进程就可以知道，这种情况显然是因为Kubernetes在这个节点上过多地安排了任务。所以，我先把Member服务移到另一个worker上，然后看到TPS如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2a/5a/2a0dbc3d50efdb6993a7839c8a7fb35a.png?wh=1831%2A581" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2a/5a/2a0dbc3d50efdb6993a7839c8a7fb35a.png?wh=1831%2A581" /></p>
 <p>你看，TPS增加到400多了，也就是说我们的方向是对的。</p>
 <p>那为什么我们之前修改Order服务的Tomcat线程数没有看到效果呢？这是因为压力已经到了Member服务上，这让Member服务所在的worker节点资源使用率增加，导致Member服务无法正常响应请求。因此，整个TPS看起来没有什么优化效果。现在，我们移走了Member服务，看到效果明显增加，这说明我们的方向还在正确的道路上。</p>
 <p>我们再回来看一下整体的资源监控：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/94/7e/94e40d9e66ca3dd35dd1140fa5fdfb7e.png?wh=1826%2A454" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/94/7e/94e40d9e66ca3dd35dd1140fa5fdfb7e.png?wh=1826%2A454" /></p>
 <p>现在，没有一个worker的资源用满或者接近用满，完全不符合我们“把资源都用起来”的目标，这显然是不可接受的。</p>
 <p>在长时间的压力中，我们发现资源怎么也用不上去。而且在上节课第三阶段的最后一个图中，你也能清楚地看到这一点。</p>
 <p>到这里为止，我们查看了一次次的性能分析决策树，也调整了一些参数，比如Spring Boot中的Tomcat连接池、JDBC池、Jedis池、MQ池等，调整之后TPS似乎有增加的趋势，但是非常不明显。所以，我们只能开始新一轮的定位。</p>
@@ -6471,7 +6471,7 @@
 <p>在这里，我多说几句闲话。我看到过很多企业连一些简单的优化都没有做，就从寻找心理安全感的角度去增加机器，结果耗费了大量的成本，这是非常不理智的。从技术的角度来说，花不多的时间成本就可以节省大量的资源成本，这显然是很划算的。可是，受一些社会不良思维的误导，有些企业就觉得只要能通过加机器解决的问题，都不是啥大问题。</p>
 <p>对于这种思路，我们就得放到成本上来算一算了。大部分打工人可能会觉得，反正用的又不是自己的钱，管老板花多少钱加机器干嘛？没意义。但是，从节能减排的全球大局观来看，一个该做的优化没有做，不仅浪费公司的成本，还一点儿都不环保！呃…好像扯的有点远了。</p>
 <p>我们回到正题，既然我们想优化业务，就得先知道业务的调用逻辑是个啥样子。所以我们打开idea，找到generateOrder方法，然后把sequence diagram（idea的一个插件）打开，就看到了这样一张很长的业务逻辑图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7a/ac/7aa61af1bf6a89c2d525d6a4538e25ac.png?wh=5996%2A7976" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7a/ac/7aa61af1bf6a89c2d525d6a4538e25ac.png?wh=5996%2A7976" /></p>
 <p>如果你看不懂这张图，也没有关系。我在这里给你大致描述一下这张图里有什么东西：</p>
 <ol>
 <li>获取用户名；</li>
@@ -6495,7 +6495,7 @@
 <p>在这节课中，我们不是要去设计一个下订单的业务逻辑，因为每个企业的下订单逻辑，都会有不同的业务限制。做为性能工程师，我们没有对业务逻辑的设计说改就改的权利，因为修改业务逻辑需要所有的相关人员一起商讨确定。不过，我们可以通过分析的结果给出优化的建议。</p>
 <p>在这里，我把优惠券、积分、发送延时取消订单信息的步骤都从下订单的步骤中删掉。有人可能会问这样改合适吗？我强调一下，不是我要这样改业务逻辑，而是想看看这样改了之后，TPS有没有增加。如果增加了，就说明我们的方向是对的，也就是说，这个业务逻辑需要再和各方商量一下，重新设计。</p>
 <p>我们来看修改之后的TPS图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9e/c3/9ecd0a5d86f6d9c9d3723e943b8e14c3.png?wh=1825%2A580" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9e/c3/9ecd0a5d86f6d9c9d3723e943b8e14c3.png?wh=1825%2A580" /></p>
 <p>可以看到，这样的修改确实有效果，那我们后续的优化建议就比较清晰了。如果你在项目中遇到这样的接口，优化建议就可以这样来提：</p>
 <ol>
 <li>分库分表；</li>
@@ -6509,7 +6509,7 @@
 <h2 id="_7">第六阶段</h2>
 <h3 id="tps">定位TPS会降下来的问题</h3>
 <p>具体是什么原因呢？我在接着压的时候，又出现了这样的问题：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f3/16/f3caebb33d1b4274df8bbdf696fbed16.png?wh=1832%2A831" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f3/16/f3caebb33d1b4274df8bbdf696fbed16.png?wh=1832%2A831" /></p>
 <p>你看，TPS掉呀掉的，心都碎了……虽说在每个项目的优化过程中，都会出现各种意外的事情，但是，这个接口的意外也太多了点。没办法，我们接着查吧。</p>
 <p>仍然是按照高老师强调的性能分析决策树（如果你不清楚，可以再看看<a href="https://time.geekbang.org/column/article/356789">第4讲</a>），我们一个个计数器看过去，最后在mysqlreport中看到了下面这些数据：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>__ InnoDB Lock _________________________________________________________
@@ -6521,7 +6521,7 @@
 <a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>Max           51977 ms
 </code></pre></div>
 <p>显然当前的锁有点多，并且这锁的时间还挺长。要想查锁，就得先知道当前正在运行的是什么样的事务，所以我们就去查一下innodb_trx表，因为MySQL在这个表中会记录所有正在执行的事务。在数据库中，我们发现了大量的lock_wait（锁等待）：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ef/e8/ef514de33b59cc1eca4fb29bb39eaee8.png?wh=1904%2A531" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ef/e8/ef514de33b59cc1eca4fb29bb39eaee8.png?wh=1904%2A531" /></p>
 <p>既然有锁等待，那我们自然要查一下锁关系，看看是什么在等待锁。在看具体的锁关系之前，我们也来查看一下应用日志。</p>
 <p>为什么要看应用日志呢？因为对于数据库来说，锁是为了保护数据的一致性，而产生锁的事务自然是从应用中来的。按照这样的逻辑，我们在MySQL中和在应用中看到的事务SQL，应该是对应的。而现在我们只看到了MySQL中的锁，还不知道在应用中会是什么样子，所以，我们要看一下应用的日志。</p>
 <p>这里温馨提醒一句：**在这个时候，<strong>我们</strong>还<strong>需要注意，不要用</strong>重压力工具中的某些具有唯一性的参数化数据**<strong>。因为当参数化数据用重了，在数据库中执行update语句也照样会出现锁。</strong></p>
@@ -6547,9 +6547,9 @@
 </code></pre></div>
 <p>你看，其中有update语句，这样一来，逻辑就成立了：我们知道，update是会锁数据的，但是，MySQL用的是InnoDB的引擎。如果update的条件是精确查找，那就应该不会出现表级锁。</p>
 <p>可是，如果update的范围比较大，就会有问题了，因为这会导致insert语句被阻塞。过一会儿之后，你就会看到如下内容：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/68/f9/6877fa4a920aa988a08b3db3b1a63bf9.png?wh=1865%2A678" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/68/f9/6877fa4a920aa988a08b3db3b1a63bf9.png?wh=1865%2A678" /></p>
 <p>我们看到，所有的insert都在LOCK WAIT状态了，这就是表级锁对insert产生的影响。如果你再查一下锁和锁等待的话，就会看到如下信息：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4f/4d/4f790e6fa173ddbf2172ee11ef42c74d.png?wh=1488%2A707" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4f/4d/4f790e6fa173ddbf2172ee11ef42c74d.png?wh=1488%2A707" /></p>
 <p>不难看出，lock_mode这一列的值全是X，意思是X锁。我们知道，排他锁（X锁），又叫写锁。图中的锁类型（lock_type）全是RECORD，锁住的是索引，并且索引是GEN_CLUST_INDEX，说明这个锁等待是因为innodb创建的隐藏的聚集索引。</p>
 <p>当一个SQL没有走任何索引时，就会在每一条聚集索引后面加X锁，这和表级锁的现象是一样的，只是在原理上有所不同而已。为了方便描述，我们仍然用“表级锁”来描述。</p>
 <p>要查锁，就得看看是谁持有锁。经过仔细查看上面的INNODB_LOCK_WAIT后，我们确定了这个锁对应的事务ID是157710723，它对应的SQL是：</p>
@@ -6562,11 +6562,11 @@
 <a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>int updateOrderStatus(@Param(&quot;ids&quot;) List&lt;Long&gt; ids,@Param(&quot;status&quot;) Integer status);
 </code></pre></div>
 <p>原来这是一个批量任务的调用，具体逻辑如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8b/9c/8b4d2ea1d59309d1467be3c236f2039c.png?wh=1419%2A753" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8b/9c/8b4d2ea1d59309d1467be3c236f2039c.png?wh=1419%2A753" /></p>
 <p>这个批量任务的问题在于，在一个订单表中做批量更新的操作，并且这个批量查询的内容还挺多。因为上面的ID是0，表示订单是未支付的，而未支付的订单在这个表中有很多，所以，在更新时做大范围的查找，会进而导致表级锁的出现。</p>
 <p>这个批量任务的设计明显有问题。你想想，要在订单表中做更新这么大的动作，那也应该是做精准更新，而不是范围更新。其实对于订单的更新逻辑，我们可以选择其他的实现方式。</p>
 <p>锁的原因找到了，我们现在要把范围更新改为非常精准的更新，让它不产生表级锁。修改之后，重新执行场景的结果如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0d/68/0d63c40c3a5c25177807fa3612437d68.png?wh=1830%2A582" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0d/68/0d63c40c3a5c25177807fa3612437d68.png?wh=1830%2A582" /></p>
 <p>从优化效果来看，TPS已经达到700以上了。对这样一个复杂的接口来说，这已经非常不错了。</p>
 <p>其实，这个订单业务还有很多的优化空间，比如说：</p>
 <ol>
@@ -6708,8 +6708,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -14141,7 +14141,7 @@
 <h2 id="_1">设计背景</h2>
 <p>消息中间件在分布式架构体系中的应用非常广泛，要想实现蓝绿发布，只在微服务调用层面实现还远远不够。</p>
 <p>在进行具体的方案设计之前，我们还是先来看一下我们这个项目中消息中间件的部署情况：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e2/ce/e2d8a4b3611498142585fe52f5f5d9ce.jpg?wh=1920x778" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e2/ce/e2d8a4b3611498142585fe52f5f5d9ce.jpg?wh=1920x778" /></p>
 <p>这里有四个应用，简单解释一下。</p>
 <ol>
 <li>应用1支持蓝绿发布，并且处理完业务后，需要向消息中间件中的topic_A主题发送消息。</li>
@@ -14153,10 +14153,10 @@
 <h2 id="_2">消息中间件隔离机制</h2>
 <p>那么怎么基于这一条件来设计和实施蓝绿方案呢？这又涉及到一个隔离机制的问题。因为无论是蓝绿发布还是全链路压测，需要着重解决的一个问题就是消息的隔离性。蓝绿发布的本质就是对消息进行分类，蓝颜色的消息只能被蓝颜色的消费者消费，绿颜色的消息只能被绿颜色的消费者消费。</p>
 <p>消息中间件领域通常有“基于消息主题”和“基于消息属性”两种隔离机制。我们先来看第一种隔离机制，基于消息主题的物理隔离机制：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/54/df/54e1fa3293c2e7c70b05cbe2e27e95df.jpg?wh=1920x725" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/54/df/54e1fa3293c2e7c70b05cbe2e27e95df.jpg?wh=1920x725" /></p>
 <p>基于主题的隔离机制在消息服务端是分开存储的，属于物理层面的隔离。在消息消费端，由于应用使用不同的消费组进行消费，每一个消费组在物理层面也是互不影响的，每一个消费组有独立的线程池、消费进度等。</p>
 <p>消息中间件中的另外一种隔离机制是基于消息属性的。例如，蓝绿两种颜色的消息使用的是同一个主题，但我们可以在消息中添加一个属性，标识这条消息的颜色。其存储示意图如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/33/7c/332690cb07f39355yyc916c389f40d7c.jpg?wh=1920x790" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/33/7c/332690cb07f39355yyc916c389f40d7c.jpg?wh=1920x790" /></p>
 <p>这样，不同属性的消息就可以共用一个主题了。消息发送端在发送消息时，会为消息设置相应的属性，将它存储到消息的属性中。然后单个消费端应用会创建蓝绿两个消费组，都订阅同一个主题。消费组拉取到消息后，需要先解码找到对应的消息属性，蓝颜色消费者只真正处理属性为BLUE的消息，那些属性为GREEN的消息会默认向服务端返回“消费成功”。这样就在客户端实现了消息过滤机制。</p>
 <p>目前主流消息中间件的隔离机制都是基于消息属性的。在消息发送端为消息指定属性的示例代码如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>//RocketMQ示例
@@ -14183,7 +14183,7 @@
 <p>我们这个方案是基于RocketMQ展开的，Kafka的设计方案类似。所以如果你使用的是Kafka，完全可以进行知识迁移。</p>
 <p>基于消息属性的隔离机制的一个显著的特点是，蓝绿消息使用的是同一个主题。因此我们需要在不同环境的生产者发送消息时，为消息设置不同的颜色。</p>
 <p>和在微服务领域实现蓝绿发布一样，我们通过系统参数为应用设置所属环境：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/25/1c/250739e236ea29f519402bcc84217d1c.jpg?wh=1920x1066" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/25/1c/250739e236ea29f519402bcc84217d1c.jpg?wh=1920x1066" /></p>
 <p>通常每一家公司都会有一个统一的开发框架，会基于目前主流的RocketMQ、Kafka客户端进行封装，或者使用类似rocketmq-spring这样的开源类库。为了防止对业务代码进行侵入，通常会采用拦截器机制，拦截消息发送API，然后在拦截器中根据系统参数，为消息设置对应的属性。从系统参数中获取颜色值的示例代码如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>private static final String COLOR_SYS_PROP = &quot;color&quot;;
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>private static final String COLOR_ENV = System.getProperty(COLOR_SYS_PROP, &quot;&quot;);
@@ -14191,10 +14191,10 @@
 <p>当不同环境的消息发送者将消息发送到消息服务器后，消费端就要按颜色将消费分开了。</p>
 <p>虽然消费端的隔离机制是通过不同的消费组来实现的，每一个消费组拥有自己独立的消费者线程池、消费进度，组与组之间互不影响。但是消费端不能简单粗暴地用系统参数来区分消费组的颜色，因为一个应用中可能存在多个消费组，这些消费组并不都开启了蓝绿机制。</p>
 <p>所以基于消费组的蓝绿定义，首先需要在消费者的元信息中定义。例如，我们公司在申请消费组时，可以根据环境为消费组设置是否启用蓝绿机制。如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f2/e0/f2ab88bfa5b4103fc0290bd4316516e0.png?wh=582x654" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f2/e0/f2ab88bfa5b4103fc0290bd4316516e0.png?wh=582x654" /></p>
 <p>蓝绿发布状态可选择：蓝、绿、所有。这里的“所有”表示消费组未开启蓝绿，选择“蓝”或“绿”都表示消费组开启蓝绿。</p>
 <p>消费组是如何进行消息过滤的呢？我们来看下部署示意图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d9/11/d9756ec5843c453a6e61217890deea11.jpg?wh=1920x907" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d9/11/d9756ec5843c453a6e61217890deea11.jpg?wh=1920x907" /></p>
 <p>我们看应用3会部署在蓝、绿两个环境，但是在原始的镜头项目代码中我们只会定义一个基本的消费组，例如dw_test_consumer_group，蓝绿发布要求我们这套代码用不同的系统属性定义后，就能分别实现消息的过滤。</p>
 <p>例如，我们在代码中定义一个消费组，示例代码如下（这段代码来源于中通快递开源的<a href="https://github.com/ZTO-Express/zms">消息中间件运维平台</a>，封装了Kafka/RocketMQ的消息发送与消息消费、可视化监控与告警）：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>public void testSubscribe() {
@@ -14230,12 +14230,12 @@
 <p>同时，我们还支持在蓝绿之间进行切换。如果将消费组的蓝绿状态由BLUE变为GREEN，我们会将原本在蓝环境的dw_test_consumer_group关闭，然后在绿环境中新增一个dw_test_consumer_group消费组。这样，我们就在消息中间件层面实现了蓝绿发布。</p>
 <h2 id="_4">基于消息主题的蓝绿设计方案</h2>
 <p>不过，基于消息属性的蓝绿发布机制存在一个比较严重的问题，那就是一旦开启了蓝绿发布，一份消息就会被多次拉取，这无形中增加了消息服务器的读取请求。示意图如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/da/26/dafef196c55944d6c247d9b4689db826.jpg?wh=1920x657" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/da/26/dafef196c55944d6c247d9b4689db826.jpg?wh=1920x657" /></p>
 <p>原本代码中只声明了一个消费组dw_test_consumer_group，但我们引入蓝绿发布机制之后，会创建三个消费组，读取流量是原来的三倍，这会给服务端带来较大压力。</p>
 <p>造成读流量放大的主要原因是，蓝绿消息在物理存储上并未实现真正隔离，仍然需要在消费端进行过滤。既然如此，如果我们在发送消息的时候就对消息进行隔离，是不是可以避免这种情况？</p>
 <p>这就要说到另外一种蓝绿设计方案了，它使用的是基于主题的消息隔离机制。</p>
 <p>这种机制在发送消息时，就根据发送者所在的环境将消息发送到不同的主题中。示意图如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ff/95/ff403581b68db3d44497bab4942c2a95.jpg?wh=1920x567" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ff/95/ff403581b68db3d44497bab4942c2a95.jpg?wh=1920x567" /></p>
 <p>在代码层面，要在发送端改变消息发送的主题名称非常简单。只需要拦截消息发送方法，根据系统变量color的值改写主题的名称就可以了。但是在实践过程中，我们还要避免发送方法的嵌套调用，避免主题名称在一次发送过程中多次被改写，所以在改写主题名称之前，我们还要对代码进行判断：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>public static String renameTopicName(String topicName) {
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>String color = System.getProperty(&quot;color&quot;, &quot;&quot;);
@@ -14248,7 +14248,7 @@
 <a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>}
 </code></pre></div>
 <p>之后，消费端的隔离机制仍然是为不同的环境创建不同的消费组：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/23/99/23880714e3f9688915466d38dd41b899.jpg?wh=1920x437" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/23/99/23880714e3f9688915466d38dd41b899.jpg?wh=1920x437" /></p>
 <p>这样，每一个消费组就只会拉取符合条件的消息。因为所有的消息拉取都是有效拉取，所以基于消息隔离而产生的弊端就解决了。</p>
 <h2 id="_5">总结</h2>
 <p>我们这节课首先结合消息中间件在生产环境的部署情况，引出了蓝绿设计需要解决的具体问题，然后介绍了实现蓝绿的两种方案。</p>
@@ -14380,8 +14380,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

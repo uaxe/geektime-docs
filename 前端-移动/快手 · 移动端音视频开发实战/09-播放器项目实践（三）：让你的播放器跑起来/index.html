@@ -5462,7 +5462,7 @@
 <p>前面两节课，我们从播放器的场景入手设计出了播放器的架构，然后一起实现了播放器的底层核心模块，包括音频渲染模块、视频渲染模块与视频解码模块。这节课我们要把这些模块串联在一起，让我们的播放器运行起来。</p>
 <p>用播放器播放视频最重要的一点就是要保证<strong>音画对齐</strong>，架构设计中的AVSync模块就承担这一职责。</p>
 <h2 id="avsync">AVSync模块的实现</h2>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6d/4e/6d09fac5e835b1a6115cc560689aff4e.png?wh=1920x1077" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6d/4e/6d09fac5e835b1a6115cc560689aff4e.png?wh=1920x1077" /></p>
 <p>AVSync模块除了负责音视频的同步之外，还要维护一个解码线程，主要工作就是线程的创建、暂停、运行、销毁，就是我们架构类图中AVSynchronizer这个类。</p>
 <p>这个类的实现分为两部分，第一部分是维护解码线程，第二部分就是音视频同步。主要接口与实现有以下四个。</p>
 <ul>
@@ -5500,7 +5500,7 @@
 <p>到这里，解码线程的工作模式和运行原理我们就学完了，下面我们来看AVSync模块的第二部分——音视频同步的设计逻辑。</p>
 <h3 id="_2">音视频同步</h3>
 <p>音视频同步的策略一般分为三种：音频向视频同步、视频向音频同步，以及音频视频统一向外部时钟同步，在使用ffplay播放视频文件的时候，所指定的对齐方式就是上面所说的三种方式，下面我们来逐一分析一下，这三种对齐方式是如何实现的，以及各自的优缺点。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/4b/bf/4bffcf5254f99400492cff6ecaa85fbf.png?wh=1920x639" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4b/bf/4bffcf5254f99400492cff6ecaa85fbf.png?wh=1920x639" /></p>
 <ol>
 <li>音频向视频同步</li>
 </ol>
@@ -5521,7 +5521,7 @@
 <p>有研究表明，人的耳朵比眼睛要敏感得多，也就是说，一旦音频跳帧或者填充空数据，我们的耳朵是十分容易察觉到的，而视频有跳帧或者重复渲染的行为，我们的眼睛其实不太容易分辨出来，所以我们实现的播放器中就<strong>选用视频向音频对齐的方式</strong>。到代码实现阶段，音视频同步这部分的逻辑放到获取视频帧的方法里面就可以了。</p>
 <p>到这里我们一起回忆一下，我们使用AVSync模块将解码模块包装了起来，而音频与视频渲染两个模块也已经准备好了，接下来我们需要书写一个中控模块，将这三个模块有机地串联起来，让我们的播放器可以跑起来。</p>
 <h2 id="_3">中控模块</h2>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/92/63/92b3cfed65850ff71a0a7cfb63c39463.png?wh=1920x1079" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/92/63/92b3cfed65850ff71a0a7cfb63c39463.png?wh=1920x1079" /></p>
 <p>中控模块就是架构类图中VideoPlayerController这个类，这个类就是将上面提到的各个模块有序地组织起来，让单独运行的各个模块可以协同配合起来。由于每个模块都有各自的线程在运行，所以这个类需要维护好各个模块的生命周期，否则容易产生多线程的问题。我会将这个类拆分为初始化、运行、销毁三个阶段给你讲解。</p>
 <h3 id="_4">初始化阶段</h3>
 <p>虽然我们的项目叫做“视频”播放器，但即使客户端代码没提供渲染的View，播放器也应该能够播放出声音来，可以单独播放音频。在某些场景下是一个比较有用的功能，比如可以加速秒开，可以做一些画中画的功能。要想达到这样的目标，我们需要把播放器的初始化和渲染界面的初始化分开。所以，初始化阶段可以分为两部分，一部分是播放器的初始化，另外一部分是渲染界面的初始化。</p>
@@ -5556,10 +5556,10 @@
 <p>VideoOutput模块接收到这个指令之后，就可以调用回调方法来获取一帧视频帧，由于在初始化的时候，已经把中控系统注册给VideoOutput用来获取视频帧了，所以这里会调用中控模块获取视频帧的方法。这个方法会调用AVSync模块，来获取一个与音频匹配的视频帧，然后返回给视频播放模块，将最新的一帧视频帧更新到画面中。</p>
 <p>运行阶段还有暂停和继续播放接口的实现，由于当前实现整个播放器是由音频播放模块来驱动的，所以只需要让音频播放模块暂停和继续就好了。</p>
 <p>经过学习运行阶段的内容，我们知道整个视频播放的过程其实是由音频来驱动的，所以在销毁阶段要先停掉音频。首先调用AudioOutput对象的stop方法；然后要停掉AVSync模块，由于这个模块内部组合了输入模块，所以要把输入模块的连接给断开，输入模块中利用FFmpeg的超时设置可以快速断开连接，然后需要使用pthread_join这个排程的方法，等待解码线程运行结束，再把音频队列、视频队列以及解码器都给销毁掉。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ea/4e/ea348ffaeb66b9ec6a254d1cbd8a1f4e.png?wh=1846x584" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ea/4e/ea348ffaeb66b9ec6a254d1cbd8a1f4e.png?wh=1846x584" /></p>
 <p>最后一步是停止VideoOutput模块，通过调用VideoOutput的销毁资源方法（里面会销毁frameBuffer、renderbuffer、Program等）来实现，最后再调用音频输出模块的销毁方法。这样就可以销毁所有的模块了。</p>
 <h3 id="_6">小结</h3>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/10/50/105d67db1b5739fe753b0086448ba750.png?wh=1920x998" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/10/50/105d67db1b5739fe753b0086448ba750.png?wh=1920x998" /></p>
 <p>视频播放器项目我们已经实现完了，因为这个实战项目比较大，所以我们一起来回顾一下整个设计与开发阶段。我们从<a href="http://https://time.geekbang.org/column/article/548457">第7节课</a>开始，一步步设计并实现这个播放器。</p>
 <ul>
 <li>首先实现了输入模块，也叫做解码模块，输出的音频帧是AudioFrame，里面的主要数据就是PCM裸数据，输出的视频帧是VideoFrame，里面的主要数据就是YUV420P的裸数据。</li>
@@ -5695,8 +5695,6 @@ Q1：“混音”的技术方案。
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -14210,7 +14210,7 @@
 <p>在我们痛并快乐着的日常开发工作中，修bug已经是很常见一环了，当编写的功能出了bug，我们一般会先根据现象分析可能存在的问题，如果没头绪，就会继续根据用户提供的有限关键字信息，去查看相关日志希望能找到蛛丝马迹。</p>
 <p>在这个环节，如果关键字信息比较独特且唯一，我们比较容易排查出问题，但如果关键字不那么独特，我们很可能需要从检索出来的一堆日志中继续痛苦地分析。</p>
 <p>然而痛苦才刚刚开始，实际开发会涉及很多系统，如果出问题的功能调用流程非常复杂，你可能都不确定找到的日志是不是出问题时的日志，也可能只是找到了出问题时日志体系中的小部分，还可能找到一堆与问题毫无关系的日志。比如下面这个复杂调用关系：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/33/47/33b9bcba4120a1e2cbd081f98ce69447.jpg?wh=1920x817" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/33/47/33b9bcba4120a1e2cbd081f98ce69447.jpg?wh=1920x817" /></p>
 <p>图中描述了一种多系统合作的链路，一个请求调用了系统A，接着系统A分别调用了系统B和系统D，然后系统B还调用了系统C。</p>
 <p>通过请求中的关键字，我们在A、B、C、D系统中找到了相关日志：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="mi">2022</span><span class="o">-</span><span class="mi">10</span><span class="o">-</span><span class="mi">28</span><span class="w"> </span><span class="mi">23</span><span class="p">:</span><span class="mi">29</span><span class="p">:</span><span class="mf">01.302</span><span class="w"> </span><span class="o">[</span><span class="n">系统A</span><span class="p">,</span><span class="n">DubboServerHandler</span><span class="o">-</span><span class="mi">1095</span><span class="o">]</span><span class="w"> </span><span class="n">INFO</span><span class="w"> </span><span class="n">com</span><span class="p">.</span><span class="na">XxxJob</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="o">[</span><span class="n">JOB</span><span class="o">]</span><span class="w"> </span><span class="n">calling</span><span class="w"> </span><span class="n">start</span><span class="w"> </span><span class="o">[</span><span class="n">emp_airOrderNoticeJob</span><span class="o">]</span>
@@ -14225,7 +14225,7 @@
 <h2 id="_1">日志检索问题</h2>
 <p>现在的主要问题就变成了一次请求调用系统A、B、C、D，如何精准找出一次请求所打印的全部日志？</p>
 <p>其实思路也很简单，类似田径400米接力赛跑，一个请求，如果有一个序列号，而且序列号还能被“接棒”传到系统A、B、C、D，那么我们就可以利用这个序列号，将这次请求的日志全部检索出来。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f7/93/f73c30db757a51c0aaeff59b7cd81793.jpg?wh=1920x817" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f7/93/f73c30db757a51c0aaeff59b7cd81793.jpg?wh=1920x817" /></p>
 <p>结合刚才的例子，系统B的 DubboServerHandler-1093 线程打印的两行日志，如果有一个序列号的体现，我们就能确定是不是同一次请求所打印的。</p>
 <p>可是该怎么把一次请求动态生成的序列号，传递到此次请求所涉及的所有系统中去呢？</p>
 <h3 id="1">1. 显式传递</h3>
@@ -14244,7 +14244,7 @@
 这样一来，因为继承关系，每个接收请求的对象都相当于有了 reqNo 字段，最后告诉调用方按照要求传参就可以了。</p>
 <p>思路很美好，但这个时候相信你一定发现了第一个盲点：<strong>考虑方案的落地，已有对象如何修改呢？</strong></p>
 <p>我们顺着这个思路先比划比划流程：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/34/f0/343af91420f4582ec87743739c64b9f0.jpg?wh=1920x580" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/34/f0/343af91420f4582ec87743739c64b9f0.jpg?wh=1920x580" /></p>
 <p>把系统中所有接收请求的对象找出来，然后挨个修改这些对象的继承属性，改为继承 AbstractRequest 类，最后在打印日志的时候顺便把 reqNo 字段值打印出来。</p>
 <p>但是需要修改多少个接收请求对象的类呢？系统中有10个对象就要改10个，有100个对象那就改100个，但系统中有10000个对象，要改10000个？不太实际，而且在开发环境中，系统中接收请求对象的个数是不可估量的，我们光改个继承关系，就能改上几天几夜，还无法保证不出问题。</p>
 <p>哪怕假设修改量不大，我们在打印日志的时候还会遇到第二个更难处理的问题。</p>
@@ -14270,7 +14270,7 @@
 <p>现在的问题就转变为，既不能改动方法的请求入参对象，也不能在工程中遍地开花地修改代码，还要能在日志中看到序列号，似乎有点困难。</p>
 <p>但是仔细分析这个需求，你就能找到突破点。请求入参对象，都是一些处理业务功能需要的对象，但是这个序列号参数，业务其实并不需要，因为业务不关心日志怎么打印，也不关心开发人员怎么排查问题。</p>
 <p>所以序列号和业务对象在一定程度上划分了界限，我们可以<strong>把业务对象划分到业务属性，把请求序列号划分到技术属性</strong>。以一次简单的请求发送为例：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/bb/28/bbc733e24580345846cfda3362c18528.jpg?wh=1920x580" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bb/28/bbc733e24580345846cfda3362c18528.jpg?wh=1920x580" /></p>
 <p>HTTP请求在向系统A发起请求时，需要想办法将技术属性和业务属性都发送给系统A，怎么编写代码发送HTTP请求的呢？</p>
 <p>回忆平时发送HTTP请求的逻辑步骤：</p>
 <ol>
@@ -14281,14 +14281,14 @@
 <p>所以我们可以将业务属性放到请求体中，将技术属性放到请求头中，这样不就把技术属性和业务属性一起发送出去了么。</p>
 <p><strong>可是系统A与系统B、C、D之间是Dubbo调用的，又该怎么解决技术属性的传递问题呢？</strong></p>
 <p>同样地，我们回忆平时编写代码进行Dubbo远程调用时的流程链路：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/22/05/22e6b83e56f00123cd7c5db848e3e005.jpg?wh=1920x823" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/22/05/22e6b83e56f00123cd7c5db848e3e005.jpg?wh=1920x823" /></p>
 <p>这是一个比较简单的消费者调用提供者的链路图，在消费者调用的过程中，一些附加的信息可以设置到RpcContext上下文中去，然后RpcContext中的信息就会随着远程调用去往提供者那边。</p>
 <p>可以看到，调用链路图中的附带参数设置形式和HTTP的请求头设置形式，几乎是如出一辙。所以我们可以考虑将序列号设置到RpcContext中，这样就能既不改动方法的请求入参对象，又不用大范围进行修改了。</p>
 <p>那如何把参数设置到RpcContext中呢？我们进入今天的高潮环节——隐式传参的实现。</p>
 <h2 id="_2">编码实现</h2>
 <p>对于技术属性的设置，现在的你肯定知道是不能大肆在代码各个角落进行操作的，也不现实，我们需要有一个集中的环节可以进行操作，那么这个集中环节在哪里呢？</p>
 <p>再来看调用链路图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/53/9b/53da04ab9bb2d105779ecb45c9d3d49b.jpg?wh=1920x823" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/53/9b/53da04ab9bb2d105779ecb45c9d3d49b.jpg?wh=1920x823" /></p>
 <p>为了尽可能降低侵入性，我们最好能在系统的入口和出口，把接收数据的操作以及发送数据的操作进行完美衔接。这就意味着需要在接收请求的内部、发送请求的内部做好数据的交换。</p>
 <p>再结合前面的消费者调用提供者的链路图，编写业务代码无感知的“过滤器”，似乎能完美满足需求：</p>
 <ul>
@@ -14561,8 +14561,6 @@ RpcContext有4个重要属性和你设置隐式的技术属性有关，分别是
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

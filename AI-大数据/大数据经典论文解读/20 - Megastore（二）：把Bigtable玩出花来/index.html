@@ -7902,7 +7902,7 @@
 <h3 id="_2">实体组的数据布局</h3>
 <p>抛开这些题外话，我们一起看看为什么在一个实体组内，我们可以让数据经常共同访问，而跨越实体组就不合适呢？</p>
 <p>其实只要观察一下上面的这个示例Schema，在Bigtable内是如何存储的，你自己就能得出答案。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/40/5b/40d23c0b8a626a9c19d8a363d779a15b.jpg?wh=1920x750" title="论文里的图5，示例Schema在Bigtable中的数据布局" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/40/5b/40d23c0b8a626a9c19d8a363d779a15b.jpg?wh=1920x750" title="论文里的图5，示例Schema在Bigtable中的数据布局" /></p>
 <p>我把论文里面的图5，也就是前面的PhotoApp表在Bigtable里是怎么存储的放在了这里，并把示例数据分别标成了绿色和蓝色。对于PhotoApp里的User和Photo这两张表，是存放在同一张Bigtable的表里的，其中，绿色部分的数据是来自User表的，而蓝色部分的数据来自Photo表。</p>
 <p>可以看到，我们是直接拿User表的主键user_id，作为了Bigtable里的行键。而对于Photo表，我们是拿user_id和photo_id组合作为行键，存放在同一张表里。因为Bigtable里面的数据，是按照行键连续排列的。所以，同一个User下的Photo的数据记录，会连续存储在对应的User记录后面。</p>
 <p>在前面的<a href="https://time.geekbang.org/column/article/423602">第9讲</a>解读Bigtable这篇论文的时候，我们说过在Bigtable里，数据是按照行键分区的，实际的数据存储，也是按照行键连续存储的。并且，当我们用一个行键去Bigtable里面查询数据的话，Bigtable会有Block Cache，也就是把底层的SSTable的整个Block都获取回来。而这个里面，其实就会包含当前行键前后连续行键所包含的数据。</p>
@@ -7912,7 +7912,7 @@
 <h3 id="megastore">Megastore的索引</h3>
 <p>了解了Megastore的实际数据是怎么存储在Bigtable里的，我们再来看看它的索引是怎么回事儿。</p>
 <p>Megastore的索引，分成了两种类型，一个是本地索引，另一种叫做全局索引。<strong>本地索引的数据，是直接存储在实体组“内部”的</strong>，它是我们已经确定是哪一个实体组的情况下，去寻找具体的记录位置。这个，你可以看看我在上一讲里，放过的论文图2里面索引的位置。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/14/a4/14e7e9d6be877ffaac50a290b87beda4.jpg?wh=1920x1080" title="论文中的图2，本地索引的数据是和实体组数据存储在一起的" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/14/a4/14e7e9d6be877ffaac50a290b87beda4.jpg?wh=1920x1080" title="论文中的图2，本地索引的数据是和实体组数据存储在一起的" /></p>
 <p>而我们通过看前面的Schema的例子也会非常清楚，PhotosByTime这个本地索引，需要通过user_id和time这样两个字段才能查询到。其实，也就是我们先通过user_id，知道是哪一个User实体组，再在这个实体组里查询数据。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nc">CREATE</span><span class="w"> </span><span class="nc">LOCAL</span><span class="w"> </span><span class="nc">INDEX</span><span class="w"> </span><span class="nc">PhotosByTime</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nc">ON</span><span class="w"> </span><span class="nc">Photo</span><span class="p">(</span><span class="n">user_id</span><span class="p">,</span><span class="w"> </span><span class="n">time</span><span class="p">);</span>
@@ -7927,7 +7927,7 @@
 <p>传统的数据库索引里，往往只存储指向具体数据记录的主键。这就意味着，当我们查询数据的时候，需要两次请求：第一次请求是查询索引，拿到对应数据记录的主键；第二次请求是再通过主键，去查询对应的整条数据，然后拿到我们需要的字段的值。</p>
 <p>而在Megastore里，你可以通过一个STORING语句，指定索引里存储下对应的数据记录的某一个字段的值。这样，我们的查询只需要检索索引，就能拿到需要字段的值。</p>
 <p>这个优化听起来微不足道，但是在分布式数据库里其实作用很大。在一般的单机数据库里，索引和数据都是在同一台服务器上，所以索引里不存储数据，只是多了硬盘随机访问的压力。<strong>但是在分布式数据库里，如果我们的索引和数据不存储在一个节点上，就意味着还会多一次网络往返，进一步会拉低整个集群的性能。</strong></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/36/ec/365ab4771ec9dd7e4770b24b47d6a3ec.jpg?wh=1920x1805" title="通过STORING语句，我们可以指定把特定列的值，存储在索引数据里，这样只要查询索引就能拿到想要的结果" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/36/ec/365ab4771ec9dd7e4770b24b47d6a3ec.jpg?wh=1920x1805" title="通过STORING语句，我们可以指定把特定列的值，存储在索引数据里，这样只要查询索引就能拿到想要的结果" /></p>
 <p>不过，需要显示指定索引里存放哪一个字段，也意味着开发人员需要预先判定，业务中未来特定的查询会使用到的字段值，其实这也给开发人员带来了很多挑战。</p>
 <p><strong>第二点，是Megastore支持为repeated类型的字段建立索引（Repeated Indexes）。</strong></p>
 <p>这里对应的例子，仍然是前面的PhotosByTag索引，它对应的索引字段，是Photo这个实体里的tag这个字段。tag这个字段，在Photos表里是申明为repeated的，也就是一张Photo表里面可以有多个Tag。</p>
@@ -7953,7 +7953,7 @@
 <p>这个索引类型，是为了帮助父实体（Parent Entity）能够快速访问子实体（Child Entity）的某些字段。</p>
 <p>还是回到论文中的例子，我们可以把Schema中定义的本地索引，PhotosByTime这个原本索引Photo实体的索引，变成User实体的内联索引。这样，User表实际上会相当于多了一个repeated的虚拟字段（virtual）。而既然是repeated字段，那它其实就是一个List。List里的每一个结构体，都存放了两个信息，一个是PhotosByTime里面的time信息，另一个是对应的这个time，对应的是Photos里的哪一条记录。</p>
 <p>这样，通过在父实体里添加了一个虚拟字段，我们对于子实体里的数据查询，直接在父实体里就能够完成了，而不需要再去查询具体的索引数据。因为在应用开发的时候，比如在Instagram里，我们看一个用户最近的照片，都是先取到User这样的父实体，再根据user_id和索引去查询它的照片信息。当有了内联索引之后，我们在第二步查询子实体数据的时候，就可以少一次索引的访问了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a2/85/a2a60497c47cf8e276ca35b0b9ec6585.jpg?wh=1920x821" title="内联索引相当于把索引直接作为一个repeated字段存储在父实体的一个列中[br]这样我们不需要访问索引数据，就能查询到我们想要的结果" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a2/85/a2a60497c47cf8e276ca35b0b9ec6585.jpg?wh=1920x821" title="内联索引相当于把索引直接作为一个repeated字段存储在父实体的一个列中[br]这样我们不需要访问索引数据，就能查询到我们想要的结果" /></p>
 <h4 id="_4">索引实现</h4>
 <p>其实，Megastore的索引实现也并不复杂。<strong>每一条索引，都是作为一行数据，存储在Bigtable里的。</strong>这条记录的行键，就是建立索引的字段，和索引到的数据的主键的组合。我们还是回到论文里的例子来看：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nc">CREATE</span><span class="w"> </span><span class="nc">LOCAL</span><span class="w"> </span><span class="nc">INDEX</span><span class="w"> </span><span class="nc">PhotosByTime</span>
@@ -7965,8 +7965,8 @@
 <li>那么，索引这一行的行键，就是 ((user_id, time), (user_id, photo_id)) 这样的一个组合；</li>
 <li>而如果我们的索引，指向的是一个repeated的字段，比如tags，那么每一个tag都会有一行数据。比如有三个tag，分别是 [tag1, tag2, tag3]，我们的索引，就会有三条记录，分别是 (tag1, (user_id, time)), (tag2, (user_id, time)) 和 (tag3, (user_id, time))。</li>
 </ul>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/08/a3/08f8dfb669dbf911bc0af9574a4c46a3.jpg?wh=1920x501" title="索引直接以行键的形式存储在Bigtable里" /></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/79/66/79b273c49e69cb24794cba849ea94866.jpg?wh=1920x850" title="对于repeated的字段，每个repeated里面出现的值，都会有一行索引[br]而对应的STORING语句中指定的列，可以存放在值列中" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/08/a3/08f8dfb669dbf911bc0af9574a4c46a3.jpg?wh=1920x501" title="索引直接以行键的形式存储在Bigtable里" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/79/66/79b273c49e69cb24794cba849ea94866.jpg?wh=1920x850" title="对于repeated的字段，每个repeated里面出现的值，都会有一行索引[br]而对应的STORING语句中指定的列，可以存放在值列中" /></p>
 <p>而这样的索引，其实是充分利用了Bigtable的特性。因为Bigtable的行数据，是按照行键范围分区，连续的数据会存储在一起。所以，无论是根据索引值进行范围内查询一段数据，还是随机查询某一条数据，都会很容易。</p>
 <p>可以看到，这个索引的实现，也和前面的实体组的数据布局一样，是充分利用了Bigtable的特性的一个很好的应用。</p>
 <h2 id="megastore_1">Megastore的事务与隔离性</h2>
@@ -7976,12 +7976,12 @@
 <p>那么，要实现“可串行化”的隔离性，当然不只有真的把所有的事务排一个队，一个个来执行这样一种办法。这样的方式，就彻底丧失了数据库事务的并发性，会大大拖累数据库的性能。现代的关系型数据库，都是采用一种叫做<strong>MVCC</strong>（Multiversion Concurrency Control）的机制来实现，中文名称叫做多版本并发控制。</p>
 <p>这个机制，通俗来讲，就是数据库中的数据会有多个历史版本。你的每一次事务请求，都会拿到当前最新已经提交的那个版本的快照，<strong>在整个事务提交的时候，会检查当前数据库里数据的最新版本，是否和你拿到的快照版本一致</strong>。</p>
 <p>如果一致的话，数据提交会成功，并且数据库里的版本会更新。而当有两个并发的数据库事务都会去读或者写同一份数据的时候，先尝试提交的A事务的会成功。后尝试提交的B事务，因为数据的最新版本已经变了，就会失败。而当你有一个事务正在提交，或者数据写入到一半，另一个读取事务的请求并不会读到你写到一半的数据，而是读取上一个完成提交的事务的一个快照。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/59/6d/592524068b954a387ef1a4d0d2yyd66d.jpg?wh=1920x1080" title="数据库的单条记录会有多个版本，事务执行过程中获取的是某个版本的快照[br]而可线性化的要求，使得我们提交的时候需要检查是否有其他事务已经更新过当前事务读/写的数据" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/59/6d/592524068b954a387ef1a4d0d2yyd66d.jpg?wh=1920x1080" title="数据库的单条记录会有多个版本，事务执行过程中获取的是某个版本的快照[br]而可线性化的要求，使得我们提交的时候需要检查是否有其他事务已经更新过当前事务读/写的数据" /></p>
 <p>看完这个对于MVCC机制的描述，不知道你是不是和我一样，发现Bigtable的底层数据读写机制，和它非常匹配。因为Bigtable天然会存储数据的多个版本，每一次的数据写入，都是追加了一个新版本，而不是把原来的数据覆盖掉。这样我们就可以把每一个事务提交时的时间戳，用作MVCC机制里面的版本。</p>
 <p>Megastore的一个实体组，可能包含多行的数据。而你就要问了：可是Bigtable本身只支持单行数据的事务呀？别着急，我们完全可以使用时间戳这个版本信息，来实现基于MVCC的事务性和隔离性。</p>
 <p>我们在<strong>提交事务的时候，需要指定一个时间戳</strong>，而不是让每一行的数据更新都使用当前的时间戳。然后我们在读取数据的时候，只需要找到最后成功提交的事务的时间戳，我们读取这个时间戳版本的数据，就是最新的版本。</p>
 <p>而如果这个时候，有一个事务提交到一半，一个实体组里的一部分数据更新了，另一部分数据还没有来得及更新，也不要紧，我们的读请求并不会读到这个数据。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/5e/c8/5e5634dfb01c151ffbee2d4bb5c9a3c8.jpg?wh=1920x980" title="Bigtable里的一个值，根据时间戳就会有多个版本" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5e/c8/5e5634dfb01c151ffbee2d4bb5c9a3c8.jpg?wh=1920x980" title="Bigtable里的一个值，根据时间戳就会有多个版本" /></p>
 <p>正是因为这个时间戳机制的存在，Megastore对于读取数据提供了current，snapshot以及 inconsistent三种模式。这三种模式其实看名字就很明白了：</p>
 <ul>
 <li><strong>current</strong>就是读取最新版本的数据。在读数据之前，Megastore的事务系统，会先确认已经提交的事务都已经应用成功。然后，事务系统会读取最新事务对应的时间戳的数据版本。</li>
@@ -8131,8 +8131,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

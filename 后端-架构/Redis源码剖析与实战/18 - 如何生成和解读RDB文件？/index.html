@@ -14595,7 +14595,7 @@
 <p>这是Redis server在采用不落盘方式传输RDB文件进行主从复制时，创建RDB文件的入口函数。它会被startBgsaveForReplication函数调用（在<a href="http://github.com/redis/redis/tree/5.0/src/replication.c">replication.c</a>文件中）。而startBgsaveForReplication函数会被replication.c文件中的syncCommand函数和replicationCron函数调用，这对应了Redis server执行主从复制命令，以及周期性检测主从复制状态时触发RDB生成。</p>
 <p>和rdbSaveBackground函数类似，rdbSaveToSlavesSockets函数也是通过fork创建子进程，让子进程生成RDB。不过和rdbSaveBackground函数不同的是，rdbSaveToSlavesSockets函数是通过网络<strong>以字节流的形式，直接发送RDB文件的二进制数据给从节点</strong>。</p>
 <p>而为了让从节点能够识别用来同步数据的RDB内容，rdbSaveToSlavesSockets函数调用<strong>rdbSaveRioWithEOFMark函数</strong>（在rdb.c文件中），在RDB二进制数据的前后加上了标识字符串，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d8/25/d8b79034afb8180721b7978b0063bb25.jpg?wh=2000x412" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d8/25/d8b79034afb8180721b7978b0063bb25.jpg?wh=2000x412" /></p>
 <p>以下代码也展示了rdbSaveRioWithEOFMark函数的基本执行逻辑。你可以看到，它除了写入前后标识字符串之外，还是会调用rdbSaveRio函数实际生成RDB内容。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>int rdbSaveRioWithEOFMark(rio *rdb, int *error, rdbSaveInfo *rsi) {
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>...
@@ -14613,7 +14613,7 @@
 <p>那么经过查找，我们可以发现在Redis源码中，rdbSave还会在<strong>flushallCommand函数</strong>（在<a href="http://github.com/redis/redis/tree/5.0/src/db.c">db.c</a>文件中）、<strong>prepareForShutdown函数</strong>（在<a href="https://github.com/redis/redis/tree/5.0/src/server.c">server.c</a>文件中）中被调用。这也就是说，Redis在执行flushall命令以及正常关闭时，会创建RDB文件。</p>
 <p>对于rdbSaveBackground函数来说，它除了在执行bgsave命令时被调用，当主从复制采用落盘文件方式传输RDB时，它也会被startBgsaveForReplication函数调用。此外，Redis server运行时的周期性执行函数serverCron（在<a href="https://github.com/redis/redis/tree/5.0/src/server.c">server.c</a>文件中），也会调用rdbSaveBackground函数来创建RDB文件。</p>
 <p>为了便于你掌握RDB文件创建的整体情况，我画了下面这张图，展示了Redis源码中创建RDB文件的函数调用关系，你可以看下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/93/a9/939b3b3fb530668d7c91c94cb05510a9.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/93/a9/939b3b3fb530668d7c91c94cb05510a9.jpg?wh=2000x1125" /></p>
 <p>好了，到这里，你可以看到，实际最终生成RDB文件的函数是rdbSaveRio。所以接下来，我们就来看看rdbSaveRio函数的执行过程。同时，我还会给你介绍RDB文件的格式是如何组织的。</p>
 <h2 id="rdb_1">RDB文件是如何生成的？</h2>
 <p>不过在了解rdbSaveRio函数具体是如何生成RDB文件之前，你还需要先了解下RDB文件的基本组成部分。这样，你就可以按照RDB文件的组成部分，依次了解rdbSaveRio函数的执行逻辑了。</p>
@@ -14624,7 +14624,7 @@
 <li><strong>文件尾</strong>：这部分保存了RDB文件的结束标识符，以及整个文件的校验值。这个校验值用来在Redis server加载RDB文件后，检查文件是否被篡改过。</li>
 </ul>
 <p>下图就展示了RDB文件的组成，你可以看下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b0/86/b031cb3c43ce9563f07f3ffb591cc486.jpg?wh=1804x1020" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b0/86/b031cb3c43ce9563f07f3ffb591cc486.jpg?wh=1804x1020" /></p>
 <p>好，接下来，我们就来看看rdbSaveRio函数是如何生成RDB文件中的每一部分的。这里，为了方便你理解RDB文件格式以及文件内容，你可以先按照如下步骤准备一个RDB文件。</p>
 <p>第一步，在你电脑上Redis的目录下，启动一个用来测试的Redis server，可以执行如下命令：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>./redis-server
@@ -14646,7 +14646,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>od -A x -t x1c -v dump.rdb
 </code></pre></div>
 <p>以下代码展示的就是我用od命令，查看刚才生成的dump.rdb文件后，输出的从文件头开始的部分内容。你可以看到这四行结果中，第一和第三行是用十六进制显示的dump.rdb文件的字节内容，这里每两个十六进制数对应了一个字节。而第二和第四行是od命令生成的每个字节所对应的ASCII字符。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/09/yy/092af3cc2dcda84307bc2e30a6fc47yy.jpg?wh=2000x775" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/09/yy/092af3cc2dcda84307bc2e30a6fc47yy.jpg?wh=2000x775" /></p>
 <p>这也就是说，在刚才生成的RDB文件中，如果想要转换成ASCII字符，它的文件头内容其实就已经包含了REDIS的字符串和一些数字，而这正是RDB文件头包含的内容。</p>
 <p>那么下面，我们就来看看RDB文件的文件头是如何生成的。</p>
 <h3 id="_1">生成文件头</h3>
@@ -14659,7 +14659,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>if (rdbSaveInfoAuxFields(rdb,flags,rsi) == -1) goto werr; //写入属性信息
 </code></pre></div>
 <p>rdbSaveInfoAuxFields函数是在rdb.c文件中实现的，它会使用键值对的形式，在RDB文件头中记录Redis server的属性信息。下表中列出了RDB文件头记录的一些主要信息，以及它们对应的键和值，你可以看下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c7/01/c79a8314710d2b74483fd74d58ed5301.jpg?wh=2000x792" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c7/01/c79a8314710d2b74483fd74d58ed5301.jpg?wh=2000x792" /></p>
 <p>那么，当属性值为字符串时，rdbSaveInfoAuxFields函数会调用<strong>rdbSaveAuxFieldStrStr函数</strong>写入属性信息；而当属性值为整数时，rdbSaveInfoAuxFields函数会调用<strong>rdbSaveAuxFieldStrInt函数</strong>写入属性信息，如下所示：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>if (rdbSaveAuxFieldStrStr(rdb,&quot;redis-ver&quot;,REDIS_VERSION) == -1) return -1;
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>if (rdbSaveAuxFieldStrInt(rdb,&quot;redis-bits&quot;,redis_bits) == -1) return -1;
@@ -14677,10 +14677,10 @@
 <a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>#define RDB_OPCODE_EOF        255   //标识RDB文件结束，用在文件尾
 </code></pre></div>
 <p><strong>第二步</strong>，rdbSaveAuxField函数调用rdbSaveRawString函数（在rdb.c文件中）写入属性信息的键，而键通常是一个字符串。<strong>rdbSaveRawString函数</strong>是用来写入字符串的通用函数，它会先记录字符串长度，然后再记录实际字符串，如下图所示。这个长度信息是为了解析RDB文件时，程序可以基于它知道当前读取的字符串应该读取多少个字节。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2f/dd/2f5a8ec2219109178ca74e169d7974dd.jpg?wh=1669x334" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2f/dd/2f5a8ec2219109178ca74e169d7974dd.jpg?wh=1669x334" /></p>
 <p>不过，为了节省RDB文件消耗的空间，如果字符串中记录的实际是一个整数，rdbSaveRawString函数还会<strong>调用rdbTryIntegerEncoding函数</strong>（在rdb.c文件中），尝试用<strong>紧凑结构</strong>对字符串进行编码。具体做法你可以进一步阅读rdbTryIntegerEncoding函数。</p>
 <p>下图展示了rdbSaveRawString函数的基本执行逻辑，你可以看下。其中，它调用rdbSaveLen函数写入字符串长度，调用rdbWriteRaw函数写入实际数据。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c3/f7/c3be595bb11ce318239eee9a3828bdf7.jpg?wh=2000x986" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c3/f7/c3be595bb11ce318239eee9a3828bdf7.jpg?wh=2000x986" /></p>
 <p><strong>第三步</strong>，rdbSaveAuxField函数就需要写入属性信息的值了。因为属性信息的值通常也是字符串，所以和第二步写入属性信息的键类似，rdbSaveAuxField函数会调用rdbSaveRawString函数来写入属性信息的值。</p>
 <p>下面的代码展示了rdbSaveAuxField函数的执行整体过程，你可以再回顾下。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>ssize_t rdbSaveAuxField(rio *rdb, void *key, size_t keylen, void *val, size_t vallen) {
@@ -14698,7 +14698,7 @@
 <a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>}
 </code></pre></div>
 <p>到这里，RDB文件头的内容已经写完了。我把刚才创建的RDB文件头的部分内容，画在了下图当中，并且标识了十六进制对应的ASCII字符以及一些关键信息，你可以结合图例来理解刚才介绍的代码。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3b/34/3b7db22a0c7276fbe24afed80a3bc234.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3b/34/3b7db22a0c7276fbe24afed80a3bc234.jpg?wh=2000x1125" /></p>
 <p>这样接下来，rdbSaveRio函数就要开始写入实际的键值对了，这也是文件中实际记录数据的部分。下面，我们就来具体看下。</p>
 <h3 id="_2">生成文件数据部分</h3>
 <p>因为Redis server上的键值对可能被保存在不同的数据库中，所以，<strong>rdbSaveRio函数会执行一个循环，遍历每个数据库，将其中的键值对写入RDB文件</strong>。</p>
@@ -14712,7 +14712,7 @@
 <a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>...
 </code></pre></div>
 <p>下图展示了刚才我创建的RDB文件中SELECTDB操作码的信息，你可以看到，数据库编号为0。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3c/73/3c3a9cc720506802fa75ba10276d7d73.jpg?wh=1551x461" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3c/73/3c3a9cc720506802fa75ba10276d7d73.jpg?wh=1551x461" /></p>
 <p>紧接着，rdbSaveRio函数会写入<strong>RESIZEDB操作码</strong>，用来标识全局哈希表和过期key哈希表中键值对数量的记录，这个过程的执行代码如下所示：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>...
 <a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>db_size = dictSize(db-&gt;dict);   //获取全局哈希表大小
@@ -14723,7 +14723,7 @@
 <a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>...
 </code></pre></div>
 <p>我也把刚才创建的RDB文件中，RESIZEDB操作码的内容画在了下图中，你可以看下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/15/ff/15782167d58b478ffc08a38fca093fff.jpg?wh=1904x502" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/15/ff/15782167d58b478ffc08a38fca093fff.jpg?wh=1904x502" /></p>
 <p>你可以看到，在RESIZEDB操作码后，紧接着记录的是全局哈希表中的键值对，它的数量是2，然后是过期key哈希表中的键值对，其数量为0。我们刚才在生成RDB文件前，只插入了两个键值对，所以，RDB文件中记录的信息和我们刚才的操作结果是一致的。</p>
 <p>好了，在记录完这些信息后，rdbSaveRio函数会接着<strong>执行一个循环流程</strong>，在该流程中，rdbSaveRio函数会取出当前数据库中的每一个键值对，并调用rdbSaveKeyValuePair函数（在rdb.c文件中），将它写入RDB文件。这个基本的循环流程如下所示：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>while((de = dictNext(di)) != NULL) {  //读取数据库中的每一个键值对
@@ -14765,7 +14765,7 @@
 <a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>#define RDB_TYPE_HASH_ZIPLIST  13
 </code></pre></div>
 <p>我把刚才写入的String类型键值对“hello”“redis”在RDB文件中对应的记录内容，画在了下图中，你可以看下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/78/1d/786363a521ae6e3911c8c4002b53331d.jpg?wh=1920x514" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/78/1d/786363a521ae6e3911c8c4002b53331d.jpg?wh=1920x514" /></p>
 <p>你可以看到，这个键值对的开头类型标识就是0，和刚才介绍的RDB_TYPE_STRING宏定义的值是一致的。而紧接着的key和value，它们都会先记录长度信息，然后才记录实际内容。</p>
 <p>因为键值对的key都是String类型，所以rdbSaveKeyValuePair函数就用rdbSaveStringObject函数来写入了。而键值对的value有不同的类型，所以，rdbSaveObject函数会根据value的类型，执行不同的代码分支，将value底层数据结构中的内容写入RDB。</p>
 <p>好了，到这里，我们就了解了rdbSaveKeyValuePair函数是如何将键值对写入RDB文件中的了。在这个过程中，除了键值对类型、键值对的key和value会被记录以外，键值对的过期时间、LRU空闲时间或是LFU访问频率也都会记录到RDB文件中。这就生成RDB文件的数据部分。</p>
@@ -14784,7 +14784,7 @@
 <a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>...
 </code></pre></div>
 <p>下图展示了我刚才生成的RDB文件的文件尾，你可以看下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/15/15/158b7b6f7315e6376428f9cc3e04a515.jpg?wh=1923x452" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/15/15/158b7b6f7315e6376428f9cc3e04a515.jpg?wh=1923x452" /></p>
 <p>这样，我们也就整体了解了RDB文件从文件头、文件数据部分再到文件尾的整个生成过程了。</p>
 <h2 id="_4">小结</h2>
 <p>今天这节课，我给你介绍了Redis内存快照文件RDB的生成。你要知道，创建RDB文件的三个入口函数分别是rdbSave、rdbSaveBackground、rdbSaveToSlavesSockets，它们在Redis源码中被调用的地方，也就是触发RDB文件生成的时机。</p>
@@ -14960,8 +14960,6 @@ bgsave因为AOF重写的原有被迫推迟，所以在最后需要重新调用�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

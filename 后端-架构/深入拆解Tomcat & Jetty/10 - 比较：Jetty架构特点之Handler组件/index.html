@@ -14429,7 +14429,7 @@
   <h1>10   比较：Jetty架构特点之Handler组件</h1>
 
 <p>在专栏上一期，我们学习了Jetty的整体架构。先来回顾一下，Jetty 就是由多个Connector（连接器）、多个Handler（处理器），以及一个线程池组成，整体结构图如下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/66/6a/66e55e89fd621c0eba6321471da2016a.png?wh=1354%2A714" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/66/6a/66e55e89fd621c0eba6321471da2016a.png?wh=1354%2A714" /></p>
 <p>上一期我们分析了Jetty Connector组件的设计，Connector会将Servlet请求交给Handler去处理，那Handler又是如何处理请求的呢？</p>
 <p>Jetty的Handler在设计上非常有意思，可以说是Jetty的灵魂，Jetty通过Handler实现了高度可定制化，那具体是如何实现的呢？我们能从中学到怎样的设计方法呢？接下来，我就来聊聊这些问题。</p>
 <h2 id="handler">Handler是什么</h2>
@@ -14452,12 +14452,12 @@
 <p><strong>Handler继承关系</strong></p>
 <p>Handler只是一个接口，完成具体功能的还是它的子类。那么Handler有哪些子类呢？它们的继承关系又是怎样的？这些子类是如何实现Servlet容器功能的呢？</p>
 <p>Jetty中定义了一些默认Handler类，并且这些Handler类之间的继承关系比较复杂，我们先通过一个全景图来了解一下。为了避免让你感到不适，我对类图进行了简化。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3a/64/3a7b3fbf16bb79594ec23620507c5c64.png?wh=1145%2A684" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3a/64/3a7b3fbf16bb79594ec23620507c5c64.png?wh=1145%2A684" /></p>
 <p>从图上你可以看到，Handler的种类和层次关系还是比较复杂的：</p>
 <p>Handler接口之下有抽象类AbstractHandler，这一点并不意外，因为有接口一般就有抽象实现类。</p>
 <p>在AbstractHandler之下有AbstractHandlerContainer，为什么需要这个类呢？这其实是个过渡，为了实现链式调用，一个Handler内部必然要有其他Handler的引用，所以这个类的名字里才有Container，意思就是这样的Handler里包含了其他Handler的引用。</p>
 <p>理解了上面的AbstractHandlerContainer，我们就能理解它的两个子类了：HandlerWrapper和HandlerCollection。简单来说就是，HandlerWrapper和HandlerCollection都是Handler，但是这些Handler里还包括其他Handler的引用。不同的是，HandlerWrapper只包含一个其他Handler的引用，而HandlerCollection中有一个Handler数组的引用。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f8/c1/f89a1e88a78a7e6860d69af3572467c1.png?wh=1470%2A544" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f8/c1/f89a1e88a78a7e6860d69af3572467c1.png?wh=1470%2A544" /></p>
 <p>接着来看左边的HandlerWrapper，它有两个子类：Server和ScopedHandler。Server比较好理解，它本身是Handler模块的入口，必然要将请求传递给其他Handler来处理，为了触发其他Handler的调用，所以它是一个HandlerWrapper。</p>
 <p>再看ScopedHandler，它也是一个比较重要的Handler，实现了“具有上下文信息”的责任链调用。为什么我要强调“具有上下文信息”呢？那是因为Servlet规范规定Servlet在执行过程中是有上下文的。那么这些Handler在执行过程中如何访问这个上下文呢？这个上下文又存在什么地方呢？答案就是通过ScopedHandler来实现的。</p>
 <p>而ScopedHandler有一堆的子类，这些子类就是用来实现Servlet规范的，比如ServletHandler、ContextHandler、SessionHandler、ServletContextHandler和WebAppContext。接下来我会详细介绍它们，但我们先把总体类图看完。</p>
@@ -14491,7 +14491,7 @@
 <p>再来看ServletHandler，它实现了Servlet规范中的Servlet、Filter和Listener的功能。ServletHandler依赖FilterHolder、ServletHolder、ServletMapping、FilterMapping这四大组件。FilterHolder和ServletHolder分别是Filter和Servlet的包装类，每一个Servlet与路径的映射会被封装成ServletMapping，而Filter与拦截URL的映射会被封装成FilterMapping。</p>
 <p>SessionHandler从名字就知道它的功能，用来管理Session。除此之外WebAppContext还有一些通用功能的Handler，比如SecurityHandler和GzipHandler，同样从名字可以知道这些Handler的功能分别是安全控制和压缩/解压缩。</p>
 <p>WebAppContext会将这些Handler构建成一个执行链，通过这个链会最终调用到我们的业务Servlet。我们通过一张图来理解一下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5f/c1/5f1404567deec36ac68c36e44bb06cc1.jpg?wh=1994%2A934" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5f/c1/5f1404567deec36ac68c36e44bb06cc1.jpg?wh=1994%2A934" /></p>
 <p>通过对比Tomcat的架构图，你可以看到，Jetty的Handler组件和Tomcat中的容器组件是大致是对等的概念，Jetty中的WebAppContext相当于Tomcat的Context组件，都是对应一个Web应用；而Jetty中的ServletHandler对应Tomcat中的Wrapper组件，它负责初始化和调用Servlet，并实现了Filter的功能。</p>
 <p>对于一些通用组件，比如安全和解压缩，在Jetty中都被做成了Handler，这是Jetty Handler架构的特点。</p>
 <p>因此对于Jetty来说，请求处理模块就被抽象成Handler，不管是实现了Servlet规范的Handler，还是实现通用功能的Handler，比如安全、解压缩等，我们可以任意添加或者裁剪这些“功能模块”，从而实现高度的可定制化。</p>
@@ -14651,8 +14651,6 @@ handler 应该会把请求字节流转换为servlet request</p>2019-06-04</li><b
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

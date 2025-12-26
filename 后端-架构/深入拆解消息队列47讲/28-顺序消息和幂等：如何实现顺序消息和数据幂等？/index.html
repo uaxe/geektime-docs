@@ -14814,7 +14814,7 @@
 <li>消息队列功能需求较为简单，不太需要复杂的数据结构来支持检索等操作。</li>
 </ol>
 <p>所以，理想情况下顺序消息的实现是：<strong>生产端按顺序发送消息，Broker端按接收到的顺序存储消息，消费端按照Broker端存储的顺序消费消息</strong>。那技术上的实现真的有这么简单吗？我们继续分析。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/06/0d/069374fe8a3098bb5cd1ef7ac4abfc0d.jpg?wh=10666x3427" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/06/0d/069374fe8a3098bb5cd1ef7ac4abfc0d.jpg?wh=10666x3427" /></p>
 <p>如上图所示，实现顺序消息的核心就是：Broker 接收到的消息的顺序要和生产端发出来的顺序是一致的。那在实际的场景中，会发生什么事呢？</p>
 <ol>
 <li>如果有多个生产者，因为发送时间点不一样、网络延迟不一样，此时多个生产者发送到Broker的顺序就无法保证有序，此时落盘的顺序就无法保证。</li>
@@ -14824,14 +14824,14 @@
 <p>所以基于消息队列架构上的这些特性，我们接下来看看在消息队列中如何实现顺序消息。</p>
 <h3 id="_3">基于顺序存储结构的设计</h3>
 <p>基于顺序存储结构的设计，是指保持消息队列底层顺序存储结构不变的前提下，实现顺序消息的技术方案。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/32/18/3217de363e6babed33de427db252fc18.jpg?wh=10666x3922" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/32/18/3217de363e6babed33de427db252fc18.jpg?wh=10666x3922" /></p>
 <p>如上图所示，这是一个三分区的Topic的底层存储结构。结合前面提到的3种实际的场景，为了实现顺序消息就需要满足单一生产者、同步发送、单一分区三个因素。就是说在当前的顺序存储结构中，消息队列实现顺序消息的前提是： <strong>一个生产者同步发送消息到一个分区才能保证消息的有序</strong>。</p>
 <p>其中，<strong>单一生产者+同步发送</strong>是为了解决生产端数据发送的有序性，只有前面一条数据写入成功后，后面的数据才能继续写入。从而规避重试发送、TCP网络延迟带来的不同的请求包到达Broker的时间不一样，导致Broker保存数据的顺序和客户端发送的顺序不一致的问题。</p>
 <p><strong>单一分区</strong>是为了解决消息数据被发送到不同的分区中，导致的不同消费者消费不同分区中的消息的顺序不可控的情况。</p>
 <p>那就有一个问题：如果只能是单一分区，消息队列就失去了水平扩容能力，而无法水平扩容对性能的影响会很大。那有解决办法吗？</p>
 <p>有一个点我们需要知道，<strong>在实际的业务场景中很少会要求所有的的数据是有序的</strong>。比如在数据库Binlog订阅的场景中，假设一个数据库里面有100张表，此时一般只需要保证每张表或者某一行记录的变更记录是有序的即可，因为下游的处理的主体一般是表或者行。所以在实际的场景中，我们只需要保证局部有序即可，而不需要全局有序。</p>
 <p>那么从技术上看，我们就只要保证局部有序的数据写入同一个分区即可，即<strong>根据某个标识将需要有序的数据发送到同一个分区中</strong>。我们举个例子来说明这个标识的作用。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0e/df/0ede26c23bdb16096b583b05405b41df.jpg?wh=10666x3946" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0e/df/0ede26c23bdb16096b583b05405b41df.jpg?wh=10666x3946" /></p>
 <p>如上图所示，给每一批需要排序的消息赋予一个标识，然后把标识为k1、k2、k3的消息分别固定发送到分区一、二、三，从而在满足单一生产者、同步发送、单一分区三个因素的同时，也可以具备水平扩容的能力。</p>
 <p>这个方案有个缺点是：如果某一个标识的数据量特别大，就可能会出现写入数据倾斜。比如k1的数据量非常大，k2、k3的数据量很小，数据就会全部写入到k1中，从而导致集群Broker之间的负载出现倾斜，影响集群的稳定性。</p>
 <p>目前来看，在当前消息队列的架构中，数据倾斜纯依靠服务端很难解决，需要客户端配合，将数据打散写入到多个分区中，不过这样做就无法保证消息的顺序了。</p>
@@ -14839,7 +14839,7 @@
 <p>接下来我们来看一下，目前主流消息队列对于顺序消息的支持方式。</p>
 <h3 id="_4">主流消息队列的实现机制</h3>
 <p>四款主流消息队列对于顺序消息的实现机制如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ff/61/ffff9e021107ca607cd619cda3031f61.jpg?wh=3106x678" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ff/61/ffff9e021107ca607cd619cda3031f61.jpg?wh=3106x678" /></p>
 <p>Kafka 和 Pulsar是通过生产端按Key Hash的方案将数据写入到同一个分区。RocketMQ是通过消息组（功能上类似消息Key）将同一个消息组的数据写入到不同的MessageQueue。RabbitMQ是通过Exchange和Route Key的机制，将数据写入到不同的Queue里面。接下来我们来看一下实现的细节。</p>
 <p>Kafka 和 Puslar 的生产端支持按 Key Hash 的生产分区分配策略。我们只需要给每条消息赋予一个消息Key，比如将属于AppID 1001 客户的消息的Key都设置为1001，此时 Key 为1001的消息会被固定发送到同一个分区。配合生产端的单个生产者和同步发送机制，就可以保证属于AppID 为1001的数据被有序存储。</p>
 <p>RocektMQ 支持消息组（MessageGroup）的概念。在生产端指定消息组，则同一个消息组的消息就会被发送到同一个分区中。此时这个消息组起到的作用和Kakfa 的消息的Key是一样的。</p>
@@ -14851,7 +14851,7 @@
 <p>那么消息队列中的幂等是指什么呢？</p>
 <h3 id="_6">消息队列中幂等的定义</h3>
 <p>消息队列中的幂等主要指生产幂等和消费幂等，当然还有其他一些集群管控类的操作的幂等，比如创建Topic、切换Leader等。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8e/yb/8ec71f8eb5f7cabf857d42f22c855yyb.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8e/yb/8ec71f8eb5f7cabf857d42f22c855yyb.jpg?wh=10666x6000" /></p>
 <p><strong>生产幂等</strong>通常指同一条消息不会被重复写入到Broker。即同一条消息客户端无论重复发送多少次，服务端也只会保存一份这条消息。</p>
 <p><strong>消费幂等</strong>很少被单独提到。在<a href="https://time.geekbang.org/column/article/673672">第08讲</a>和<a href="https://time.geekbang.org/column/article/674123">第09讲</a>讲到的消息队列主要是基于消费位点的消费机制。只要客户端不提交消费位点信息，此时消费天生就是幂等的。即不管怎么消费，返回的都是同一条消息。而如果提交了Offset，就会自动消费下一条数据，也符合设计预期。在提交位点的操作中，即使重复提交了同一个位点，消费位点保存的都是同一个值，对消费也不会产生影响。</p>
 <p>因此消费端谈的更多的是Exactly Once，即如何保证一条消息只会被消费一次。这个话题我们在后面讲消息队列事务时再展开细讲。所以接下来我们就重点来看看生产端的幂等是如何实现的。</p>
@@ -14859,22 +14859,22 @@
 <p>我们先来思考一个问题：如果一条消息客户端发送了多次，而Broker端只能保存一份，此时最核心要解决的是什么问题呢？</p>
 <p>答案应该是：<strong>Broker 怎么识别接收到的多条消息是指同一条消息？</strong>即如果 Broker 不知道收到的消息是否为同一条，那就无法拒绝重复的消息。</p>
 <p>我们先来看下面这个示例：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8e/a3/8e728581ef78c941ef859da755116da3.jpg?wh=10666x3018" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8e/a3/8e728581ef78c941ef859da755116da3.jpg?wh=10666x3018" /></p>
 <p>你认为生产端的第二、三行是同一条消息吗？答案是：不是同一条消息。原因是Producer 主动调用了两次 send 方法，所以应该认为客户端发送了两条消息。此时这两条消息都需要保存。</p>
 <p>再来看一下下面这个场景：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a2/4b/a20e25d2c929dcbc6af1d32bffb9b44b.jpg?wh=10666x3114" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a2/4b/a20e25d2c929dcbc6af1d32bffb9b44b.jpg?wh=10666x3114" /></p>
 <p>Producer 只调用了一次 send 方法，只发送了一条消息。但是因为底层网络或者其他故障，这条消息在底层被重传了2次，导致Broker端收到两条内容都是abc的消息。此时从Broker端看来，无法区分清楚收到的两条内容都是abc的消息，客户端是主动send了一次还是两次？</p>
 <p>讲到这里，我们就知道了消息的唯一性应该是以Producer 的 send 调用为准。即 Producer send 一次就表示发送了一条消息，send 两次表示发送两条消息。所以就需要在客户端调用 send 的时候标识消息的唯一性，以标识消息的唯一。</p>
 <p>从技术上来看，主要有两种方案。</p>
 <p><strong>1. 通过消息唯一</strong> <strong>ID</strong> <strong>实现幂等</strong></p>
 <p>通过消息唯一ID实现幂等是指在发送消息的时候，为每条消息分配唯一的消息ID（MsgID），来表示消息的唯一性。如下图所示，消息中携带 MsgID 发送到Broker，Broker 根据 MsgID 判断这条消息是否已经接收，如果没有就保存数据，否则就拒绝写入。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2e/91/2e0c79d2a000ba535f196a899d270091.jpg?wh=10666x3018" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2e/91/2e0c79d2a000ba535f196a899d270091.jpg?wh=10666x3018" /></p>
 <p>基于这种方案的前提是，<strong>需要在生产端开启按Key Hash的机制</strong>，以保证同一个MsgID的消息可以发送到同一个分区中。否则如果同一条消息多次发送投递到不同分区，此时就无法判断之前是否接收过这条消息了。</p>
 <p>这种方案主要有两个技术问题需要重点解决：一个是消息唯一ID的生成策略，另一个是Broker如何识别之前没有接收过这个消息ID。</p>
 <p><strong>消息唯一ID的生成策略</strong>，也可以理解为分布式唯一ID的生成，这样就比较好理解。技术上最简单的就是UUID，但是因为UUID的内容长度和有可能重复等问题，在消息队列中并不适用。</p>
 <p>技术上看，我们在业务系统中常常基于MySQL/Redis/ZooKeeper等第三方系统或基于雪花（Snowflake）算法生成分布式唯一ID。但是在消息队列客户端直接集成 MySQL/Redis/ZooKeeper 等引擎的复杂度太高，所以这个方案基本不可用，因此雪花算法算是比较常用的方案。</p>
 <p>雪花算法的目标是生成一个唯一的 int64(long) 的整形数字。它的核心思想是将long型的64位区分为5段进行组合，以生成规定的唯一数字。来看一下64位long型的结构：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bc/95/bc4f5d4e35d1d441029fa577f74d9595.jpg?wh=10666x2764" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bc/95/bc4f5d4e35d1d441029fa577f74d9595.jpg?wh=10666x2764" /></p>
 <p>如上图所示，64位long型的结构一般可以分为<strong>符号位</strong>、<strong>时间戳</strong>、<strong>数据中心</strong> <strong>ID</strong>、<strong>机器</strong> <strong>ID</strong>、<strong>计数器</strong> 5个字段，每个字段的意义是不一样的。算法的核心是数据中心ID和机器ID这两个字段，只要这两个字段的内容是唯一的，那么就可以保证生成的long型的值是唯一的。</p>
 <p>一般情况下从业务上看，只需要在Topic维度保持消息的顺序性就可以。我们在<a href="https://time.geekbang.org/column/article/688520">第27讲</a>中提到消息队列架构中，会有集群ID和TopicID来唯一标识集群和Topic，因此可以将雪花算法中的数据中心ID和机器ID替换为集群ID和TopicID，这样就可以使生成的消息ID是唯一的。</p>
 <p><strong>Broker如何识别之前没有接收过这个消息ID</strong>，就是说需要在 Broker 端设计保存已经接收到的所有MsgID，用来在接收到消息后将消息ID和当前接收过的所有的消息ID做一个比较，以判断消息是否重复。</p>
@@ -14891,13 +14891,13 @@
 <p>所以该方案的核心思路是：为每个生产者赋予唯一的ID，生产者ID是全局唯一的。然后生产者启动时生成一个从0开始的自增序号，用来表示这个生产者发送出去的消息，每条消息分别有一个自增序号，比如 0、1、2……即通过Producer和seqnum二元组来唯一标识消息。</p>
 <p>特别说明一下，生产者ID可以用上面提到的Snowflake算法来生成，因为生产者很少，甚至直接用UUID也可以，毕竟UUID重复的几率也非常低。</p>
 <p>来看一下下面这张图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b9/9a/b96762db952ea8ba4f428c435dfc869a.jpg?wh=10666x2976" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b9/9a/b96762db952ea8ba4f428c435dfc869a.jpg?wh=10666x2976" /></p>
 <p>在上图中，生产者有一个唯一ID p1，消息中会携带 ProducerID 和 seqnum 两个值来唯一标识这条消息。此时Broker会根据这个二元组判断是否收到过这条消息，是就保存，否就拒绝。</p>
 <p>从实现的角度，服务端理论上依旧要保留这个生产者所有发送成功的seqnum的集合，这样才能判断消息是否有重复。此时如果生产者很多并且生产者一直没有重启的话，服务端就需要保留非常多的Producer和seqnum数据。<strong>此时开发复杂度和上一个方案是差不多的，技术实现上只是把标识从MsgID 换为Producer + seqnum 而已，没有本质区别。</strong></p>
 <p>既然没有本质区别，那么这个方案跟第一种方案的区别哪里呢？从技术上看，有一个技巧可以不保存生产者所有发送成功的seqnum集合，但是又可以识别出所有已发送的seqnum。</p>
 <p>这个技巧的思路是：我们不保留所有的seqnum，只保留最新收到的seqnum。此时如果收到的消息的seqnum是下一条msg，那么就正常保存数据。否则就放进队列中先等待，等待下一条msg收到后，再来判断是否保存该数据，甚至可以直接拒绝消息写入。</p>
 <p>我们通过下面这张图来说明一下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/de/a1/de2yy635b56029f4c23126f7efbdc2a1.jpg?wh=10666x4222" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/de/a1/de2yy635b56029f4c23126f7efbdc2a1.jpg?wh=10666x4222" /></p>
 <p>Broker 收到的 Producer ID 为p1的生产者的最新的seqnum 为4（current seqnum），那么下一条允许收到的seqnum是5。如果下一条是5，则保存数据，然后current seqnum更新为5，并等待seqnum为6的数据。而如果此时发送过来的是8，就可以有两种策略：</p>
 <ul>
 <li>策略一：先把8缓存在Broker内存中，等待收到6和7后，再把8写入存储。这种方案的缺点是6和7可能永远接收不到，而Broker就需要一直保存8这条数据。因此可能会发生内存溢出或占用额外的存储空间。</li>
@@ -14906,12 +14906,12 @@
 <p>目前业界主流的消息队列只有Kafka支持幂等，其他三款消息队列RocketMQ、RabbitMQ、Pulsar都不支持。所以接下来我们简单看一下Kafka幂等机制的实现方式。</p>
 <h3 id="kafka">Kafka的幂等机制的实现方案</h3>
 <p>kafka的生产者在启动时会为每个生产者分配一个唯一ID。这个唯一ID是客户端从Broker申请的，不是自己生成的。来看下图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6f/24/6f70200b2aeb7ea1e97e22c5d7608824.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6f/24/6f70200b2aeb7ea1e97e22c5d7608824.jpg?wh=10666x6000" /></p>
 <p>从实现上看，Broker 通过在ZooKeper创建一个节点来生成自增ID，然后返回给客户端，从而保证生产者的ID是这个集群唯一的，属于基于第三方系统来生成分布式唯一ID。这里你要注意的是，唯一ID是 Broker 和 ZooKeeper 交互生成的，而不是客户端直接和 ZooKeeper 交互生成的，这是为了避免给客户端引入了过高的复杂度。</p>
 <p>我们知道，Kafka 支持 Batch 语义，所以在发送消息的时候会为每批次消息赋予一个seqnum，用来标识这个生产者发送的消息的唯一性。和我们上面的思路有些不一样的是，Kafka 在每个Topic-Partition 维度都会有一个独立的seqnum，即通过PID、Topic、PartitionNum、seqnum 四元组来唯一标识一条消息。我们稍后再来说明为何这样实现。</p>
 <p>我们先重点来看一下，Kafka 是怎样判断消息是否重复的？</p>
 <p>从具体实现上看，Broker 端会缓存 PID 对应 Topic-Partition 的五个最近的 batch 信息。比如曾经接收过1、2、3、4、5、6六个消息，此时只会缓存 2~6 五个消息ID。如下图所示，Broker接收到数据后，会循环缓存中的数据，判断是否重复，重复就拒绝，不重复就直接保存。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/96/3a/964b540200ab03f8dab7eaa1637f603a.png?wh=1488x338" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/96/3a/964b540200ab03f8dab7eaa1637f603a.png?wh=1488x338" /></p>
 <p>此时有一个问题是，如果消息1过期后，客户端再把消息1发送过来，此时判断结果就是不重复，从而写入数据，那么数据就没办法达到真正意义上的幂等了。所以从具体实现上来看，Kafka的幂等是无法实现完全幂等的，只能支持部分的幂等。</p>
 <p>既然这样，那为什么还用这个方案呢？</p>
 <p>我们上面提到过，如果使用保留判断最后一个seqnum的方案，就会对性能有影响。如果实现强幂等则需要缓存全量seqnum，对内存和存储空间的压力较大，判断匹配性能也会较低，从而对写入性能产生影响。</p>
@@ -15103,8 +15103,6 @@ Kafka幂等发送的思路采用的方案2，它通过Producer ID、Topic、Part
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

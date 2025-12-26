@@ -5886,12 +5886,12 @@
 <p>因为网络这一块涉及到的场景太多了，Linux内核需要去处理各种各样的网络场景，不同网络场景的处理策略也会有所不同。而Linux内核的默认网络配置可能未必会适用我们的场景，这就可能导致我们的业务出现一些莫名其妙的行为。</p>
 <p>所以，要想让业务行为符合预期，你需要了解Linux的相关网络配置，让这些配置更加适用于你的业务。Linux中的网络配置项是非常多的，为了让你更好地了解它们，我就以最常用的TCP/IP协议为例，从一个网络连接是如何建立起来的以及如何断开的来开始讲起。</p>
 <h2 id="tcp">TCP连接的建立过程会受哪些配置项的影响？</h2>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/af/44/afc841ee3822fyye3ec186b28ee93744.jpg?wh=3478%2A2074" title="TCP建连过程" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/af/44/afc841ee3822fyye3ec186b28ee93744.jpg?wh=3478%2A2074" title="TCP建连过程" /></p>
 <p>上图就是一个TCP连接的建立过程。TCP连接的建立是一个从Client侧调用connect()，到Server侧accept()成功返回的过程。你可以看到，在整个TCP建立连接的过程中，各个行为都有配置选项来进行控制。</p>
 <p>Client调用connect()后，Linux内核就开始进行三次握手。</p>
 <p>首先Client会给Server发送一个SYN包，但是该SYN包可能会在传输过程中丢失，或者因为其他原因导致Server无法处理，此时Client这一侧就会触发超时重传机制。但是也不能一直重传下去，重传的次数也是有限制的，这就是tcp_syn_retries这个配置项来决定的。</p>
 <p>假设tcp_syn_retries为3，那么SYN包重传的策略大致如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/01/e4/012b9bf3e59f3abd5c5588a968e354e4.jpg?wh=2907%2A2066" title="tcp_syn_retries示意图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/01/e4/012b9bf3e59f3abd5c5588a968e354e4.jpg?wh=2907%2A2066" title="tcp_syn_retries示意图" /></p>
 <p>在Client发出SYN后，如果过了1秒 ，还没有收到Server的响应，那么就会进行第一次重传；如果经过2s的时间还没有收到Server的响应，就会进行第二次重传；一直重传tcp_syn_retries次。</p>
 <p>对于tcp_syn_retries为3而言，总共会重传3次，也就是说从第一次发出SYN包后，会一直等待（1 + 2 + 4 + 8）秒，如果还没有收到Server的响应，connect()就会产生ETIMEOUT的错误。</p>
 <p>tcp_syn_retries的默认值是6，也就是说如果SYN一直发送失败，会在（1 + 2 + 4 + 8 + 16+ 32 + 64）秒，即127秒后产生ETIMEOUT的错误。</p>
@@ -5929,11 +5929,11 @@
 </blockquote>
 <p>这是因为，Server如果来不及accept()而导致全连接队列满，这往往是由瞬间有大量新建连接请求导致的，正常情况下Server很快就能恢复，然后Client再次重试后就可以建连成功了。也就是说，将 tcp_abort_on_overflow 配置为0，给了Client一个重试的机会。当然，你可以根据你的实际情况来决定是否要使能该选项。</p>
 <p>accept()成功返回后，一个新的TCP连接就建立完成了，TCP连接进入到了ESTABLISHED状态：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e0/3c/e0ea3232fccf6bba8bace54d3f5d8d3c.jpg?wh=3000%2A2003" title="TCP状态转换" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e0/3c/e0ea3232fccf6bba8bace54d3f5d8d3c.jpg?wh=3000%2A2003" title="TCP状态转换" /></p>
 <p>上图就是从Client调用connect()，到Server侧accept()成功返回这一过程中的TCP状态转换。这些状态都可以通过netstat或者ss命令来看。至此，Client和Server两边就可以正常通信了。</p>
 <p>接下来，我们看下TCP连接断开过程中会受哪些系统配置项的影响。</p>
 <h2 id="tcp_1">TCP连接的断开过程会受哪些配置项的影响？</h2>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1c/cf/1cf68d3eb4f07113ba13d84124f447cf.jpg?wh=3000%2A1929" title="TCP的四次挥手" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1c/cf/1cf68d3eb4f07113ba13d84124f447cf.jpg?wh=3000%2A1929" title="TCP的四次挥手" /></p>
 <p>如上所示，当应用程序调用close()时，会向对端发送FIN包，然后会接收ACK；对端也会调用close()来发送FIN，然后本端也会向对端回ACK，这就是TCP的四次挥手过程。</p>
 <p>首先调用close()的一侧是active close（主动关闭）；而接收到对端的FIN包后再调用close()来关闭的一侧，称之为passive close（被动关闭）。在四次挥手的过程中，有三个TCP状态需要额外关注，就是上图中深红色的那三个状态：主动关闭方的FIN_WAIT_2和TIME_WAIT，以及被动关闭方的CLOSE_WAIT状态。除了CLOSE_WAIT状态外，其余两个状态都有对应的系统配置项来控制。</p>
 <p>我们首先来看FIN_WAIT_2状态，TCP进入到这个状态后，如果本端迟迟收不到对端的FIN包，那就会一直处于这个状态，于是就会一直消耗系统资源。Linux为了防止这种资源的开销，设置了这个状态的超时时间tcp_fin_timeout，默认为60s，超过这个时间后就会自动销毁该连接。</p>
@@ -5961,7 +5961,7 @@
 <p>好了，我们这节课就到此为止。</p>
 <h2 id="_1">课堂总结</h2>
 <p>这节课我们讲了很多的配置项，我把这些配置项汇总到了下面这个表格里，方便你记忆：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3d/de/3d60be2523528f511dec0fbc88ce1ede.jpg?wh=3854%2A2416" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3d/de/3d60be2523528f511dec0fbc88ce1ede.jpg?wh=3854%2A2416" /></p>
 <p>当然了，有些配置项也是可以根据你的服务器负载以及CPU和内存大小来做灵活配置的，比如tcp_max_syn_backlog、somaxconn、tcp_max_tw_buckets这三项，如果你的物理内存足够大、CPU核数足够多，你可以适当地增大这些值，这些往往都是一些经验值。</p>
 <p>另外，我们这堂课的目的不仅仅是为了让你去了解这些配置项，最主要的是想让你了解其背后的机制，这样你在遇到一些问题时，就可以有一个大致的分析方向。</p>
 <h2 id="_2">课后作业</h2>
@@ -6110,8 +6110,6 @@ TIME_WAIT 是与 FIN_WAIT_2 共用了同一个选项吗?</p>2020-09-12</li><br/>
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

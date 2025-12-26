@@ -6669,33 +6669,33 @@
 <h2 id="_1">我们为什么需要高速缓存?</h2>
 <p>按照<a href="https://zh.wikipedia.org/wiki/%E6%91%A9%E5%B0%94%E5%AE%9A%E5%BE%8B">摩尔定律</a>，CPU的访问速度每18个月便会翻一番，相当于每年增长60%。内存的访问速度虽然也在不断增长，却远没有这么快，每年只增长7%左右。而这两个增长速度的差异，使得CPU性能和内存访问性能的差距不断拉大。到今天来看，一次内存的访问，大约需要120个CPU Cycle，这也意味着，在今天，CPU和内存的访问速度已经有了120倍的差距。</p>
 <p>如果拿我们现实生活来打个比方的话，CPU的速度好比风驰电掣的高铁，每小时350公里，然而，它却只能等着旁边腿脚不太灵便的老太太，也就是内存，以每小时3公里的速度缓慢步行。因为CPU需要执行的指令、需要访问的数据，都在这个速度不到自己1%的内存里。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4f/4b/4fc459f42a67d3949402865a998bf34b.png?wh=1142%2A607" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4f/4b/4fc459f42a67d3949402865a998bf34b.png?wh=1142%2A607" /></p>
 <p>随着时间变迁，CPU和内存之间的性能差距越来越大</p>
 <p>为了弥补两者之间的性能差异，我们能真实地把CPU的性能提升用起来，而不是让它在那儿空转，我们在现代CPU中引入了高速缓存。</p>
 <p>从CPU Cache被加入到现有的CPU里开始，内存中的指令、数据，会被加载到L1-L3 Cache中，而不是直接由CPU访问内存去拿。在95%的情况下，CPU都只需要访问L1-L3 Cache，从里面读取指令和数据，而无需访问内存。要注意的是，这里我们说的CPU Cache或者L1/L3 Cache，不是一个单纯的、概念上的缓存（比如之前我们说的拿内存作为硬盘的缓存），而是指特定的由SRAM组成的物理芯片。</p>
 <p>这里是一张Intel CPU的放大照片。这里面大片的长方形芯片，就是这个CPU使用的20MB的L3 Cache。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c1/15/c1dc0e3453f469fc4607557dab9d5215.jpg?wh=1142%2A1147" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c1/15/c1dc0e3453f469fc4607557dab9d5215.jpg?wh=1142%2A1147" /></p>
 <p>现代CPU中大量的空间已经被SRAM占据，图中用红色框出的部分就是CPU的L3 Cache芯片</p>
 <p>在这一讲一开始的程序里，运行程序的时间主要花在了将对应的数据从内存中读取出来，加载到CPU Cache里。CPU从内存中读取数据到CPU Cache的过程中，是一小块一小块来读取数据的，而不是按照单个数组元素来读取数据的。这样一小块一小块的数据，在CPU Cache里面，我们把它叫作Cache Line（缓存块）。</p>
 <p>在我们日常使用的Intel服务器或者PC里，Cache Line的大小通常是64字节。而在上面的循环2里面，我们每隔16个整型数计算一次，16个整型数正好是64个字节。于是，循环1和循环2，需要把同样数量的Cache Line数据从内存中读取到CPU Cache中，最终两个程序花费的时间就差别不大了。</p>
 <p>知道了为什么需要CPU Cache，接下来，我们就来看一看，CPU究竟是如何访问CPU Cache的，以及CPU Cache是如何组织数据，使得CPU可以找到自己想要访问的数据的。因为Cache作为“缓存”的意思，在很多别的存储设备里面都会用到。为了避免你混淆，在表示抽象的“缓存“概念时，用中文的“缓存”；如果是CPU Cache，我会用“高速缓存“或者英文的“Cache”，来表示。</p>
 <h2 id="cache">Cache的数据结构和读取过程是什么样的？</h2>
 <p>现代CPU进行数据读取的时候，无论数据是否已经存储在Cache中，CPU始终会首先访问Cache。只有当CPU在Cache中找不到数据的时候，才会去访问内存，并将读取到的数据写入Cache之中。当时间局部性原理起作用后，这个最近刚刚被访问的数据，会很快再次被访问。而Cache的访问速度远远快于内存，这样，CPU花在等待内存访问上的时间就大大变短了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3a/cc/3a6fcfd1155e03f4f2781dbb6ddaf6cc.png?wh=1142%2A579" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3a/cc/3a6fcfd1155e03f4f2781dbb6ddaf6cc.png?wh=1142%2A579" /></p>
 <p>这样的访问机制，和我们自己在开发应用系统的时候，“使用内存作为硬盘的缓存”的逻辑是一样的。在各类基准测试（Benchmark）和实际应用场景中，CPU Cache的命中率通常能达到95%以上。</p>
 <p>问题来了，CPU如何知道要访问的内存数据，存储在Cache的哪个位置呢？接下来，我就从最基本的<strong>直接映射Cache</strong>（Direct Mapped Cache）说起，带你来看整个Cache的数据结构和访问逻辑。</p>
 <p>在开头的3行小程序里我说过，CPU访问内存数据，是一小块一小块数据来读取的。对于读取内存中的数据，我们首先拿到的是数据所在的<strong>内存块</strong>（Block）的地址。而直接映射Cache采用的策略，就是确保任何一个内存块的地址，始终映射到一个固定的CPU Cache地址（Cache Line）。而这个映射关系，通常用mod运算（求余运算）来实现。下面我举个例子帮你理解一下。</p>
 <p>比如说，我们的主内存被分成0～31号这样32个块。我们一共有8个缓存块。用户想要访问第21号内存块。如果21号内存块内容在缓存块中的话，它一定在5号缓存块（21 mod 8 = 5）中。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/52/22/522eade51bbfad19fd25eb4f3ce80f22.png?wh=1142%2A793" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/52/22/522eade51bbfad19fd25eb4f3ce80f22.png?wh=1142%2A793" /></p>
 <p>Cache采用mod的方式，把内存块映射到对应的CPU Cache中</p>
 <p>实际计算中，有一个小小的技巧，通常我们会把缓存块的数量设置成2的N次方。这样在计算取模的时候，可以直接取地址的低N位，也就是二进制里面的后几位。比如这里的8个缓存块，就是2的3次方。那么，在对21取模的时候，可以对21的2进制表示10101取地址的低三位，也就是101，对应的5，就是对应的缓存块地址。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ca/80/caadd2728b5cfcd2bd704103570f3a80.png?wh=1142%2A762" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ca/80/caadd2728b5cfcd2bd704103570f3a80.png?wh=1142%2A762" /></p>
 <p>取Block地址的低位，就能得到对应的Cache Line地址，除了21号内存块外，13号、5号等很多内存块的数据，都对应着5号缓存块中。既然如此，假如现在CPU想要读取21号内存块，在读取到5号缓存块的时候，我们怎么知道里面的数据，究竟是不是21号对应的数据呢？同样，建议你借助现有知识，先自己思考一下，然后再看我下面的分析，这样会印象比较深刻。</p>
 <p>这个时候，在对应的缓存块中，我们会存储一个<strong>组标记</strong>（Tag）。这个组标记会记录，当前缓存块内存储的数据对应的内存块，而缓存块本身的地址表示访问地址的低N位。就像上面的例子，21的低3位101，缓存块本身的地址已经涵盖了对应的信息、对应的组标记，我们只需要记录21剩余的高2位的信息，也就是10就可以了。</p>
 <p>除了组标记信息之外，缓存块中还有两个数据。一个自然是从主内存中加载来的实际存放的数据，另一个是<strong>有效位</strong>（valid bit）。啥是有效位呢？它其实就是用来标记，对应的缓存块中的数据是否是有效的，确保不是机器刚刚启动时候的空数据。如果有效位是0，无论其中的组标记和Cache Line里的数据内容是什么，CPU都不会管这些数据，而要直接访问内存，重新加载数据。</p>
 <p>CPU在读取数据的时候，并不是要读取一整个Block，而是读取一个他需要的数据片段。这样的数据，我们叫作CPU里的一个字（Word）。具体是哪个字，就用这个字在整个Block里面的位置来决定。这个位置，我们叫作偏移量（Offset）。</p>
 <p>总结一下，<strong>一个内存的访问地址，最终包括高位代表的组标记、低位代表的索引，以及在对应的Data Block中定位对应字的位置偏移量。</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/13/d4/1313fe1e4eb3b5c949284c8b215af8d4.png?wh=1142%2A638" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/13/d4/1313fe1e4eb3b5c949284c8b215af8d4.png?wh=1142%2A638" /></p>
 <p>内存地址到Cache Line的关系</p>
 <p>而内存地址对应到Cache里的数据结构，则多了一个有效位和对应的数据，由“<strong>索引 + 有效位</strong> <strong>+ 组标记 + 数据</strong>”组成。如果内存中的数据已经在CPU Cache里了，那一个内存地址的访问，就会经历这样4个步骤：</p>
 <ol>
@@ -6885,8 +6885,6 @@ print &#39;2,&#39;, int(time.time()*1000) - start
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

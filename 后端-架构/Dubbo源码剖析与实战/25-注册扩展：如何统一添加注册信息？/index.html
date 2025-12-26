@@ -14175,7 +14175,7 @@
 <p>但是大多数功能的核心逻辑，不在网关，而是在后端应用，那就意味着，网关接收到前端请求后，还得再调用其他后端应用，但是，后端应用系统会部署在测试环境的多个 IP 节点上。那，<strong>网关怎么知道要调用后端应用哪个 IP 节点呢？</strong></p>
 <p>按“<a href="https://time.geekbang.org/column/article/611355">温故知新</a>”学过的负载均衡策略，你可能会说，网关根据调用接口，负载均衡到任意一个 IP 节点就行了。</p>
 <p>可是，你忽略了一个重要因素，在需求并行迭代开发的节奏下，不同的 IP 节点，可能部署的是你这个后端应用的不同版本，如果让网关负载均衡，我们怎么能保证每次前端发起的请求，都会命中需要测试的那个后端应用 IP 节点呢？</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ce/40/ce7e2ee053943a54e836f16084397c40.jpg?wh=1920x803" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ce/40/ce7e2ee053943a54e836f16084397c40.jpg?wh=1920x803" /></p>
 <p>就像图中，有一个网关，两个后端应用 app1 和 app2，app1 的两个迭代版本分别部署在 ip1 和 ip2 节点上。现在，前端通过指定 IP 请求到了网关，网关继续调用 app1，该调用 app1 的 ip1 节点，还是 ip2 节点呢？网关是负载均衡调用，还是指定 app1 的 IP 调用呢？</p>
 <p>对于这种需要把请求，路由到指定的后端应用 IP 节点的情况，该怎么处理呢？</p>
 <h2 id="ip">手动配置 IP</h2>
@@ -14194,7 +14194,7 @@
 </ul>
 <p>既然改代码这么麻烦，你肯定也想到了新想法——<strong>变成可配置化形式，就不必再为了修改代码、打包和部署而烦恼了</strong>。</p>
 <p>一想到配置化的形式，回忆之前在“<a href="https://time.geekbang.org/column/article/615345">配置加载顺序</a>”中学过的四层配置覆盖关系，System Properties 优先级最高，Externalized Configuration 次之，API / XML / 注解的优先级再低一点，Local File 优先级最低。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e4/1c/e47919148139eb4c4c17925yy808721c.png?wh=4716x2134" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e4/1c/e47919148139eb4c4c17925yy808721c.png?wh=4716x2134" /></p>
 <p>我们可以在 System Properties、Externalized Configuration 两个层级进行动态化的配置，立马就解决了先前的硬编码形式，效率有了大大的提升。</p>
 <p>配置形式，我举 2 个例子。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>///////////////////////////////////////////////////
@@ -14220,12 +14220,12 @@
 <p>之前手动配置的 IP 地址，是在 dubbo:reference 标签或者 @DubboReference 注解中通过添加 url 属性来搞定的，而 url 属性值的解析处理，是由 Dubbo 框架层面完成的。所以，解析逻辑，我们很难人为介入控制，即使控制了，还得为 Dubbo 框架使用 url 属性值的地方做兼容考虑，工作量肯定不小。因此为 IP 添加标识这个事，继续打 url 属性的主意会越走越歪，我们得另辟蹊径。</p>
 <p>你可能觉得有点难找到突破点，别着急，我分享一个小技巧，<strong>在抽象的时候，我们可以先梳理整个功能的流程，然后反复琢磨每个步骤，看看是否能撕开一个口子做扩展，通过少量的代码编写来完成抽象的能力。</strong></p>
 <p>按照小技巧的说法，我们想在消费方调用提供方时，通过一些标识，来精准找到指定的 IP 进行远程调用，那回忆一下“<a href="https://time.geekbang.org/column/article/621733">调用流程</a>”中的各个步骤，看看能否找到惊喜。看我们当时画的调用流程的总结图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/77/ba/77d06f89cf3731bf52488f109a26c6ba.jpg?wh=5412x2895" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/77/ba/77d06f89cf3731bf52488f109a26c6ba.jpg?wh=5412x2895" /></p>
 <p>在 Cluster 层次模块中，有个故障转移策略的调用步骤，通过重试多次来达到容错目的，恰好这里能拿到多个提供者的 invoker 对象，每个 invoker 对象中就有提供方的 IP 地址。</p>
 <p>这就好办了，到时候只要从多个 invoker 对象中选出一个具体的 invoker 对象就可以了，至于 IP 标识，我们还是不能直接在 IP 地址内容中添加一些东西，因为一旦添加，源码中好多用到 IP 的地方都得做相应的调整，不可行。那我们干脆在 invoker 中添加一个新字段，通过循环 invoker 对象列表的新字段，貌似也能拿到精准的 invoker 对象。</p>
 <p>所有，现在问题变成了，<strong>怎么给 invoker 对象增加一个新字段？</strong></p>
 <p>invoker 是框架层面实打实的硬编码类，想要修改可能有点难，我们得采取一种巧妙的方式，看看这个 invoker 有没有一些扩展属性的字段能用的。我们之前在“<a href="https://time.geekbang.org/column/article/615345">配置加载顺序</a>”中见过 invoker 内部的一些属性，看当时的截图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3d/19/3d8ecc1534747e35bc543a5b39ab4119.jpg?wh=4464x2004" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3d/19/3d8ecc1534747e35bc543a5b39ab4119.jpg?wh=4464x2004" /></p>
 <p>果然，我们找到了一个 urlParam 参数，可以在 urlParam 中添加一个新字段，这样一来，我们只需要循环 invoker 列表中的 urlParam 属性，寻找含有新字段的 invoker 对象就可以了。</p>
 <p>而且，因为 invoker 对象中的 urlParam 属性，在消费方的首次订阅和后续节点变更时，都会从 ZooKeeper 拉取最新的数据，这就意味着，到时候只要让提供方把这个新字段写到 ZooKeeper 中就行了。</p>
 <p>怎么往 ZooKeeper 写数据，我们之前也学过，在“<a href="https://time.geekbang.org/column/article/620988">发布流程</a>”中讲 RegistryProtocol 的 export 方法中，有一段向 ZooKeeper 写数据的代码，这里我也复制过来了。</p>
@@ -14437,7 +14437,7 @@
 <li>在消费方自定义一个集群扩展器，把集群扩展器中的 invoker 列表按照 routeNo 进行分组后，再从接收请求的上下文对象中拿到 routeNo 属性值，从分组集合中选出过滤后的 invoker 列表，最后使用过滤后的 invoker 进行负载均衡调用。</li>
 <li>前端若需要在哪个环境下测试，就在请求头中设置对应的 routeNo 属性以及属性值，这样就充分通过 routeNo 标识，体现了不同环境的隔离。</li>
 </ul>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/60/d8/604c778707754c0ec5a8a1de56b4a1d8.jpg?wh=1920x783" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/60/d8/604c778707754c0ec5a8a1de56b4a1d8.jpg?wh=1920x783" /></p>
 <h2 id="_2">注册扩展的应用</h2>
 <p>注册扩展如何使用，想必你已经非常清楚了，在我们日常开发的过程中，哪些场景会使用到注册扩展呢？我举 3 个常见的应用场景。</p>
 <p>第一，添加路由标识，统一在消费方进行动态路由，以选择正确标识对应的 IP 地址进行远程调用。</p>
@@ -14460,7 +14460,7 @@
 <h3 id="24">24 思考题参考</h3>
 <p>上一期留了个作业，在消费方提供一套针对敏感字段进行加密的过滤器。</p>
 <p>想要解答这个问题，其实很简单，就是与解密过滤器形成对称反向操作，唯一不同的地方，就是将解密操作改为加密操作，其他环节变化不大，看流程图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0c/41/0c9e12a16b24236eb2edf4ab403d6141.jpg?wh=1920x887" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0c/41/0c9e12a16b24236eb2edf4ab403d6141.jpg?wh=1920x887" /></p>
 <p>代码主要有 4 个步骤。</p>
 <ul>
 <li>第一，新增 EncryptConsumerFilter 加密过滤器，并且设置 @Activate 的 group 属性值作用于消费方。</li>
@@ -14649,8 +14649,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

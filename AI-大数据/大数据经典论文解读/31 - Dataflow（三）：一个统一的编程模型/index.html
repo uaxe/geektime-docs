@@ -7800,7 +7800,7 @@
 <p><strong>ParDo，地位相当于MapReduce里的Map阶段。</strong>所有的输入数据，都会被一个DoFn，也就是处理函数处理。但是这些数据，不是在一台服务器上处理的，而是和MapReduce一样，会在很多台机器上被并行处理。只不过MapReduce里的数据处理，只有一个Map阶段和一个Reduce阶段。而在Dataflow里，Pardo会和下面的GroupByKey组合起来，可以有很多层，就好像是很多个MapReduce串在一起一样。</p>
 <p><strong>而GroupByKey，地位则是MapReduce里的Shuffle操作。</strong>在Dataflow里，所有的数据都被抽象成了key-value对。前面的ParDo的输入和Map函数一样，是一个key-value对，输出也是一系列的key-value对。而GroupByKey，则是把相同的Key汇总到一起，然后再通过一个ParDo下的DoFn进行处理。</p>
 <p>比如，我们有一个不断输入的日志流，想要统计所有广告展示次数超过100万次的广告。那么，我们可以先通过一个Pardo解析日志，然后输出（广告ID，1）这样的key-value对，通过GroupByKey，把相同的广告ID的数据分组到一起。然后再通过一个ParDo，并行统计每一个广告ID下的展示次数。最后再通过一个ParDo，过滤掉所有展示次数少于100万次的广告就好了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e1/1c/e1fdcc60133de727a997a3c09a78bc1c.jpg?wh=1920x236" title="Dataflow的编程模型，就是一系列ParDo和GroupByKey串接在一起" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e1/1c/e1fdcc60133de727a997a3c09a78bc1c.jpg?wh=1920x236" title="Dataflow的编程模型，就是一系列ParDo和GroupByKey串接在一起" /></p>
 <h2 id="_1">理解流批一体</h2>
 <p>那么这样看起来，Dataflow不就是个MapReduce吗？它无非是可以把多个MapReduce的过程串接在一起就是了。当然，答案并没有那么简单，因为在Dataflow里，我们还有一个很重要的维度没有加入进来，这个维度就是<strong>时间</strong>。</p>
 <p>Dataflow里的GroupByKey，会把相同Key的数据Shuffle到一起供后续处理，但是它并没有定义在什么时间，这些数据会被Shuffle到一起。</p>
@@ -7817,12 +7817,12 @@
 <li>然后是<strong>滑动窗口</strong>（Sliding Window），也就是窗口随着时间的变动在“滑动”。比如，我们要统计“过去2分钟的广告展示”，那么我们的窗口并不是划分成12:00<sub>12:02，12:02</sub>12:04这样一段段。而是12:00<sub>12:02，然后一分钟之后变成12:01</sub>12:03，在这个例子里，2分钟被称之为<strong>窗口大小</strong>，而窗口每1分钟“滑动”一次，这个1分钟被称之为<strong>滑动周期</strong>。</li>
 <li>最后是<strong>会话窗口</strong>（Session Window）。这个常常用在统计用户的会话上，对于会话的划分，往往是通过我们设置的两次事件之间的一个“超时时间”来定义的。比如，我们有一个客服聊天系统，如果用户和客服之间超过30分钟没有互动，我们就认为上一次会话结束了。在这之后无论是用户主动发言，还是客服主动回复，我们都会认为是进入了一个新的会话。</li>
 </ul>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3c/0e/3cf0dd871c995826cb523yy6c422550e.jpg?wh=1920x529" title="论文中的图1，不同的窗口类型" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3c/0e/3cf0dd871c995826cb523yy6c422550e.jpg?wh=1920x529" title="论文中的图1，不同的窗口类型" /></p>
 <p>既然引入了时间窗口这个概念，相信你很容易理解，我们在Dataflow模型里，需要的不只是GroupByKey，实际在统计数据的时候，往往需要的是<strong>GroupByKeyAndWindow</strong>。统计一个不考虑任何时间窗口的数据，往往是没有意义的，1分钟内广告展示了100万次，和1个月内展示了100万次代表着完全不同的广告投放力度。<strong>我们需要根据特定的时间窗口，来进行数据统计。</strong></p>
 <p>而在实际的逻辑实现层面，Dataflow最重要的两个函数，也就是<strong>AssignWindows函数和MergeWindows函数</strong>。每一个原始的事件，在我们的业务处理函数之前，其实都是（key, value, event_time）这样一个三元组。而AssignWindows要做的，就是把这个三元组，根据我们的处理逻辑，变成（key, value, event_time, window）这样的四元组。</p>
 <p>需要注意，一个事件不只可以分配给一个时间窗口，而是可以分配给多个时间窗口。比如，我们有一个广告在12:01展示给了用户，但是我们统计的是“过去2分钟的广告展示”，那么这个事件，就会被分配给[12:00, 12:02)和[12:01, 12:03)两个时间窗口，我们原先一条的事件就可以变成多条记录。</p>
 <p>而在有了Window的信息之后，如果我们想要按照固定窗口或者滑动窗口统计数据，我们可以很容易地根据Key+Window进行聚合，完成相应的计算。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/64/2d/648e4c74a74710577bd9ec02031e672d.jpg?wh=1920x495" title="分配窗口的时候，可能会生成多条记录，你也可以去查看一下论文里的图3" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/64/2d/648e4c74a74710577bd9ec02031e672d.jpg?wh=1920x495" title="分配窗口的时候，可能会生成多条记录，你也可以去查看一下论文里的图3" /></p>
 <p>但是，有些窗口函数的计算并不容易，比如我们前面讲过的第三种会话窗口，每个事件的发生时间都是不一样的。那么这个时间窗口就很难定义。</p>
 <p>而Dataflow里的做法，是通过<strong>AssignWindows+MergeWindows</strong>的组合，来进行相应的数据统计。我们还是以前面说的，客服30分钟没有互动就算作超时的例子来看看。</p>
 <ul>
@@ -7832,7 +7832,7 @@
 </ul>
 <p>比如同一个用户下，有三个事件，发生的时间分别是13:02、13:14、13:57。那么分配窗口的时候，三个窗口会是$[13:02,13:32)$，$[13:14,13:44)$以及$[13:57,14:27)$。前两个时间窗口是有重叠部分的，但是第三个时间窗口并没有重叠，对应的窗口会合并成$[13:02,13:44)$以及$[13:57,14:27)$这样两个时间窗口。</p>
 <p><strong>窗口的分配和合并功能，就使得Dataflow可以处理乱序数据。</strong>相同的数据以不同的顺序到达我们的计算节点，计算的结果仍然是相同的。并且在这个过程里，我们可以把上一次计算完的结果作为状态持久化下来，然后每一个新进入的事件，都按照AssignWindows和MergeWindows的方式不断对数据进行化简。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/91/fb/91e86c6a57e22ec69902e48f5c10f9fb.jpg?wh=1920x1901" title="论文中的图5，如何通过AssignWindows和MergeWindows来进行数据计算，数据乱序也不影响计算结果" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/91/fb/91e86c6a57e22ec69902e48f5c10f9fb.jpg?wh=1920x1901" title="论文中的图5，如何通过AssignWindows和MergeWindows来进行数据计算，数据乱序也不影响计算结果" /></p>
 <p>你可以来看下论文里的图5，这个图有助于你去理解Dataflow是如何通过它的一些基础操作，来完成对应的数据化简和统计的。</p>
 <h2 id="_3">触发器和增量数据处理</h2>
 <p>这样一来，有了对应的窗口函数逻辑，如果我们的输入数据是确定的，能够一次性都给出来，我们就很容易统计会话数这样的数据了，即使数据是乱序的也没有关系。但是，在实际情况里，我们的输入数据是以流的形式传输到每个计算节点的。并且，我们会遇到延时、容错等情况，所以我们还需要有一个机制告诉我们，在什么时候数据都已经到了，我们可以把计算结果向下游输出了。</p>
@@ -7864,7 +7864,7 @@
 <li>原本我们先收到了三个事件，13:02、13:14、13:57，根据30分钟的会话窗口，我们的逻辑计算完，窗口就变成了$[13:02,13:44)$以及$[13:57,14:27)$这样两个时间窗口。并且，这两个会话分别作为两条记录，向下游的不同计算节点下发了。</li>
 <li>这个时候，我们又接收到了一条姗姗来迟的新日志，日志的时间是13:40。那么，根据我们的业务逻辑，这个用户其实只有一个会话$[13:02,14:27)$。所以，我们不仅要向下游发送一个新会话出去，还需要能够“撤回”之前已经发送的两个错误的会话。</li>
 </ul>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6d/03/6db189438b36d2e6f4cf7417668b2803.jpg?wh=1920x1247" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6d/03/6db189438b36d2e6f4cf7417668b2803.jpg?wh=1920x1247" /></p>
 <p>当然，这只是我们最理想的状况，抛弃和累积这两种策略并不难实现，但是累积并撤回并不容易实现，即使在2021年的今天，Apache Beam也还没有支持<a href="https://issues.apache.org/jira/browse/BEAM-91">撤回（Retraction）功能</a>。不过，即使你从没有使用过对应的功能，你也需要理解为什么我们需要这样的功能。因为没有这个功能的话，我们的计算结果的正确性，在有些情况下是保障不了的。从这个角度来看，Lambda架构仍未彻底过时。</p>
 <h2 id="_4">小结</h2>
 <p>好了，到这里，我们也算是为整个课程里，大数据的流式处理画上一个句号了。随着时代洪流滚滚向前，Google也针对自己发表的Dataflow这个编程模型，孵化出了Apache Beam这个项目。而在这个时间节点之后，像Apache Flink这样的开源流式处理项目，也都向Dataflow的编程模型靠拢，并实现了Apache Beam的接口。</p>
@@ -7992,8 +7992,6 @@ https:&#47;&#47;storage.googleapis.com&#47;pub-tools-public-publication-data&#47
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

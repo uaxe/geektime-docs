@@ -14047,7 +14047,7 @@
 <p>那么etcd是通过什么机制来回收历史版本数据，控制索引内存占用和db大小的呢？</p>
 <p>这就是我今天要和你分享的etcd压缩机制。希望通过今天的这节课，能帮助你理解etcd压缩原理，在使用etcd过程中能根据自己的业务场景，选择适合的压缩策略，避免db大小增长失控而不可写入，帮助你构建稳定的etcd服务。</p>
 <h2 id="_1">整体架构</h2>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7c/21/7c5d5212fa14yy6aaf843ae3dfc5f721.png?wh=1920%2A918" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7c/21/7c5d5212fa14yy6aaf843ae3dfc5f721.png?wh=1920%2A918" /></p>
 <p>在了解etcd压缩模块实现细节前，我先给你画了一幅压缩模块的整体架构图。从图中可知，你可以通过client API发起人工的压缩(Compact)操作，也可以配置自动压缩策略。在自动压缩策略中，你可以根据你的业务场景选择合适的压缩模式。目前etcd支持两种压缩模式，分别是时间周期性压缩和版本号压缩。</p>
 <p>当你通过API发起一个Compact请求后，KV Server收到Compact请求提交到Raft模块处理，在Raft模块中提交后，Apply模块就会通过MVCC模块的Compact接口执行此压缩任务。</p>
 <p>Compact接口首先会更新当前server已压缩的版本号，并将耗时昂贵的压缩任务保存到FIFO队列中异步执行。压缩任务执行时，它首先会压缩treeIndex模块中的keyIndex索引，其次会遍历boltdb中的key，删除已废弃的key。</p>
@@ -14109,19 +14109,19 @@
 <p>如前面的整体架构图所述，Compact请求经过Raft日志同步给多数节点后，etcd会从Raft日志取出Compact请求，应用此请求到状态机执行。</p>
 <p>执行流程如下图所示，MVCC模块的Compact接口首先会检查Compact请求的版本号rev是否已被压缩过，若是则返回ErrCompacted错误给client。其次会检查rev是否大于当前etcd server的最大版本号，若是则返回ErrFutureRev给client，这就是我们上面执行etcdctl compact命令所看到的那两个错误原理。</p>
 <p>通过检查后，Compact接口会通过boltdb的API在meta bucket中更新当前已调度的压缩版本号(scheduledCompactedRev)号，然后将压缩任务追加到FIFO Scheduled中，异步调度执行。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9a/ff/9ac55d639f564b56324b96dc02f0c0ff.png?wh=1920%2A1332" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9a/ff/9ac55d639f564b56324b96dc02f0c0ff.png?wh=1920%2A1332" /></p>
 <p>为什么Compact接口需要持久化存储当前已调度的压缩版本号到boltdb中呢？</p>
 <p>试想下如果不保存这个版本号，etcd在异步执行的Compact任务过程中crash了，那么异常节点重启后，各个节点数据就会不一致。</p>
 <p>因此etcd通过持久化存储scheduledCompactedRev，节点crash重启后，会重新向FIFO Scheduled中添加压缩任务，已保证各个节点间的数据一致性。</p>
 <p>异步的执行压缩任务会做哪些工作呢？</p>
 <p>首先我们回顾下<a href="https://time.geekbang.org/column/article/340226">07</a>里介绍的treeIndex索引模块，它是etcd支持保存历史版本的核心模块，每个key在treeIndex模块中都有一个keyIndex数据结构，记录其历史版本号信息。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4f/dc/4f9cb015a842da0d5bd556d6b45970dc.png?wh=1920%2A1124" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4f/dc/4f9cb015a842da0d5bd556d6b45970dc.png?wh=1920%2A1124" /></p>
 <p>如上图所示，因此异步压缩任务的第一项工作，就是<strong>压缩treeIndex模块中的各key的历史版本</strong>、已删除的版本。为了避免压缩工作影响读写性能，首先会克隆一个B-tree，然后通过克隆后的B-tree遍历每一个keyIndex对象，压缩历史版本号、清理已删除的版本。</p>
 <p>假设当前压缩的版本号是CompactedRev， 它会保留keyIndex中最大的版本号，移除小于等于CompactedRev的版本号，并通过一个map记录treeIndex中有效的版本号返回给boltdb模块使用。</p>
 <p>为什么要保留最大版本号呢?</p>
 <p>因为最大版本号是这个key的最新版本，移除了会导致key丢失。而Compact的目的是回收旧版本。当然如果keyIndex中的最大版本号被打了删除标记(tombstone)， 就会从treeIndex中删除这个keyIndex，否则会出现内存泄露。</p>
 <p>Compact任务执行完索引压缩后，它通过遍历B-tree、keyIndex中的所有generation获得当前内存索引模块中有效的版本号，这些信息将帮助etcd清理boltdb中的废弃历史版本。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d6/70/d625753e5a7f0f7f37987764b9204270.png?wh=1920%2A1129" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d6/70/d625753e5a7f0f7f37987764b9204270.png?wh=1920%2A1129" /></p>
 <p>压缩任务的第二项工作就是<strong>删除boltdb中废弃的历史版本数据</strong>。如上图所示，它通过etcd一个名为scheduleCompaction任务来完成。</p>
 <p>scheduleCompaction任务会根据key区间，从0到CompactedRev遍历boltdb中的所有key，通过treeIndex模块返回的有效索引信息，判断这个key是否有效，无效则调用boltdb的delete接口将key-value数据删除。</p>
 <p>在这过程中，scheduleCompaction任务还会更新当前etcd已经完成的压缩版本号(finishedCompactRev)，将其保存到boltdb的meta bucket中。</p>
@@ -14271,8 +14271,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

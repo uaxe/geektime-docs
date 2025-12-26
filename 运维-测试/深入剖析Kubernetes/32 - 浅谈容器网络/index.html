@@ -6797,7 +6797,7 @@
 <p>而这个端口，正是nginx-2容器“插”在docker0网桥上的另一块虚拟网卡，当然，它也是一个Veth Pair设备。这样，数据包就进入到了nginx-2容器的Network Namespace里。</p>
 <p>所以，nginx-2容器看到的情况是，它自己的eth0网卡上出现了流入的数据包。这样，nginx-2的网络协议栈就会对请求进行处理，最后将响应（Pong）返回到nginx-1。</p>
 <p>以上，就是同一个宿主机上的不同容器通过docker0网桥进行通信的流程了。我把这个流程总结成了一幅示意图，如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e0/66/e0d28e0371f93af619e91a86eda99a66.png?wh=1715%2A995" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e0/66/e0d28e0371f93af619e91a86eda99a66.png?wh=1715%2A995" />
 需要注意的是，在实际的数据传递时，上述数据的传递过程在网络协议栈的不同层次，都有Linux内核Netfilter参与其中。所以，如果感兴趣的话，你可以通过打开iptables的TRACE功能查看到数据包的传输过程，具体方法如下所示：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a># 在宿主机上执行
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>$ iptables -t raw -A OUTPUT -p icmp -j TRACE
@@ -6806,10 +6806,10 @@
 <p>通过上述设置，你就可以在/var/log/syslog里看到数据包传输的日志了。这一部分内容，你可以在课后结合<a href="https://en.wikipedia.org/wiki/Iptables">iptables的相关知识</a>进行实践，从而验证我和你分享的数据包传递流程。</p>
 <p>熟悉了docker0网桥的工作方式，你就可以理解，在默认情况下，<strong>被限制在Network Namespace里的容器进程，实际上是通过Veth Pair设备+宿主机网桥的方式，实现了跟同其他容器的数据交换。</strong></p>
 <p>与之类似地，当你在一台宿主机上，访问该宿主机上的容器的IP地址时，这个请求的数据包，也是先根据路由规则到达docker0网桥，然后被转发到对应的Veth Pair设备，最后出现在容器里。这个过程的示意图，如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9f/01/9fb381d1e49318bb6a67bda3f9db6901.png?wh=1715%2A995" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9f/01/9fb381d1e49318bb6a67bda3f9db6901.png?wh=1715%2A995" />
 同样地，当一个容器试图连接到另外一个宿主机时，比如：ping 10.168.0.3，它发出的请求数据包，首先经过docker0网桥出现在宿主机上。然后根据宿主机的路由表里的直连路由规则（10.168.0.0/24 via eth0)），对10.168.0.3的访问请求就会交给宿主机的eth0处理。</p>
 <p>所以接下来，这个数据包就会经宿主机的eth0网卡转发到宿主机网络上，最终到达10.168.0.3对应的宿主机上。当然，这个过程的实现要求这两台宿主机本身是连通的。这个过程的示意图，如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/90/95/90bd630c0723ea8a1fb7ccd738ad1f95.png?wh=1834%2A994" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/90/95/90bd630c0723ea8a1fb7ccd738ad1f95.png?wh=1834%2A994" />
 所以说，<strong>当你遇到容器连不通“外网”的时候，你都应该先试试docker0网桥能不能ping通，然后查看一下跟docker0和Veth Pair设备相关的iptables规则是不是有异常，往往就能够找到问题的答案了。</strong></p>
 <p>不过，在最后一个“Docker容器连接其他宿主机”的例子里，你可能已经联想到了这样一个问题：如果在另外一台宿主机（比如：10.168.0.3）上，也有一个Docker容器。那么，我们的nginx-1容器又该如何访问它呢？</p>
 <p>这个问题，其实就是容器的“跨主通信”问题。</p>
@@ -6818,7 +6818,7 @@
 <p>如果我们通过软件的方式，创建一个整个集群“公用”的网桥，然后把集群里的所有容器都连接到这个网桥上，不就可以相互通信了吗？</p>
 <p>说得没错。</p>
 <p>这样一来，我们整个集群里的容器网络就会类似于下图所示的样子：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b4/3d/b4387a992352109398a66d1dbe6e413d.png?wh=1828%2A721" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b4/3d/b4387a992352109398a66d1dbe6e413d.png?wh=1828%2A721" />
 可以看到，构建这种容器网络的核心在于：我们需要在已有的宿主机网络上，再通过软件构建一个覆盖在已有宿主机网络之上的、可以把所有容器连通在一起的虚拟网络。所以，这种技术就被称为：Overlay Network（覆盖网络）。</p>
 <p>而这个Overlay Network本身，可以由每台宿主机上的一个“特殊网桥”共同组成。比如，当Node 1上的Container 1要访问Node 2上的Container 3的时候，Node 1上的“特殊网桥”在收到数据包之后，能够通过某种方式，把数据包发送到正确的宿主机，比如Node 2上。而Node 2上的“特殊网桥”在收到数据包后，也能够通过某种方式，把数据包转发给正确的容器，比如Container 3。</p>
 <p>甚至，每台宿主机上，都不需要有一个这种特殊的网桥，而仅仅通过某种方式配置宿主机的路由表，就能够把数据包转发到正确的宿主机上。这些内容，我在后面的文章中会为你一一讲述。</p>
@@ -6983,8 +6983,6 @@ ip netns exec netns2 ip link | grep 5 &lt;- 序列号
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

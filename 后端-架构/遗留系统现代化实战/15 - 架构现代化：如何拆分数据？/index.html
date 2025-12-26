@@ -14127,7 +14127,7 @@
 <p>不拆分真的可行么？这需要先分析一下拆分的必要性。遗留系统的数据拆分是个认知负载非常高的工作，不同的数据混杂在一起，具有不同业务含义的数据也往往存放于一张表中，要想彻底拆分干净十分不容易。</p>
 <p>如果你不需要不停机更新（大多数企业的业务系统其实都不需要）、没有严苛的可用性和弹性需求，或者数据量没有大到无法接受的程度，就没有必要拆分数据库。</p>
 <p>这时，<strong>共享数据库（Shared Database）也是一个可以接受的选择。我在<a href="https://time.geekbang.org/column/article/515274">第十二节课</a>分享了基于服务的分布式架构</strong>，就是一种共享数据库的分布式架构。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/91/6b/910e51dc730d7fba4e2c753d7f2bd26b.jpg?wh=1920x1090" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/91/6b/910e51dc730d7fba4e2c753d7f2bd26b.jpg?wh=1920x1090" /></p>
 <p>共享的数据分成两种情况。第一种是不同的服务访问同一数据库的不同Schema，第二种是不同的服务访问同一数据库的同一Schema。</p>
 <p>第一种情况相当理想，因为不同业务领域的数据在逻辑上是隔离的，数据的所有权非常清晰。一个服务如果想访问其他服务的数据，在发现Schema不同后，一般不会跨Schema去读表，而是通过代码依赖或者数据库视图来访问。</p>
 <p>第二种情况要差一些，所有模块都可以随意访问任意的表，操作这些数据的业务逻辑散落在各个服务中，你很难知道一张表到底归谁所有。</p>
@@ -14137,11 +14137,11 @@
 <p>还有一种场景，外部系统需要连接你的数据库来读写它所需要的数据，这里要你要绝对避免共享数据库。因为在这种情况下，数据的所有权将不再仅属于当前系统，不同的团队都能随意修改数据，很快就会变得混乱不堪，不同系统间的集成也会成为大问题。</p>
 <p>这时你可以采取的一种方式是，为不同的外部系统创建不同的Schema，在Schema中提供<strong>数据库视图（Database View）</strong>，这些视图访问主Schema中的表。这样一来，外部系统就能以只读的方式访问你的数据了。</p>
 <p>由于视图提供的是全部数据的一个有限的子集，外部系统只能访问你想让它访问的数据，比如部分表以及表中的部分字段，其他数据得以隐藏。这样就能最大程度地避免数据所有权的模糊。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d2/a2/d24eea29cf9d339759fece1784a38fa2.jpg?wh=1920x1090" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d2/a2/d24eea29cf9d339759fece1784a38fa2.jpg?wh=1920x1090" /></p>
 <h2 id="_3">数据库包装服务</h2>
 <p>可以访问数据库视图的，不仅仅是外部系统，还可以包括气泡上下文中的基于防腐层的仓库。但视图的方式只能提供只读数据，如果外部系统希望写入数据，应该如何处理呢？</p>
 <p>你可以对数据库进行一层薄薄的封装，形成一个服务，将数据库的细节隐藏在这个<strong>数据库包装服务（Database Wrapping Service）</strong>之后，将数据库依赖转换成服务依赖。通过在数据库外放置一个明确的包装层，你可以很清楚地知道哪些数据是属于你的，哪些数据是别人的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a0/ec/a070bc0d65d899c07af0c6c0b5074aec.jpg?wh=1920x1090" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a0/ec/a070bc0d65d899c07af0c6c0b5074aec.jpg?wh=1920x1090" /></p>
 <p>如果你的系统是基于Web的，你甚至可以在原系统之中去开发这个包装服务。但我还是建议你，最好把它当做一个气泡上下文，去开发一个全新的服务，不要让本就混乱的遗留系统雪上加霜。如果你的遗留系统不是基于Web的，那就更推荐使用这种模式了。</p>
 <p>数据库包装服务除了可以提供写能力外，在读能力上也比数据库视图更灵活。你提供的并不局限于一张表或表中的部分字段，还可以提供更加复杂的数据映射。</p>
 <p>这种包装服务看似很薄，但它也可以作为一个中间步骤，为后续更深入的数据拆分打下基础。</p>
@@ -14150,7 +14150,7 @@
 <p>而数据库视图也有点力不从心，因为业务数据和报表的流量都压在一个数据库上，这显然不是你想看到的。</p>
 <p>更好的方式是使用<strong>报表数据库（Reporting Database）模式</strong>，它会为报表这类只读的服务单独构建一个数据库。</p>
 <p>这个数据库可以是业务数据库的远程复本，也可以是一个完全不同的、更适合报表的数据结构（如大宽表），并通过某种方式来做数据的转换和映射。对于后一种实现，你可以使用与业务数据库完全异构的数据库，这样更加灵活。但它也带来了一定的开销，就是你需要自己去实现一个数据映射的工具。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7c/12/7c66ffa33c8ced5da6766e0d08275712.jpg?wh=1920x1090" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7c/12/7c66ffa33c8ced5da6766e0d08275712.jpg?wh=1920x1090" /></p>
 <p>报表数据库模式有时也叫做<strong>数据库即服务接口（Database-as-a-Service Interface）</strong>，因为这种思想已经远远不止用于报表这个单一场景了。随着大数据的兴起，很多数据项目也使用类似的方式，将业务数据映射到数据仓库或数据湖中，再由数据流水线去进行处理。</p>
 <h2 id="_5">变更数据所有权</h2>
 <p>到目前为止，我们学习的四种模式，都是基于一个共享的数据库，并没有涉及到拆分数据库这个真正棘手的问题。之所以先讲四种共享数据库模式，是想让你知道，在不拆分数据库的情况下，你也有一些方案可以选择。</p>
@@ -14158,7 +14158,7 @@
 <p>如果不同服务访问的是单体数据库中的相同Schema，就会麻烦得多，因为数据并没有从逻辑上进行隔离。但简单的情况怎样处理，我们已经知道了，那稍微复杂一些的情况就好办了，只要把它转换成简单的情况就可以了。所以我们只需要把同一Schema下的数据，用Schema隔离开。</p>
 <p>那新的问题就来了，怎么隔离呢？不同的领域服务访问的表都是交织在一起的，根本不知道哪些表属于哪个领域服务或组件。</p>
 <p>其实，你可以回忆一下<a href="https://time.geekbang.org/column/article/515274">第十二节课</a>的内容，如果组件之间边界不明显，我们可以使用<strong>战术分叉</strong>的方式将“拆”变为“删”。其实数据拆分也是一样的，你也可以将整个Schema复制一份，在新的Schema中删除相应的领域服务没有访问到的表，剩下的就是与领域服务有关的所有表了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/72/30/723deedaf3e552f032f73eb93874a730.jpg?wh=1920x1090" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/72/30/723deedaf3e552f032f73eb93874a730.jpg?wh=1920x1090" /></p>
 <p>接下来，我们再对访问的表做个分组处理。需要依据的原则是，<strong>谁写数据谁就拥有这张表。</strong>因此，我们可以把执行写操作的表，当作是真正归属于当前领域服务的，保持不动即可；而只读的表应该归其他领域服务，所以我们可以把这些表调整成视图。</p>
 <p>如果目标是拆分Schema，到这一步就差不多结束了。但如果目标是独立的数据库，你还要在独立的数据库中将这些视图转换为表，将原数据库中的数据冗余到新库中，并通过<strong>CDC</strong>和<strong>事件拦截</strong>等方式同步数据。</p>
 <p>如果不想冗余数据，你还可以<strong>将连表查询转换为API调用</strong>。具体来说就是，拆分新库和老库中不同表的连表查询，提取出新库的查询，在单体或其他领域服务中把老库的表封装成API。然后在独立出来的领域服务中，把新库的数据和调用API得到的数据组装起来。</p>
@@ -14187,9 +14187,9 @@
 <h2 id="_8">小结</h2>
 <p>又到了总结的时候。今天我们学习了拆分遗留系统的数据时，可以选用的一系列模式，结合前面课程里讲过的一些内容，我特意为你总结了两张表格用于回顾重点。</p>
 <p>第一张表是在拆分数据库时，可用于数据同步的几种模式：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/16/ab/16aa52e4b4fc30f2dbd92f5d0eb31cab.jpg?wh=1920x797" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/16/ab/16aa52e4b4fc30f2dbd92f5d0eb31cab.jpg?wh=1920x797" /></p>
 <p>第二张表是在拆分服务时，可用于数据共享的几种模式：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/00/8a/001167da9423818eb78e813266f5158a.jpg?wh=1920x1070" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/00/8a/001167da9423818eb78e813266f5158a.jpg?wh=1920x1070" /></p>
 <p>数据库的解耦，是我们无论如何都会面对的问题，也是架构现代化中最困难最复杂的部分。很多时候，代码的拆分其实就相当于数据的拆分。希望你能牢记这些模式，用它们指导你的日常工作。</p>
 <p>到此为止，我们用五节课的时间学习了架构现代化的种种模式，相信它们可以指导你对遗留系统的前端、后端、架构和数据进行演进。<a href="https://time.geekbang.org/column/article/518816">下节课</a>，我们一起来聊聊DevOps现代化相关的内容，敬请期待。</p>
 <h2 id="_9">思考题</h2>
@@ -14317,8 +14317,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

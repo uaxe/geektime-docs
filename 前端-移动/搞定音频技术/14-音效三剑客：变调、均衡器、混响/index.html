@@ -5208,20 +5208,20 @@
 <p>之前我们讲语音信号分析的时候说过，不同的人发音的基频是不一样的。而音调和基频是直接相关的，要变调其实就是要改变基频。而基频的本质是一个信号的循环周期的倒数，比如基频是250Hz，那么当前时间的语音信号就是以4ms为周期的信号。<strong>我们要变调，其实就是把这个循环周期进行扩大或者缩小。</strong></p>
 <p>如图1所示，如果我们把语音信号的基频提升一倍，或者说提升一个八度或者12个半音，那么时域信号（绿线部分，上面为变调前，下面为变调后）语音的波形还是很相似的，只是每一个周期都缩短了一半。</p>
 <p>再看看频域信号（红色部分）是不是变得更稀疏了？最下面的那根亮线代表的基频从250Hz左右提升到了大约500Hz的位置。由于谐波的频率是基频的倍数，所以谐波之间的间隔也变大了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/89/61/89e70eyy5132e033ec1e46a0aacbe661.png?wh=702x734" title="图1 升调后的语音时域和频域图" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/89/61/89e70eyy5132e033ec1e46a0aacbe661.png?wh=702x734" title="图1 升调后的语音时域和频域图" /></p>
 <p>那么我们是如何实现音调提升的呢？</p>
 <p>其实方法很简单，就是<strong>把原来的信号进行重采样，但不改变播放信号的采样率</strong>。简单来说，比如把原来20ms的音频每两个点取一个点，然后按照相同的采样率进行播放，这样10ms内需要播放原来20ms的内容。这样一来，原本的信号循环时间周期就变成了二分之一，从而实现了升调。</p>
 <p>但这里有个问题，因为每一段时间内需要播放的音频信号的采样点是固定的。也就是说，通过下采样的方法，音频从原来的20ms缩短成了10ms。直观的感受就是这个人的音调变高了，但说话的语速也变快了，也就是变速又变调。</p>
 <p>但我们想实现的变声只是改变音调，也就是所谓的“<strong>变调不变速</strong>”。其实，实现的方法也很简单，核心思想就是通过把音频中的信号按照一定的规律拼接起来，把音频的长度拉长或者缩短，这就是我们要讲的第一种变调算法OLA（Overlap-and-Add）。</p>
 <p>还记得之前我们讲的STFT吗？<strong>其实OLA的思想和STFT中的Overlap的思想很相似。</strong></p>
 <p>如图2所示，$x$为输入信号、$y$为输出信号。OLA的过程按照图2中b、c、d的顺序：取一帧$x_m$，选择间隔长度$H_a$的下一帧$x_{m+1}$，然后把这两帧加窗（汉宁窗）后，以步长$H_s$把两帧重叠、相加在一起。很显然$H_a$和$H_s$的比值就是原始信号和输出信号长度的比值。这样我们就可以把原始音频拼接成不同长度的音频了，然后再经过重采样把音频恢复成和原始音频相同长度的音频再播放，这样就实现了变速不变调。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/92/2f/9229cff9c61f989d2536c6b7d110722f.png?wh=606x455" title="图2 OLA算法的基本原理[br]图片来源 https://www.mdpi.com/2076-3417/6/2/57" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/92/2f/9229cff9c61f989d2536c6b7d110722f.png?wh=606x455" title="图2 OLA算法的基本原理[br]图片来源 https://www.mdpi.com/2076-3417/6/2/57" /></p>
 <p>有趣的是，如果不进行重采样直接播放，由于拼接起来的音频没有改变原始语音的基频周期，只是改变了音频的长短，这就实现了我们弱网对抗中用的“变速不变调”的算法。</p>
 <p>但是采用这种Overlap的方式虽然可以防止连接处的信号产生跳变，但不能保证每一个窗内覆盖的信号都处于周期中的相同相位，或者说<strong>两个窗内信号周期的起始位置不相同</strong>。这就会导致我们常说的“相位失真”。</p>
 <p>如图3所示，拼接的信号会出现时高时低的现象。所以如果我们能实时的根据信号本身的自相关属性，也就是把信号中相似的两段直接拼接在一起，这样就不会有相位的问题了。基于这样的思想，于是就有了波形相似叠加WSOLA（Waveform similarity Overlap-Add）算法。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/cb/94/cb0a1479dd41aeebe1f88e2408597f94.png?wh=593x446" title="图3 Overlap导致的幅度变化[br]图片来源 https://www.mdpi.com/2076-3417/6/2/57" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cb/94/cb0a1479dd41aeebe1f88e2408597f94.png?wh=593x446" title="图3 Overlap导致的幅度变化[br]图片来源 https://www.mdpi.com/2076-3417/6/2/57" /></p>
 <p>WSOLA算法的计算步骤如图4所示，其实相比于OLA，WSOLA会在$x_{m+1}$帧的附近寻找和输入信号中如果也移动步长$H_s$的信号$\tilde{x}_{m}$相似度最高的一段$x’_{m+1}$来做拼接。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/dd/b9/dd5b839fee9947397e3314f7b4fe53b9.png?wh=1151x866" title="图4 WSOLA的计算步骤[br]图片来源 https://www.mdpi.com/2076-3417/6/2/57" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dd/b9/dd5b839fee9947397e3314f7b4fe53b9.png?wh=1151x866" title="图4 WSOLA的计算步骤[br]图片来源 https://www.mdpi.com/2076-3417/6/2/57" /></p>
 <p>根据相似性原理，其实WSOLA合成出来的变调杂音基本已经没有了，WebRTC中的快慢放用的就是WSOLA。但WSOLA算法在实时变调中有一个问题，那就是每一帧出现的位置由于需要相似性搜索，所以需要更多的未来帧的信息，也就是说，需要引入更多的延迟。</p>
 <p>在时域变调的算法中还有一种<a href="http://articles.ircam.fr/textes/Schnell00a/index.pdf">PSOLA</a>（Pitch Synchronous Overlap and Add），顾名思义需要先计算pitch，然后根据基音周期来改变Overlap的大小，这样就直接实现了变调。但是基频检测的鲁棒性没有WSOLA的相似性搜索高，所以PSOLA的生成可能会出现不稳定的情况，你有兴趣的话可以根据<a href="http://articles.ircam.fr/textes/Schnell00a/index.pdf">链接</a>自行了解一下。</p>
 <p>其实变调算法除了在时域上做拼接，还可以在频域上实现，比如常见的LSEE-MSTFTM、Phase Vocoder等算法。</p>
@@ -5237,16 +5237,16 @@
 <p>音频滤波器有很多种，比如常用的FIR（Finite Impulse Response）和IIR（Infinite Impulse Response）Filter。如何根据你想要的频段和增益来设计FIR和IIR滤波器，其实早已编入了教材，不是信号处理专业的同学可以参考《数字信号处理》这本书。</p>
 <p>当然EQ的处理经过多年的发展已经有很多通用的滤波器可以选用了，比如椭圆、切比雪夫、巴特沃斯和贝塞尔滤波器等等。如果你想快速实现一个滤波器看看效果也可以直接使用Matlab中的<a href="https://ww2.mathworks.cn/help/signal/filter-design.html?s_tid=CRUX_lftnav">滤波器设计toolbox</a> 来加速实现进程。</p>
 <p>如果不想自己编程实现，也可以利用一些音频处理软件来进行可视化的处理。比如在Adobe Audition中，我们可以看到各种常见的EQ均衡器。如图5所示，由上到下依次为FFT滤波器、图形均衡器以及科学滤波器。我们在离线自己做一些音频处理时，可以选择其中的一个或者多个串行使用。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d7/87/d7c41d40fd05eb7744255c66009b8a87.png?wh=707x1460" title="图5 Audition中常见的均衡效果器" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d7/87/d7c41d40fd05eb7744255c66009b8a87.png?wh=707x1460" title="图5 Audition中常见的均衡效果器" /></p>
 <h2 id="_3">混响</h2>
 <p>好的，知道了如何调节音色，我们再来看看和空间相关的混响。</p>
 <p>其实在之前的课程中，我们已经多次提及了混响的概念。在之前讲空间音频时，我们知道可以通过采样的方式或者镜像法得到房间的混响RIR，这样得到的混响叫做采样混响。采样混响真实，但是不一定好听，并且RIR需要和音频信号做卷积才能得到混响信号。当混响时间很长的时候需要的算力也是巨大的。在音乐制作时，为了营造更好的听感经常会使用一些人工混响效果器来产生混响，在实时音效里也可能因为要节省算力而采用人工混响效果器的方式来生成混响。</p>
 <p>简单地理解，混响信号可以看作是直达声和许多逐步衰减、不断延迟的回声信号叠加而成的。假设一个衰减系数$a$和延迟$D$，那么混响信号$y(n)$可以用下面的等比数列来表示：</p>
 <p>$$y(n)=x(n)+ax(n-D)+a^{2}x(n-2D)+…$$</p>
 <p>其中 $x(n)$ 是输入信号，$D$为回声的延迟。而这种形式正是梳状滤波器的形式。如图6所示，所谓梳状滤波器，其实就是因为它的频率响应呈一个梳子的形状。<strong>梳状滤波常被用来消除某些不需要的谐波，但这里主要是利用了它的拖尾效应。</strong></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/15/ec/152f235816f7128dyy77e47663fb16ec.png?wh=922x347" title="图6 梳状滤波器的频率响应" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/15/ec/152f235816f7128dyy77e47663fb16ec.png?wh=922x347" title="图6 梳状滤波器的频率响应" /></p>
 <p>但也如图6所示，梳状滤波器的频谱曲线不平坦，呈现明显的梳状效应。从而对不同的频率成分幅度会产生波动，导致梳状滤波器的拖尾声音带有很强的金属染色效应。而且回声只在延迟为D和D的倍数的时候出现，这就显得过于稀疏了。所以在梳状滤波器的基础上Schroeder使用多个梳状滤波器来解决混响不够密集的问题，然后用全通滤波器（Allpass filter）来消除金属声。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f9/da/f99af8748bd81e2c870b6049663125da.png?wh=1104x338" title="图7 Schroeder混响模型流程[br]图片来源 http://freeverb3vst.osdn.jp/doc/Sun-Schroeders_Reverberator.pdf" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f9/da/f99af8748bd81e2c870b6049663125da.png?wh=1104x338" title="图7 Schroeder混响模型流程[br]图片来源 http://freeverb3vst.osdn.jp/doc/Sun-Schroeders_Reverberator.pdf" /></p>
 <p>图7为Schroeder混响模型的结构图，其中每个Comb代表一个梳状滤波器。<strong>但Schroeder依靠全通滤波器生成的混响依旧不够密集。</strong></p>
 <p>后续Moorer又对Schroeder模型进行了改良，把混响的生成拆成了直达声、早期混响、晚期混响这三个部分。加入了FIR模块来模拟早期混响，用6个梳状滤波器和一个全通滤波器来模拟晚期混响，并可以控制各部分的增益。有兴趣的话，你可以通过<a href="http://freeverb3vst.osdn.jp/doc/Elec407-HybridReverb.pdf">链接</a>了解一下。</p>
 <p>其实Moorer模型之后，人们会用各种方式来对混响模型进行改造，现在的混响生成器基本上也都是开放出很多参数，可调节的混响效果器了。比如混响的初始延迟、干湿比、混响RT60时间等。这里介绍一个<a href="http://www.nongnu.org/freeverb3">Freeverb3</a> 开源库，这里有很多基于不同算法的混响效果器实现方法，你可以根据自己的需求了解一下里面的内容。</p>
@@ -5257,7 +5257,7 @@
 <p>当然音效的种类还远不止这三种，这节课只能算是音效的常见算法的入门。在这里再和你分享一个音效的网页demo，里面有声网研发的各种声音效果。你可以通过<a href="https://www.agora.io/cn/audio-demo">链接</a>感受一下，看看音效还能做出什么不同的效果。</p>
 <h2 id="_5">思考题</h2>
 <p>其实知道了这些音效的基本原理，结合常用的一些开源库或者音频处理软件就可以开始对音频进行音频效果调整了。比如我们之前说的绿巨人的音效，实际上就是通过变调、均衡器和混响来整体调节的。绿巨人需要把原来的声音进行降调，比如降八度，然后可以使用10段均衡器，绿巨人的均衡器参数如图8所示，然后再加一个小房间的混响就可以实现了。你可以用Audition的效果模块自己试着调一调。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0f/dc/0f4b314b534dcddd000bff4683e379dc.png?wh=488x261" title="图8 绿巨人均衡器参数" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0f/dc/0f4b314b534dcddd000bff4683e379dc.png?wh=488x261" title="图8 绿巨人均衡器参数" /></p>
 <p>期待你的动手实践，过程中遇到任何问题，都可以到留言区中与我交流讨论。也欢迎你把这节课分享给你的朋友，邀请他一同尝试。我们下节课再见！</p>
 <div><strong>精选留言（7）</strong></div>
 <ul>
@@ -5376,8 +5376,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

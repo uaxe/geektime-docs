@@ -5942,7 +5942,7 @@
 <p>所以为了解决 Service 处理集群外部访问请求的局限性，K8s 提供了 Ingress 资源对象。Ingress 是一种七层的负载均衡，可以实现高级路由策略，从而更高效地管理集群外部流量。</p>
 <h2 id="ingress">认识 Ingress</h2>
 <p>Ingress 通过定义一系列的路由规则，允许你将集群外部的 HTTP/HTTPS 请求分配到集群内不同的 Service 上。所以 Ingress 的机制相当于是在 Service 上又加了一层规则，它获取到用户访问的域名和路径，然后根据规则把访问请求转发到了对应的 Service 上，然后再由 Service 把流量转发到具体的应用 Pod。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/67/e0/671d322bc3547f0a0f6d0b1523b6bce0.jpg?wh=1177x721" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/67/e0/671d322bc3547f0a0f6d0b1523b6bce0.jpg?wh=1177x721" /></p>
 <p>Ingress 由三个核心组件组成，Ingress、Ingress Controller 和 Ingress Class。</p>
 <p>Ingress 是一组路由规则（Rules）。每个规则定义了如何处理进入集群的访问请求，包含主机域名（Host）和路径列表（Path）。路径列表定义了基于 URL 路径的请求分发规则，每个路径都关联一个后端服务（Backend），后端服务就是实际处理请求的 Service，包含了 Service 的名称（ServiceName）和端口（ServicePort）。Ingress 本身并不直接处理流量，它的功能需要依赖于 Ingress Controller。</p>
 <p>Ingress Controller 是负责实现 Ingress 规则的组件，它负责监听 Ingress 的变化，并确保路由规则被正确应用。K8s 官方并没有实现自己的 Ingress Controller，而是定义了 Ingress Controller 的实现标准，很多第三方公司都基于标准实现了自己的 Ingress Controller，目前我们最常用的就是大名鼎鼎的 Nginx Ingress Controller，你也可以使用其他公司实现的 <a href="https://kubernetes.io/zh-cn/docs/concepts/services-networking/ingress-controllers/">Ingress Controller</a>。</p>
@@ -6040,7 +6040,7 @@
 <p>现在路由转发规则也创建好了，我们思考一下如何通过域名和路径访问应用。</p>
 <h2 id="ingress-controller_1">访问 Ingress Controller</h2>
 <p>你已经知道在 Ingress 机制中，集群外部的访问请求是由 Ingress Controller 按照规则转发到不同 Service的，所以要访问应用 Pod，就需要访问到 Ingress Controller。而 Ingress Controller 是由部署到 K8s 的 Deployment（包含处理流量转发的 Pod）和 Service 组成的。因此，我们实际上要访问这个 Service，从而访问到 Deployment 中的处理流量转发的 Pod。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a4/af/a4688551d4446a07459048306c5cf6af.jpg?wh=472x489" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a4/af/a4688551d4446a07459048306c5cf6af.jpg?wh=472x489" /></p>
 <p>根据以上原理，我们通过 “kubectl get svc” 命令查看 Ingress Controller 的 Service。</p>
 <p><strong>注意：</strong>命名空间为 “ingress-nginx”。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="o">[</span>root@k8s-master<span class="w"> </span>~<span class="o">]</span><span class="c1"># kubectl get svc ingress-nginx-controller -n ingress-nginx</span>
@@ -6050,7 +6050,7 @@
 <p>从结果中我们看到名称为 ingress-nginx-controller 的 Service，它的类型是 LoadBalancer。</p>
 <p>如果集群可以使用外部的第三方负载均衡器，那么这个 Service 可以分配到一个外部 IP（EXTERNAL-IP），我们就可以<strong>把域名解析到这个 IP，然后直接通过“&lt;域名&gt;&lt;路径&gt;”方式访问 Service，从而访问到最终的应用 Pod</strong>。</p>
 <p>如果没有外部 IP（EXTERNAL-IP），我们也可以通过 NodePort 的方式访问 Service。 LoadBalancer 类型的 Service 也会自动分配一个 NodePort 端口，我们可以通过这个节点端口来访问 Service。但是，这里访问 Service 不能使用 “&lt;节点 IP&gt;:&lt;节点端口&gt;” 的方式，因为 Ingress 需要根据访问请求的域名和路径来转发流量，所以我们<strong>需要把域名解析到任意节点的 IP，然后使用“&lt;域名&gt;:&lt;节点端口&gt;&lt;路径&gt;”的方式访问 Service，从而访问到最终的应用 Pod</strong>。这种 NodePort 访问方式虽然简单，但是缺点就是访问时还需要输入节点端口号。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/96/6d/9678e175f030c24cae59b2035e94b76d.jpg?wh=520x538" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/96/6d/9678e175f030c24cae59b2035e94b76d.jpg?wh=520x538" /></p>
 <p>最后，如果你无法配置互联网上的域名解析，只是想在本地机器上测试规则，我们可以在自己的本地机器上配置一条域名解析。对于 Mac 系统用户，可以打开终端，编辑 “/etc/hosts” 文件，在文件末尾添加 “IP 域名”的映射规则。这样，在本地机器的浏览器中输入域名访问时，系统会优先按照 “/etc/hosts” 文件中的配置来解析 IP，从而将请求转发到集群中的相应节点上。其他系统的配置方法可以参考网上相关文档。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p p-Indicator">[</span><span class="nv">steve@bogon ~</span><span class="p p-Indicator">]</span><span class="c1"># vi /etc/hosts  # 在文件中插入域名解析规则条目</span>
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nn">...</span>
@@ -6058,7 +6058,7 @@
 <a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="l l-Scalar l-Scalar-Plain"># 使用你的集群中任意节点的公网 IP，以及你在 Ingress 中配置的 Host 域名</span>
 </code></pre></div>
 <p>然后你在本地机器的浏览器中输入域名和端口号，尝试一下，终于出现了我们部署在 Deployment 中的应用 Nginx，也就意味着 Ingress 路由规则生效了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/26/16/2665ab54407a698c9c2d4db50cbcd416.jpg?wh=1399x547" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/26/16/2665ab54407a698c9c2d4db50cbcd416.jpg?wh=1399x547" /></p>
 <h2 id="https">配置 HTTPS</h2>
 <p>现在，一套完整的 Web 应用已经部署成功了，这套部署方案中包含了 Deployment、Service 和 Ingress，最终通过 URL 访问到了我们的应用，是不是很有成就感？先别着急，我们还有一个重要的问题，那就是 HTTPS 请求。在当前的网络环境下，大部分网络访问请求都使用 HTTPS 协议，因此我们需要在 Ingress 中配置一下 HTTPS 协议。</p>
 <blockquote>
@@ -6129,7 +6129,7 @@
 <a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>ingress-nginx-controller<span class="w">   </span>LoadBalancer<span class="w">   </span><span class="m">10</span>.106.241.178<span class="w">   </span>&lt;pending&gt;<span class="w">     </span><span class="m">80</span>:31445/TCP,443:30181/TCP<span class="w">   </span>2d2h
 </code></pre></div>
 <p>这时，我们要注意，<strong>HTTPS 协议访问请求默认是 443 端口，也就是要访问 Ingress Controller 中的 Service 的 443 端口，这个端口被映射到了节点的 30181 端口（443:30181/TCP），</strong>此时就可以通过本地机器的浏览器访问 <a href="https://myapp.address.com:30181/">https://myapp.address.com:30181/</a> URL 地址。我们就可以看到返回的 Nginx 欢迎页面了（因为我们使用了自签名证书，其实并不安全，所以浏览器通常都会有个安全提示，在提示页面中的高级按钮中点击继续就可以看到欢迎网页了）。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/98/b5/98a9c3a5b2ca04046df75d333a6412b5.jpg?wh=1916x678" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/98/b5/98a9c3a5b2ca04046df75d333a6412b5.jpg?wh=1916x678" /></p>
 <h2 id="_2"><strong>小结</strong></h2>
 <p>今天，我介绍了 Ingress 资源对象在 K8s 集群中的作用和使用方法。</p>
 <p>Ingress 通过定义一系列的路由规则，允许你将集群外部的 HTTP/HTTPS 请求转发到集群内不同的 Service 上。它获取到用户访问的域名和路径，然后根据规则把访问请求转发到了对应的 Service 上，然后再由 Service 把流量转发到具体的应用 Pod。Ingress 路由机制的主要组成包括 Ingress、Ingress Controller 和 Ingress Class。Ingress 定义了访问路由转发规则，Ingress Controller 负责根据这些规则将外部访问请求转发到后端的 Service，而 Ingress Class 则用于解耦 Ingress 和 Ingress Controller。</p>
@@ -6275,8 +6275,6 @@ deployment 的pod 层面并不需要暴露 443，加解密其实在ingress 层�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

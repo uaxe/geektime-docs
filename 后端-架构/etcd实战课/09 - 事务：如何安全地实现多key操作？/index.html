@@ -14251,7 +14251,7 @@
 <a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>OK
 </code></pre></div>
 <h2 id="_1">整体流程</h2>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e4/d3/e41a4f83bda29599efcf06f6012b0bd3.png?wh=1920%2A852" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e4/d3/e41a4f83bda29599efcf06f6012b0bd3.png?wh=1920%2A852" /></p>
 <p>在和你介绍上面案例中的etcd事务原理和问题前，我先给你介绍下事务的整体流程，为我们后面介绍etcd事务ACID特性的实现做准备。</p>
 <p>上图是etcd事务的执行流程，当你通过client发起一个txn转账事务操作时，通过gRPC KV Server、Raft模块处理后，在Apply模块执行此事务的时候，它首先对你的事务的If语句进行检查，也就是ApplyCompares操作，如果通过此操作，则执行ApplyTxn/Then语句，否则执行ApplyTxn/Else语句。</p>
 <p>在执行以上操作过程中，它会根据事务是否只读、可写，通过MVCC层的读写事务对象，执行事务中的get/put/delete各操作，也就是我们上一节课介绍的MVCC对key的读写原理。</p>
@@ -14262,7 +14262,7 @@
 <p>事务的原子性（Atomicity）是指在一个事务中，所有请求要么同时成功，要么同时失败。比如在我们的转账案例中，是绝对无法容忍Alice账号扣款成功，但是Bob账号资金到账失败的场景。</p>
 <p>持久性（Durability）是指事务一旦提交，其所做的修改会永久保存在数据库。</p>
 <p>软件系统在运行过程中会遇到各种各样的软硬件故障，如果etcd在执行上面事务过程中，刚执行完扣款命令（put Alice 100）就突然crash了，它是如何保证转账事务的原子性与持久性的呢？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cf/9e/cf94ce8fc0649fe5cce45f8b7468019e.png?wh=1920%2A949" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cf/9e/cf94ce8fc0649fe5cce45f8b7468019e.png?wh=1920%2A949" /></p>
 <p>如上图转账事务流程图所示，etcd在执行一个事务过程中，任何时间点都可能会出现节点crash等异常问题。我在图中给你标注了两个关键的异常时间点，它们分别是T1和T2。接下来我分别为你分析一下etcd在这两个关键时间点异常后，是如何保证事务的原子性和持久性的。</p>
 <h4 id="t1">T1时间点</h4>
 <p>T1时间点是在Alice账号扣款100元完成时，Bob账号资金还未成功增加时突然发生了crash。</p>
@@ -14283,7 +14283,7 @@
 <p>很明显，转账系统内的各账号资金总额，在转账前后应该一致，同时各账号资产不能小于0。</p>
 <p>为了帮助你更好地理解前面转账事务实现的问题，下面我给你画了幅两个并发转账事务的流程图。</p>
 <p>图中有两个并发的转账事务，Mike向Bob转账100元，Alice也向Bob转账100元，按照我们上面的事务实现，从下图可知转账前系统总资金是600元，转账后却只有500元了，因此它无法保证转账前后账号系统内的资产一致性，导致了资产凭空消失，破坏了事务的一致性。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1f/ea/1ff951756c0ffc427e5a064e3cf8caea.png?wh=1920%2A1153" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1f/ea/1ff951756c0ffc427e5a064e3cf8caea.png?wh=1920%2A1153" /></p>
 <p>事务一致性被破坏的根本原因是，事务中缺少对Bob账号资产是否发生变化的判断，这就导致账号资金被覆盖。</p>
 <p>为了确保事务的一致性，一方面，业务程序在转账逻辑里面，需检查转账者资产大于等于转账金额。在事务提交时，通过账号资产的版本号，确保双方账号资产未被其他事务修改。若双方账号资产被其他事务修改，账号资产版本号会检查失败，这时业务可以通过获取最新的资产和版本号，发起新的转账事务流程解决。</p>
 <p>另一方面，etcd会通过WAL日志和consistent index、boltdb事务特性，去确保事务的原子性，因此不会有部分成功部分失败的操作，导致资金凭空消失、新增。</p>
@@ -14297,7 +14297,7 @@
 <p>下面我重点和你介绍下未提交读、已提交读、可重复读、串行化快照隔离。</p>
 <h4 id="_5">未提交读</h4>
 <p>首先是最低的事务隔离级别，未提交读。我们通过如下一个转账事务时间序列图，来分析下一个client能否读取到未提交事务修改的数据，是否存在脏读。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6a/8d/6a526be4949a383fd5263484c706d68d.png?wh=1920%2A786" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6a/8d/6a526be4949a383fd5263484c706d68d.png?wh=1920%2A786" /></p>
 <p>图中有两个事务，一个是用户查询Alice和Bob资产的事务，一个是我们执行Alice向Bob转账的事务。</p>
 <p>如图中所示，若在Alice向Bob转账事务执行过程中，etcd server收到了client查询Alice和Bob资产的读请求，显然此时我们无法接受client能读取到一个未提交的事务，因为这对应用程序而言会产生严重的BUG。那么etcd是如何保证不出现这种场景呢？</p>
 <p>我们知道etcd基于boltdb实现读写操作的，读请求由boltdb的读事务处理，你可以理解为快照读。写请求由boltdb写事务处理，etcd定时将一批写操作提交到boltdb并清空buffer。</p>
@@ -14316,7 +14316,7 @@
 <p><strong>同时，它还要确保事务提交时，你读写的数据都是最新的，未被其他人修改，也就是要增加冲突检测机制。</strong>当事务提交出现冲突的时候依赖client重试解决，安全地实现多key原子更新。</p>
 <p>那么我们应该如何为上面一致性案例中，两个并发转账的事务，增加冲突检测机制呢？</p>
 <p>核心就是我们前面介绍MVCC的版本号，我通过下面的并发转账事务流程图为你解释它是如何工作的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3b/26/3b4c7fb43e03a38aceb2a8c2d5c92226.png?wh=1920%2A1011" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3b/26/3b4c7fb43e03a38aceb2a8c2d5c92226.png?wh=1920%2A1011" /></p>
 <p>如上图所示，事务A，Alice向Bob转账100元，事务B，Mike向Bob转账100元，两个事务同时发起转账操作。</p>
 <p>一开始时，Mike的版本号(指mod_revision)是4，Bob版本号是3，Alice版本号是2，资产各自200。为了防止并发写事务冲突，etcd在一个写事务开始时，会独占一个MVCC读写锁。</p>
 <p>事务A会先去etcd查询当前Alice和Bob的资产版本号，用于在事务提交时做冲突检测。在事务A查询后，事务B获得MVCC写锁并完成转账事务，Mike和Bob账号资产分别为100，300，版本号都为5。</p>
@@ -14547,8 +14547,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

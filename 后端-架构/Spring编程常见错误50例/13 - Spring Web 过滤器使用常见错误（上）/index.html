@@ -14161,7 +14161,7 @@ APPLICATION FAILED TO START
 <h3 id="_1">案例解析</h3>
 <p>这次我们换个方式，我先告诉你结论，你可以暂停几分钟想想关键点。</p>
 <p>本质上，过滤器被 @WebFilter 修饰后，TimeCostFilter 只会被包装为 FilterRegistrationBean，而 TimeCostFilter 自身，只会作为一个 InnerBean 被实例化，这意味着 <strong>TimeCostFilter 实例并不会作为 Bean 注册到 Spring 容器</strong>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/61/6b/615a6049ec924b596cfb6b0abd795c6b.png?wh=1341%2A339" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/61/6b/615a6049ec924b596cfb6b0abd795c6b.png?wh=1341%2A339" /></p>
 <p>所以当我们想自动注入 TimeCostFilter 时，就会失败了。知道这个结论后，我们可以带着两个问题去理清一些关键的逻辑：</p>
 <ol>
 <li>FilterRegistrationBean 是什么？它是如何被定义的？</li>
@@ -14176,7 +14176,7 @@ APPLICATION FAILED TO START
 <li>在能被 @ServletComponentScan 扫到的路径之下。</li>
 </ul>
 <p>这里我们直接检索对 @WebFilter 的使用，可以发现 WebFilterHandler 类使用了它，直接在 doHandle() 中加入断点，开始调试，执行调用栈如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/67/35/67ff2f20993e9de7cdfc5c73acbe1035.png?wh=1156%2A448" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/67/35/67ff2f20993e9de7cdfc5c73acbe1035.png?wh=1156%2A448" /></p>
 <p>从堆栈上，我们可以看出对@WebFilter 的处理是在 Spring Boot 启动时，而处理的触发点是 ServletComponentRegisteringPostProcessor 这个类。它继承了 BeanFactoryPostProcessor 接口，实现对 @WebFilter、@WebListener、@WebServlet 的扫描和处理，其中对于@WebFilter 的处理使用的就是上文中提到的 WebFilterHandler。这个逻辑可以参考下面的关键代码：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>class ServletComponentRegisteringPostProcessor implements BeanFactoryPostProcessor, ApplicationContextAware {
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>private static final List&lt;ServletComponentHandler&gt; HANDLERS;
@@ -14224,19 +14224,19 @@ APPLICATION FAILED TO START
 <a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>}
 </code></pre></div>
 <p>从这里，我们第一次看到了 FilterRegistrationBean。通过调试上述代码的最后一行，可以看到，最终我们注册的 FilterRegistrationBean，其名字就是我们定义的 WebFilter 的名字：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/00/1d/009c909439cdb317063ff49b2460e41d.png?wh=954%2A146" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/00/1d/009c909439cdb317063ff49b2460e41d.png?wh=954%2A146" /></p>
 <p>后续这个 Bean 的具体创建过程，这里不再赘述，感兴趣的话你可以继续深入研究。</p>
 <p>现在，我们接着看第二个问题：TimeCostFilter 何时被实例化？</p>
 <p>此时，我们想要的 Bean 被“张冠李戴”成 FilterRegistrationBean，但是 TimeCostFilter 是何时实例化的呢？为什么它没有成为一个普通的 Bean?</p>
 <p>关于这点，我们可以在 TimeCostFilter 的构造器中加个断点，然后使用调试的方式快速定位到它的初始化时机，这里我直接给出了调试截图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1c/b0/1cb7346dda1e06e68f092ab789e230b0.png?wh=1180%2A837" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1c/b0/1cb7346dda1e06e68f092ab789e230b0.png?wh=1180%2A837" /></p>
 <p>在上述的关键调用栈中，结合源码，你可以找出一些关键信息：</p>
 <ol>
 <li>Tomcat 等容器启动时，才会创建 FilterRegistrationBean；</li>
 <li>FilterRegistrationBean 在被创建时（createBean）会创建 TimeCostFilter 来装配自身，TimeCostFilter 是通过 ResolveInnerBean 来创建的；</li>
 <li>TimeCostFilter 实例最终是一种 InnerBean，我们可以通过下面的调试视图看到它的一些关键信息：</li>
 </ol>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d1/41/d1637b371db3b4fd1c192e2dcaa6b541.png?wh=781%2A288" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d1/41/d1637b371db3b4fd1c192e2dcaa6b541.png?wh=781%2A288" /></p>
 <p>通过上述分析，你可以看出<strong>最终 TimeCostFilter 实例是一种 InnerBean</strong>，所以自动注入不到也就非常合理了。</p>
 <h3 id="_2">问题修正</h3>
 <p>找到了问题的根源，解决就变得简单了。</p>
@@ -14297,7 +14297,7 @@ APPLICATION FAILED TO START
 <p>在解析之前，我先给你讲下 Filter 背后的机制，即责任链模式。</p>
 <p>以 Tomcat 为例，我们先来看下它的 Filter 实现中最重要的类 ApplicationFilterChain。它采用的是责任（职责）链设计模式，在形式上很像一种递归调用。</p>
 <p>但区别在于递归调用是同一个对象把子任务交给同一个方法本身去完成，而<strong>职责链则是一个对象把子任务交给其他对象的同名方法去完成</strong>。其核心在于上下文 FilterChain 在不同对象 Filter 间的传递与状态的改变，通过这种链式串联，我们就可以对同一种对象资源实现不同业务场景的处理，达到业务解耦。整个 FilterChain 的结构就像这张图一样：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/77/de/7791d08ec8212d86ba4b4bc217bf35de.png?wh=1686%2A608%3Fwh%3D1686%2A608" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/77/de/7791d08ec8212d86ba4b4bc217bf35de.png?wh=1686%2A608%3Fwh%3D1686%2A608" /></p>
 <p>这里我们不妨还是带着两个问题去理解 FilterChain：</p>
 <ol>
 <li>FilterChain 在何处被创建，又是在何处进行初始化调用，从而激活责任链开始链式调用？</li>
@@ -14420,7 +14420,7 @@ APPLICATION FAILED TO START
 <li>pos &lt; n 意味着执行完所有的过滤器，才能通过servlet.service(request, response) 去执行真正的业务。</li>
 </ul>
 <p>执行完所有的过滤器后，代码调用了 servlet.service(request, response) 方法。从下面这张调用栈的截图中，可以看到，经历了一个很长的看似循环的调用栈，我们终于从 internalDoFilter() 执行到了Controller层的saveUser()。这个过程就不再一一细讲了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9c/f3/9ce67a5bec2dd4686b428ec88126fbf3.png?wh=1155%2A745" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9c/f3/9ce67a5bec2dd4686b428ec88126fbf3.png?wh=1155%2A745" /></p>
 <p>分析了这么多，最后我们再来思考一下这个问题案例。</p>
 <p>DemoFilter 代码中的 doFilter() 在捕获异常的部分执行了一次，随后在 try 外面又执行了一次，因而当抛出异常的时候，doFilter() 明显会被执行两次，相对应的 servlet.service(request, response) 方法以及对应的 Controller 处理方法也被执行了两次。</p>
 <p>你不妨回过头再次查看上文中的过滤器执行流程图，相信你会有更多的收获。</p>
@@ -14454,7 +14454,7 @@ APPLICATION FAILED TO START
 <ol>
 <li>我们在过滤器的执行中，一定要注意避免不要多次调用doFilter()，否则可能会出现业务代码执行多次的问题。这个问题出现的根源往往在于“不小心”，但是要理解这个问题呈现的现象，就必须对过滤器的流程有所了解。可以看过滤器执行的核心流程图：</li>
 </ol>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/77/de/7791d08ec8212d86ba4b4bc217bf35de.png?wh=1686%2A608%3Fwh%3D1686%2A608" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/77/de/7791d08ec8212d86ba4b4bc217bf35de.png?wh=1686%2A608%3Fwh%3D1686%2A608" /></p>
 <p>结合这个流程图，我们还可以进一步细化出以下关键步骤：</p>
 <ul>
 <li>当一个请求来临时，会执行到 StandardWrapperValve的invoke()，这个方法会创建 ApplicationFilterChain，并通过ApplicationFilterChain#doFilter() 触发过滤器执行；</li>
@@ -14601,8 +14601,6 @@ A:结果是接口无法正常响应，程序不会回调执行，最后无返回
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

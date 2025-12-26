@@ -14323,13 +14323,13 @@
 <li><strong>提交阶段</strong></li>
 </ol>
 <p>这是两阶段提交的第二阶段，提交 Primary Row，也就是写入新版本的提交记录并清除 Primary Lock，如果顺利完成，那么这个事务整体也就完成了，反之就是失败。而Secondary Rows上的锁，则会交给异步线程根据Primary Lock的状态去清理。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2f/e8/2fc7c4959ae0b4a223c23303a57c92e8.jpg?wh=2700%2A1531" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2f/e8/2fc7c4959ae0b4a223c23303a57c92e8.jpg?wh=2700%2A1531" /></p>
 <p>你看这个过程中不仅有锁，而且锁的数量还不少。那么，为什么又说它是乐观协议呢？</p>
 <p>想回答这个问题，我们就需要一些理论知识了。</p>
 <h3 id="_2">并发控制的三个阶段</h3>
 <p>在经典理论教材“<a href="https://link.springer.com/content/pdf/bfm%3A978-1-4419-8834-8%2F1.pdf">Principles of Distributed Database Systems</a>”中，作者将乐观协议和悲观协议的操作，都统一成四个阶段，分别是有效性验证（V）、读（R）、计算（C）和写（W）。两者的区别就是这四个阶段的顺序不同：悲观协议的操作顺序是VRCW，而乐观协议的操作顺序则是RCVW。因为在比较两种协议时，计算（C）这个阶段没有实质影响，可以忽略掉。那么简化后，悲观协议的顺序是VRW，而乐观协议的顺序就是RVW。</p>
 <p>RVW的三阶段划分，也见于研究乐观协议的经典论文“<a href="https://www.cs.du.edu/~leut/4423/papers/kung.pdf">On Optimistic Methods for Concurrency Control</a>”。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a2/eb/a2f4a6f1e7d21c0a206dc74308a2d6eb.jpg?wh=2700%2A768" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a2/eb/a2f4a6f1e7d21c0a206dc74308a2d6eb.jpg?wh=2700%2A768" /></p>
 <p>关于三个阶段的定义在不同文献中稍有区别，其中“Principles of Distributed Database Systems”对这三个阶段的定义通用性更强，对于RVW和VRW都是有效的，我们先看下具体内容。</p>
 <p><strong>读阶段（Read Pharse）</strong>，每个事务对数据项的局部拷贝进行更新。</p>
 <p>要注意，此时的更新结果对于其他事务是不可见的。这个阶段的命名特别容易让人误解，明明做了写操作，却叫做“读阶段”。我想它大概是讲，那些后面要写入的内容，先要暂时加载到一个仅自己可见的临时空间内。这有点像我们抄录的过程，先读取原文并在脑子里记住，然后誊写出来。</p>
@@ -14353,7 +14353,7 @@
 <p>select for update是不是一个必须的操作呢？其实也不是的，这个语句出现是因为数据库不能支持可串行化隔离，给应用提供了一个控制手段，主导权交给了应用。但是，这就是单体数据库长久以来的规则，已经是生态的一部分，为了降低应用的改造量，新产品还是必须接受。</p>
 <h2 id="_6">乐观协议的改变</h2>
 <p>因为上面这些挑战，TiDB的并发控制机制也做出了改变，增加了“悲观锁”并作为默认选项。TiDB悲观锁的理论基础很简单，就是在原有的局部有效性确认前，增加一轮全局有效性确认。这样就是严格的VRW，自然就是标准的悲观协议了。具体采用的方式就是增加了悲观锁，这个锁是实际存在的，表现为一个占位符，随着SQL的执行即时向存储系统（TiKV）发出，这样事务就可以在第一时间发现是否有其他事务与自己冲突。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/81/3c/8105877712a140096aac9cc1d122a43c.jpg?wh=2700%2A1915" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/81/3c/8105877712a140096aac9cc1d122a43c.jpg?wh=2700%2A1915" /></p>
 <p>另外，悲观锁还触发了一个变化。TiDB原有的事务模型并不是一个交互事务，它会把所有的写SQL都攒在一起，在commit阶段一起提交，所以有很大的并行度，锁的时间较短，死锁的概率也就较低。因为增加了悲观锁的加锁动作，变回了一个可交互事务，TiDB还要增加一个死锁检测机制。</p>
 <h2 id="_7">小结</h2>
 <p>到这里，今天的内容就告一段落了，让我们一起梳理下今天内容。</p>
@@ -14364,7 +14364,7 @@
 <li>TiDB的悲观协议符合严格的VRW顺序，在原有的两阶段提交前，增加了一轮悲观锁占位操作，实现全局有效性确认。但是随着悲观锁的引入，TiDB转变为一个可交互事务模式，出现死锁的概率大幅提升，对应增加死锁检测功能。</li>
 </ol>
 <p>今天的课程中，我们澄清了对乐观协议的常见误解，也解释了为什么TiDB要把默认选项从乐观锁改为悲观锁。当然你一定注意到了，除了基于锁的悲观协议外，还有一些其他技术，比如基于时间戳排序（TO）和串行化图检测（SGT）等，我们将在下一讲中继续探讨这个话题。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/79/39/7950a13569109c0cb811868d5a5b5739.jpg?wh=2700%2A2100" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/79/39/7950a13569109c0cb811868d5a5b5739.jpg?wh=2700%2A2100" /></p>
 <h2 id="_8">思考题</h2>
 <p>课程的最后，我们来看看今天的思考题。</p>
 <p>在这一讲开头，我们说TiDB和CockroachDB都经历了从乐观协议到悲观协议的转变，但在文中只展开了TiDB变化前后的设计细节。其实，对于CockroachDB你应该也不陌生了，我们在最近几讲中都有提及到它的一些特性。所以，我今天的问题是，请你推测下CockraochDB的悲观协议大概会采用什么方式？而这种方式又有什么优势？当然，CockroachDB的实现方式很容易查到，所以我更关心你的思考的过程。</p>
@@ -14499,8 +14499,6 @@ Spanner 在文档中称自己的事务是基于悲观锁的，但是其实它也
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

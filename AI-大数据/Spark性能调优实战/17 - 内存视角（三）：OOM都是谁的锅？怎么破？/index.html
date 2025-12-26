@@ -7211,7 +7211,7 @@
 </ul>
 <p>第一类病灶不言自明，咱们不细说了。看到第二类病灶，想必你第一时间想到的就是万恶的collect。确实，说到OOM就不得不提collect。collect算子会从Executors把全量数据拉回到Driver端，因此，如果结果集尺寸超过Driver内存上限，它自然会报OOM。</p>
 <p>由开发者直接调用collect算子而触发的OOM问题其实很好定位，比较难定位的是间接调用collect而导致的OOM。那么，间接调用collect是指什么呢？还记得广播变量的工作原理吗？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b3/2a/b3c5ab392c2303bf7923488623b4022a.jpg?wh=5094%2A1695" title="广播变量的创建与分发" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b3/2a/b3c5ab392c2303bf7923488623b4022a.jpg?wh=5094%2A1695" title="广播变量的创建与分发" /></p>
 <p>广播变量在创建的过程中，需要先把分布在所有Executors的数据分片拉取到Driver端，然后在Driver端构建广播变量，最后Driver端把封装好的广播变量再分发给各个Executors。第一步的数据拉取其实就是用collect实现的。如果Executors中数据分片的总大小超过Driver端内存上限也会报OOM。在日常的调优工作中，你看到的表象和症状可能是：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>java.lang.OutOfMemoryError: Not enough memory to build and broadcast
 </code></pre></div>
@@ -7243,7 +7243,7 @@
 <a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>keywords.map((_, 1)).reduceByKey(_ + _).collect
 </code></pre></div>
 <p>自定义的列表dict会随着Task分发到所有Executors，因此多个Task中的dict会对User Memory产生重复消耗。如果把dict尺寸记为#size，Executor线程池大小记为#threads，那么dict对User Memory的总消耗就是：#size * #threads。一旦总消耗超出User Memory内存上限，自然就会产生OOM问题。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ba/39/ba45d47a910ccb92861b1fd153b36839.jpg?wh=3540%2A1482" title="用户数据在任务中的分发" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ba/39/ba45d47a910ccb92861b1fd153b36839.jpg?wh=3540%2A1482" title="用户数据在任务中的分发" /></p>
 <p>那么，解决User Memory 端 OOM的思路和Driver端的并无二致，也是先对数据结构的消耗进行预估，然后相应地扩大User Memory的内存配置。不过，相比Driver，User Memory内存上限的影响因素更多，总大小由spark.executor.memory * （ 1 - spark.memory.fraction）计算得到。</p>
 <h3 id="execution-memoryoom">Execution Memory的OOM</h3>
 <p>要说OOM的高发区，非Execution Memory莫属。久行夜路必撞鬼，在分布式任务执行的过程中，Execution Memory首当其冲，因此出错的概率相比其他内存区域更高。关于Execution Memory的OOM，我发现不少同学都存在这么一个误区：只要数据量比执行内存小就不会发生OOM，相反就会有一定的几率触发OOM问题。</p>
@@ -7254,7 +7254,7 @@
 <p>根据配置项那一讲我们说过的不同内存区域的计算公式，在默认配置下，我们不难算出Execution Memory和Storage Memory内存空间都是180MB。而且，因为我们的例子里没有RDD缓存，所以Execution Memory内存空间上限是360MB。</p>
 <h4 id="1">实例1：数据倾斜</h4>
 <p>我们先来看第一个数据倾斜的例子。节点在Reduce阶段拉取数据分片，3个Reduce Task对应的数据分片大小分别是100MB和300MB。显然，第三个数据分片存在轻微的数据倾斜。由于Executor线程池大小为3，因此每个Reduce Task最多可获得360MB * 1 / 3 = 120MB的内存空间。Task1、Task2获取到的内存空间足以容纳分片1、分片2，因此可以顺利完成任务。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bb/e2/bbd4052de37200a7152646668f88a5e2.jpg?wh=4134%2A1836" title="数据倾斜导致OOM" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bb/e2/bbd4052de37200a7152646668f88a5e2.jpg?wh=4134%2A1836" title="数据倾斜导致OOM" /></p>
 <p>Task3的数据分片大小远超内存上限，即便Spark在Reduce阶段支持Spill和外排，120MB的内存空间也无法满足300MB数据最基本的计算需要，如PairBuffer和AppendOnlyMap等数据结构的内存消耗，以及数据排序的临时内存消耗等等。</p>
 <p>这个例子的表象是数据倾斜导致OOM，但实质上是Task3的内存请求超出1/N上限。因此，针对以这个案例为代表的数据倾斜问题，我们至少有2种调优思路：</p>
 <ul>
@@ -7270,7 +7270,7 @@
 <p>关于线程池、内存和并行度之间的平衡与设置，我在CPU视角那一讲做过详细的介绍，你可以去回顾一下。至于怎么消除数据倾斜，你可以好好想想，再把你的思路分享出来。</p>
 <h4 id="2">实例2：数据膨胀</h4>
 <p>我们再来看第二个数据膨胀的例子。节点在Map阶段拉取HDFS数据分片，3个Map Task对应的数据分片大小都是100MB。按照之前的计算，每个Map Task最多可获得120MB的执行内存，不应该出现OOM问题才对。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/63/cb/639c65b2ce9213295feedd3634e261cb.jpg?wh=4689%2A1919" title="数据膨胀导致OOM" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/63/cb/639c65b2ce9213295feedd3634e261cb.jpg?wh=4689%2A1919" title="数据膨胀导致OOM" /></p>
 <p>尴尬的地方在于，磁盘中的数据进了JVM之后会膨胀。在我们的例子中，数据分片加载到JVM Heap之后翻了3倍，原本100MB的数据变成了300MB，因此，OOM就成了一件必然会发生的事情。</p>
 <p>在这个案例中，表象是数据膨胀导致OOM，但本质上还是Task2和Task3的内存请求超出1/N上限。因此，针对以这个案例为代表的数据膨胀问题，我们还是有至少2种调优思路：</p>
 <ul>
@@ -7448,8 +7448,6 @@ collect是把executor所有数据全部拉回来，但是他是一次性全放�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

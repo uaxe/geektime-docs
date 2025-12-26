@@ -6493,11 +6493,11 @@
 <p>这里就需要用到进程、线程之类的抽象了，这也是<strong>早期计算机引入多进程的主要目的，让你的计算机看起来可以同时执行不同的任务</strong>。</p>
 <p>我们通常会把不同的程序分配给不同的独立进程去执行，让计算机基于一定的策略，把CPU的计算时间调度给不同的进程使用；但因为进程间切换的时间一般比较短，并不能达到人们能感知到的阈值，所以用户在使用计算机的时候就会觉得多个程序或者任务是同时，也就是并发，执行的。</p>
 <p>如果你在Linux系统上运行一下<code>ps</code>命令，就可以看到你的计算机当前正在运行的许多进程了：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c8/14/c8dcb1b07e65893dcd3bfd6a1e919614.png?wh=1920x684" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c8/14/c8dcb1b07e65893dcd3bfd6a1e919614.png?wh=1920x684" /></p>
 <p>可以看到进程都会被分配一个PID，也就是进程的标识符。</p>
 <p>而每个进程在执行程序的时候显然也要访问内存，也需要自己的程序计数器等资源，操作系统都会给每个进程独立分配这些资源。</p>
 <p>如果把操作系统比作一家公司的CEO，进程就像这家公司的员工，每个员工当然需要被分配有自己独立的办公设备，而许多任务，就像是客户的需求。为了让这些员工可以有条不紊地完成这些需求，当然也就需要一定的调度算法。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c4/0a/c4c76030ffyy7d46ef451c471673010a.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c4/0a/c4c76030ffyy7d46ef451c471673010a.jpg?wh=1920x1145" /></p>
 <p>怎么实现调度呢？我们首先要介绍进程状态这个概念。其实就相当于每个员工当前的工作状态，我们只有知道各员工是空闲还是正在工作，才能科学分配需求，以高效完成更多任务。</p>
 <h2 id="_2">进程状态</h2>
 <p>以Linux内核为例，进程的状态还是比较多的，它们都被定义在 include/linux/sched.h 下，#define 是C语言宏相关的语法，你不熟悉的话，简单理解成左边的是变量名，右边的是变量名对应的值就好了：</p>
@@ -6521,12 +6521,12 @@
 </code></pre></div>
 <p>注意这里的state都是一个可以被表示成2的幂次的数字，这其实是一种常见的bitset的表示方式，方便用位运算判断状态，之后讲解布隆过滤器的时候我们再讨论。</p>
 <p><strong>进程状态，本质上就是为了用有限的计算机资源合理且高效地完成更多的任务</strong>。我们就看一种简化的模型来学习，把操作系统进程的状态分为3类：READY (就绪的) 、 RUNNING（运行的）、BLOCK（阻塞的）。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/2e/c7/2e353cb4824f52d2e7e5315efa0653c7.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2e/c7/2e353cb4824f52d2e7e5315efa0653c7.jpg?wh=1920x1145" /></p>
 <p>RUNNING就是程序正在执行的状态，非常好理解，READY和BLOCK要涉及程序执行中一块比较重要的耗时来源 IO。因为程序运行除了计算之外，也经常需要与外界进行交互，比如等待用户输入一串文本、或者往显示器上输出一副画面，或者从网卡接受一些数据等等，这些操作，我们一般称为IO，也就是输入输出。</p>
 <p>计算机执行程序的时候是单进程的，如果需要等待一个IO操作才能执行后续指令，那在IO数据返回前，整个CPU就不会执行任何有意义的计算了，也就是只能放在那边空跑。用公司-员工的例子就是某个员工被一个任务阻塞了，其他员工也都只能闲着，什么都干不了，这显然不是一个好的策略。</p>
 <p>如果有了多进程就不一样了。一个正在运行的进程，如果需要等待一个IO操作才能执行后续命令，我们就让这个进程的状态变成阻塞的。操作系统就会把当前阻塞的进程调度开，换一个可以被执行的也就是就绪的进程去运行，被调度执行的新进程现在就成为一个运行中的进程了，而那个被调度到一边的进程I/O结束后，也就会重新进入就绪状态。</p>
 <p>过程切换就像这样：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/dd/17/ddfaa0a4a7b6f838f4dbac2457610817.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dd/17/ddfaa0a4a7b6f838f4dbac2457610817.jpg?wh=1920x1145" /></p>
 <p>这是<strong>进程的第二个意义：可以提高程序的性能，让我们不必再空等IO的耗时，尽可能多地利用CPU的计算资源</strong>。</p>
 <p>好，复习完进程相关的一些基本概念，我们进入今天的主题，调度算法。</p>
 <h2 id="_3">调度算法</h2>
@@ -6539,7 +6539,7 @@
 <p>我们还是用公司-员工的例子来简单解释一下这两大类调度策略。</p>
 <p>公司有许多客户的需求待处理，每个员工负责一个客户的需求，但都需要用到计算机来处理自己的需求，当然不同需求的解决时间可能不同；但是公司现在只有一台计算机，这时某个员工使用这台计算机，就好像操作系统用CPU执行某个进程。</p>
 <p>我们的本质问题“如何用有限的计算机资源合理且高效地完成更多的任务”，现在其实就变成了如何在耗时不同的任务间合理切换进程。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/5c/b4/5ca872628f8e432035767da184dae5b4.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5c/b4/5ca872628f8e432035767da184dae5b4.jpg?wh=1920x1145" /></p>
 <p>一个非常简单的想法就是让所有员工排队用这台计算机，轮到的这个员工一直使用到自己的所有工作都处理完，才让给下一个同事。这就是<strong>非抢占式调度</strong>的思路，操作系统调度到某个进程之后，不会对进程做任何干预，直到该进程阻塞或者结束，才会切换到其他就绪的进程。</p>
 <p>但如果轮到的这个员工处理完自己的工作需要2小时，但后几名员工都只需要几分钟，这个排序效率就不够好了。</p>
 <p>考虑到这种问题，就有了<strong>抢占式调度</strong>的策略，操作系统调度到某个进程之后会给它分配一个时间片，如果超过时间片还没有结束或者中途被阻塞，该进程会被操作系统挂起，调度其他进程来执行其他程序。这就好比在公司里加了一个协调者，如果有员工用电脑时间太长，就让他先暂停一会重新排队，先把计算机分配给其他同事。</p>
@@ -6556,7 +6556,7 @@
 <p>接下来，我们就以Linux中进程调度的实现为例，讲一讲基于这两类调度策略的一些常用调度算法；当然，由于操作系统中的真实源码实现涉及Linux对进程的管理和存储方式，不是一两节课能讲完的需要你自己研究，所以我们会用伪代码来讲解核心思路。</p>
 <h2 id="linux">Linux的进程</h2>
 <p>按相同的思路，Linux进程其实也分为两类，一类是有实时交互需要的，它们需要尽快返回结果，不能一直得不到执行；另一类则是普通进程，大部分优先级要求不高，可以忍受更长时间的得不到执行。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/31/36/3121fa47ebb3e9cb08cdb815e2056836.jpg?wh=1920x1290" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/31/36/3121fa47ebb3e9cb08cdb815e2056836.jpg?wh=1920x1290" /></p>
 <p>我们先来看实时交互进程中的调度算法。</p>
 <h3 id="round-robin">Round-Robin 算法</h3>
 <p>一种最经典的实现就是 Round-Robin 调度算法，这种算法也常常作为服务器负载均衡的算法，其主要特点就是比较简单且比较公平。</p>
@@ -6564,7 +6564,7 @@
 <p><strong>实时进程调度的算法衡量指标之一就是平衡性</strong>，因为有实时交互需要的进程不能一直得不到执行，需要雨露均沾。比如在图形化的交互任务中，平衡性比较好的调度算法，往往就不会出现有一些计算密集型的任务过多占用CPU导致用户体验到卡顿的情况。</p>
 <p>所以Round-Robin算法最大的优势就是不会存在某个进程执行时间太长，每个程序都可以有机会得到较早的执行。</p>
 <p>看 Round-Robin 的例子，一共有ABCDE5个进程，arrival time代表进程产生的时间，service time代表进程总共需要执行的时间，单位就是时间片的长度。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1d/8f/1d40cb1029debf1f0dc78e4474ab108f.jpg?wh=1920x1290" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1d/8f/1d40cb1029debf1f0dc78e4474ab108f.jpg?wh=1920x1290" /></p>
 <p>可以看到，在整个操作系统运行的时间里，这些进程都是轮流执行的，不会一直等待。</p>
 <p>那我们选择的时间片是不是越短越好呢？</p>
 <p>当然不是。前面说过进程切换是有开销的，每次切换都需要保存程序运行的状态，并将新的状态装载进寄存器中，这些都需要时间，这个时间大约需要1ms。</p>
@@ -6601,16 +6601,16 @@
 <h3 id="fcfs">FCFS</h3>
 <p>FCFS（First Come First Serve）是最简单也最直接的，其实它和我们学过的队列很像。</p>
 <p>按照进程产生的顺序将它们放到一个队列中，每次调度的时候，直接取队列中第一个进程执行，这是一个非抢占式算法，所以直到这个任务完成或者被阻塞前，我们都会一直执行这个任务；如果这个任务被阻塞了，就重新将它加回队尾重新排队。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/73/e0/737347db194fe09a9d8cb7616926c0e0.jpg?wh=1920x1290" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/73/e0/737347db194fe09a9d8cb7616926c0e0.jpg?wh=1920x1290" /></p>
 <p>但不好的地方就是对短任务不是很公平，如果短任务之前有长任务，长任务就会一直执行，这样一来短任务的周转时间就被拉长了，即使完成它的时间其实很短。整体的平均周转时间也就变得比较差。</p>
 <h3 id="sjf">SJF</h3>
 <p>有了FCFS的基础，我们自然想到，让短任务更优先执行，是不是就能降低平均周转时间了呢？这就是SJF（Shortest Job First）的思路，</p>
 <p>SJF在从队列取出任务的时候，按照作业时间把待作业的任务排序，优先调度<strong>最短可以完成的</strong>任务。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/cf/y1/cf402659ebbe49dd21e9dee8e859cyy1.jpg?wh=1920x1290" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cf/y1/cf402659ebbe49dd21e9dee8e859cyy1.jpg?wh=1920x1290" /></p>
 <p>SJF因为按各任务的需要时长排序，可能导致长任务一直得到不到执行，会被饿死，而因为最短可完成时长没有把有IO的情况纳入计算，也就出现了下一个SRTF算法。</p>
 <h3 id="srtf">SRTF</h3>
 <p>SRTF（Shortest Remaining Time First）从思想上来说和SJF差不多，只不过放回队列的时候按照作业剩余时间排序，优先调度<strong>剩余完成时间最短的</strong>任务。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/cc/c3/ccd22253b7b08ba6cd96f359a86e5ac3.jpg?wh=1920x1290" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cc/c3/ccd22253b7b08ba6cd96f359a86e5ac3.jpg?wh=1920x1290" /></p>
 <p>因为都是非抢占式的调度，在没有IO的时候，SRTF其实和SJF的机制是一样的，只不过它<strong>可以把有IO的情况也纳入到考虑范畴中</strong>，如果任务因为阻塞主动调度开，我们再次出队的时候不会再傻傻的按照任务总时长进行排序，而是按照剩余需要的时长进行排序，尽量提高调度整体的吞吐量。</p>
 <p>同样，SRTF基于时长的排序策略也一定程度上放弃了公平性，和SJF一样，可能导致长任务一直得到不到执行。</p>
 <p>当然，其实还有许多特定场景的调度算法。比如有些系统中，我们会关心某些任务的截止时间，如果任务快到截止时间了，我们需要优先完成接近截止时间的任务。</p>
@@ -6737,8 +6737,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -6108,16 +6108,16 @@
 <p>最后一个参数是"-numjobs=1"，指只有一个进程/线程在运行。</p>
 <p>所以，这条fio命令表示我们通过异步方式读取了10GB的磁盘文件，用来计算文件的读取性能。</p>
 <p>那我们看到在ubuntu 18.04，内核4.15上的容器I/O性能是584MB/s的带宽，IOPS（I/O per second）是150K左右。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5d/5e/5df788a1c7fb9f5677557d6cb15c995e.png?wh=1920%2A257" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5d/5e/5df788a1c7fb9f5677557d6cb15c995e.png?wh=1920%2A257" /></p>
 <p>同样我们再启动一个ubuntu 20.04，内核5.4的虚拟机，然后在它的上面也启动一个容器。</p>
 <p>我们运行 <code>docker run -it ubuntu:20.04 bash</code> ，接着在容器中使用同样的fio命令，可以看到它的I/O性能是70MB带宽，IOPS是18K左右。实践证明，这的确比老版本的ubuntu 18.04差了很多。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/90/f1/90aff20c885286d4b6b5aed7b017a9f1.png?wh=1920%2A256" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/90/f1/90aff20c885286d4b6b5aed7b017a9f1.png?wh=1920%2A256" /></p>
 <h2 id="_2">知识详解</h2>
 <h3 id="_3">如何理解容器文件系统？</h3>
 <p>刚才我们对比了升级前后的容器读写性能差异，那想要分析刚刚说的这个性能的差异，我们需要先理解容器的文件系统。</p>
 <p>我们在容器里，运行 <code>df</code> 命令，你可以看到在容器中根目录(/)的文件系统类型是"overlay"，它不是我们在普通Linux节点上看到的Ext4或者XFS之类常见的文件系统。</p>
 <p>那么看到这里你肯定想问，Overlay是一个什么样的文件系统呢，容器为什么要用这种文件系统？别急，我会一步一步带你分析。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2f/b0/2fed851ba2df3232efbdca1d1cce19b0.png?wh=1554%2A144" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2f/b0/2fed851ba2df3232efbdca1d1cce19b0.png?wh=1554%2A144" /></p>
 <p>在说容器文件系统前，我们先来想象一下如果没有文件系统管理的话会怎样。假设有这么一个场景，在一个宿主机上需要运行100个容器。</p>
 <p>在我们这个课程的<a href="https://time.geekbang.org/column/article/308108">第一讲</a>里，我们就说过每个容器都需要一个镜像，这个镜像就把容器中程序需要运行的二进制文件，库文件，配置文件，其他的依赖文件等全部都打包成一个镜像文件。</p>
 <p>如果没有特别的容器文件系统，只是普通的Ext4或者XFS文件系统，那么每次启动一个容器，就需要把一个镜像文件下载并且存储在宿主机上。</p>
@@ -6126,13 +6126,13 @@
 <p>特别是这样的情况：假如这100个容器镜像都是基于"ubuntu:18.04"的，每个容器镜像只是额外复制了50MB左右自己的应用程序到"ubuntu: 18.04"里，那么就是说在总共50GB的数据里，有90%的数据是冗余的。</p>
 <p>讲到这里，你不难推测出理想的情况应该是什么样的？</p>
 <p>没错，当然是在一个宿主机上只要下载并且存储存一份"ubuntu:18.04"，所有基于"ubuntu:18.04"镜像的容器都可以共享这一份通用的部分。这样设置的话，不同容器启动的时候，只需要下载自己独特的程序部分就可以。就像下面这张图展示的这样。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c0/3f/c0119d9d2af9cf7386db13467027003f.jpg?wh=1594%2A852" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c0/3f/c0119d9d2af9cf7386db13467027003f.jpg?wh=1594%2A852" /></p>
 <p><strong>正是为了有效地减少磁盘上冗余的镜像数据，同时减少冗余的镜像数据在网络上的传输，选择一种针对于容器的文件系统是很有必要的，而这类的文件系统被称为UnionFS。</strong></p>
 <p>UnionFS这类文件系统实现的主要功能是把多个目录（处于不同的分区）一起挂载（mount）在一个目录下。这种多目录挂载的方式，正好可以解决我们刚才说的容器镜像的问题。</p>
 <p>比如，我们可以把ubuntu18.04这个基础镜像的文件放在一个目录ubuntu18.04/下，容器自己额外的程序文件app_1_bin放在app_1/目录下。</p>
 <p>然后，我们把这两个目录挂载到container_1/这个目录下，作为容器1看到的文件系统；对于容器2，就可以把ubuntu18.04/和app_2/两个目录一起挂载到container_2的目录下。</p>
 <p>这样在节点上我们只要保留一份ubuntu18.04的文件就可以了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/44/27/449669a1aaa8c631d7768369b275ed27.jpg?wh=1620%2A806" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/44/27/449669a1aaa8c631d7768369b275ed27.jpg?wh=1620%2A806" /></p>
 <h3 id="overlayfs">OverlayFS</h3>
 <p>UnionFS类似的有很多种实现，包括在Docker里最早使用的AUFS，还有目前我们使用的OverlayFS。前面我们在运行<code>df</code>的时候，看到的文件系统类型"overlay"指的就是OverlayFS。</p>
 <p>在Linux内核3.18版本中，OverlayFS代码正式合入Linux内核的主分支。在这之后，OverlayFS也就逐渐成为各个主流Linux发行版本里缺省使用的容器文件系统了。</p>
@@ -6161,24 +6161,24 @@
 <p>然后我们看"uppder/"，它是被mount两层目录中上面的这层 （upperdir）。在OverlayFS中，如果有文件的创建，修改，删除操作，那么都会在这一层反映出来，它是可读写的。</p>
 <p>接着是最上面的"merged" ，它是挂载点（mount point）目录，也是用户看到的目录，用户的实际文件操作在这里进行。</p>
 <p>其实还有一个"work/"，这个目录没有在这个图里，它只是一个存放临时文件的目录，OverlayFS中如果有文件修改，就会在中间过程中临时存放文件到这里。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ca/5d/ca894a91e0171a027ba0ded6cdf2a95d.jpg?wh=1438%2A840" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ca/5d/ca894a91e0171a027ba0ded6cdf2a95d.jpg?wh=1438%2A840" /></p>
 <p>从这个例子我们可以看到，OverlayFS会mount两层目录，分别是lower层和upper层，这两层目录中的文件都会映射到挂载点上。</p>
 <p>从挂载点的视角看，upper层的文件会覆盖lower层的文件，比如"in_both.txt"这个文件，在lower层和upper层都有，但是挂载点merged/里看到的只是upper层里的in_both.txt.</p>
 <p>如果我们在merged/目录里做文件操作，具体包括这三种。</p>
 <p>第一种，新建文件，这个文件会出现在upper/ 目录中。</p>
 <p>第二种是删除文件，如果我们删除"in_upper.txt"，那么这个文件会在upper/目录中消失。如果删除"in_lower.txt", 在 lower/目录里的"in_lower.txt"文件不会有变化，只是在 upper/目录中增加了一个特殊文件来告诉OverlayFS，"in_lower.txt'这个文件不能出现在merged/里了，这就表示它已经被删除了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f3/2a/f3813b984193e3aebebe1b5104f75e2a.png?wh=1026%2A470" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f3/2a/f3813b984193e3aebebe1b5104f75e2a.png?wh=1026%2A470" /></p>
 <p>还有一种操作是修改文件，类似如果修改"in_lower.txt"，那么就会在upper/目录中新建一个"in_lower.txt"文件，包含更新的内容，而在lower/中的原来的实际文件"in_lower.txt"不会改变。</p>
 <p>通过这个例子，我们知道了OverlayFS是怎么工作了。那么我们可以再想一想，怎么把它运用到容器的镜像文件上？</p>
 <p>其实也不难，从系统的mounts信息中，我们可以看到Docker是怎么用OverlayFS来挂载镜像文件的。容器镜像文件可以分成多个层（layer），每层可以对应OverlayFS里lowerdir的一个目录，lowerdir支持多个目录，也就可以支持多层的镜像文件。</p>
 <p>在容器启动后，对镜像文件中修改就会被保存在upperdir里了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/55/26/55a7059809afdd3d51e5a6b3f5c83626.png?wh=1920%2A368" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/55/26/55a7059809afdd3d51e5a6b3f5c83626.png?wh=1920%2A368" /></p>
 <h2 id="_4">解决问题</h2>
 <p>在理解了容器使用的OverlayFS文件系统后，我们再回到开始的问题，为什么在宿主机升级之后，在容器里读写文件的性能降低了？现在我们至少应该知道，在容器中读写文件性能降低了，那么应该是OverlayFS的性能在新的ubuntu20.04中降低了。</p>
 <p>要找到问题的根因，我们还需要进一步的debug。对于性能问题，我们需要使用Linux下的perf工具来查看一下，具体怎么使用perf来解决问题，我们会在后面讲解。</p>
 <p>这里你只要看一下结果就可以了，自下而上是函数的一个调用顺序。通过perf工具，我们可以比较在容器中运行fio的时候，ubuntu 18.04和ubuntu 20.04在内核函数调用上的不同。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6d/7a/6d970f9cf76bd0875ff3e505900b1b7a.png?wh=698%2A540" title="ubuntu 18.04 (Linux内核4.15)环境下使用perf输出的函数调用结果" /></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/46/1f/466cd0da98f4170111c5ce2436f2ed1f.png?wh=1920%2A437" title="ubuntu 20.04 (Linux内核 5.4)环境下使用perf输出的函数调用结果" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6d/7a/6d970f9cf76bd0875ff3e505900b1b7a.png?wh=698%2A540" title="ubuntu 18.04 (Linux内核4.15)环境下使用perf输出的函数调用结果" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/46/1f/466cd0da98f4170111c5ce2436f2ed1f.png?wh=1920%2A437" title="ubuntu 20.04 (Linux内核 5.4)环境下使用perf输出的函数调用结果" /></p>
 <p>我们从系统调用框架之后的函数aio_read()开始比较：Linux内核4.15里aio_read()之后调用的是xfs_file_read_iter()，而在Linux 内核5.4里，aio_read()之后调用的是ovl_read_iter()这个函数，之后再调用xfs_file_read_iter()。</p>
 <p>这样我们就可以去查看一下，在内核4.15之后新加入的这个函数ovl_read_iter()的代码。</p>
 <p>查看<a href="https://lwn.net/Articles/755889/">代码</a>后我们就能明白，Linux为了完善OverlayFS，增加了OverlayFS自己的read/write函数接口，从而不再直接调用OverlayFS后端文件系统（比如XFS，Ext4）的读写接口。但是它只实现了同步I/O（sync I/O），并没有实现异步I/O。</p>
@@ -6370,8 +6370,6 @@ psync 的IOPS 差距巨大。但是在传统kvm架构上面labiao psync的IOPS�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

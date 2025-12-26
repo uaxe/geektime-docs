@@ -5910,7 +5910,7 @@
 </ul>
 <p>那么，我们就先从生产环境中C/S架构的网络抖动案例说起。</p>
 <h2 id="cs">如何分析C/S架构中的网络抖动问题？</h2>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bf/37/bf1cd8873fff3a7528f194658753e837.jpg?wh=2172x948" title="典型的C/S架构" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bf/37/bf1cd8873fff3a7528f194658753e837.jpg?wh=2172x948" title="典型的C/S架构" /></p>
 <p>上图就是一个典型的C/S架构，Client和Server之间可能经过了很复杂的网络，但是对于服务器开发者或者运维人员而言，这些中间网络可以理解为是一个黑盒，很难去获取这些网络的详细信息，更不用说到这些网络设备上去做debug了。所以，我在这里把它们都简化为了一个Router（路由器），然后Client和Server通过这个路由器来相互通信。比如互联网场景中的数据库服务（像MySQL）、http服务等都是这种架构。而当时给我们提需求来诊断网络抖动问题的也是MySQL业务。因此，接下来我们就以MySQL为例来进行具体讲解。</p>
 <p>MySQL的业务方反馈说他们的请求偶尔会超时很长，但不清楚是什么原因引起了超时，对应到上图中，就是D点收到响应的时刻和A点发出请求的时刻，这个时间差会偶然性地有毛刺。在发生网络问题时，使用tcpdump来抓包是常用的分析手段，当你不清楚该如何来分析网络问题时，那就使用tcpdump先把事故现场保存下来吧。</p>
 <p>如果你使用过tcpdump来分析问题，那你应该也吐槽过用tcpdump分析问题会很麻烦。如果你熟悉wireshark的话，就会相对容易一些了。但是对于大部分人而言呢，学习wirkshark的成本也是很高的，而且wireshark的命令那么多，把每一条命令都记清楚也是件很麻烦的事。</p>
@@ -5918,7 +5918,7 @@
 <p>针对tcpdump难以分析应用协议的问题，有一个思路是，在tcpdump的时候把数据也保存下来，然后使用tcpdump再进一步去解析这些应用协议。但是你会发现，用这种方式来处理生产环境中的抖动问题是很不现实的，因为在生产环境中的 TCP 连接动辄数百上千条，我们往往并不清楚抖动发生在哪个TCP连接上。如果把这些TCP流都dump出来，data部分即使只dump与应用协议有关的数据，这对磁盘I/O也是个负担。那有什么好办法吗？</p>
 <p>好办法还是需要和应用协议关联起来，不过我们可以把这些应用协议做一层抽象，从而可以更简单地来解析它们，甚至无需解析。对于MySQL而言呢，工具<a href="https://www.percona.com/blog/2010/08/31/introducing-tcprstat-a-tcp-response-time-tool/">tcprstat</a>就是来做这件事的。</p>
 <p>tcprstat的大致原理是利用MySQL的request-response特征来简化对协议内容的处理。request-response是指一个请求到达MySQL后，MySQL处理完该请求，然后回response，Client侧收到response后再去发下一个request，然后MySQL收到下一个request并处理。也就是说这种模型是典型的串行方式，处理完了一个再去处理下一个。所以tcprstat就可以以数据包到达MySQL Server侧作为起始时间点，以MySQL将最后一个数据包发出去作为结束时间点，然后这二者的时间差就是RT（Response Time），这个过程大致如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/62/d6/62666eab402a7d4ed9eb41ae8a2581d6.jpg?wh=2969%2A1685" title="tcprstat追踪RT抖动" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/62/d6/62666eab402a7d4ed9eb41ae8a2581d6.jpg?wh=2969%2A1685" title="tcprstat追踪RT抖动" /></p>
 <p>tcprstat会记录request的到达时间点，以及request发出去的时间点，然后计算出RT并记录到日志中。当时我们把tcprstat部署到MySQL server侧后，发现每一个RT值都很小，并没有延迟很大的情况，所以看起来服务端并没有问题。那么问题是否发生在Client这里呢？</p>
 <p>在我们想要把tcprstat也部署在Client侧抓取信息时，发现它只支持在Server侧部署，所以我们对tcprstat做了一些改造，让它也可以部署在Client侧。</p>
 <p>这种改造并不麻烦，因为在Client侧解析的也是MySQL协议，只是TCP流的方向跟Server侧相反，Client侧是发请求收响应，而Server侧是收请求发响应。</p>
@@ -5934,7 +5934,7 @@
 <p>能够达到这个目标的方案大致有两种：一种是使用内核模块，另一种是使用轻量级的内核追踪框架。</p>
 <p>使用内核模块的缺点是它的安装部署会很不方便，特别是在线上内核版本非常多的情况下，比如说，我们的线上既有CentOS-6的操作系统，也有CentOS-7的操作系统，每个操作系统又各自有很多小版本，以及我们自己发布的版本。统一线上的内核版本是件很麻烦的事，这会涉及到很多变更，不太现实。所以这种现状也就决定了，使用内核模块的方式需要付出比较高的维护成本。而且内核模块的易用性也很差，这会导致业务人员和运维人员排斥使用它，从而增加它的推广难度。基于这些考虑，我们最终选择了基于systemtap这个追踪框架来开发。没有选择eBPF的原因是，它对内核版本要求较高，而我们线上很多都是CentOS-7的内核。</p>
 <p>基于systemtap实现的追踪框架大致如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0e/ff/0e6bf3f396e9c89f8a35376075d8c5ff.jpg?wh=2899%2A2027" title="TCP流的追踪" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0e/ff/0e6bf3f396e9c89f8a35376075d8c5ff.jpg?wh=2899%2A2027" title="TCP流的追踪" /></p>
 <p>它会追踪每一个TCP流，TCP流对应到内核里的实现就是一个struct sock实例，然后记录TCP流经过A/B/C/D这四个点的时刻，依据这几个时间点，我们就可以得到下面的结论：</p>
 <ul>
 <li>如果C-B的时间差较大，那就说明Server侧有抖动，否则是Client或网络的问题；</li>
@@ -5950,7 +5950,7 @@
 <p>C/S架构是互联网服务中比较典型的场景，那针对其他场景我们该如何来分析问题呢？接下来我们以虚拟机这种场景为例来看一下。</p>
 <h2 id="_2">虚拟机场景下该如何判断抖动是发生在宿主机上还是虚拟机里？</h2>
 <p>随着云计算的发展，越来越多的业务开始部署在云上，很多企业或者使用自己定制的私有云，或者使用公有云。我们也有很多业务部署在自己的私有云中，既有基于KVM的虚拟机，也有基于Kubernetes和Docker的容器。以虚拟机为例，在Server侧发生抖动的时候，业务人员还想进一步知道，抖动是发生在Server侧的虚拟机内部，还是发生在Server侧的宿主机上。要想实现这个需求，我们只需要进一步扩展，再增加新的hook点，去记录TCP流经过虚拟机的时间点就好了，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/27/c1/27e5240900409a0848842f73704d3bc1.jpg?wh=3121%2A2066" title="虚拟机场景下TCP流的追踪" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/27/c1/27e5240900409a0848842f73704d3bc1.jpg?wh=3121%2A2066" title="虚拟机场景下TCP流的追踪" /></p>
 <p>这样我们就可以根据F和E的时间差来判断抖动是否发生在虚拟机内部。针对这个需求，我们对tcprstat也做了类似的改造，让它可以识别出抖动是否发生在虚拟机内部。这个改造也不复杂，tcprstat默认只处理目标地址为本机的数据包，不会处理转发包，所以我们让它支持混杂模式，然后就可以处理转发包了。当然，虚拟机的具体网络配置是千差万别的，你需要根据你的实际虚拟网络配置来做调整。</p>
 <p>总之，希望你可以举一反三，根据你的实际业务场景来做合理的数据分析，而不要局限于我们这节课所列举的这几个具体场景。</p>
 <h2 id="_3">课堂总结</h2>
@@ -6112,8 +6112,6 @@ RTT 是否可以作为这次网络耗时？
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

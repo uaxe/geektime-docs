@@ -14588,7 +14588,7 @@
 <p>和上面这些分布式存储系统相比，MQ 的区别在于，它的数据结构非常简单，就是一个由消息构成的队列。</p>
 <p>数据的查询和更新方式也很简单：根据一个索引序号查询消息，只在尾部追加写入。MQ 的这个队列数据模型几乎就是一个天然的 WAL（Write Ahead Log），所以 MQ 可以在保证数据持久化的情况下，达到非常高的吞吐能力。</p>
 <p>WAL 是一种最简单的数据模型，简单到无从考证到底是谁发明了它，或者说根本不需要发明，很多系统都已经在自觉或不自觉地使用 WAL。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/83/3c/83641428d65aac96d7ce8ef70c9dd33c.png?wh=505x191" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/83/3c/83641428d65aac96d7ce8ef70c9dd33c.png?wh=505x191" /></p>
 <p>WAL 就是一串有序的日志（Log），需要具备下面这些特征：</p>
 <ul>
 <li>尾部追加：日志只能在尾部追加写入。</li>
@@ -14609,7 +14609,7 @@
 <h2 id="mmap">不要迷信 mmap</h2>
 <p>WAL 是一个抽象的数据结构，和其他的数据结构一样，最终要通过操作系统的文件系统，以文件的方式保存在磁盘上。</p>
 <p>一般来说 WAL 会按照顺序把数据写入到文件中，一个文件超过一定长度，再开启一个文件继续写。这样写入 WAL 的时候，对于磁盘来说就是典型的顺序写入，会有非常好的写入性能。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/92/8a/92f80d8e0e1ac99ae1fd6daca6b29d8a.png?wh=991x191" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/92/8a/92f80d8e0e1ac99ae1fd6daca6b29d8a.png?wh=991x191" /></p>
 <p>mmap 是 Linux 的内核提供的一个用于读写文件的系统调用（System Call）。它的作用是，将一个文件（或者文件中的一部分）映射到进程的内存地址空间上。映射关系建立之后，进程就可以通过读写这段映射的内存地址空间来读写文件，操作系统内核负责维护映射关系以及内存和磁盘文件的双向同步。</p>
 <p>mmap 和传统的 IO 方式相比，读写过程中减少了一次内存数据拷贝，通常被认为具有更好的读写性能。很多 IO 密集型的系统，也都会使用 mmap 来读写文件。</p>
 <p>JoyQueue 的存储引擎最开始也是使用 mmap 来实现的，然而性能测试显示，实际的性能表现和理论预期有不小的差距。</p>
@@ -14617,11 +14617,11 @@
 <p>是什么原因导致了这样的结果呢？</p>
 <p>查阅相关论文后，我发现在 <a href="https://shimo.im/outlink/gray?url=https%3A%2F%2Fwww.usenix.org%2Fsystem%2Ffiles%2Fconference%2Fhotstorage17%2Fhotstorage17-paper-choi.pdf">Efficient Memory Mapped File I/O for In-Memory File Systems</a> 这篇论文中，作者做了类似的测试，测试结果仍然是传统读写方式更快。</p>
 <p>下图是论文作者放出的测试数据：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fe/51/fe6759c2321bf584fac5f82d4c98d851.png?wh=1920x1018" title="图片来源于上述论文" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fe/51/fe6759c2321bf584fac5f82d4c98d851.png?wh=1920x1018" title="图片来源于上述论文" /></p>
 <p>论文中给出了详细的原因分析，简单的说就是，mmap 相比于传统读写，会有一些额外的开销，包括：缺页中断、TLB miss 和 PTE 创建这些软件开销。</p>
 <p>绝大多数情况下，这些开销相对于磁盘 IO 的开销来说，几乎可以忽略不计。但是在顺序读写和高性能存储这种场景下，磁盘 IO 的开销要小很多，这个时候 mmap 的额外开销就被相对放大了。</p>
 <p>从下面这张图中可以看到在不同硬件环境下，mmap 软件开销的占比情况：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cc/0c/ccd0bc8be29de112c8ac47ee9d99b90c.png?wh=1920x1025" title="图片来源于上述论文" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cc/0c/ccd0bc8be29de112c8ac47ee9d99b90c.png?wh=1920x1025" title="图片来源于上述论文" /></p>
 <p>目前国内大多数数据中心，网络和服务器配置接近上图中的第二种情况：NVMe SSD &amp; 10Gb NIC，mmap 额外的的开销占到了约 50%。</p>
 <p>mmap 软件开销的详细分析，你可以参考论文，不再赘述。论文还给出了一种 Async Map-ahead 的方法来优化顺序读，但因为并不适用于 JoyQueue 的使用场景，我们并没有采用。</p>
 <p>由此我们得到一个重要的经验：<strong>在高性能存储上顺序读写 WAL，传统 IO（read/write）的性能要优于 mmap。</strong></p>
@@ -14633,7 +14633,7 @@
 <p>使用堆外内存，相当于绕过了 Java 的自动内存管理机制，所以这些策略对于使用 C++ 等这些非自动内存管理语言编写的系统，同样是适用的。</p>
 <p>考虑到 WAL 在写入磁盘过程中，数据一定要经过堆外内存，所以用堆外内存实现一个读写缓存是自然的选择。JoyQueue 在堆外为每个 WAL 文件，申请一块儿和文件大小相同的堆外内存，作为文件的读写缓存，我们称为缓存页。</p>
 <p>写入的过程如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/29/09/29804499c049e88f1340e7d6be66fa09.png?wh=763x409" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/29/09/29804499c049e88f1340e7d6be66fa09.png?wh=763x409" /></p>
 <p>数据首先从 Socket Buffer 拷贝到堆内存，存放在 BrokerMessage 的实例，也就是一个 Java 对象中。所有的协议解析、数据转换等逻辑都在堆内存中完成。</p>
 <p>处理完的消息从堆内存拷贝到堆外内存，追加写入到 WAL 最后一个文件对应的缓存页中，到这里 WAL 的写入已经完成。
 缓存中的脏数据由 Flush 线程异步写入 PageCache，再由操作系统择机异步同步到磁盘的文件中。</p>
@@ -14794,8 +14794,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

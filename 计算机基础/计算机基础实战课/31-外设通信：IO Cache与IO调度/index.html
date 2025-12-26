@@ -6481,12 +6481,12 @@
 </code></pre></div>
 <p>该命令是用来显示Linux系统上内存的使用情况的，单位以MB计。</p>
 <p>输入这条命令，我们会得到如下图所示的情况：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/61/d3/616bca3d76779c6bb3e7f2b2f77316d3.jpg?wh=1920x1042" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/61/d3/616bca3d76779c6bb3e7f2b2f77316d3.jpg?wh=1920x1042" /></p>
 <p>上图中的buff/cache，就是我们所说的IO Cache占用的内存。从这个角度，是不是看得更透彻了？所谓IO Cache，不过是操作系统基于某种算法管理的一块内存空间，用该内存空间缓存IO设备的数据，应用多次读写外设数据会更方便，而不需要反复发起IO操作。</p>
 <p>其实早期的Cache是位于CPU和内存之间的高速缓存，由于硬件实现的Cache芯片的速度仅次于CPU，而内存速度远小于CPU，Cache只是为了缓存内存中的数据，加快CPU的性能，避免CPU等待内存。而Buffer是在内存中由软件实现的，用于缓存IO设备的数据，缓解由于IO设备过慢带来系统性能下降。</p>
 <p>但是现在Buffer和Cache成了在计算机技术中被用滥的两个名词。在Linux的内存管理中，<strong>Buffer指Linux内存的Buffer Cache，而Cache是指Linux内存中的Page Cache</strong>，翻译成中文可以叫做<strong>缓冲区缓存和页面缓存</strong>，用来缓存IO设备的读、写数据。补充一句，这里的IO设备，主要指的是块设备文件和文件系统上的普通文件。</p>
 <p>在当前的Linux内核中，BufferCache建立Page Cache之上，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7f/d3/7fc388859b3981e398fc456b3b5539d3.jpg?wh=1920x1426" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7f/d3/7fc388859b3981e398fc456b3b5539d3.jpg?wh=1920x1426" /></p>
 <p>在现代Linux的实现中，远比上图画得要复杂得多，不过我们只需要关注这个层次结构就行了。Buffer Cache中有多个小块组成，块大小通常为512字节，在Linux内核中用一个struct Bio结构来描述块，而一个物理内存页中存在多个块，多个struct Bio结构形成Buffer Cache，多个这种页就形成了Page Cache。</p>
 <p>在操作系统理论中，这一套实现机制被抽象为IO Cache。但是，各种操作系统的实现的叫法不同，在此不必展开了，我们只需要明白它们能在内存中缓存设备数据就行了。</p>
 <p>我们明白了Buffer Cache和Page Cache的概念，下面我们以Linux读写硬盘的过程为例，研究一下IO操作时IO Cache发挥的作用。</p>
@@ -6495,7 +6495,7 @@
 <p>2.块层。Linux内核把各种设备分成块设备，字符设备、网络设备和硬盘都属于块设备，块层主要负责管理块设备的 IO 队列，对 IO 请求进行合并、排序等操作。</p>
 <p>3.设备层。具体设备驱动通过 DMA 与内存交互，完成数据和具体设备之间的交换，此例子中的设备为硬盘。</p>
 <p>我们画一幅图，表示一下这个过程：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d7/ce/d78fd983c18af99826bc3a160d19c1ce.jpg?wh=1920x1803" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d7/ce/d78fd983c18af99826bc3a160d19c1ce.jpg?wh=1920x1803" /></p>
 <p>IO操作在到达Linux的VFS层后，会根据相应的IO操作标志确定是DirectIO还是BufferedIO，如果是前者则不经过Cache，直接由块层发送到设备层，完成IO操作；如果是后者，则IO操作到达Page Cache之后就返回了。</p>
 <p>在某一时刻，Linux会启动pdflush线程，该线程会扫描PageCache中的脏页，进而找到对应的Bio结构，然后把Bio结构发送给块层的IO调度器，调度器会对bio进行合并、排序，以提高IO效率。</p>
 <p>之后，调用设备层的相关函数将Bio转发到设备驱动程序处理，设备驱动程序函数对IO请求队列中每个Bio进行分别处理，根据Bio中的信息向磁盘控制器发送命令。处理完成后，调用Bio完成函数以通知上层完成了操作。这便是一个IO操作的过程。</p>
@@ -6504,23 +6504,23 @@
 <p>我们把IO操作缓存起来了，这样操作系统就对IO操作有了控制权，具体点说就是可以对IO操作进行调度。</p>
 <p>我先不直接说明IO调度是干什么的，先结合例子带你一起分析看看。我们从软件层面来看一个场景：假如一个应用程序往硬盘中写入1GB大小的文件，但是这个应用程序很调皮，它每次只写入一个字节。如果没有 IO Cache和IO调度，可以想见，这需要发生多少次IO操作才能完成，如果硬件能说话，估计要骂人。</p>
 <p>再来说说硬件自己结构的问题，这里以机械硬盘为主。千万不要感觉机械硬盘已经淘汰了，其实在很多服务器上仍然大量使用它。硬盘结构如下所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f3/09/f3a04735ca4439715b7d5eae386e8509.jpg?wh=1920x1711" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f3/09/f3a04735ca4439715b7d5eae386e8509.jpg?wh=1920x1711" /></p>
 <p>一个硬盘中有多个盘片，一个盘片上有多个同心圆组成的多条磁道，每条磁道上有多个扇区，一个扇区512字节，磁头来回移动经过多个同心圆形成的柱面定位到一个扇区。很显然，找到一个扇区花费的时间等于磁头移动时间加上盘片旋转的时间。这些运动都是机械运动，是非常缓慢的。</p>
 <p>以上两个场景，提醒我们有两个问题需要考虑，一是怎么降低IO操作次数，二是如何优化硬盘寻址。这两个问题解决好了，都能大大提升系统性能。想解决第一个问题，我们可以对IO操作进行缓存和合并；而对于第二个问题，我们可以对IO操作进行排序，能让硬盘磁头按照一定的顺序定位扇区，解决这些问题的就是IO调度器。</p>
 <p>有了IO调度器，还得有相应的调度算法，IO调度器提供了多种调度算法来适应不同的IO请求场景。有的场景需要的是提高IO吞吐量，比如数据库后台的储存引擎；有的场景则是要降低IO响应时间，比如游戏应用程序。</p>
 <p>我们先看看第一种调度算法，该算法名为Noop。<strong>Noop是最简单的IO调度算法</strong>，其实可以说它是没有“调度”的IO调度，因为Noop会把所有的IO请求，几乎按照先来后到的顺序放入先进先出队列之中。</p>
 <p>之所以说“几乎”，是因为Noop在先进先出队列的基础上，还做了相邻IO操作的合并，而不是完完全全按照先进先出的规则满足IO操作。我来给你画一幅图，展示一下这个算法实施的操作，如下所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ca/ea/cabf6327b721f48233f5f374f1df32ea.jpg?wh=1920x850" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ca/ea/cabf6327b721f48233f5f374f1df32ea.jpg?wh=1920x850" /></p>
 <p>一个个BIo结构进入Noop IO调度器，产生request结构，这个结构中包含Bio链表。Noop IO调度器把扇区相邻的Bio合并在一起形成request结构，然后将requset结构挂载到块设备的requset_queue中，块设备通常是你的硬盘。</p>
 <p>然后，我们来看看第二种调度算法，该算法名为CFQ，全称为Completely Fair Queuing。由于传统的机械硬盘上，硬盘寻址花去了绝大多数的IO操作的时间，所以要优化硬盘寻址所花的时间。</p>
 <p>CFQ调度器的出发点就是<strong>对IO操作扇区地址进行排序</strong>，比如硬盘旋转到1号扇区，很快就旋转到2号扇区，如果你先访问2号扇区再次访问1号扇区，则要等到硬盘旋转一周后，才能到达1号扇区。CFQ调度器对其进行排序后，就能通过尽量少的硬盘旋转次数，来满足尽可能多的IO操作。CFQ调度器算法执行逻辑如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0a/03/0afee91b6311050140bee36155135203.jpg?wh=1920x1043" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0a/03/0afee91b6311050140bee36155135203.jpg?wh=1920x1043" /></p>
 <p>我们看到在CFQ调度器下，将多个BIO结构生成requset结构时，会按照扇区地址升序挂载到块设备的requset_queue中，这会使机械硬盘的吞吐量大大提高。</p>
 <p>相比Noop调度器，不知道你有没有发现一个问题：先来的IO操作并不一定能被满足，还可能会出现饿死的情况。比如，先来一个IO操作扇区地址是1000，然后不停地进入扇区地址小于1000的IO操作，就会出现饿死现象。</p>
 <p>我们来看一看最后一种IO调度算法，该算法名为Deadline，Deadline调度器提供了两个红黑树以及两个先进先出队列，两个红黑树分别对读、写的IO操作按照其扇区地址排序，同时给每个IO操作添加超时时间，并插入到对应的（读、写）先进先出的队列尾部。这样一来，一个IO操作会同时挂在红黑树和先进先出队列中。</p>
 <p>当Deadline调度器在发送一个IO操作时，会综合考虑IO操作是否超时、是否饥饿，由此决定到底发送哪个IO操作，发送IO操作之后会将该IO操作同时在红黑树和先进先出队列中删除。</p>
 <p>我来画一幅图，展示一下这个算法实施的操作，如下所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9d/73/9d6efcbbe24d7ae8c58140a11a9a2473.jpg?wh=1920x1663" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9d/73/9d6efcbbe24d7ae8c58140a11a9a2473.jpg?wh=1920x1663" /></p>
 <p>上图中读写队列分开，同时用红黑树对其排序，而且还加入了超时机制。硬盘驱动会找Deadline IO调度器获取IO request，Deadline IO调度器根据这些数据结构和算法分配request，完美地解决了CFQ IO调度器的缺陷，由于读写分开且读优先于写，导致该算法非常适合数据库这种随机读写的场景。</p>
 <p>我们发现，IO调度器算法多种多样，那么要怎么选择呢？</p>
 <p>其实选择IO调度器算法，既要考虑硬件特性，也要考虑应用程序场景。在传统的机械硬盘上，CFQ、Deadline算法是不错的选择；对于专属的数据库服务器，Deadline IO调度器的IO吞吐量和IO响应时间综合性能都表现非常好。</p>
@@ -6530,7 +6530,7 @@
 <p>为了搞明白IO Cache的概念，我们从Linux的缓存结构入手，发现Linux用物理内存页面为基础，建立了Page Cache。在这个Page Cache之上，又建立了Buffer Cache，BufferCache组织了传输到IO设置上的数据块。我们通过对IO流程的探讨，发现IO操作可以不经过IO Cache，而是直接到达设备。</p>
 <p>之后，我们对软件场景和硬盘结构进行了讨论，发现有了IO Cache以后，还需要对IO请求进行调度，才能使IO效率最大化，针对不同的场景有不同IO调度器，我们重点讨论了三种IO调度算法，分别是Noop、CFQ、Deadline，其中综合性能最好的是Deadline。然而硬件技术的升级又产生了固态硬盘，导致这些IO调度器没有了用武之地，不调度就是最好的调度。</p>
 <p>这节课的导图如下所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/78/42/785f246b72a1b6279bbc5942084dde42.jpg?wh=1920x1513" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/78/42/785f246b72a1b6279bbc5942084dde42.jpg?wh=1920x1513" /></p>
 <h3 id="_2">思考题</h3>
 <p>操作系统为什么要开发 IO Cache？</p>
 <p>欢迎你在留言区和我交流讨论，如果觉得这节课对你有启发，别忘了分享给更多朋友！</p>
@@ -6651,8 +6651,6 @@ io cache是必须的，就好比如把d盘的文件a剪切到c盘中，观察可
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

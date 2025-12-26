@@ -7236,7 +7236,7 @@
 <a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="c1">// Array[(String, Int)] = Array((Apache,34), (Spark,63))</span>
 </code></pre></div>
 <p>将上述代码丢进spark-shell，我们很快就能算出，在wikiOfSpark.txt文件中，“Apache”这个单词出现了34次，而“Spark”则出现了63次。虽说得出计算结果挺容易的，不过知其然，还要知其所以然，接下来，咱们一起来分析一下，这段代码在运行时是如何工作的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8d/49/8dd52d329d74d212cfa6b188cfea2b49.jpg?wh=1920x1140" title="定向计数中list变量的全网分发" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8d/49/8dd52d329d74d212cfa6b188cfea2b49.jpg?wh=1920x1140" title="定向计数中list变量的全网分发" /></p>
 <p>如上图所示，list变量本身是在Driver端创建的，它并不是分布式数据集（如lineRDD、wordRDD）的一部分。因此，在分布式计算的过程中，Spark需要把list变量分发给每一个分布式任务（Task），从而对不同数据分区的内容进行过滤。</p>
 <p>在这种工作机制下，如果RDD并行度较高、或是变量的尺寸较大，那么重复的内容分发就会引入大量的网络开销与存储开销，而这些开销会大幅削弱作业的执行性能。为什么这么说呢？</p>
 <p>要知道，<strong>Driver端变量的分发是以Task为粒度的，系统中有多少个Task，变量就需要在网络中分发多少次</strong>。更要命的是，每个Task接收到变量之后，都需要把它暂存到内存，以备后续过滤之用。换句话说，在同一个Executor内部，多个不同的Task多次重复地缓存了同样的内容拷贝，毫无疑问，这对宝贵的内存资源是一种巨大的浪费。</p>
@@ -7267,7 +7267,7 @@
 <a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a><span class="c1">// Array[(String, Int)] = Array((Apache,34), (Spark,63))</span>
 </code></pre></div>
 <p>可以看到，代码的修改非常简单，我们先是使用broadcast函数来封装list变量，然后在RDD过滤的时候调用bc.value来访问list变量内容。<strong>你可不要小看这个改写，尽管代码的改动微乎其微，几乎可以忽略不计，但在运行时，整个计算过程却发生了翻天覆地的变化</strong>。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/90/12/9050f159749465d0c9d3394f3335ee12.jpg?wh=1920x969" title="广播变量工作原理" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/90/12/9050f159749465d0c9d3394f3335ee12.jpg?wh=1920x969" title="广播变量工作原理" /></p>
 <p>在使用广播变量之前，list变量的分发是以Task为粒度的，而在使用广播变量之后，变量分发的粒度变成了以Executors为单位，同一个Executor内多个不同的Tasks只需访问同一份数据拷贝即可。换句话说，变量在网络中分发与存储的次数，从RDD的分区数量，锐减到了集群中Executors的个数。</p>
 <p>要知道，在工业级系统中，Executors个数与RDD并行度相比，二者之间通常会相差至少两个数量级。在这样的量级下，广播变量节省的网络与内存开销会变得非常可观，省去了这些开销，对作业的执行性能自然大有裨益。</p>
 <p>好啦，到现在为止，我们讲解了广播变量的用法、工作原理，以及它的优势所在。在日常的开发工作中，<strong>当你遇到需要多个Task共享同一个大型变量（如列表、数组、映射等数据结构）的时候，就可以考虑使用广播变量来优化你的Spark作业</strong>。接下来，我们继续来说说Spark支持的第二种共享变量：累加器。</p>
@@ -7604,8 +7604,6 @@ https:&#47;&#47;github.com&#47;Spoon94&#47;spark-practice&#47;blob&#47;master&#4
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

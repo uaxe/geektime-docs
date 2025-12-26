@@ -6221,7 +6221,7 @@
 <h2 id="cps">CPS转换背后的细节</h2>
 <p>在<a href="https://time.geekbang.org/column/article/487085">第15讲</a>当中，我们已经初步介绍过挂起函数的用法了：挂起函数，只是比普通的函数多了suspend关键字。有了这个suspend关键字以后，Kotlin编译器就会特殊对待这个函数，将其转换成一个带有Callback的函数，这里的Callback就是Continuation接口。</p>
 <p>而这个过程，我们称之为CPS转换：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/37/92/3732f7a3473e82c5a5d109a18d87f992.gif?wh=720x405" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/37/92/3732f7a3473e82c5a5d109a18d87f992.gif?wh=720x405" /></p>
 <p>以上的CPS 转换过程中，函数的类型发生了变化：<code>suspend ()-&gt;String</code> 变成了 <code>(Continuation)-&gt; Any?</code>。这意味着，如果你在Java里访问一个Kotlin挂起函数getUserInfo()，会看到 getUserInfo()的类型是 <code>(Continuation)-&gt; Object</code>，也就是：接收 Continuation 为参数，返回值是Object。</p>
 <p>而在这里，函数签名的变化可以分为两个部分：<strong>函数参数</strong>的变化和<strong>函数返回值</strong>的变化。</p>
 <h3 id="cps_1">CPS参数变化</h3>
@@ -6294,7 +6294,7 @@
 </code></pre></div>
 <p>从上面的代码里，可以看到getUserInfo()的返回值类型从String变成“Any?”。你肯定会好奇，函数原本的String返回值难道丢失了吗？如果原本的返回值类型丢失了，那么程序执行难道不会出问题吗？</p>
 <p>其实并不是这样。Kotlin官方之所以要弄这一套CPS转换规则，它必然是“<strong>等价转换</strong>”。也就是说，String这个原本的返回值类型肯定不会消失，而是会换一种形式存在。只是String存在的形式，经过Kotlin<strong>反编译成Java之后会丢失</strong>。如果你直接在Java当中调用getUserInfo()的话，就会发现String这个返回值类型成为了Continuation的泛型类型。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/36/06/36eebc96c2dd6acf0c178068db0f4a06.png?wh=1582x426" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/36/06/36eebc96c2dd6acf0c178068db0f4a06.png?wh=1582x426" /></p>
 <p>所以，对于getUserInfo()这个方法，经过CPS转换后，它完整的函数签名应该是这样的：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>// 代码段4
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
@@ -6305,7 +6305,7 @@
 <a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>fun getUserInfo(cont: Continuation&lt;String&gt;): Any? {}
 </code></pre></div>
 <p>这时候，我们就可以更新第15讲当中的那个CPS动图了：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/78/yy/784ce5776def5255e6d300cd5890a6yy.gif?wh=1080x608" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/78/yy/784ce5776def5255e6d300cd5890a6yy.gif?wh=1080x608" /></p>
 <p>好，现在我们知道了，挂起函数原本的返回值类型String只是挪了个地方，所以，Kotlin编译器的CPS转换仍然是等价的转换。也就是：<code>suspend () -&gt; String</code> 转换成 <code>(Continuation&lt;String&gt;) -&gt; Any?</code>。不过，<strong>这里的“Any?”又是干什么的呢？</strong></p>
 <p>其实，挂起函数经过 CPS 转换后，它的返回值有一个重要作用：<strong>标志该挂起函数有没有被挂起</strong>。这听起来有点绕：挂起函数，就是可以被挂起的函数，它还能不被挂起吗？</p>
 <p>是的，挂起函数也能不被挂起。</p>
@@ -6331,12 +6331,12 @@
 <a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>}
 </code></pre></div>
 <p>这个其实是 <strong>noSuspendFriendList()方法</strong>，它的方法体跟普通函数一样。它跟一般的挂起函数有个区别：在执行的时候，它并不会被挂起，因为它就是个普通函数。当你写出以下这样的代码后，IDE也会提示你，suspend是多余的：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/35/d3/35de8c0f0bbabbce0ca8dee2840d33d3.png?wh=624x119" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/35/d3/35de8c0f0bbabbce0ca8dee2840d33d3.png?wh=624x119" /></p>
 <p>也就是，当我们调用noSuspendFriendList()这个挂起函数的时候，它不会真正挂起，而是会直接返回String类型：<code>"no suspend"</code>。针对这样的挂起函数，你可以把它看作是<strong>伪挂起函数</strong>。</p>
 <p>所以到这里，挂起函数经过CPS转换后，返回值变成“Any?”的原因也就清晰了：</p>
 <p>由于suspend修饰的函数，既可能返回 <code>CoroutineSingletons.COROUTINE_SUSPENDED</code>，也可能返回实际结果 <code>"no suspend"</code>，甚至可能返回 null，为了适配所有的可能性，CPS 转换后的函数返回值类型就只能是 <code>Any?</code> 了。</p>
 <p>可见我在第15讲当中给出的这个CPS动图，仅仅只是粗略模拟了协程的CPS流程，其中还有很多细节没有体现出来。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/03/22/03d156ec6a31d650c6634f486dc06222.gif?wh=720x405" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/03/22/03d156ec6a31d650c6634f486dc06222.gif?wh=720x405" /></p>
 <p>那么，为了让你对挂起函数的底层实现原理有一个更加清晰的认识，接下来，我们来看看挂起函数反编译之后会变成什么样。</p>
 <h2 id="_1">挂起函数的反编译</h2>
 <p>我们知道，通过查看Kotlin反编译后的字节码，可以帮助我们理解Kotlin的底层原理。不过，和往常不一样的是，这次我不会直接贴反编译后的代码，因为它的逻辑比较复杂。</p>
@@ -7238,8 +7238,6 @@ return withContext(Dispatchers.IO) {
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

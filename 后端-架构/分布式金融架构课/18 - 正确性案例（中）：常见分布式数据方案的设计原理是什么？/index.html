@@ -14072,18 +14072,18 @@
 2.异步容灾，通过牺牲单调读一致和自读自写，换取消息返回速度。
 3.用RDB来实现定期的状态备份，通过牺牲数据完整性来换取处理速度。</p>
 <p>Redis的一个简单架构图如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4c/47/4ce05bb01a9d1046a751a7709956b647.png?wh=1920%2A734" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4c/47/4ce05bb01a9d1046a751a7709956b647.png?wh=1920%2A734" /></p>
 <h2 id="rocksdb">RocksDB</h2>
 <p>数据系统一般有三件事情要处理，分别是数据查询，数据保存和数据处理，也就是数据的读写和计算。Redis优化的是数据的读和计算，接下来我们来看看，RocksDB怎么来优化数据的写。</p>
 <p>RocksDB和我后面要讲的Spanner、TiDB一样，都属于同一类K/V的实现。这些实现都基于SSTable和LSM树。</p>
 <p>SSTable的全称是Sorted String Table。其实<strong>SSTable就是一个存储在文件的Map</strong>，这个Map的键的类型是字符串，在存储的时候这些键是按从小到大的顺序排列的。下面这幅图是SSTable的一个简单例子：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/98/6c/98e140a8158d916c06f4ddef09f4c16c.jpg?wh=2920%2A1471" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/98/6c/98e140a8158d916c06f4ddef09f4c16c.jpg?wh=2920%2A1471" /></p>
 <p>你也许觉得单个SSTable没有什么特别之处，但是多个SSTable放在一起之后会，就出现一个特殊的数据结构，它就是LSM树。</p>
 <p><strong>LSM树用多个SSTable实现了一个Map。</strong>LSM树将所有SSTable从上到下排列，查询的时候先查最上面的SSTable，如果查不到就查下一层，以此类推。</p>
 <p>我还是结合一个例子给你讲解。LSM树一共有两层。这两层有3个键是重复的，分别是a、b和c。当我们想查询a的时候，在第一层就发现了数据，因此不需要访问第二层的SSTable。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/08/be/086dd4b236fd6536e16905af30e4ecbe.jpg?wh=2720%2A1853" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/08/be/086dd4b236fd6536e16905af30e4ecbe.jpg?wh=2720%2A1853" /></p>
 <p>但是如果我们换一下查询的条件。这时候查询的是h，而不是a。第一层不包含键为h的数据，因此查询会继续访问第二层。下面这幅图展示了这个查询过程：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4c/3e/4c8617dbc5afc8a1aaf1821f2fd3c93e.jpg?wh=2708%2A1834" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4c/3e/4c8617dbc5afc8a1aaf1821f2fd3c93e.jpg?wh=2708%2A1834" />
 那LSM树的这个架构有什么优势呢？前面提到过，这种架构的写入速度非常快。其实写入速度无论多快，肯定也比不上Redis，因为Redis可以选择不写文件。所以<strong>LSM树的真正优势是当K/V数据量超过内存大小时，基于文件系统的LSM树结构提供了基本的K/V查询能力，同时它还具有很高的数据写入速度。</strong></p>
 <p>传统的基于文件的K/V结构是B+树。B+树在更新数据的时候需要对文件做修改。LSM树在更新数据的时候，并不会对已有的SSTable进行修改，而是在所有的SSTable之上再建一个新的SSTable。</p>
 <p>这种方式和MVCC的方法类似（MVCC的内容详见<a href="https://time.geekbang.org/column/article/334878">第12节课</a>，都是<strong>将一个修改操作变成了新增操作</strong>，这样对文件的所有操作都是在末尾添加新的内容。</p>
@@ -14112,7 +14112,7 @@
 <p>通过前面的学习，我们知道了两阶段提交需要有一个协调者，这个协调者会成为分布式事务的单点。Spanner在设计的时候，分布式事务的协调者其实是一个Paxos算法的主节点，因此它本身就有一定的容灾能力，不再是单点。</p>
 <p>其实我们在上节课学习分布式的事件溯源架构的时候，采用的也是同一个思路。共识算法的主节点承担所有的写入操作和对外沟通工作，其他节点负责同步主节点的修改行为。</p>
 <p>下图展示了简化版的Spanner架构图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/64/b6/6488115082ee73d6a3c4470465e586b6.png?wh=1920%2A867" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/64/b6/6488115082ee73d6a3c4470465e586b6.png?wh=1920%2A867" /></p>
 <p>Spanner还有另一个著名的优化技巧，那就是用原子钟实现的TrueTime API，它用物理的方式优化了事务的实现。这个方法的普适性不高，所以在这里不再详细介绍，如果你有兴趣可以查看Spanner的论文。</p>
 <p>在这里我要特别提到的一点是，虽然现在看起来Spanner的设计比较平常，用的都是我们常见的数据系统解决方案，但是不要忽略先后顺序。现在的数据系统用到的成熟解决方案，它们普遍来自于Spanner，其实我们只是站在了巨人的肩上而已，饮水不忘打井人。</p>
 <h2 id="tidb">TiDB</h2>
@@ -14128,7 +14128,7 @@
 <p>数据分析不需要有一致性读的一致性能力，因此有常规查询的支持就足够了。<strong>常规查询需要用到读模式的状态机</strong>，因此TiFlash可以从TiKV的节点上复制日志文件。TiFlash选择只从主节点复制，主要是为了节省延时。</p>
 <p>TiKV的存储方式和RocksDB类似，也用的是LSM树，因此写入速度快，但是查询速度慢。读写分离的优势是可以分开优化，既然写模式的LSM树查询慢，那么读模式就需要改变文件的组织结构，于是TiFlash用了一些B+树来优化列文件的查询。</p>
 <p>下图是简化版的TiDB架构图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ef/6e/ef471ea6cec3cd90011a18a568ce0e6e.png?wh=2360x1316" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ef/6e/ef471ea6cec3cd90011a18a568ce0e6e.png?wh=2360x1316" /></p>
 <h2 id="_1">小结</h2>
 <p>这节课我们一起学习了分布式数据系统的设计原理。所有业务系统从本质上来讲都是数据系统，因此我们可以从分析分布式数据系统的架构，来学习怎么设计业务系统架构。</p>
 <p>首先来看Redis。Redis是一个基于内存的K/V存储，用单线程和epoll来提高数据处理速度，用异步主从备份的方式来牺牲一致性，从而降低容灾延迟。Redis还可以通过RDB实现定期的状态备份，牺牲数据完整性来换取处理速度。</p>
@@ -14137,7 +14137,7 @@
 <p>TiDB进一步优化了Spanner的设计。它将关系型数据库的存储抽象成了独立的分布式K/V存储，负责解决数据库的写入操作，同时用基于列存储方式的TiFlash来实现数据库的查询操作。TiFlash通过读模式状态机的方式，从TiKV的共识算法主节点同步数据。</p>
 <p>从这4个例子我们可以看出一些常用的架构取舍思路。在分布式环境下，系统稳定性的提高会伴随着处理速度下降，而处理速度的提升会伴随着正确性的下降，因此<strong>稳定性、正确性和速度不能三者同时兼顾。</strong></p>
 <p>另外，写入的速度快，那么读取的速度就会慢，如果想读写都很快，那么需要用到多份存储，所以<strong>读、写和存储空间也不能三者同时优化。</strong>因此，在分布式环境下一般不会有正确的架构，只有满足业务需求的合适的架构，这就是分布式环境下架构的艺术性所在。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/76/dd/760604339286938350dd63dda03667dd.jpg?wh=3075%2A2371" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/76/dd/760604339286938350dd63dda03667dd.jpg?wh=3075%2A2371" /></p>
 <h2 id="_2">思考题</h2>
 <p>在大数据之前的时代里，关系型数据库倾向于把所有功能都实现在一起，这样就能充分优化各个组件之间的交互，从而达到很高的单机吞吐量。</p>
 <p>但是到了现在这个大数据的时代，单机再也无法承载这么大的数据量，因此需要把数据分散在多台机器上处理。分布式环境下一定存在网络延时，所以单机版的优化并没有之前那么好的效果。</p>
@@ -14335,8 +14335,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

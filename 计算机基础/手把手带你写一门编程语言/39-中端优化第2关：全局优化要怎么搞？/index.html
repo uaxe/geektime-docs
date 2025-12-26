@@ -6408,11 +6408,11 @@
 <p>这个例子其实是我在《编译原理之美》第28节中举的一个例子。在那里，我是基于CFG做变量活跃性分析，再基于分析结果去做优化。你有兴趣的话可以去看一下。那个算法的核心，是跨越多个基本块做变量活跃性分析。一个基本块的输出，会顺着控制流，成为另一个基本块的输入。在这门课的第20节，我也介绍过这种变量活跃性分析的思路，所以这里我就不再去重复了。</p>
 <p>那在这节课中，我们感兴趣的是，<strong>基于现在的IR，我们能否更便捷地实现变量活跃性分析，实现死代码的删除呢？</strong></p>
 <p>我们先来运行一下“node play example_opt2.ts --dumpIR”命令，看一下deadCode2函数对应的IR是什么样子的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c2/88/c2d61a707d0cbcbd42c84a25a53f7988.png?wh=824x1080" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c2/88/c2d61a707d0cbcbd42c84a25a53f7988.png?wh=824x1080" /></p>
 <p>你会发现，这个图里加入了If节点，并产生了流程分支，然后又通过Merge节点合并到了一起，不同流程分支的变量产生了多个定义。相应的，IR中也有Phi节点，用来选择不同流程分支的变量定义。</p>
 <p>以变量d为例，实际上现在我们的程序保存了d的三个定义，在if块中定义了d0，在else块中定义了d1，“y = c + d”这一句中还有一个。不过在“y = c + d”这一句中的变量d，要通过phi节点来获得。类似的，变量b也有三个定义，而变量y也有两个不同的定义。</p>
 <p>同时，你还会发现，图中有几个节点的uses属性为空集合。比如y0和y1，所以我们又可以把它们从图中去掉。而在去掉了y0和y1以后，d0、d1和d2也不再有用，所以也可以去掉。做过这些优化以后，IR图就变成了下面的样子：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f2/c7/f2431b6d6b96eddb777e59671af3abc7.png?wh=696x1080" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f2/c7/f2431b6d6b96eddb777e59671af3abc7.png?wh=696x1080" /></p>
 <p>而最后这个版本，其实就可以对应上优化后的那个源代码了。</p>
 <p>所以，我们在全局做死代码的删除，其实跟前一节课的本地优化没有区别，都是<strong>根据uses属性来做判断</strong>。<strong>因为这个时候，控制流并没有影响我们的优化算法。</strong></p>
 <p>不过，并不是在所有情况下，控制流都不会影响到优化。我们再来分析一种优化技术，就是部分冗余消除。在这个场景下，控制流的影响就会体现出来。</p>
@@ -6464,7 +6464,7 @@
 <a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>}
 </code></pre></div>
 <p>然后再生成它的IR看一下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/25/88/250e84d0e267f3fc1b8b2b78974d2d88.png?wh=740x1080" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/25/88/250e84d0e267f3fc1b8b2b78974d2d88.png?wh=740x1080" /></p>
 <p>从这个IR中你能看到，x+4对应着编号为8的节点，y1和z的值都是x+4，最后的返回值是13号节点，也就是y2+z。而y2是一个phi节点，根据流程分支，它的值可能是常量0，也可能是x+4。</p>
 <p>我们再进一步，如果你研究13号节点的def链，你会发现它肯定会依赖到8号节点，也就是x+4。无论程序是否经过if语句的那条控制流，都会是这样。所以，当我们把节点划分到基本块的时候，8号节点可以划分到if语句之前的基本块，这样就实现了对x+4只计算一次的目的。相当于下面的代码：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>function PRE(x:number):number{
@@ -6482,7 +6482,7 @@
 <h2 id="schedule">划分基本块和指令调度（Schedule）</h2>
 <p>我们当前的IR采用的是一个基于图的数据结构。可是我们在生成汇编代码的时候，还是要把整个程序划分成基本块，并在基本块之间实现跳转。这个时候，我们就要采用一个调度算法，确定把哪条代码放到哪个基本块。</p>
 <p>划分基本块其实比较简单，我们基于控制流做运算就行了。每产生一个控制流分支的时候，我们就划分一个新的基本块。比如，我们刚才的PRE示例程序就可以划分成四个基本块，if语句前后各有一个，而if语句的两个分支也分别是一个基本块。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/30/98/302c0911443487a21730bf9ec935e698.png?wh=1220x888" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/30/98/302c0911443487a21730bf9ec935e698.png?wh=1220x888" /></p>
 <p>接下来，我们就要把各个数据流节点也纳入到不同的基本块中去。由于数据节点是浮动的，它其实有比较大的自由度，可以归到不同的基本块中去。<strong>那我们这里的算法，就是如果某个表达式的计算会出现在多个流程分支里，我们就尽量把它提到外面去</strong>。比如对x+4的计算，我们就把它放到第1个基本块中了。</p>
 <p>那看着前面这张图，你可能会产生疑问：难道if条件的两个流程分支都是空的基本块吗？按照源代码，在x&gt;0的时候，应该有一个y=t的赋值呀？</p>
 <p>没错，我们现在把控制流的Merge节点和数据流的Phi节点都归到了第4个基本块。但其实phi节点会在Merge节点之前的两个基本块中生成代码的。只不过是因为，我们现在在HIR的阶段，只能画成这样，没法把phi节点划分到前面两个不同的基本块去。在生成LIR或汇编代码的时候，phi节点就会被转化成位于基本块中的代码。所以，这个阶段，我们只需要记住phi节点生成代码的特点就行了。</p>
@@ -6511,7 +6511,7 @@
 <p>当然，这么做也有一个风险，就是如果程序并不进入循环，那么这次计算就白做了，反倒多消耗了计算量。不过，这个情况总归是小概率事件。除非我们有运行时的统计数据作依托，不然我们很难做出更准确地选择。</p>
 <p>在静态编译的情况下，我们只能假设把它放到循环外面，大概率是比放在循环里面更好一些。从这个场景中，你也能再次体会到“全生命周期优化”的意义，<strong>AOT编译并不总是能得到最好的效果</strong>。</p>
 <p>那要如何实现这个优化呢？我们还是把这个程序生成IR来看一下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b2/57/b2fd95c0a693a693c80a48d1f3bafd57.jpg?wh=1692x1504" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b2/57/b2fd95c0a693a693c80a48d1f3bafd57.jpg?wh=1692x1504" /></p>
 <p>从这个IR图中，我们能看出a*a计算确实是与循环无关的，是可以在循环内部和外部浮动的。相比之下，变量i和b1的计算，则受限于控制流的结构，只能出现在LoopBegin之后。</p>
 <p>所以，基于我们的指令调度算法，我们就把a*a这个节点归入第1个基本块，这样就实现了循环无关代码的外提。</p>
 <h2 id="_3">课程小结</h2>
@@ -6640,8 +6640,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

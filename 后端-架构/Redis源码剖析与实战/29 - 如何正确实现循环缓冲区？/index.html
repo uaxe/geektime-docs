@@ -14574,14 +14574,14 @@
 <p>那么，在后端系统中设计缓冲区时，直接面临的一个问题就是，<strong>缓冲区空间不够用时该怎么办？</strong></p>
 <p>我们比较容易想到的实现方案是，当缓冲区不够用时，系统再动态分配缓冲区。但是动态分配缓冲区会<strong>有一定的开销</strong>，而且如果一旦空间不够用了，就动态分配缓冲区，这也会造成缓冲区空间持续增长，<strong>占用过多内存资源</strong>。</p>
 <p>而实际上，缓冲区中的数据在发送给从节点后，其实可以删除掉，这样就有新空间可以用了。这也就是说，缓冲区空间是可以复用的，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/27/d9/27278ea3db0f74afb4ca7e576e9837d9.jpg?wh=1920x962" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/27/d9/27278ea3db0f74afb4ca7e576e9837d9.jpg?wh=1920x962" /></p>
 <p>那么，循环缓冲区的实现就是使用了复用缓冲区的设计思想，它的空间可以循环写入。从工作原理来说，它有两个特点：</p>
 <ul>
 <li><strong>循环缓冲区有一个写指针，表示主节点在缓冲区中的当前写入位置。</strong>如果写指针已经指向了缓冲区末尾，那么此时主节点再写入数据，写指针就会重新指向缓冲区头部，从头部开始再次写入数据，这样就可以复用缓冲区空间了。</li>
 <li><strong>循环缓冲区有一个或多个读指针，表示不同从节点在缓冲区中的当前读取位置。</strong>当读指针指向缓冲区末尾时，从节点也会把读指针重新指向缓冲区头部，从缓冲区头部开始继续读取数据。</li>
 </ul>
 <p>下图展示了循环缓冲区的写指针工作机制，你可以看下，读指针的工作机制和这个也是类似的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d1/78/d1e86c89cb18540e9dae23b6496d6b78.jpg?wh=1920x999" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d1/78/d1e86c89cb18540e9dae23b6496d6b78.jpg?wh=1920x999" /></p>
 <p>好了，了解了循环缓冲区的工作原理后，我们就来看下Redis中是如何实现循环缓冲区的。</p>
 <h2 id="redis">Redis中如何实现循环缓冲区？</h2>
 <p>在Redis的主从复制代码实现中，循环缓冲区就是被用来暂存主节点收到的命令的。</p>
@@ -14691,27 +14691,27 @@
 </code></pre></div>
 <p>为了便于你理解刚才介绍的循环缓冲区写入过程，这里我也来给你举个例子。下面我会用表格展示数据写入过程中各状态值的变化，并辅以示意图说明。</p>
 <p>首先，我们假设循环缓冲区总长度为8，也就是repl_backlog_size值为8，以及全局复制偏移量master_repl_offset初始值为0（这个值在代码中会随机生成）。按照刚才介绍的循环缓冲区初始化操作，repl_backlog_idx、repl_backlog_histlen的初始值为0，而repl_backlog_off初始值为1，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/99/90/991e1b4c813ca456dd54e16d079d4690.jpg?wh=1920x947" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/99/90/991e1b4c813ca456dd54e16d079d4690.jpg?wh=1920x947" /></p>
 <p>假设第一次写入长度为5的数据“abcde”（len=5），此时，全局复制偏移量等于初始值0加上写入的数据长度5，结果为5，也就是master_repl_offset等于5。</p>
 <p>那么，按照feedReplicationBacklog函数的执行逻辑，循环缓冲区的各状态值如下表所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/de/86/de2b3a9de0e8e8400ae076278d8f6986.jpg?wh=1920x1022" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/de/86/de2b3a9de0e8e8400ae076278d8f6986.jpg?wh=1920x1022" /></p>
 <p>下图也展示了写入长度为5的数据后，循环缓冲区中的内容以及全局范围内两个偏移量的值。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/29/1b/29f456yy9cc5ddc96f4acf156568fc1b.jpg?wh=1920x912" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/29/1b/29f456yy9cc5ddc96f4acf156568fc1b.jpg?wh=1920x912" /></p>
 <p>然后，假设第二次写入长度为16的数据“fghijklmnopqrstu”（len=16），此时，全局复制偏移量等于上一次的值5，加上本次写入的数据长度16，结果为21，也就是master_repl_offset等于21。</p>
 <p>因为缓冲区总长度为8，目前已经写入5个字符，那么要再写入16个字符，按照feedReplicationBacklog函数的执行逻辑，就需要执行一个循环流程来写入数据，而每轮循环写入缓冲区的数据长度是缓冲区当前的剩余长度，最大为缓冲区总长度。</p>
 <p>所以，当要再写入16个字符时，feedReplicationBacklog函数<strong>需要执行三轮循环</strong>，第一轮循环写入3个字符，第二轮循环写入8个字符，第三轮循环写入5个字符。这个写入过程中，循环缓冲区各状态信息如下面的三张表所示，你可以仔细看下。</p>
 <p>第一轮循环写入“fgh”3个字符，缓冲区各状态信息如下表所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/36/d4/36715bcbfd624de950aefcf8ec4dc3d4.jpg?wh=1920x917" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/36/d4/36715bcbfd624de950aefcf8ec4dc3d4.jpg?wh=1920x917" /></p>
 <p>此时，循环缓冲区中的内容，以及全局范围内两个偏移量的值，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/53/74/536fe9069dbd07b76b8d36e08f4d8074.jpg?wh=1920x923" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/53/74/536fe9069dbd07b76b8d36e08f4d8074.jpg?wh=1920x923" /></p>
 <p>紧接着第二轮循环写入“ijklmnop”8个字符，缓冲区各状态信息如下表所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0b/b1/0b2efc0fcc47f87b7817ebe4bbd452b1.jpg?wh=1920x907" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0b/b1/0b2efc0fcc47f87b7817ebe4bbd452b1.jpg?wh=1920x907" /></p>
 <p>此时，循环缓冲区中的内容，以及全局范围内两个偏移量的值，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9d/fb/9d298cf61128da29e0690a8c0986b1fb.jpg?wh=1920x916" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9d/fb/9d298cf61128da29e0690a8c0986b1fb.jpg?wh=1920x916" /></p>
 <p>最后，第三轮循环写入“qrstu”5个字符，缓冲区各状态信息如下表所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ef/60/ef56d5a6e4c550db7bab20841aaa6f60.jpg?wh=1920x959" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ef/60/ef56d5a6e4c550db7bab20841aaa6f60.jpg?wh=1920x959" /></p>
 <p>三轮循环结束后，因为repl_backlog_histlen已经大于缓冲区总长度了，所以它会被更新为缓冲区总长度8，而repl_backlog_off会被更新为14。此时，循环缓冲区中的内容，以及全局范围内两个偏移量的值，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a3/4b/a328153f7049c5f20fbfdb2edf77yy4b.jpg?wh=1920x900" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a3/4b/a328153f7049c5f20fbfdb2edf77yy4b.jpg?wh=1920x900" /></p>
 <p>好了，到这里，你就了解了循环缓冲区的写入过程。接下来，我们再来看下循环缓冲区的读取过程。</p>
 <h3 id="_4">循环缓冲区的读操作</h3>
 <p>在Redis中，当从节点和主节点在断连后再次建立连接时，从节点会发送<strong>PSYNC命令</strong>给主节点，而这个命令中就<strong>包含了从节点的全局读取偏移量offset</strong>，如下所示：</p>
@@ -14728,10 +14728,10 @@
 </code></pre></div>
 <p>其实，这里我们可以分成两种情况来理解这段计算代码。</p>
 <p><strong>一是，缓冲区还没有写满。</strong>此时，repl_backlog_histlen就等于repl_backlog_idx，所以代码的计算相当于repl_backlog_size对它自己取模，结果为0。这也就是说，当缓冲区还没写满时，缓冲区中最早保存的数据的首字节，就是在缓冲区头，这也是因为缓冲区没有被覆盖重写。你可以看看下面的图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3b/5c/3bd9d114a90212050a609271785f7e5c.jpg?wh=1920x616" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3b/5c/3bd9d114a90212050a609271785f7e5c.jpg?wh=1920x616" /></p>
 <p><strong>二是，缓冲区已经写满过，并且已从头再次写入数据。</strong>此时，repl_backlog_histlen就等于缓冲区总长度repl_backlog_size。所以，代码的计算相当于repl_backlog_idx对repl_backlog_size取模，结果就是repl_backlog_idx。</p>
 <p>这也好理解，repl_backlog_idx指向了下一次写入的数据位置，当缓冲区写满过，这个位置上是有数据的，而这个数据正是缓冲区中最早保存数据的首字节。一旦再次写入时，这个位置就会被覆盖重写了，你可以看看下图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/fd/7a/fdc78822a1dd8ef05289f164762c097a.jpg?wh=1920x636" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fd/7a/fdc78822a1dd8ef05289f164762c097a.jpg?wh=1920x636" /></p>
 <p>当计算得到缓冲区中最早保存数据的首字节，在缓冲区中的对应位置后，addReplyReplicationBacklog函数就会在此基础上，增加从节点要跳过的数据长度，得到一个新的位置值。因为这个位置值可能超越缓冲区长度边界，所以它要对repl_backlog_size取模。这样一来，就得到了从节点的全局读取位置在缓冲区中的对应位置了。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>j = (j + skip) % server.repl_backlog_size;
 </code></pre></div>
@@ -14901,8 +14901,6 @@ goto need_full_resync;
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

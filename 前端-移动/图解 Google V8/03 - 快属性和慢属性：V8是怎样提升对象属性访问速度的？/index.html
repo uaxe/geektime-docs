@@ -5393,7 +5393,7 @@
 <p>你好，我是李兵。</p>
 <p>在前面的课程中，我们介绍了JavaScript中的对象是由一组组属性和值的集合，从JavaScript语言的角度来看，JavaScript对象像一个字典，字符串作为键名，任意对象可以作为键值，可以通过键名读写键值。</p>
 <p>然而在V8实现对象存储时，并没有完全采用字典的存储方式，这主要是出于性能的考量。因为字典是非线性的数据结构，查询效率会低于线性的数据结构，V8为了提升存储和查找效率，采用了一套复杂的存储策略。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c9/ef/c970cdc7b89bfe0a12e560fe94fcdfef.jpg?wh=1142%2A601" title="线性结构和非线性结构" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c9/ef/c970cdc7b89bfe0a12e560fe94fcdfef.jpg?wh=1142%2A601" title="线性结构和非线性结构" /></p>
 <p>今天这节课我们就来分析下V8采用了哪些策略提升了对象属性的访问速度。</p>
 <h2 id="propertieselement">常规属性(properties)和排序属性(element)</h2>
 <p>在开始之前，我们先来了解什么是对象中的<strong>常规属性</strong>和<strong>排序属性</strong>，你可以先参考下面这样一段代码：</p>
@@ -5436,18 +5436,18 @@
 <p>之所以出现这样的结果，是因为在ECMAScript规范中定义了<strong>数字属性应该按照索引值大小升序排列，字符串属性根据创建时的顺序升序排列。</strong></p>
 <p>在这里我们把对象中的数字属性称为<strong>排序属性</strong>，在V8中被称为<strong>elements</strong>，字符串属性就被称为<strong>常规属性</strong>，在V8中被称为<strong>properties</strong>。</p>
 <p>在V8内部，为了有效地提升存储和访问这两种属性的性能，分别使用了两个<strong>线性数据结构</strong>来分别保存排序属性和常规属性，具体结构如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/af/75/af2654db3d3a2e0b9a9eaa25e862cc75.jpg?wh=1142%2A846" title="V8内部的对象构造" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/af/75/af2654db3d3a2e0b9a9eaa25e862cc75.jpg?wh=1142%2A846" title="V8内部的对象构造" /></p>
 <p>通过上图我们可以发现，bar对象包含了两个隐藏属性：elements属性和properties属性，elements属性指向了elements对象，在elements对象中，会按照顺序存放排序属性，properties属性则指向了properties对象，在properties对象中，会按照创建时的顺序保存了常规属性。</p>
 <p>分解成这两种线性数据结构之后，如果执行索引操作，那么V8会先从elements属性中按照顺序读取所有的元素，然后再在properties属性中读取所有的元素，这样就完成一次索引操作。</p>
 <h2 id="_1">快属性和慢属性</h2>
 <p>将不同的属性分别保存到elements属性和properties属性中，无疑简化了程序的复杂度，但是在查找元素时，却多了一步操作，比如执行 <code>bar.B</code>这个语句来查找B的属性值，那么在V8会先查找出properties属性所指向的对象properties，然后再在properties对象中查找B属性，这种方式在查找过程中增加了一步操作，因此会影响到元素的查找效率。</p>
 <p>基于这个原因，V8采取了一个权衡的策略以加快查找属性的效率，这个策略是将部分常规属性直接存储到对象本身，我们把这称为<strong>对象内属性(in-object properties)。</strong>对象在内存中的展现形式你可以参看下图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f1/3e/f12b4c6f6e631ce51d5b4f288dbfb13e.jpg?wh=1142%2A490" title="对象内属性" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f1/3e/f12b4c6f6e631ce51d5b4f288dbfb13e.jpg?wh=1142%2A490" title="对象内属性" /></p>
 <p>采用对象内属性之后，常规属性就被保存到bar对象本身了，这样当再次使用<code>bar.B</code>来查找B的属性值时，V8就可以直接从bar对象本身去获取该值就可以了，这种方式减少查找属性值的步骤，增加了查找效率。</p>
 <p>不过对象内属性的数量是固定的，默认是10个，如果添加的属性超出了对象分配的空间，则它们将被保存在常规属性存储中。虽然属性存储多了一层间接层，但可以自由地扩容。</p>
 <p>通常，我们将保存在线性数据结构中的属性称之为“快属性”，因为线性数据结构中只需要通过索引即可以访问到属性，虽然访问线性结构的速度快，但是如果从线性结构中添加或者删除大量的属性时，则执行效率会非常低，这主要因为会产生大量时间和内存开销。</p>
 <p>因此，如果一个对象的属性过多时，V8就会采取另外一种存储策略，那就是“慢属性”策略，但慢属性的对象内部会有独立的非线性数据结构(词典)作为属性存储容器。所有的属性元信息不再是线性存储的，而是直接保存在属性字典中。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e8/17/e8ce990dce53295a414ce79e38149917.jpg?wh=1142%2A876" title="慢属性是如何存储的" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e8/17/e8ce990dce53295a414ce79e38149917.jpg?wh=1142%2A876" title="慢属性是如何存储的" /></p>
 <h2 id="chrome">实践：在Chrome中查看对象布局</h2>
 <p>现在我们知道了V8是怎么存储对象的了，接下来我们来结合Chrome中的内存快照，来看看对象在内存中是如何布局的？</p>
 <p>你可以打开Chrome开发者工具，先选择控制台标签，然后在控制台中执行以下代码查看内存快照：</p>
@@ -5466,9 +5466,9 @@
 </code></pre></div>
 <p>上面我们创建了一个构造函数，可以利用该构造函数创建了新的对象，我给该构造函数设置了两个参数property_num、element_num，分别代表创建常规属性的个数和排序属性的个数，我们先将这两种类型的个数都设置为10个，然后利用该构造函数创建了一个新的bar对象。</p>
 <p>创建了函数对象，接下来我们就来看看构造函数和对象在内存中的状态。你可以将Chrome开发者工具切换到Memory标签，然后点击左侧的小圆圈就可以捕获当前的内存快照，最终截图如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d2/d3/d2a123d127a2895d9f0d09be61cc55d3.png?wh=1142%2A693" title="V8内存快照截图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d2/d3/d2a123d127a2895d9f0d09be61cc55d3.png?wh=1142%2A693" title="V8内存快照截图" /></p>
 <p>上图就是收集了当前内存快照的界面，要想查找我们刚才创建的对象，你可以在搜索框里面输入构造函数Foo，Chrome会列出所有经过构造函数Foo创建的对象，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2b/89/2b4ee447d061f72026ca38d6dfc25389.png?wh=1142%2A772" title="从内存快照搜索构造函数" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2b/89/2b4ee447d061f72026ca38d6dfc25389.png?wh=1142%2A772" title="从内存快照搜索构造函数" /></p>
 <p>观察上图，我们搜索出来了所有经过构造函数Foo创建的对象，点开Foo的那个下拉列表，第一个就是刚才创建的bar对象，我们可以看到bar对象有一个elements属性，这里面就包含我们创造的所有的排序属性，那么怎么没有常规属性对象呢？</p>
 <p>这是因为只创建了10个常规属性，所以V8将这些常规属性直接做成了bar对象的对象内属性。</p>
 <p>所以这时候的数据内存布局是这样的：</p>
@@ -5480,9 +5480,9 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>var bar2 = new Foo(20,10)
 </code></pre></div>
 <p>然后我们再重新生成内存快照，再来看看生成的图片：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ef/6e/ef117bbc99504f1daea52a0831a5756e.png?wh=1142%2A536" title="利用构造函数生成的对象" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ef/6e/ef117bbc99504f1daea52a0831a5756e.png?wh=1142%2A536" title="利用构造函数生成的对象" /></p>
 <p>我们可以看到，构造函数Foo下面已经有了两个对象了，其中一个bar，另外一个是bar2，我们点开第一个bar2对象，内容如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/49/86/49c1f8e735e5b7772f3d54fb53eae386.png?wh=1142%2A1096" title="查看对象属性" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/49/86/49c1f8e735e5b7772f3d54fb53eae386.png?wh=1142%2A1096" title="查看对象属性" /></p>
 <p>由于创建的常用属性超过了10个，所以另外10个常用属性就被保存到properties中了，注意因为properties中只有10个属性，所以依然是线性的数据结构，我们可以看其都是按照创建时的顺序来排列的。</p>
 <p>所以这时候属性的内存布局是这样的：</p>
 <ul>
@@ -5494,7 +5494,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>var bar3 = new Foo(100,10)
 </code></pre></div>
 <p>然后以同样的方式打开bar3，查看其内存布局，最终如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/da/69/dab6d6e2291117781e4294f27113d469.png?wh=1142%2A955" title="利用字典存放常规元素" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/da/69/dab6d6e2291117781e4294f27113d469.png?wh=1142%2A955" title="利用字典存放常规元素" /></p>
 <p>结合上图，我们可以看到，这时候的properties属性里面的数据并不是线性存储的，而是以非线性的字典形式存储的，所以这时候属性的内存布局是这样的：</p>
 <ul>
 <li>10属性直接存放在bar3的对象内;</li>
@@ -5503,7 +5503,7 @@
 </ul>
 <h2 id="_2">其他属性</h2>
 <p>好了，现在我们知道V8是怎么存储对象的了，不过这里还有几个重要的隐藏属性我还没有介绍，下面我们就来简单地看下。你可以先看下图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/82/4d/82463f4c1a4bf5fb8920b0099284e84d.png?wh=1142%2A341" title="其他隐藏属性" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/82/4d/82463f4c1a4bf5fb8920b0099284e84d.png?wh=1142%2A341" title="其他隐藏属性" /></p>
 <p>观察上图，除了elements和properties属性，V8还为每个对象实现了map属性和__proto__属性。__proto__属性就是原型，是用来实现JavaScript继承的，我们会在下一节来介绍；而map则是隐藏类，我们会在《<a href="https://time.geekbang.org/column/article/226417">15 | 隐藏类：如何在内存中快速查找对象属性？</a>》这一节中介绍其工作机制。</p>
 <h2 id="_3">总结</h2>
 <p>好了，本节的内容就介绍到这里，下面我来总结下本文的主要内容：</p>
@@ -5678,8 +5678,6 @@ properties存的属性key是字符串，应该不可能是数组存。要不就�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

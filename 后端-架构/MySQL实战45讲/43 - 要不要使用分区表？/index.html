@@ -14426,7 +14426,7 @@
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>PARTITION p_others VALUES LESS THAN MAXVALUE ENGINE = InnoDB);
 <a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>insert into t values(&#39;2017-4-1&#39;,1),(&#39;2018-4-1&#39;,1);
 </code></pre></div>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/06/f5/06f041129783533de9c75580f9decdf5.png?wh=1602%2A60" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/06/f5/06f041129783533de9c75580f9decdf5.png?wh=1602%2A60" /></p>
 <p>图1 表t的磁盘文件</p>
 <p>我在表t中初始化插入了两行记录，按照定义的分区规则，这两行记录分别落在p_2018和p_2019这两个分区上。</p>
 <p>可以看到，这个表包含了一个.frm文件和4个.ibd文件，每个分区对应一个.ibd文件。也就是说：</p>
@@ -14437,24 +14437,24 @@
 <p>你可能会觉得这两句都是废话。其实不然，这两句话非常重要，可以帮我们理解分区表的执行逻辑。</p>
 <h1 id="_2">分区表的引擎层行为</h1>
 <p>我先给你举个在分区表加间隙锁的例子，目的是说明对于InnoDB来说，这是4个表。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d2/c7/d28d6ab873bd8337d88812d45b9266c7.png?wh=939%2A297" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d2/c7/d28d6ab873bd8337d88812d45b9266c7.png?wh=939%2A297" /></p>
 <p>图2 分区表间隙锁示例</p>
 <p>这里顺便复习一下，我在<a href="https://time.geekbang.org/column/article/75659">第21篇文章</a>和你介绍的间隙锁加锁规则。</p>
 <p>我们初始化表t的时候，只插入了两行数据， ftime的值分别是，'2017-4-1' 和'2018-4-1' 。session A的select语句对索引ftime上这两个记录之间的间隙加了锁。如果是一个普通表的话，那么T1时刻，在表t的ftime索引上，间隙和加锁状态应该是图3这样的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/27/d2/273c9ca869f5b52621641d73eb6f72d2.jpg?wh=1142%2A880" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/27/d2/273c9ca869f5b52621641d73eb6f72d2.jpg?wh=1142%2A880" /></p>
 <p>图3 普通表的加锁范围</p>
 <p>也就是说，'2017-4-1' 和'2018-4-1' 这两个记录之间的间隙是会被锁住的。那么，sesion B的两条插入语句应该都要进入锁等待状态。</p>
 <p>但是，从上面的实验效果可以看出，session B的第一个insert语句是可以执行成功的。这是因为，对于引擎来说，p_2018和p_2019是两个不同的表，也就是说2017-4-1的下一个记录并不是2018-4-1，而是p_2018分区的supremum。所以T1时刻，在表t的ftime索引上，间隙和加锁的状态其实是图4这样的：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/92/5c/92f63aba0b24adefac7316c75463b95c.jpg?wh=1142%2A880" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/92/5c/92f63aba0b24adefac7316c75463b95c.jpg?wh=1142%2A880" /></p>
 <p>图4 分区表t的加锁范围</p>
 <p>由于分区表的规则，session A的select语句其实只操作了分区p_2018，因此加锁范围就是图4中深绿色的部分。</p>
 <p>所以，session B要写入一行ftime是2018-2-1的时候是可以成功的，而要写入2017-12-1这个记录，就要等session A的间隙锁。</p>
 <p>图5就是这时候的show engine innodb status的部分结果。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e3/0f/e3d83d9ba89de9a6f541c9a2f24a3b0f.png?wh=3080%2A240" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e3/0f/e3d83d9ba89de9a6f541c9a2f24a3b0f.png?wh=3080%2A240" /></p>
 <p>图5 session B被锁住信息</p>
 <p>看完InnoDB引擎的例子，我们再来一个MyISAM分区表的例子。</p>
 <p>我首先用alter table t engine=myisam，把表t改成MyISAM表；然后，我再用下面这个例子说明，对于MyISAM引擎来说，这是4个表。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/94/76/941306d4a7193455dcf1cfebf7678876.png?wh=927%2A264" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/94/76/941306d4a7193455dcf1cfebf7678876.png?wh=927%2A264" /></p>
 <p>图6 用MyISAM表锁验证</p>
 <p>在session A里面，我用sleep(100)将这条语句的执行时间设置为100秒。由于MyISAM引擎只支持表锁，所以这条update语句会锁住整个表t上的读。</p>
 <p>但我们看到的结果是，session B的第一条查询语句是可以正常执行的，第二条语句才进入锁等待状态。</p>
@@ -14467,7 +14467,7 @@
 <h1 id="_3">分区策略</h1>
 <p>每当第一次访问一个分区表的时候，MySQL需要把所有的分区都访问一遍。<strong>一个典型的报错情况</strong>是这样的：如果一个分区表的分区很多，比如超过了1000个，而MySQL启动的时候，open_files_limit参数使用的是默认值1024，那么就会在访问这个表的时候，由于需要打开所有的文件，导致打开表文件的个数超过了上限而报错。</p>
 <p>下图就是我创建的一个包含了很多分区的表t_myisam，执行一条插入语句后报错的情况。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ab/e7/abfa0054ec43d97fb18ba3c1c8829ae7.png?wh=2060%2A124" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ab/e7/abfa0054ec43d97fb18ba3c1c8829ae7.png?wh=2060%2A124" /></p>
 <p>图 7 insert 语句报错</p>
 <p>可以看到，这条insert语句，明显只需要访问一个分区，但语句却无法执行。</p>
 <p>这时，你一定从表名猜到了，这个表我用的是MyISAM引擎。是的，因为使用InnoDB引擎的话，并不会出现这个问题。</p>
@@ -14479,9 +14479,9 @@
 <h1 id="server">分区表的server层行为</h1>
 <p>如果从server层看的话，一个分区表就只是一个表。</p>
 <p>这句话是什么意思呢？接下来，我就用下面这个例子来和你说明。如图8和图9所示，分别是这个例子的操作序列和执行结果图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0e/81/0eca5a3190161e59ea58493915bd5e81.png?wh=935%2A202" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0e/81/0eca5a3190161e59ea58493915bd5e81.png?wh=935%2A202" /></p>
 <p>图8 分区表的MDL锁</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/af/a8/afe662f5e051a2ceb96a87624a589aa8.png?wh=2912%2A368" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/af/a8/afe662f5e051a2ceb96a87624a589aa8.png?wh=2912%2A368" /></p>
 <p>图9 show processlist结果</p>
 <p>可以看到，虽然session B只需要操作p_2017这个分区，但是由于session A持有整个表t的MDL锁，就导致了session B的alter语句被堵住。</p>
 <p>这也是DBA同学经常说的，分区表，在做DDL的时候，影响会更大。如果你使用的是普通分表，那么当你在truncate一个分表的时候，肯定不会跟另外一个分表上的查询语句，出现MDL锁冲突。</p>
@@ -14692,8 +14692,6 @@ ADD PRIMARY KEY (id, ftime);
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

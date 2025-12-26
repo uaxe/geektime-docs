@@ -6110,20 +6110,20 @@
 <p>接下来，我会以一个 HTTP 外部调用的例子，让你看一下 Wasm 开发的全貌。为了给你演示插件的编写过程和效果，我想了一个和 AI 结合的非常简单的功能，那就是 JSON Mode 功能。JSON Mode 技术已经出现了半年多了，你应该对此不陌生了，这项技术是为了让大模型输出稳定的结构化的内容，而发明的。</p>
 <p>其原理也非常简单，属于 Prompt 工程的范畴。就是直接告诉大模型“请参考我的 JSON 定义输出 JSON 对象，示例：{“ouput”: “hello”}”。</p>
 <p>因此在接下来的代码中，我会通过调用大模型 API 的方式来进行。首先通过 AI Proxy 插件访问通义千问大模型，例如向大模型发送 “hello”，之后由我们自己的插件，暂定名是wasm-ai，拦截通义千问的返回，使用 DeepSeek 大模型实现 JSON Mode。整个输入输出的拓补图如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3b/0b/3be8a21bebd99d2094a6e733aace2a0b.jpg?wh=1425x813" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3b/0b/3be8a21bebd99d2094a6e733aace2a0b.jpg?wh=1425x813" /></p>
 <h3 id="_3">服务与路由配置</h3>
 <p>要想实现在插件中调用外部服务，首先需要进行服务配置。可在 Higress 控制台服务来源页面，点击创建服务来源，选择创建 DNS 域名类型的服务，在这里我创建两个大模型服务，一个是通义千问，用来做对话，另一个是最近比较火的 DeepSeek 大模型，用来做 JSON Mode。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b7/a1/b734109f16b6e5ffa2a5b24204cf52a1.png?wh=988x784" /></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/45/e1/45bc7cc767259426eb8ba91f33a60ee1.png?wh=1000x783" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b7/a1/b734109f16b6e5ffa2a5b24204cf52a1.png?wh=988x784" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/45/e1/45bc7cc767259426eb8ba91f33a60ee1.png?wh=1000x783" /></p>
 <p>之后需要为通义千问大模型配置好路由，使得外部可以通过网关访问到。路由在路由配置页面进行设置。首先设置好路径匹配规则，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1c/41/1c2965dea13b117ca2648af1e0167841.png?wh=986x531" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1c/41/1c2965dea13b117ca2648af1e0167841.png?wh=986x531" /></p>
 <p>通义千问大模型是 HTTPS 的服务，因此需要设置三个 ingress 注解。分别是：</p>
 <ul>
 <li>higress.io/backend-protocol: HTTPS</li>
 <li>higress.io/proxy-ssl-name: dashscope.aliyuncs.com</li>
 <li>higress.io/proxy-ssl-server-name: on</li>
 </ul>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/28/e4/287590f00aa96dd023a1008152a64ee4.png?wh=1005x566" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/28/e4/287590f00aa96dd023a1008152a64ee4.png?wh=1005x566" /></p>
 <p>最后将路由关联到模板服务上即可。</p>
 <h3 id="_4">初始化工程目录</h3>
 <p>服务创建完成后，接下来就可以开始写代码了。首先新建一个工程目录，例如 wasm-ai.。并在目录下执行以下命令，进行Go工程初始化：</p>
@@ -6305,7 +6305,7 @@
 <p>接下来看看拦截 HTTP Response 的代码。代码首先取出 Response Body，这个就是请求通义千问大模型后，大模型给出的答复。由于基本上各大模型厂商都会遵循 OpenAI SDK，因此就定义了 CompletionResponse 结构体对 Response 进行了反序列化，并从 responseCompletion.Choices[0].Message.Content 中取出了大模型的回复，拼接到了用于 JSON Mode 请求的对话 Completion。之后使用了在配置解析阶段配置好的 FQDN 客户端进行了 POST 请求，也就是向 DeepSeek 服务进行了一次请求。</p>
 <p>由于 DeepSeek 也是遵循 OpenAI SDK 的，因此也使用 CompletionResponse 结构体接收 Response。大模型返回的内容会放置在responseCompletion.Choices[0].Message.Content 中，如果不为空，那么 JSON序列化成新的 Body，使用 ReplaceHttpResponseBody 替换掉原来的 Response，并使用ResumeHttpResponse 恢复被插件拦截的 Response 流程。</p>
 <p>这里用到的 ReplaceHttpResponseBody 和 ResumeHttpResponse 都是 SDK 提供的工具方法，除了这两个工具外，还有其他常用的方法如下表所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c4/50/c4950b730c1fbd5b8cbe34cf411f5650.jpg?wh=1920x2173" />
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c4/50/c4950b730c1fbd5b8cbe34cf411f5650.jpg?wh=1920x2173" />
 需要注意的是，流程恢复工具方法，一定不能用错，否则会导致插件崩溃。流程恢复工具要在请求/响应处于Pause状态时才能使用。而在SendHttpResponse之后，Pause状态的请求/响应将自动恢复，此时不需要调用流程恢复工具方法。</p>
 <h3 id="wasm">编译生成 Wasm 文件以及打包镜像</h3>
 <p>在完成代码编写后，可执行以下命令编译成 Wasm 文件：</p>
@@ -6320,20 +6320,20 @@
 </code></pre></div>
 <h3 id="_5">部署插件</h3>
 <p>回到 Higress 控制台，切换到插件配置页面，点击添加插件。之后按要求填写镜像地址，执行阶段和执行优先级。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/4f/2c/4f357c06a690261d2bccf9ec9a2ffa2c.png?wh=984x802" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4f/2c/4f357c06a690261d2bccf9ec9a2ffa2c.png?wh=984x802" /></p>
 <p>完成后点击保存，会自动跳回插件配置页面。将页面划到最底部，就可以看到我们刚刚部署的插件了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/66/e9/6605b6506b9921d4ded57f79e46960e9.png?wh=1183x774" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/66/e9/6605b6506b9921d4ded57f79e46960e9.png?wh=1183x774" /></p>
 <p>之后点击配置，开始配置插件。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/af/98/af63b51ca5bb4037904b0af48d82ae98.png?wh=985x526" />
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/af/98/af63b51ca5bb4037904b0af48d82ae98.png?wh=985x526" />
 在配置中，将 DeepSeek 相关的参数按照设计配置上，点击保存就可以开启插件。</p>
 <p>接下来，开启 AI Proxy 插件，用来代理通义千问大模型。插件是如下图所示的 AI 代理。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e6/88/e68b0bb443f12ca22cfb74a5b8ed8f88.png?wh=379x340" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e6/88/e68b0bb443f12ca22cfb74a5b8ed8f88.png?wh=379x340" /></p>
 <p>点击配置，做一下简单配置：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c3/c9/c3353d9693e64f75d88d5042815e6ec9.png?wh=993x496" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c3/c9/c3353d9693e64f75d88d5042815e6ec9.png?wh=993x496" /></p>
 <p>apiTokens 填通义千问的，这里的 modelMapping 代表模型映射，前面的 * 代表任意模型，意义是请求网关的用户无论设置的是什么模型，最终经过 AI Proxy 时，都会最终转化成使用 qwen-max 模型。AI Proxy 同时还会将标准 OpenAI 格式的请求，转化成各个代理大模型的格式。</p>
 <h3 id="_6">测试</h3>
 <p>我们使用 apifox 工具进行测试。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/22/4b/22b66a060009e21yyff90a58d0213f4b.png?wh=1302x794" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/22/4b/22b66a060009e21yyff90a58d0213f4b.png?wh=1302x794" /></p>
 <p>由于设置了 AI Proxy，因此 URL 的 PATH 使用的是 OpenAI Chat Completions 的 PATH，即 /api/openai/v1/chat/completions。在请求 Body 中，也是使用了 OpenAI 的标准格式，model 可以随便写，写 xxx 都可以，最后都会转成 qwen-max。</p>
 <p>最后得到的 Response，就是按照预设的 JSON Mode 格式返回的。</p>
 <h2 id="_7">总结</h2>
@@ -6455,8 +6455,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

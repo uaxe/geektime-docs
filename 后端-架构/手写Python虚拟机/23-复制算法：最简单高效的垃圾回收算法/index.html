@@ -14293,7 +14293,7 @@
 <p>接下来，我们就来介绍最基本的算法原理。</p>
 <h2 id="_2">算法描述</h2>
 <p>最基础的Copy算法，就是把程序运行的堆分成大小相同的两半，一半是From空间，一半是To空间。当创建新对象的时候，都是在From空间里进行内存的分配。等From空间满了以后，垃圾回收器就会把活跃对象复制到To空间，把原来的From空间全部清空。然后再把这两个空间交换，也就是说To空间变成下一轮的From空间，现在的From空间变成To空间。你可以通过我给出的图示看一下具体过程。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/de/df/de0b7b47230e641dyy08c66ebed34fdf.png?wh=1724x1072" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/de/df/de0b7b47230e641dyy08c66ebed34fdf.png?wh=1724x1072" /></p>
 <p>可以看到，图里的from空间已经满了，如果想再创建一个新的对象是无法满足的。这个时候就会执行GC算法将活跃对象都拷贝到新的空间中去。</p>
 <p>假设A对象作为根对象是存活的，而A引用了B和D，所以B和D是活跃的。D又引用了F，所以F也是活跃的。这时候，要是已经没有任何地方引用C对象和E对象，那么C和E就是垃圾了。当GC算法开始执行以后，就会把A、B、D、F都拷贝到To空间中去。拷贝完成后，From空间就清空了，并且From空间与To空间相互交换。</p>
 <p>这个时候，top指针指向了新的From空间，并且是可用内存的开始处。如果需要再分配新的对象的话，就会从top指针开始进行内存分配。</p>
@@ -14321,14 +14321,14 @@
 </code></pre></div>
 <p>可以看到，算法是从roots的遍历开始的，然后对每一个roots中的对象都执行copy方法（第2～4行）。copy方法会在To空间中申请一块新的内存（第7行），然后将对象拷贝到To空间（第8行），再对这个对象所引用到的对象进行递归的拷贝（第9~11行），最后返回新空间的地址（第12行）。</p>
 <p>如果你比较了解深度优先搜索算法，就会发现，刚刚的代码中缺少了对重复访问对象的判断。考虑到有两个对象A和B，它们都引用了对象C，而且它们都是活跃对象，现在我们对这个图进行深度优先遍历。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/23/81/238e24270dd4f9f4f3d530fba0eaaa81.png?wh=1290x420" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/23/81/238e24270dd4f9f4f3d530fba0eaaa81.png?wh=1290x420" /></p>
 <p>在遍历过程中，A先拷到 to space，然后C又拷过去，这时候空间里的引用是这种状态：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b8/67/b8ba5bcf5c574b6e785f066996256b67.png?wh=1268x420" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b8/67/b8ba5bcf5c574b6e785f066996256b67.png?wh=1268x420" /></p>
 <p>A和C都拷到新的空间里了，原来的引用关系还是正确的。但我们的算法在拷贝B对象的时候，先完成B的复制，然后你就会发现，此时我们还会把C再复制一次。这样，在To空间里就会有两个C对象了，这显然是错的。我们必须要想办法解决这个问题。</p>
 <p>在一般的深度优先搜索算法中，我们只需要为每个结点增加一个标志位visited，以表示这个结点是否被访问过。但这只能解决重复访问的问题，还有一件事情我们没有做到：新空间中B对象对C对象的引用没有修改。这是因为我们在拷贝B的时候，并不知道它所引用的对象在新空间中的地址。</p>
 <p>解决这个问题的办法是使用forwarding指针。也就是说每个对象的头部引入一个新的域（field），叫做forwarding。正常状态下，它的值是NULL，如果一个对象被拷贝到新的空间里以后，就把它的新地址设到旧空间对象的forwarding指针里。</p>
 <p>当我们访问完B以后，对于它所引用的C，我们并不能知道C是否被拷贝，更不知道它被拷贝到哪里去了。此时，我们就可以在C上留下一个地址，告诉后来的人，这个地址已经变化了，你要找的对象已经搬到新地方了，请沿着这个新地址去寻找目标对象。这就是forwarding指针的作用。我用一张图片展示了这个过程，你可以看一下。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/08/64/08f45b58ffdf10a6b7e401b9ff04a264.png?wh=1366x794" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/08/64/08f45b58ffdf10a6b7e401b9ff04a264.png?wh=1366x794" /></p>
 <p>如果你还不太明白，我再给你举一个形象点的例子：你拿到一张画，上面写着武穆遗书在临安皇宫花园里。等你去花园里找到一个盒子，却发现里面的武穆遗书已经不在了，里面留了另一幅画，告诉你它在铁掌峰第二指节。显然，有人移动过武穆遗书，并把新的地址告诉你了，等你第二次访问，到达临安的时候，根据新的地址就能找到真正的武穆遗书了。</p>
 <p>到这里，我们就可以彻底完成copy gc的算法了，你可以看一下完整的算法伪代码。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>void copy_gc() {
@@ -14405,7 +14405,7 @@
 <a id="__codelineno-2-47" name="__codelineno-2-47" href="#__codelineno-2-47"></a><span class="p">};</span>
 </code></pre></div>
 <p>Space 代表了一个独立的空间，上一节课我们已经讲过 survivor 空间和 eden 空间的关系。一个空间的基本属性包括它的起始起址 _base、尾地址 _end、总的容量 _size、当前可用内存的开始地址 _top，以及当前可用内存的总量 _capacity。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3y/17/3yy8db514685a2e7eb0c305cd39ab417.png?wh=1904x730" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3y/17/3yy8db514685a2e7eb0c305cd39ab417.png?wh=1904x730" /></p>
 <p>如图所示， _size 总是等于 _end 减去 _base。在堆刚创建的时候，_capacity 等于 _end 减去 _top。当需要在堆空间中分配内存的时候，我们只需要把 _top 向后增加，并实时更新 _capacity 的值即可。所以 Space 可以这样实现：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">Space</span><span class="o">::</span><span class="n">Space</span><span class="p">(</span><span class="kt">size_t</span><span class="w"> </span><span class="n">size</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">size</span><span class="p">;</span>
@@ -14791,8 +14791,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

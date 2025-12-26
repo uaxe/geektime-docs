@@ -14519,11 +14519,11 @@
 <p>如何设计快速的宕机判断算法呢？其实，这是一个从一堆主机中寻找宕机服务的信息题。<strong>根据香农的理论，引入更多的信息，才能减少不确定性降低信息熵，从而减少计算量。就像心跳包间是有时间顺序的，上面的宕机判断算法显然忽略了接收到它们的顺序。</strong>比如主机A的上次心跳包距现在4秒了，而主机B距现在只有1秒，显然不应同等对待。</p>
 <p>于是，我们引入存放心跳包的先入先出队列，这就保存了心跳包的时序关系。新的心跳包进入队列尾部，而老的心跳包则从队列首部退出，这样，寻找宕机服务时，只要看队列首部最老的心跳包，距现在是否超过5秒，如果超过5秒就认定宕机，同时把它取出队列，否则证明队列中不存在宕机服务，维持队列不变。</p>
 <p>当然，这里并没有解决如何发现新主机的问题。我们还需要一个能够执行高效查询的容器，存放所有主机及其状态。红黑树虽然不慢，但我们不再需要遍历容器，所以可以选择更快的、查询时间复杂度为O(1)的哈希表存放主机信息（非标哈希表的实现参见<a href="https://time.geekbang.org/column/article/232351">[第 3 讲]</a>）。如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/32/41/322fff00d232ebc1c85694babfb37541.png?wh=1306%2A582" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/32/41/322fff00d232ebc1c85694babfb37541.png?wh=1306%2A582" /></p>
 <p>当然，队列中的心跳包并不是只能从队首删除，否则判断宕机流程的时间复杂度仍然是O(N)。实际上，每当收到心跳包时，如果对应主机的上一个心跳包还在队列中，那么可以直接把它从队列中删除。显然，计算在线主机何时宕机，只需要最新的心跳包，老的心跳包没有必要存在。因此，这个队列为每个主机仅保留最新的那个心跳包。如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/97/94/97cae81094f213896989158cf9baf594.png?wh=899%2A799" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/97/94/97cae81094f213896989158cf9baf594.png?wh=899%2A799" /></p>
 <p>这样，判断宕机的速度会非常快，它的计算量等于实际发生宕机的主机数量。同时，接收心跳包并发现新主机的流程，因为只需要做一次哈希表查询，时间复杂度也只有O(1)。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6b/d9/6ba31e4046ba0f578659bf423e4553d9.png?wh=1509%2A588" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6b/d9/6ba31e4046ba0f578659bf423e4553d9.png?wh=1509%2A588" /></p>
 <p>这样，新算法通过<strong>以空间换时间</strong>的思想，虽然使用了更加占用空间的哈希表，并新增了有序队列容器，但将宕机和新主机发现这两个流程都优化到了常量级的时间复杂度。尤其是宕机流程的计算量非常小，它仅与实际宕机服务的数量有关，这就允许我们将宕机判断流程插入到心跳包的处理流程中，以微观上的分时任务实现宏观上的并发，同时也避免了对哈希表的加锁。</p>
 <h2 id="_2">如何设计高并发架构？</h2>
 <p>有了核心算法，还需要充分利用服务器资源的架构，才能实现高并发。</p>
@@ -14536,7 +14536,7 @@
 <li>由于工作线程多过分发线程（接收心跳包消耗的资源更少），所以每个工作线程都配发独立的缓冲队列及操作队列的互斥锁；</li>
 <li>为避免线程执行主动切换，必须使用自旋锁，关于锁的选择你可以看<a href="https://time.geekbang.org/column/article/234548">[第 6 讲]</a>。如下图所示：</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/27/76/2726b6c9b73325583f8491a822a22476.png?wh=1008%2A785" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/27/76/2726b6c9b73325583f8491a822a22476.png?wh=1008%2A785" /></p>
 <p>第三要解决CPU亲和性问题。从<a href="https://time.geekbang.org/column/article/232351">[第 1 讲]</a> 我们可以看到，CPU缓存对计算速度的影响很大，如果线程频繁地切换CPU会导致缓存命中率下降，降低性能，此时将线程绑定到特定的CPU就是一个解决方案（NUMA架构也会对CPU亲和性产生影响，这里略过）。</p>
 <p>这样，通过上述的多线程架构就可以有效地使用CPU。当然，除了CPU，内存的使用效率也很重要。<a href="https://time.geekbang.org/column/article/230221">[第２讲]</a> 中我们提到，TCMalloc相比Linux默认的PtMalloc2内存池，在多线程下分配小块内存的速度要快得多，所以对于心跳服务应当改用TCMalloc申请内存。而且，如果心跳包对象的格式已经固定，你还可以建立一个心跳包资源池，循环往复的使用，这进一步减少了构造、销毁心跳包对象所消耗的计算力。</p>
 <p>由于服务重启后一个心跳周期内就可以获得所有心跳包，所以并不需要将数据持久化到磁盘上。如果你想进一步了解磁盘优化，可以再看下<a href="https://time.geekbang.org/column/article/232676">[第 4 讲]</a>。</p>
@@ -14545,7 +14545,7 @@
 <p>网络报文的长度是受限的，<a href="https://zh.wikipedia.org/wiki/%E6%9C%80%E5%A4%A7%E4%BC%A0%E8%BE%93%E5%8D%95%E5%85%83">MTU</a>（Maximum Transmission Unit）定义了最大值。比如以太网中MTU是1500字节，如果TCP或者UDP试图传送大于1500字节的报文，IP协议就会把报文拆分后再发到网络中，并在接收方组装回原来的报文。然而，IP协议并不擅长做这件事，拆包组包的效率很低，因此TCP协议宁愿自己拆包（详见<a href="https://time.geekbang.org/column/article/239176">[第 11 讲]</a>）。</p>
 <p>所以，如果心跳包长度小于MTU，那么UDP协议是最佳选择。如果心跳包长度大于MTU，那么最好选择TCP协议，面对复杂的TCP协议，还需要解决以下问题。</p>
 <p>首先，一台服务器到底能同时建立多少TCP连接？要回答这个问题，得先从TCP四元组谈起，它唯一确定一个TCP连接。TCP四元组分别是&lt;源IP、目的IP、源端口、目的端口&gt;，其中前两者在IP头部中，后两者在TCP头部中。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e0/2f/e05b4dcffa30fe5ec5a3a85511f0db2f.png?wh=1683%2A417" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e0/2f/e05b4dcffa30fe5ec5a3a85511f0db2f.png?wh=1683%2A417" /></p>
 <p>由于IPv4地址为4个字节（参见<a href="https://time.geekbang.org/column/article/235302">[第 7 讲]</a>）、端口为2个字节，所以当服务器IP地址和监听端口固定时，并发连接数的上限则是2(32+16)。</p>
 <p>当然，这么高的并发连接需要很多条件，其中之一就是增加单个进程允许打开的最大句柄数（包括操作系统允许的最大句柄数/proc/sys/fs/file-nr），因为Linux下每个连接都要用掉一个文件句柄。当然，作为客户端的主机如果想用足216 端口，还得修改ip_local_port_range配置，扩大客户端的端口范围：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>net.ipv4.ip_local_port_range = 32768    60999
@@ -14695,8 +14695,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -7765,7 +7765,7 @@
 <p>你好，我是徐文浩。在前面的两讲中，我们一起探讨了GFS系统设计中秉持的两个原则，分别是“保持简单”和“根据硬件特性设计系统”，而今天我们要讨论的GFS的最后一个设计特点，是“<strong>放宽数据一致性的要求</strong>”。</p>
 <p>分布式系统的一致性要求是一个很有挑战的话题。如果说分布式系统天生通过更多的服务器提升了性能，是一个天然的优点，那么在这些通过网络连起来的服务器之间保持数据一致，就是一个巨大的挑战。毕竟网络传输总有延时，硬件总会有故障，你的程序稍有不慎，就会遇到甲服务器觉得你的钱转账失败，而乙服务器却觉得钱已经转走了的情况。可以说，<strong>一致性是分布式系统里的一个永恒的话题</strong>。</p>
 <p>不过2003年的GFS，对于一致性的要求，是非常宽松的。一方面，这是为了遵循第一个设计原则，就是“保持简单”，简单的设计使得做到很强的一致性变得困难。另一方面，则是要考虑“硬件特性”，GFS希望在机械硬盘上尽量有比较高的写入性能，所以它只对顺序写入考虑了一致性，这就自然带来了宽松的一致性。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/22/73/224bffba53c4398bd39cd55342341673.jpg?wh=1920x904" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/22/73/224bffba53c4398bd39cd55342341673.jpg?wh=1920x904" /></p>
 <p>好，废话不多说，让我们切入正题。</p>
 <h2 id="_1">随机写入只是“确定”的</h2>
 <p>通过上一讲的学习，我们知道了在GFS中，客户端是怎么把数据写入到文件系统里的。不过，我们并没有探讨一个非常重要的问题，就是数据写入的一致性（Consistency）问题。这个一致性，也是我们常常听说的CAP理论中的C，即一致性、可用性、分区容错性在分布式系统中，三者不能兼得中的一致性问题。这个C，也正来自于一致性的英文Consitency的首字母。</p>
@@ -7774,7 +7774,7 @@
 <li>第一个，就叫做“一致的（Consistent）”。这个就是指，多个客户端无论是从主副本读取数据，还是从次副本读取数据，<strong>读到的数据都是一样的</strong>。</li>
 <li>第二个，叫做“确定的（Defined）”。这个要求会高一些，指的是对于客户端写入到GFS的数据，能够<strong>完整地被读到</strong>。可能看到这个定义，你还是不清楚，没关系，我下面会给你详细讲解“确定的”到底是个什么问题。</li>
 </ul>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f0/76/f08de0776c1338980a22f5e57014b976.jpg?wh=1920x589" title="GFS论文中的Table 1：在变化后文件区域的状态" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f0/76/f08de0776c1338980a22f5e57014b976.jpg?wh=1920x589" title="GFS论文中的Table 1：在变化后文件区域的状态" /></p>
 <p>现在，我们来看看GFS的论文里留的一个表格，其中告诉了我们GFS对于数据写入的一致性问题。</p>
 <ul>
 <li><strong>首先，如果数据写入失败，GFS里的数据就是不一致的。</strong></li>
@@ -7789,7 +7789,7 @@
 </ul>
 <p>也就是说，两个客户端并发往一个文件里面写数据，一个想要写入《星球大战》，一个想要写入《星际迷航》，两个写入都成功了。这个时候，GFS里面三份副本的数据是一样的，客户端读到的数据无论是从哪个副本里读，都是一样的。</p>
 <p>但是呢，客户端可能读出来的数据里，前一小时是《星球大战》，后一小时是《星际迷航》。无论哪个时间节点去读数据，客户端都不能读到一部完整的《星球大战》，或者是《星际迷航》。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/16/20/16097c4fd15e13f3810401a5491d5b20.jpg?wh=1920x1444" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/16/20/16097c4fd15e13f3810401a5491d5b20.jpg?wh=1920x1444" /></p>
 <p>那么，<strong>为什么GFS的数据写入会出现一致但是非确定的状态呢？</strong>这个来自于两个因素。</p>
 <p>第一种因素是在GFS的数据读写中，为了减轻Master的负载，数据的写入顺序并不需要通过Master来进行协调，而是直接由存储了主副本的chunkserver，来管理同一个chunk下数据写入的操作顺序。</p>
 <p>第二种因素是随机的数据写入极有可能要跨越多个chunk。</p>
@@ -7808,7 +7808,7 @@
 <li>因为主副本所在的chunkserver控制了数据写入的操作顺序，并且数据只会往后追加，所以即使在有并发写入的情况下，请求也都会到主副本所在的同一个chunkserver上排队，也就不会有数据写入到同一块区域，覆盖掉已经被追加写入的数据的情况了。</li>
 <li>而为了保障chunk里能存的下需要追加的数据，GFS限制了一次记录追加的数据量是16MB，而chunkserver里的一个chunk的大小是64MB。所以，在记录追加需要在chunk里填空数据的时候，最多也就是填入16MB，也就是chunkserver的存储空间最多会浪费1/4。</li>
 </ol>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/44/0c/44440eb6b88c073763efdcb58e6f410c.jpg?wh=1920x1444" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/44/0c/44440eb6b88c073763efdcb58e6f410c.jpg?wh=1920x1444" /></p>
 <p>那么到了这里，你可能要问了：<strong>如果在主副本上写入成功了，但是在次副本上写入失败了怎么办呢？这样不是还会出现数据不一致的情况吗？</strong></p>
 <p>其实在这个时候，主副本会告诉客户端数据写入失败，然后让客户端重试。不过客户端发起的重试，并不是在原来的位置去写入数据，而是发起一个新的记录追加操作。这个时候，可能已经有其他的并发追加写入请求成功了，那么这次重试会写入到更后面。</p>
 <p>我们可以一起来看这样一个例子：有三个客户端X、Y、Z并发向同一个文件进行记录追加，写入数据A、B、C，对应的三个副本的chunkserver分别是Q、P、R。</p>
@@ -7820,7 +7820,7 @@
 <li>但是在R上，chunkserver里面的数据顺序是 N/A-B-C-A；</li>
 <li>也就是Q和P上，A的数据被写入了两次，而在R上，数据里面有一段是有不可用的脏数据。</li>
 </ul>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d3/d9/d36e354c23d0312df6e06eb31d8de0d9.jpg?wh=1920x1444" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d3/d9/d36e354c23d0312df6e06eb31d8de0d9.jpg?wh=1920x1444" /></p>
 <p>所以在这个记录追加的场景下，GFS承诺的一致性，叫做“<strong>至少一次（At Least Once）</strong>”。也就是写入一份数据A，在重试的情况下，至少会完整地在三个副本的同一个位置写入一次。但是也可能会因为失败，在某些副本里面写入多次。那么，在不断追加数据的情况下，你会看到大部分数据都是一致的，并且是确定的，但是整个文件中，会夹杂着少数不一致也不确定的数据。</p>
 <h2 id="_3">解决一致性的机制</h2>
 <p>看到这里，你发现没有，GFS的写入数据的一致性保障是相当低的。它只是保障了所有数据追加至少被写入一次，并且还保障不了数据追加的顺序。这使得客户端读取到的副本中，可能也会存在重复的数据或者空的填充数据，这样的文件系统实在不咋样。</p>
@@ -7835,7 +7835,7 @@
 <p>好了，到这里，我们通过三讲把GFS的论文讲完了。在今天的最后一讲中，我们深入剖析了GFS非常宽松的一致性模型。对于随机数据写入，GFS针对成功的并发写入，<strong>只保障一致性，但是不保障确定性</strong>。</p>
 <p>而对于记录追加这样专门设计出来的操作，GFS也<strong>只保障“至少一次”的写入</strong>，避免不了确定的数据中，夹杂着不一致和不确定的脏数据。而这些数据，都需要你通过校验和乃至应用层自行去重来进行处理。这些设计和机制，都是和GFS面临的应用场景所匹配的，即高并发大量追加写入新的日志、网页、生成的索引等等的应用场景。</p>
 <p>回顾过去三讲，我们可以看到GFS的设计原则，就是简单、围绕硬件性能设计，以及在这两个前提下对于一致性的宽松要求。可以说，GFS不是一个“黑科技”系统，而是<strong>一个非常优秀的工程化系统</strong>。在后面的MapReduce以及Bigtable的论文中，我们还会反复看到类似的设计选择。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0f/87/0f716aaaa4e182b8ddd2c26c8c919987.jpg?wh=1920x892" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0f/87/0f716aaaa4e182b8ddd2c26c8c919987.jpg?wh=1920x892" /></p>
 <h2 id="_5">推荐阅读</h2>
 <p>今天我们所讲的，其实是在大数据及分布式领域中一个非常重要的主题，那就是CAP问题。在之后的很多论文里，你也可以看到不同系统是如何处理CAP问题带来的挑战的。在学完今天这节课之后，我比较推荐你去读一读2012年，在CAP理论发表12年后，作者埃里克·布鲁尔（Eric Brewer）对CAP问题的回顾文章<a href="http://www.infoq.com/cn/articles/cap-twelve-years-later-how-the-rules-have-changed">《CAP理论十二年回顾：“规则”变了》</a>。</p>
 <h2 id="_6">思考题</h2>
@@ -7970,8 +7970,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -6748,13 +6748,13 @@
 <h3 id="fpu">快速上线和向前兼容，一个FPU的设计</h3>
 <p>如果你来设计TPU，除了满足上面的深度学习的推断特性之外，还有什么是你要重点考虑的呢？你可以停下来思考一下，然后再继续往下看。</p>
 <p>不知道你的答案是什么，我的第一反应是，有两件事情必须要考虑，第一个是TPU要有向前兼容性，第二个是希望TPU能够尽早上线。我下面说说我考虑这两点的原因。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f6/5e/f6637990792e8de1ef84891fadd11e5e.png?wh=1522%2A919" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f6/5e/f6637990792e8de1ef84891fadd11e5e.png?wh=1522%2A919" /></p>
 <p><a href="https://arxiv.org/ftp/arxiv/papers/1704/1704.04760.pdf">图片来源</a>第一代的TPU就像一块显卡一样，可以直接插在主板的PCI-E口上</p>
 <p>第一点，向前兼容。在计算机产业界里，因为没有考虑向前兼容，惨遭失败的产品数不胜数。典型的有我在<a href="https://time.geekbang.org/column/article/102888">第26讲</a>提过的安腾处理器。所以，TPU并没有设计成一个独立的“CPU“，而是设计成一块像显卡一样，插在主板PCI-E接口上的板卡。更进一步地，TPU甚至没有像我们之前说的现代GPU一样，设计成自己有对应的取指令的电路，而是通过CPU，向TPU发送需要执行的指令。</p>
 <p>这两个设计，使得我们的TPU的硬件设计变得简单了，我们只需要专心完成一个专用的“计算芯片”就好了。所以，TPU整个芯片的设计上线时间也就缩短到了15个月。不过，这样一个TPU，其实是第26讲里我们提过的387浮点数计算芯片，是一个像FPU（浮点数处理器）的协处理器（Coprocessor），而不是像CPU和GPU这样可以独立工作的Processor Unit。</p>
 <h3 id="_1">专用电路和大量缓存，适应推断的工作流程</h3>
 <p>明确了TPU整体的设计思路之后，我们可以来看一看，TPU内部有哪些芯片和数据处理流程。我在文稿里面，放了TPU的模块图和对应的芯片布局图，你可以对照着看一下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6a/ae/6a14254b2bda4dd42adac6a2129e8bae.jpeg?wh=2206%2A1726" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6a/ae/6a14254b2bda4dd42adac6a2129e8bae.jpeg?wh=2206%2A1726" /></p>
 <p><a href="https://arxiv.org/ftp/arxiv/papers/1704/1704.04760.pdf">图片来源</a>模块图：整个TPU的硬件，完全是按照深度学习一个层（Layer）的计算流程来设计的</p>
 <p>你可以看到，在芯片模块图里面，有单独的矩阵乘法单元（Matrix Multiply Unit）、累加器（Accumulators）模块、激活函数（Activation）模块和归一化/池化（Normalization/Pool）模块。而且，这些模块是顺序串联在一起的。</p>
 <p>这是因为，一个深度学习的推断过程，是由很多层的计算组成的。而每一个层（Layer）的计算过程，就是先进行矩阵乘法，再进行累加，接着调用激活函数，最后进行归一化和池化。这里的硬件设计呢，就是把整个流程变成一套固定的硬件电路。这也是一个ASIC的典型设计思路，其实就是把确定的程序指令流程，变成固定的硬件电路。</p>
@@ -6762,7 +6762,7 @@
 <p>你可以看到，超过一半的TPU的面积，都被用来作为Local Unified Buffer（本地统一缓冲区）（29%）和矩阵乘法单元（Matrix Mutliply Unit）了。</p>
 <p>相比于矩阵乘法单元，累加器、实现激活函数和后续的归一/池化功能的激活管线（Activation Pipeline）也用得不多。这是因为，在深度学习推断的过程中，矩阵乘法的计算量是最大的，计算也更复杂，所以比简单的累加器和激活函数要占用更多的晶体管。</p>
 <p>而统一缓冲区（Unified Buffer），则由SRAM这样高速的存储设备组成。SRAM一般被直接拿来作为CPU的寄存器或者高速缓存。我们在后面的存储器部分会具体讲。SRAM比起内存使用的DRAM速度要快上很多，但是因为电路密度小，所以占用的空间要大很多。统一缓冲区之所以使用SRAM，是因为在整个的推断过程中，它会高频反复地被矩阵乘法单元读写，来完成计算。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/08/2a/08e29a700898e5dabf60fbf0f026082a.jpeg?wh=3841%2A3370" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/08/2a/08e29a700898e5dabf60fbf0f026082a.jpeg?wh=3841%2A3370" /></p>
 <p><a href="https://arxiv.org/ftp/arxiv/papers/1704/1704.04760.pdf">图片来源</a>芯片布局图：从尺寸可以看出，统一缓冲区和矩阵乘法单元是TPU的核心功能组件</p>
 <p>可以看到，整个TPU里面，每一个组件的设计，完全是为了深度学习的推断过程设计出来的。这也是我们设计开发ASIC的核心原因：用特制的硬件，最大化特定任务的运行效率。</p>
 <h3 id="8-bits">细节优化，使用8 Bits数据</h3>
@@ -6906,8 +6906,6 @@ day33 天笔记：https:&#47;&#47;www.cnblogs.com&#47;luoahong&#47;p&#47;1142482
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

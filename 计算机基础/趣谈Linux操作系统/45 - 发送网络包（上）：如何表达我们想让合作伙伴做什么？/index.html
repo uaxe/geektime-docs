@@ -7132,7 +7132,7 @@
 <p>要分配这样一个结构，sk_stream_alloc_skb会最终调用到__alloc_skb。在这个函数里面，除了分配一个sk_buff结构之外，还要分配sk_buff指向的数据区域。这段数据区域分为下面这几个部分。</p>
 <p>第一部分是连续的数据区域。紧接着是第二部分，一个struct skb_shared_info结构。这个结构是对于网络包发送过程的一个优化，因为传输层之上就是应用层了。按照TCP的定义，应用层感受不到下面的网络层的IP包是一个个独立的包的存在的。反正就是一个流，往里写就是了，可能一下子写多了，超过了一个IP包的承载能力，就会出现上面MSS的定义，拆分成一个个的Segment放在一个个的IP包里面，也可能一次写一点，一次写一点，这样数据是分散的，在IP层还要通过内存拷贝合成一个IP包。</p>
 <p>为了减少内存拷贝的代价，有的网络设备支持<strong>分散聚合</strong>（Scatter/Gather）I/O，顾名思义，就是IP层没必要通过内存拷贝进行聚合，让散的数据零散的放在原处，在设备层进行聚合。如果使用这种模式，网络包的数据就不会放在连续的数据区域，而是放在struct skb_shared_info结构里面指向的离散数据，skb_shared_info的成员变量skb_frag_t frags[MAX_SKB_FRAGS]，会指向一个数组的页面，就不能保证连续了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9a/b8/9ad34c3c748978f915027d5085a858b8.png?wh=2203%2A1843" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9a/b8/9ad34c3c748978f915027d5085a858b8.png?wh=2203%2A1843" /></p>
 <p>于是我们就有了<strong>第四步</strong>。在注释/* Where to copy to? */后面有个if-else分支。if分支就是skb_add_data_nocache将数据拷贝到连续的数据区域。else分支就是skb_copy_to_page_nocache将数据拷贝到struct skb_shared_info结构指向的不需要连续的页面区域。</p>
 <p><strong>第五步</strong>，就是要发生网络包了。第一种情况是积累的数据报数目太多了，因而我们需要通过调用__tcp_push_pending_frames发送网络包。第二种情况是，这是第一个网络包，需要马上发送，调用tcp_push_one。无论__tcp_push_pending_frames还是tcp_push_one，都会调用tcp_write_xmit发送网络包。</p>
 <p>至此，tcp_sendmsg解析完了。</p>
@@ -7191,11 +7191,11 @@
 <p>于是，调用函数tcp_mss_split_point，开始计算切分的limit。这里面会计算max_len = mss_now * max_segs，根据现在不切分来计算limit，所以下一步的判断中，大部分情况下tso_fragment不会被调用，等待到了底层网卡来切分。</p>
 <p>第二个概念是<strong>拥塞窗口</strong>的概念（cwnd，congestion window），也就是说为了避免拼命发包，把网络塞满了，定义一个窗口的概念，在这个窗口之内的才能发送，超过这个窗口的就不能发送，来控制发送的频率。</p>
 <p>那窗口大小是多少呢？就是遵循下面这个著名的拥塞窗口变化图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/40/1f/404a6c5041452c0641ae3cba5319dc1f.png?wh=923%2A613" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/40/1f/404a6c5041452c0641ae3cba5319dc1f.png?wh=923%2A613" /></p>
 <p>一开始的窗口只有一个mss大小叫作slow start（慢启动）。一开始的增长速度的很快的，翻倍增长。一旦到达一个临界值ssthresh，就变成线性增长，我们就称为<strong>拥塞避免</strong>。什么时候算真正拥塞呢？就是出现了丢包。一旦丢包，一种方法是马上降回到一个mss，然后重复先翻倍再线性对的过程。如果觉得太过激进，也可以有第二种方法，就是降到当前cwnd的一半，然后进行线性增长。</p>
 <p>在代码中，tcp_cwnd_test会将当前的snd_cwnd，减去已经在窗口里面尚未发送完毕的网络包，那就是剩下的窗口大小cwnd_quota，也即就能发送这么多了。</p>
 <p>第三个概念就是<strong>接收窗口</strong>rwnd的概念（receive window），也叫滑动窗口。如果说拥塞窗口是为了怕把网络塞满，在出现丢包的时候减少发送速度，那么滑动窗口就是为了怕把接收方塞满，而控制发送速度。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/97/65/9791e2f9ff63a9d8f849df7cd55fe965.png?wh=1903%2A793" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/97/65/9791e2f9ff63a9d8f849df7cd55fe965.png?wh=1903%2A793" /></p>
 <p>滑动窗口，其实就是接收方告诉发送方自己的网络包的接收能力，超过这个能力，我就受不了了。因为滑动窗口的存在，将发送方的缓存分成了四个部分。</p>
 <ul>
 <li>第一部分：发送了并且已经确认的。这部分是已经发送完毕的网络包，这部分没有用了，可以回收。</li>
@@ -7203,7 +7203,7 @@
 <li>第三部分：没有发送，但是已经等待发送的。这部分是接收方空闲的能力，可以马上发送，接收方收得了。</li>
 <li>第四部分：没有发送，并且暂时还不会发送的。这部分已经超过了接收方的接收能力，再发送接收方就收不了了。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b6/31/b62eea403e665bb196dceba571392531.png?wh=2017%2A793" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b6/31/b62eea403e665bb196dceba571392531.png?wh=2017%2A793" /></p>
 <p>因为滑动窗口的存在，接收方的缓存也要分成了三个部分。</p>
 <ul>
 <li>第一部分：接受并且确认过的任务。这部分完全接收成功了，可以交给应用层了。</li>
@@ -7278,7 +7278,7 @@
 <a id="__codelineno-8-38" name="__codelineno-8-38" href="#__codelineno-8-38"></a>}
 </code></pre></div>
 <p>tcp_transmit_skb这个函数比较长，主要做了两件事情，第一件事情就是填充TCP头，如果我们对着TCP头的格式。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/be/0e/be225a97816a664367f29be9046aa30e.png?wh=2023%2A1183" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/be/0e/be225a97816a664367f29be9046aa30e.png?wh=2023%2A1183" /></p>
 <p>这里面有源端口，设置为inet_sport，有目标端口，设置为inet_dport；有序列号，设置为tcb-&gt;seq；有确认序列号，设置为tp-&gt;rcv_nxt。我们把所有的flags设置为tcb-&gt;tcp_flags。设置选项为opts。设置窗口大小为tp-&gt;rcv_wnd。</p>
 <p>全部设置完毕之后，就会调用icsk_af_ops的queue_xmit方法，icsk_af_ops指向ipv4_specific，也即调用的是ip_queue_xmit函数。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>const struct inet_connection_sock_af_ops ipv4_specific = {
@@ -7298,7 +7298,7 @@
 </code></pre></div>
 <h2 id="_1">总结时刻</h2>
 <p>这一节，我们解析了发送一个网络包的一部分过程，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/dc/44/dc66535fa7e1a10fd6d728865f6c9344.png?wh=2923%2A2923" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dc/44/dc66535fa7e1a10fd6d728865f6c9344.png?wh=2923%2A2923" /></p>
 <p>这个过程分成几个层次。</p>
 <ul>
 <li>VFS层：write系统调用找到struct file，根据里面的file_operations的定义，调用sock_write_iter函数。sock_write_iter函数调用sock_sendmsg函数。</li>
@@ -7450,8 +7450,6 @@ struct skb_shared_info 是否在 tcp_sendmsg 中使用，并不是由硬件决�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

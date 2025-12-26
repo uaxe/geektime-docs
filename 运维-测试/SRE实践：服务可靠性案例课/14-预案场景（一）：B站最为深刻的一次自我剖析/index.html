@@ -6211,11 +6211,11 @@
 <h2 id="_1">故障回顾</h2>
 <p>7月13日23时许，B站客户端和网页端均出现访问故障，无法打开，页面提示“正在玩命加载数据”。不久后，“B站崩了”话题也迅速登上微博热搜。14日凌晨B站网页端和App才恢复正常。</p>
 <p>22:52是故障开始的时间，SRE团队接到了关于服务和域名接入层不可用的多起警报。与此同时，客服部门接到了大量用户反映B站无法访问的反馈，公司内部员工也报告了相同的问题，包括App首页加载失败。根据报警信息，SRE团队迅速把注意力集中在可能的基础设施故障上，包括数据中心、网络连接、四层负载均衡器（L4 LB）和七层负载均衡器（L7 SLB）。为了迅速应对，SRE团队立即启动了紧急语音会议，并召集了所有相关团队的成员进行紧急处理。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1b/7a/1b311d9c67cab2eebfbf5cbc94728f7a.jpg?wh=2790x2598" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1b/7a/1b311d9c67cab2eebfbf5cbc94728f7a.jpg?wh=2790x2598" /></p>
 <p><strong>故障原因：7 层接入 SLB 代码 Bug</strong></p>
 <p>B站在2019年9月份，迁移到了OpenResty，通过服务在注册中心的权重变更，来实现SLB的动态调权，从而实现更精细的灰度能力。在某种发布模式中，应用的实例权重会短暂地调整为0，这个时候注册中心返回给SLB的权重是字符串类型的0。这个时候由于lua语言的特性并不会强制转化字符串的0为数字0，程序就会陷入到死循环进而把worker打死。</p>
 <p><strong>根因分析</strong></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/cb/c7/cbf068a32db9c6eb02a30d49f9816ac7.jpg?wh=604x358" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cb/c7/cbf068a32db9c6eb02a30d49f9816ac7.jpg?wh=604x358" /></p>
 <blockquote>
 <p>Lua 是动态类型语言，常用习惯里变量不需要定义类型，只需要为变量赋值即可。
 Lua在对一个数字字符串进行算术操作时，会尝试将这个数字字符串转成一个数字。
@@ -6225,12 +6225,12 @@ _gcd(“0”,nan)函数再次执行时返回值是 _gcd(nan,nan)，然后Nginx w
 </blockquote>
 <p>这里的根因分析你了解就可以了，如果你有兴趣可以直接看<a href="https://mp.weixin.qq.com/s?__biz=Mzg3Njc0NTgwMg%3D%3D&amp;mid=2247487272&amp;idx=1&amp;sn=038a30ce61706c97e3397eee982b1486&amp;scene=21#wechat_redirect">当时 B 站发布的报告</a>。而我们这节课的重点是发现这个案例中的问题，并讨论优化策略。接下来我们先分析一下这次故障里的几个关键点。</p>
 <h2 id="_2">故障分析</h2>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d0/2e/d0652a07de019714f8032ce040a5c32e.png?wh=2560x1382" />
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d0/2e/d0652a07de019714f8032ce040a5c32e.png?wh=2560x1382" />
 首先是响应时间，用了3分钟，还是非常快的。那是否可以再加加速呢？理论上来说比较难，这里就不再重点讨论。</p>
 <p>其次是准备时间，用时22分钟，这段时间我们看到 B 站做的最重要的操作就是了解如何通过绿色通道登录内网系统。这段时间暴露了两个问题，第一个是内网鉴权系统和接入层的循环依赖，第二个是如何通过绿色通道登录机器，就是日常紧急情况的演练和覆盖的缺失。</p>
 <p>故障恢复过程历时110分钟，从00:00开始至01:50结束。在这段时间内，SLB新集群的搭建工作耗时60分钟，包括集群的搭建、初始化、负载均衡配置以及公网IP的分配。随后的50分钟内，团队开始逐步切换流量至新集群。</p>
 <p>在多活业务的恢复方面，SLB运维团队发现多活机房的SLB存在大量请求超时的问题，但幸运的是，CPU并未出现过载的情况。因此，团队决定先重启多活机房的SLB，以尝试控制问题的扩散。在重启操作进行时，内部群组中的同学报告称主站服务已经恢复。进一步观察多活机房SLB的监控数据，发现请求超时的数量显著减少，业务成功率回升至50%以上。随着这些措施的实施，多活业务的核心功能，包括App推荐、播放、评论与弹幕拉取、动态更新、追番以及影视观看等，已基本恢复正常。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/77/4d/77d1f18498fa5994596e009c8yycd74d.png?wh=2788x500" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/77/4d/77d1f18498fa5994596e009c8yycd74d.png?wh=2788x500" /></p>
 <p>这里我们可以回顾一下B站几个有效的止损动作。全程时间178分钟，一是登录内网用时 22分钟。二是无效尝试重启用时30分钟。三是服务搭建用时60分钟。四是服务切流用时50分钟。</p>
 <h2 id="_3">故障优化</h2>
 <h3 id="_4">核心点一：双活与切流</h3>
@@ -6266,7 +6266,7 @@ _gcd(“0”,nan)函数再次执行时返回值是 _gcd(nan,nan)，然后Nginx w
 <p>这里阐述一下我的见解，拥有一个专门的团队无疑是理想的，但如果缺乏这样的支持，那么培养SRE人员的组织协调能力至关重要。同时，构建一个既完善又简洁的运作机制也非常重要。这包括迅速通报情况，及时召集相关人员；确保关键人员能够迅速了解情况，比如团队领导、对外运营、公关或政府关系人员等等；快速同步目前事件的影响范围和具体情况。</p>
 <h2 id="_10">小结</h2>
 <p>B站的故障其实非常典型，其中有非常多的问题值得我们去思考和探索。这里面最关键的<strong>双活建设、故障演练、隔离和解耦、严格的测试和发布流程，以及应急响应，</strong>都是值得我们去思考和学习的。我这里整理出了一张示意图，你可以结合示意图来复习。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9d/2e/9ded7dac0ec7b9ce9654c27cb0a1d92e.png?wh=2600x1602" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9d/2e/9ded7dac0ec7b9ce9654c27cb0a1d92e.png?wh=2600x1602" /></p>
 <h2 id="_11">思考题</h2>
 <p>你有什么办法在不影响线上服务的同时进行大规模的故障演练，同时能讲清楚收益获得老板的支持？欢迎你把你的答案分享到评论区，也欢迎你把这节课的内容分享给其他朋友，我们下节课再见！</p>
 <div><strong>精选留言（1）</strong></div>
@@ -6391,8 +6391,6 @@ _gcd(“0”,nan)函数再次执行时返回值是 _gcd(nan,nan)，然后Nginx w
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

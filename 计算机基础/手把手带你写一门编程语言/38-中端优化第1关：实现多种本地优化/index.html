@@ -6325,10 +6325,10 @@
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>}
 </code></pre></div>
 <p>这里，我先直接画出最后生成的IR图的样子：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/13/81/137c1353cd0bac2638f94103c2217b81.jpg?wh=1080x1387" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/13/81/137c1353cd0bac2638f94103c2217b81.jpg?wh=1080x1387" /></p>
 <p>你一看这个图，肯定会觉得有点眼花缭乱，摸不清头绪。不过没关系，这里面是有着清晰的逻辑的。</p>
 <p><strong>第一步，我们先来看控制流的部分。</strong></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f7/5e/f7278yye0c0d34914631cc0d6287645e.jpg?wh=1080x1387" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f7/5e/f7278yye0c0d34914631cc0d6287645e.jpg?wh=1080x1387" /></p>
 <p>在程序开头的时候，依然还是一个Start节点。</p>
 <p>而下面的LoopBegin节点，则代表了整个for循环语句的开始。开始后，它会根据for循环的条件，确定是否进入循环体。这里，我们引入了一个If节点，来代表循环条件。If节点要依据一个if条件，所以这里有一条黑线指向一个条件表达式节点。</p>
 <p>当循环条件为true的时候，程序就进入循环体。循环体以Begin开头，以LoopEnd结尾。而当循环条件为false的时候，程序则要通过LoopExit来退出循环。最后再通过Return语句从函数中返回。</p>
@@ -6346,15 +6346,15 @@
 </code></pre></div>
 <p>这里，变量i被静态赋值了两次。一开始被赋值为1，后来又通过i++来递增。为了符合SSA格式，我们要把它拆分成i1和i2两个变量，然后再用Phi节点把它们聚合起来，用于循环条件的判断。</p>
 <p>我们把与i有关的数据流加入到图中，就是下面这样：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ae/3f/aea5cc2403282bdfeaff3c4b82628f3f.jpg?wh=1080x1387" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ae/3f/aea5cc2403282bdfeaff3c4b82628f3f.jpg?wh=1080x1387" /></p>
 <p>我再解释一下这张图。i1=1这个表达式，在刚进入循环时被触发，一次循环结束后，会触发i2 = i + 1。所以，在i&lt;=a这个条件中的i，在刚进入循环的时候，会选择i1；而在循环体中循环过一次以后，会选择i2。因此，我们图中这个phi节点有一条输入边指向LoopBegin，用于判断控制流到底是从上面那条边进入的，还是从LoopEnd返回的。</p>
 <p>对于i2 = i + 1中的i，也是一样。它在一开始等于i1，循环过一次以后，就等于i2了。</p>
 <p>我们可以用同样的方式加入与sum变量有关的数据流：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b4/31/b4abf8a448yy61621533b9f7e3cf2231.jpg?wh=1080x1387" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b4/31/b4abf8a448yy61621533b9f7e3cf2231.jpg?wh=1080x1387" /></p>
 <p>这张图中，sum1在循环体外被赋值为0，后来在循环体内，则是执行sum2 = sum + i。这里的sum，也是刚进入循环体的时候取sum1，循环过一次以后就取sum2，所以这里也需要一个Phi节点。</p>
 <p>到这里，借助Phi节点，sum的值也已经算出来了。那么在最后的return语句中，是不是就可以直接把这个值返回了呢？</p>
 <p>不可以。为什么呢？因为return语句是在for循环语句之后的，而我们刚才计算的sum值，是循环体内的sum值。我们在程序里，必须要保证是在退出循环以后再获取的这个值，不能违背这个控制流带来的约束。所以，我们添加了一个ValueProxy节点，以LoopExit作为输入，确保这个值的计算是在循环之外。但它实际的值，就是刚才由Phi节点计算出的sum的值。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/fc/b2/fc4d40b7135a1bd178e5425e0f3f77b2.jpg?wh=1080x1387" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fc/b2/fc4d40b7135a1bd178e5425e0f3f77b2.jpg?wh=1080x1387" /></p>
 <p>到此为止，整个for循环的IR就生成完毕了。一开始，你感觉会有点复杂，但如果你逐渐习惯了控制流和数据流的思维方式，分析起来就会越来越快了。</p>
 <p>不过，回报和付出总是相匹配的。我们花了这么大代价来生成这个IR，会让某些优化工作变得异常简单，接下来我们就来体会一下吧！</p>
 <h2 id="_1">公共子表达式删除</h2>
@@ -6371,7 +6371,7 @@
 </code></pre></div>
 <p>如果用我们的IR来删除这个示例程序中的公共子表达式，我们甚至都不需要等到优化阶段，而是在生成IR的时候，顺带手就可以做了。</p>
 <p>你可以运行一下node play example_opt1.ts --dumpIR命令，生成下面的图。我手工在节点旁边标注了一下变量名称。你能看到，图中只有一张子图代表“a+b”这个公共子表达式，而且它被多个变量的定义引用了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/77/d4/775d8a811ed496944d2f0e83972c12d4.jpg?wh=1080x1387" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/77/d4/775d8a811ed496944d2f0e83972c12d4.jpg?wh=1080x1387" /></p>
 <p>那具体这个公共子表达式是怎么被共享的呢？首先，为了保存我们的IR图，我们设计了一个graph类，里面保存了所有节点的列表。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>//IR图
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>export class Graph{
@@ -6397,7 +6397,7 @@
 <a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>}
 </code></pre></div>
 <p>你仍然可以用我们现在的编译器加上–dumpIR选项来生成.dot图，我把它放在下面了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/38/6f/38d8855ce975f9f7165a9f8a4018106f.jpg?wh=1080x1387" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/38/6f/38d8855ce975f9f7165a9f8a4018106f.jpg?wh=1080x1387" /></p>
 <p>你会看到，变量x和y都引用了相同的DataNode。这里具体的实现你可以看一下<a href="https://gitee.com/richard-gong/craft-a-language/blob/master/38/ir.ts#L531">IRGenerator</a>中的<a href="https://gitee.com/richard-gong/craft-a-language/blob/master/38/ir.ts#L800">visitVariableDecl()</a>方法。在声明变量y的时候，我们会获取变量初始化表达式对应的DataNode，再把它跟该变量绑定。而变量y的初始化表达式就是x，x对应的DataNode就是图中的Plus节点，所以这个节点也跟变量y关联到了一起。拷贝传播就是这么在处理变量声明的过程中自然而然地发生了。</p>
 <p>最后，你在图中再看一下变量z的定义。你会看到，减法运算的左右两个input都是指向了同一个DataNode。所以，接下来我们就可以自然而然地做一个优化了，直接计算出z=0就可以了。在做优化的时候，我们经常会遇到这种情况，就是一个优化的处理结果，为其他优化创造了机会。就像当前的例子，拷贝传播的结果就是给减法运算的优化创造了机会。</p>
 <p>不过，在实际的优化算法中，我们通常会让IR经历多个Pass的处理，每个Pass处理一种优化场景。并且，经常同一种优化算法会被使用多次，原因就是在做完优化A以后，可能又制造出了优化B的机会。</p>
@@ -6415,7 +6415,7 @@
 </code></pre></div>
 <p>我之前给你介绍过变量活跃性分析的数据流方法。我们可以自底向上地遍历这个代码块，并不断更新一个“活跃变量”的集合。等分析到声明dc这一行的时候，我们会发现当前活跃变量集合里是没有dc的，这样就知道这行代码是死代码了。</p>
 <p>如果使用我们现在的IR，那应该如何检测死代码呢？我们还是先看编译器生成的IR图，看看死代码在图中有什么特点。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/72/2d/72186cf24872016e89d78295888c372d.jpg?wh=1080x1387" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/72/2d/72186cf24872016e89d78295888c372d.jpg?wh=1080x1387" /></p>
 <p>我在图中标出了作为死代码的dc变量。你从图中可以直观地看到，这个节点有一个显著的特点，就是没有其他节点引用它，因此它不是任何其他节点的input。</p>
 <p>你应该记得，我们在DataNode中设置了一个uses属性，指向所有使用该节点的其他节点，是一个反向的链接。那这个时候，其实dc变量对应的DataNode的uses列表是空的。所以，只要是uses为空的节点，我们就可以把它从图中去掉。而我们把Minus_6去掉以后，常量2也没有任何节点使用了，所以我们也可以把它去掉。</p>
 <p>你看，现在我们要去除死代码的话，简单到<strong>只是查询DataNode的uses属性是否为空集合</strong>就行了。是不是太方便了？具体实现你可以看看ir.ts中的<a href="https://gitee.com/richard-gong/craft-a-language/blob/master/38/ir.ts#L800">DeadCodeElimination</a>类。</p>
@@ -6547,8 +6547,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

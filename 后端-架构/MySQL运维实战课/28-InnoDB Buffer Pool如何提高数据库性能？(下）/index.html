@@ -14887,9 +14887,9 @@
 <p>自适应Hash索引由MySQL自动维护。MySQL会基于查询的访问模式，自动识别热点块，为热点块建立hash索引。hash索引完全存在于内存中。为了提高并发性，AHI分为多个分区，默认分为8个分区，可通过参数innodb_adaptive_hash_index调整分区数量。</p>
 <p>你可以通过参数innodb_adaptive_hash_index来控制是否开启AHI，8.0时，AHI默认开启，但是到了8.4，默认关闭了AHI。</p>
 <p>下面是AHI的一个示意图，AHI中，Key是索引记录或索引记录的前缀，Value指向索引叶子页面中的索引条目。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/39/0a/399c3c303dd7dea7fef1b355a74aa80a.jpg?wh=1440x685" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/39/0a/399c3c303dd7dea7fef1b355a74aa80a.jpg?wh=1440x685" /></p>
 <p>在为某个索引页面建立Hash索引时，InnoDB会给这个索引页面中的所有记录都创建Hash索引。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/47/13/479defd15cf1dec2ef59e707c76f8b13.jpg?wh=948x596" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/47/13/479defd15cf1dec2ef59e707c76f8b13.jpg?wh=948x596" /></p>
 <p>开启AHI后，InnoDB需要维护AHI，这带来一定的开销。查询如果能使用到hash索引，可以提升查询的性能。在具体的应用场景下，AHI是否能提升数据库的整体性能，需要通过实际的测试才能确定。</p>
 <p>你也可以观察show engine innodb status命令的输出中，ADAPTIVE HASH INDEX相关的信息，对比hash查找和非hash查找的次数。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>-------------------------------------
@@ -14934,21 +14934,21 @@
 <h2 id="change-buffer">Change Buffer</h2>
 <p>数据写入到非唯一的二级索引时，如果对应的索引页面还没有缓存在Buffer Pool中，正常情况下需要发起IO操作，将索引页面加载到buffer pool中，而IO操作通常比内存操作慢几个数量级。为了优化数据写入的性能，InnoDB使用了change buffer。在执行DML时，如果二级索引的页面还没有缓存，InnoDB会尝试先将写入操作缓存到change buffer中。在合适的时机（比如其他查询语句将页面加载到buffer pool时），innodb再将该页面缓存在change buffer中的操作合并到页面中，以此来减少数据库随机IO的数量。</p>
 <p>下面是官方文档中，Change Buffer的一个示意图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/94/bb/94a2ef6c5df8ca881a90b7b9b6d7d8bb.png?wh=1278x876" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/94/bb/94a2ef6c5df8ca881a90b7b9b6d7d8bb.png?wh=1278x876" /></p>
 <p>change buffer只对非唯一索引生效。对于唯一索引，写入数据时需要判断新数据是否和老数据有冲突，所以需要将索引页加载到内存中进行判断，因此没有必要将写入操作缓存到change buffer中。</p>
 <p>参数innodb_change_buffer_max_size控制change buffer允许使用的最大内存，默认为innodb buffer pool大小的25%。参数innodb_change_buffering用于控制将哪些操作缓存到change buffer中，参数可设置的值请参考下面这个表格。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/69/52/6901c45eef87677729f8b70231fc0552.png?wh=1920x949" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/69/52/6901c45eef87677729f8b70231fc0552.png?wh=1920x949" /></p>
 <p>8.0中innodb_change_buffering默认设置为all，不过在8.4版本中，默认值改成了none，这可能是由于SSD磁盘的大量使用，减少了Change Buffer的重要性。如果要关闭change buffer，建议先进行性能测试，评估对应用的影响。</p>
 <p>Change Buffer本身是一个B+树，存储在系统表空间中。Change Buffer中记录的格式我整理到了下面这个表格中。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/83/1f/8380cea567807c23d178945c7474a51f.png?wh=1920x1048" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/83/1f/8380cea567807c23d178945c7474a51f.png?wh=1920x1048" /></p>
 <p>change buffer记录以space id和page number为前缀，所以对同一个二级索引页面的操作，在change buffer中存储在相邻的位置。</p>
 <h3 id="change-buffer-bitmap">change buffer bitmap</h3>
 <p>Change Buffer位图信息中，记录了每个索引页面的剩余空间信息。位图页和数据页存储在相同的表空间中。数据文件中，每256M连续空间中的第二个页面用来存储位图信息。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/4c/ec/4c0a5a8b1ac6896b82494914fb64ccec.jpg?wh=735x451" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4c/ec/4c0a5a8b1ac6896b82494914fb64ccec.jpg?wh=735x451" /></p>
 <p>每个索引页面使用4bit来描述页面状态，这些信息的含义参考下面这个表格。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6d/9b/6d4a5f8f90b5773d863cacc0d122439b.png?wh=1920x928" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6d/9b/6d4a5f8f90b5773d863cacc0d122439b.png?wh=1920x928" /></p>
 <p>每个Page需要4bit的位图信息，那么存放16384个页面的位图信息需要8192字节，1个16K的IBUF位图页面足够存放这些信息。根据页面编号可直接获取对应的位图信息。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b7/42/b72105f7a790e3534b50ca2ae7bb7e42.jpg?wh=875x576" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b7/42/b72105f7a790e3534b50ca2ae7bb7e42.jpg?wh=875x576" /></p>
 <h3 id="change-buffer_1">change buffer合并</h3>
 <p>change buffer中的内容，会在一些情况下合并回索引页面。</p>
 <ol>
@@ -14963,7 +14963,7 @@
 <p>Double write buffer是用来保障数据可靠性的一种机制。有些系统中，InnoDB缓存页写到磁盘设备时，不是一个原子操作。一个缓冲页对应了多个磁盘扇区，可能会存在部分扇区写成功，部分扇区写失败的情况，这样数据页的数据就不一致了。</p>
 <p>为了避免出现这种情况，InnoDB使用了Double Write Buffer。脏页刷新时，先写到Double Write Buffer，然后再将Double Write Buffer中的页面批量刷新到Double Write文件中，如果这个过程失败了，那么数据文件中的页面还是好的。如果写Double Write文件成功了，但是后续在写数据文件时失败了，那么就可以用Double Write文件中的内容来恢复数据。</p>
 <p>下图是脏页刷新写Double Write文件的一个示意图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ab/04/ab96c470c05b09aecfdf4a4592e39004.jpg?wh=1336x892" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ab/04/ab96c470c05b09aecfdf4a4592e39004.jpg?wh=1336x892" /></p>
 <ol>
 <li>先在Double Write Buffer积攒一批脏页。</li>
 <li>脏页写入Double Write文件中。</li>
@@ -15100,8 +15100,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

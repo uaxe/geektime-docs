@@ -14787,13 +14787,13 @@
 <li>codis dashboard和codis fe：共同组成了集群管理工具。其中，codis dashboard负责执行集群管理工作，包括增删codis server、codis proxy和进行数据迁移。而codis fe负责提供dashboard的Web操作界面，便于我们直接在Web界面上进行集群管理。</li>
 </ul>
 <p>我用一张图来展示下Codis集群的架构和关键组件。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c7/a5/c726e3c5477558fa1dba13c6ae8a77a5.jpg?wh=2913%2A1835" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c7/a5/c726e3c5477558fa1dba13c6ae8a77a5.jpg?wh=2913%2A1835" /></p>
 <p>我来给你具体解释一下Codis是如何处理请求的。</p>
 <p>首先，为了让集群能接收并处理请求，我们要先使用codis dashboard 设置codis server和codis proxy的访问地址，完成设置后，codis server和codis proxy才会开始接收连接。</p>
 <p>然后，当客户端要读写数据时，客户端直接和codis proxy建立连接。你可能会担心，既然客户端连接的是proxy，是不是需要修改客户端，才能访问proxy？其实，你不用担心，codis proxy本身支持Redis的RESP交互协议，所以，客户端访问codis proxy时，和访问原生的Redis实例没有什么区别，这样一来，原本连接单实例的客户端就可以轻松地和Codis集群建立起连接了。</p>
 <p>最后，codis proxy接收到请求，就会查询请求数据和codis server的映射关系，并把请求转发给相应的codis server进行处理。当codis server处理完请求后，会把结果返回给codis proxy，proxy再把数据返回给客户端。</p>
 <p>我来用一张图展示这个处理流程：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f7/e5/f76df33a4eba1ebddfd5450745yy83e5.jpg?wh=2620%2A1817" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f7/e5/f76df33a4eba1ebddfd5450745yy83e5.jpg?wh=2620%2A1817" /></p>
 <p>好了，了解了Codis集群架构和基本流程后，接下来，我就围绕影响切片集群使用效果的4方面技术因素：数据分布、集群扩容和数据迁移、客户端兼容性、可靠性保证，来和你聊聊它们的具体设计选择和原理，帮你掌握Codis的具体用法。</p>
 <h2 id="codis_1">Codis的关键技术原理</h2>
 <p>一旦我们使用了切片集群，面临的第一个问题就是，<strong>数据是怎么在多个实例上分布的</strong>。</p>
@@ -14802,11 +14802,11 @@
 <p>第一步，Codis集群一共有1024个Slot，编号依次是0到1023。我们可以把这些Slot手动分配给codis server，每个server上包含一部分Slot。当然，我们也可以让codis dashboard进行自动分配，例如，dashboard把1024个Slot在所有server上均分。</p>
 <p>第二步，当客户端要读写数据时，会使用CRC32算法计算数据key的哈希值，并把这个哈希值对1024取模。而取模后的值，则对应Slot的编号。此时，根据第一步分配的Slot和server对应关系，我们就可以知道数据保存在哪个server上了。</p>
 <p>我来举个例子。下图显示的就是数据、Slot和codis server的映射保存关系。其中，Slot 0和1被分配到了server1，Slot 2分配到server2，Slot 1022和1023被分配到server8。当客户端访问key 1和key 2时，这两个数据的CRC32值对1024取模后，分别是1和1022。因此，它们会被保存在Slot 1和Slot 1022上，而Slot 1和Slot 1022已经被分配到codis server 1和8上了。这样一来，key 1和key 2的保存位置就很清楚了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/77/yy/77cb1b860cfa5aac9f0a0f7b780fbeyy.jpg?wh=2621%2A1259" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/77/yy/77cb1b860cfa5aac9f0a0f7b780fbeyy.jpg?wh=2621%2A1259" /></p>
 <p>数据key和Slot的映射关系是客户端在读写数据前直接通过CRC32计算得到的，而Slot和codis server的映射关系是通过分配完成的，所以就需要用一个存储系统保存下来，否则，如果集群有故障了，映射关系就会丢失。</p>
 <p>我们把Slot和codis server的映射关系称为数据路由表（简称路由表）。我们在codis dashboard上分配好路由表后，dashboard会把路由表发送给codis proxy，同时，dashboard也会把路由表保存在Zookeeper中。codis-proxy会把路由表缓存在本地，当它接收到客户端请求后，直接查询本地的路由表，就可以完成正确的请求转发了。</p>
 <p>你可以看下这张图，它显示了路由表的分配和使用过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d1/b1/d1a53f8b23d410f320ef145fd47c97b1.jpg?wh=2861%2A1864" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d1/b1/d1a53f8b23d410f320ef145fd47c97b1.jpg?wh=2861%2A1864" /></p>
 <p>在数据分布的实现方法上，Codis和Redis Cluster很相似，都采用了key映射到Slot、Slot再分配到实例上的机制。</p>
 <p>但是，这里有一个明显的区别，我来解释一下。</p>
 <p>Codis中的路由表是我们通过codis dashboard分配和修改的，并被保存在Zookeeper集群中。一旦数据位置发生变化（例如有实例增减），路由表被修改了，codis dashbaord就会把修改后的路由表发送给codis proxy，proxy就可以根据最新的路由信息转发请求了。</p>
@@ -14827,7 +14827,7 @@
 <li>第一步和第二步就是单个数据的迁移过程。Codis会不断重复这个迁移过程，直到要迁移的Slot中的数据全部迁移完成。</li>
 </ol>
 <p>我画了下面这张图，显示了数据迁移的流程，你可以看下加深理解。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e0/6b/e01c7806b51b196097c393a079436d6b.jpg?wh=2083%2A1875" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e0/6b/e01c7806b51b196097c393a079436d6b.jpg?wh=2083%2A1875" /></p>
 <p>针对刚才介绍的单个数据的迁移过程，Codis实现了两种迁移模式，分别是同步迁移和异步迁移，我们来具体看下。</p>
 <p>同步迁移是指，在数据从源server发送给目的server的过程中，源server是阻塞的，无法处理新的请求操作。这种模式很容易实现，但是迁移过程中会涉及多个操作（包括数据在源server序列化、网络传输、在目的server反序列化，以及在源server删除），如果迁移的数据是一个bigkey，源server就会阻塞较长时间，无法及时处理用户请求。</p>
 <p>为了避免数据迁移阻塞源server，Codis实现的第二种迁移模式就是异步迁移。异步迁移的关键特点有两个。</p>
@@ -14842,7 +14842,7 @@
 <p>因为在Codis集群中，客户端是和codis proxy直接连接的，所以，当客户端增加时，一个proxy无法支撑大量的请求操作，此时，我们就需要增加proxy。</p>
 <p>增加proxy比较容易，我们直接启动proxy，再通过codis dashboard把proxy加入集群就行。</p>
 <p>此时，codis proxy的访问连接信息都会保存在Zookeeper上。所以，当新增了proxy后，Zookeeper上会有最新的访问列表，客户端也就可以从Zookeeper上读取proxy访问列表，把请求发送给新增的proxy。这样一来，客户端的访问压力就可以在多个proxy上分担处理了，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/70/23/707767936a6fb2d7686c84d81c048423.jpg?wh=3000%2A1617" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/70/23/707767936a6fb2d7686c84d81c048423.jpg?wh=3000%2A1617" /></p>
 <p>好了，到这里，我们就了解了Codis集群中的数据分布、集群扩容和数据迁移的方法，这都是切片集群中的关键机制。</p>
 <p>不过，因为集群提供的功能和单实例提供的功能不同，所以，我们在应用集群时，不仅要关注切片集群中的关键机制，还需要关注客户端的使用。这里就有一个问题了：业务应用采用的客户端能否直接和集群交互呢？接下来，我们就来聊下这个问题。</p>
 <h3 id="_3">集群客户端需要重新开发吗?</h3>
@@ -14858,14 +14858,14 @@
 <p>codis server其实就是Redis实例，只不过增加了和集群操作相关的命令。Redis的主从复制机制和哨兵机制在codis server上都是可以使用的，所以，Codis就使用主从集群来保证codis server的可靠性。简单来说就是，Codis给每个server配置从库，并使用哨兵机制进行监控，当发生故障时，主从库可以进行切换，从而保证了server的可靠性。</p>
 <p>在这种配置情况下，每个server就成为了一个server group，每个group中是一主多从的server。数据分布使用的Slot，也是按照group的粒度进行分配的。同时，codis proxy在转发请求时，也是按照数据所在的Slot和group的对应关系，把写请求发到相应group的主库，读请求发到group中的主库或从库上。</p>
 <p>下图展示的是配置了server group的Codis集群架构。在Codis集群中，我们通过部署server group和哨兵集群，实现codis server的主从切换，提升集群可靠性。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/02/4a/0282beb10f5c42c1f12c89afbe03af4a.jpg?wh=3000%2A1992" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/02/4a/0282beb10f5c42c1f12c89afbe03af4a.jpg?wh=3000%2A1992" /></p>
 <p>因为codis proxy和Zookeeper这两个组件是搭配在一起使用的，所以，接下来，我们再来看下这两个组件的可靠性。</p>
 <p>在Codis集群设计时，proxy上的信息源头都是来自Zookeeper（例如路由表）。而Zookeeper集群使用多个实例来保存数据，只要有超过半数的Zookeeper实例可以正常工作， Zookeeper集群就可以提供服务，也可以保证这些数据的可靠性。</p>
 <p>所以，codis proxy使用Zookeeper集群保存路由表，可以充分利用Zookeeper的高可靠性保证来确保codis proxy的可靠性，不用再做额外的工作了。当codis proxy发生故障后，直接重启proxy就行。重启后的proxy，可以通过codis dashboard从Zookeeper集群上获取路由表，然后，就可以接收客户端请求进行转发了。这样的设计，也降低了Codis集群本身的开发复杂度。</p>
 <p>对于codis dashboard和codis fe来说，它们主要提供配置管理和管理员手工操作，负载压力不大，所以，它们的可靠性可以不用额外进行保证了。</p>
 <h2 id="_5">切片集群方案选择建议</h2>
 <p>到这里，Codis和Redis Cluster这两种切片集群方案我们就学完了，我把它们的区别总结在了一张表里，你可以对比看下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8f/b8/8fec8c2f76e32647d055ae6ed8cfbab8.jpg?wh=2880%2A1166" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8f/b8/8fec8c2f76e32647d055ae6ed8cfbab8.jpg?wh=2880%2A1166" /></p>
 <p>最后，在实际应用的时候，对于这两种方案，我们该怎么选择呢？我再给你提4条建议。</p>
 <ol>
 <li>从稳定性和成熟度来看，Codis应用得比较早，在业界已经有了成熟的生产部署。虽然Codis引入了proxy和Zookeeper，增加了集群复杂度，但是，proxy的无状态设计和Zookeeper自身的稳定性，也给Codis的稳定使用提供了保证。而Redis Cluster的推出时间晚于Codis，相对来说，成熟度要弱于Codis，如果你想选择一个成熟稳定的方案，Codis更加合适些。</li>
@@ -15053,8 +15053,6 @@ Redis Cluster 有 16384 个哈希槽 Hash Slot，采用 CRC16 算法计算哈希
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

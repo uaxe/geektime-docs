@@ -5662,10 +5662,10 @@
 <p>在移动平台的视频场景中合理地使用硬件编码器，能够很大程度上提升App的性能，所以这节课我们来学习Android平台和iOS平台视频硬件编码器的使用方法。在Android平台我们一般使用MediaCodec编码器，而在iOS平台我们一般使用VideoToolbox来完成硬件编码。</p>
 <h2 id="android-mediacodec">Android平台的硬件编码器 MediaCodec</h2>
 <p><a href="https://time.geekbang.org/column/article/560720">上节课</a>我们已经介绍了预览控制器类如何调用编码器模块进行编码，并且也已经实现了软件编码器的子类，这节课我们就来完成硬件编码器子类的实现。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f8/69/f8138250d29ef955845193d40aecb269.png?wh=1920x1104" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f8/69/f8138250d29ef955845193d40aecb269.png?wh=1920x1104" /></p>
 <p>新建的hw_encoder_adapter类继承自video_encoder_adapter这个类，然后实现核心的接口，包括创建编码器的createEncoder方法、实际编码的encode方法以及销毁编码器的destroyEncoder方法。</p>
 <p>在Android 4.3系统之后，使用MediaCodec给视频编码是官方推荐的方式。尽管Android的碎片化比较严重，会导致一些兼容性问题，但是硬件编码器的性能和速度提升的收益是非常可观的。并且在4.3系统之后，我们可以通过Surface来配置编码器的输入，降低了显存到内存的数据交换时间，大大提升了整个录制场景的体验。前面我们学过使用MediaCodec来编码AAC数据，而编码视频的工作流程和音频是一样的，我们先来回顾一下MediaCodec的工作流程。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/10/d4/10701bd6e882b52cb33d10101138d3d4.png?wh=1440x694" title="MediaCodec的工作原理" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/10/d4/10701bd6e882b52cb33d10101138d3d4.png?wh=1440x694" title="MediaCodec的工作原理" /></p>
 <p>因为MediaCodec的API接口都是在Java层，而我们整个视频预览编码的架构都是在Native层构建的，所以需要在Native层调用Java层MediaCodec的API接口，在这个hw_encoder_adapter类的构造方法中需要把JavaVM和jObject传递进来，方便后续调用。</p>
 <h3 id="_1">创建编码器</h3>
 <p>libx264编码器需要输入内存中的YUV数据，所以我们要在软件编码适配器中进行显存到内存的数据交换操作。而我们这节课使用的<strong>MediaCodec是允许直接以显存中的纹理ID作为输入的</strong>，这样就减少了显存到内存的数据交换，保证了提供数据的速度。那具体怎么把纹理ID作为MediaCodec的输入呢？</p>
@@ -5737,11 +5737,11 @@
 <li>提高编码效率，编码一帧的时间缩短。</li>
 </ol>
 <p>当然VideoToolbox既可以充当编码器又可以充当解码器，这节课我们主要介绍它作为编码器的工作流程，讲一讲如何使用VideoToolbox把摄像头采集到的纹理编码成一段H264的码流。我们会创建一个名叫H264HWEncoderImpl类，然后按照ELImage的组件规则把它封装进ELImage框架中，集成进去之后，就可以给原来的预览项目增加录制视频的功能。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/43/2f/43da58864042499a170ba75d96d9352f.png?wh=1694x636" title="ELImage架构图" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/43/2f/43da58864042499a170ba75d96d9352f.png?wh=1694x636" title="ELImage架构图" /></p>
 <h3 id="videotoolbox">VideoToolbox硬件编码器</h3>
 <h4 id="_4">输入与输出</h4>
 <p>我们先来看一下使用VideoToolbox进行编解码的输入和输出是什么，只有明确了这一点，才能知道如何给VideoToolbox提供视频帧的原始数据，还有怎么从VideoToolbox里获取编码后的数据。我们可以看一下VideoToolbox的数据流转结构图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b3/2b/b3d2d78a9f9be63ff2b01d609525122b.png?wh=1660x588" title="图片来自苹果官网" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b3/2b/b3d2d78a9f9be63ff2b01d609525122b.png?wh=1660x588" title="图片来自苹果官网" /></p>
 <p>从上图中可以看到，编码器的输入是CVPixelBuffer类型的结构体，输出是CMSampleBuffer类型的结构体。所以在ELImage框架中，我们需要<strong>把纹理ID封装成CVPixelBuffer的数据结构</strong>。这个数据结构是使用VideoToolbox编码的核心，必须要了解清楚。Apple Developer官网上对于这个数据结构给出的解释是，在主内存中存储所有像素点数据的一个对象。</p>
 <p>那什么是主内存呢？你可以这样理解，主内存其实并不是我们平时所操作的内存，但它可以关联到内存中的地址，简单理解就是这块存储区域在缓存里，但是我们在访问这块区域之前必须先锁定这块区域。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>CVPixelBufferLockBaseAddress(pixel_buffer, 0);
@@ -5759,7 +5759,7 @@
 </code></pre></div>
 <p>所以我们需要把一个纹理ID和一个CVPixelBuffer通过上述这个方法关联起来，然后把这个纹理ID作为目标（实际是这个纹理ID绑定的FBO）进行绘制，就可以在CVPixelBuffer中获取到数据了，最后把CVPixelBuffer送给VideoToolbox就可以了。</p>
 <p>接下来我们看这个编码器输出的类型，从图里可以看出这是一个CMSampleBuffer类型的对象，如果你还有印象的话，<a href="https://time.geekbang.org/column/article/556012">第14节课</a>Camera回调给我们的视频帧也是CMSampleBuffer类型的对象，但是它们所包含的内容完全不一样，Camera预览返回的CMSampleBuffer里存储的数据是一个CVPixelBuffer，而经过VideoToolbox编码输出的CMSampleBuffer里存储的数据是一个CMBlockBuffer的引用，如图所示。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/68/d7/68ef3859c1c27e56fb5ab319c6051fd7.png?wh=1660x1040" title="图片来自苹果官网" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/68/d7/68ef3859c1c27e56fb5ab319c6051fd7.png?wh=1660x1040" title="图片来自苹果官网" /></p>
 <p>图片展示了CMSampleBuffer的构成方式，左边代表了压缩数据（编码器输出的格式）的构成，右边代表了非压缩格式（摄像头采集到的数据或者解码器解码出来的数据）的构成。而CMBlockBuffer就是编码之后数据存放的对象，我们可以调用CMBlockBufferGetDataPointer方法来获取出内存中的指针，然后可以使用对应内存中的数据去写文件或者发送到网络。</p>
 <h4 id="_5">初始化与构建编码器</h4>
 <p>弄清楚了编码器的输入和输出，下面我们就来看一下如何构建出编码器。</p>
@@ -5806,7 +5806,7 @@
 </code></pre></div>
 <p>为什么要判断关键帧呢？</p>
 <p>因为VideoToolbox编码器在每一个关键帧前面都会输出sps和pps信息，所以如果这一帧是关键帧，就取出对应的sps和pps信息。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/68/d7/68ef3859c1c27e56fb5ab319c6051fd7.png?wh=1660x1040" title="图片来自苹果官网" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/68/d7/68ef3859c1c27e56fb5ab319c6051fd7.png?wh=1660x1040" title="图片来自苹果官网" /></p>
 <p>那怎么取出对应的sps和pps信息呢？图里提到CMSampleBuffer里面有一个成员是CMVideoFormatDesc，而sps和pps信息就在这个对视频格式的描述里面。取出sps的代码如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>CMFormatDescriptionRef format = CMSampleBufferGetFormatDescription(sampleBuffer);
 <a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>size_t sparameterSetSize, sparameterSetCount;
@@ -5837,7 +5837,7 @@
 <p>到这里，我们已经把VideoToolbox的使用封装到了这个H264HWEncoderImpl类里，并提供出了初始化、编码和销毁的接口，那接下来就把这个类集成到我们的ELImage框架中吧。</p>
 <h4 id="elimage">把编码器集成到ELImage框架</h4>
 <p>回顾第<a href="https://time.geekbang.org/column/article/556012">14节课</a>的内容，我们已经把Camera连接到了GLImageView上面，用户也可以在屏幕上预览到摄像头采集到的图像了。在这个设计里，Camera是输入节点，它把采集到的YUV数据渲染成为纹理对象，然后传递给GLImageView，GLImageView把纹理对象渲染到UIView上。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/43/2f/43da58864042499a170ba75d96d9352f.png?wh=1694x636" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/43/2f/43da58864042499a170ba75d96d9352f.png?wh=1694x636" /></p>
 <p>而这节课我们要书写的VideoEncoder也是一个输出节点，在Camera的targets里增加这个VideoEncoder的输出节点，然后这个输出节点负责把纹理对象编码成H264码流，并写到磁盘里。怎么构建这个节点并集成入ELImage框架里呢？</p>
 <p>首先建立ELImageVideoEncoder实现ELImageInput这个Protocol，代表我们新建立的这个节点是可以被输入纹理对象的，然后书写初始化方法，可以让调用端在创建这个节点的时候把编码参数传递进来，初始化方法定义如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>- (id) initWithFPS: (float) fps maxBitRate:(int)maxBitRate
@@ -5874,34 +5874,34 @@
 </code></pre></div>
 <p>代码里的renderTarget就是一个CVPixelBuffer的引用，和之前的渲染一样，上述代码将源纹理对象渲染到了目标纹理对象，只不过这里的处理就是把图像做一个上下翻转。</p>
 <p>再来看最关键的一步，渲染完成之后，实际上渲染的内容就会在这个CVPixelBuffer里，这样我们就可以把这个renderTarget传递给编码器进行编码操作了。当然，在交给编码器之前要先锁定这个CVPixelBuffer，编码器使用完了之后再解锁。书写完这个节点，整个ELImage框架就可以完成预览、录制这两个场景了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/43/2f/43da58864042499a170ba75d96d9352f.png?wh=1694x636" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/43/2f/43da58864042499a170ba75d96d9352f.png?wh=1694x636" /></p>
 <p>接下来，我们了解一下iOS系统为开发者提供的非常强大的多媒体API库，扩展一下知识面。当然万变不离其宗，这一些高级的API都是基于最底层的VideoToolbox进行封装的，并且提供了单一的接口来完成某些具体的功能。</p>
 <h3 id="iosapi">iOS高层次的硬件编解码API</h3>
 <p>先来看一下图片，它展示了AVFoundation与VideoToolbox的关系。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/eb/a1/ebd8e8d2ed350f741da406d0ecdd76a1.png?wh=1248x640" title="图片来自苹果官网" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/eb/a1/ebd8e8d2ed350f741da406d0ecdd76a1.png?wh=1248x640" title="图片来自苹果官网" /></p>
 <p>如图所示，iOS平台提供的AVFoundation底层使用了VideoToolbox，但是它们的关注点不一样。VideoToolbox更关注编码成内存中的CMSampleBuffer结构体，以及解码成主内存（或者理解为显存）里的CVPixelBuffer结构体，而AVFoundation更关注解码直接显示以及编码到文件中。</p>
 <p>下面我们来看一下AVFoundation这个层次提供的几个重要的API。</p>
 <ul>
 <li>AVAssetWriter</li>
 </ul>
 <p>从名字就可以看出，这是为了写入本地文件提供的API，这个类可以方便地把图像和音频写成一个完整的本地视频文件。它是如何利用VideoToolbox编码视频文件的呢？我们可以参考下面的图片来理解。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/46/d6/46c0bcyy5b8c81f7ffb76aa8703093d6.png?wh=1660x468" title="图片来自苹果官网" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/46/d6/46c0bcyy5b8c81f7ffb76aa8703093d6.png?wh=1660x468" title="图片来自苹果官网" /></p>
 <p>可以看到，AVAssetWriter是从OpenGL ES中拿到纹理对象，关联到CoreVideo这个framework提供的CVPixelBuffer里，然后使用VideoToolbox编码，最后把编码的H264码流写到H264文件或者封装到一个视频文件中。但如果只是封装成一个MP4文件，其实并不需要这么麻烦，我们可以利用iOS给我们封装好的API很简单地完成这种场景，如下图所示。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/28/98/289c7ecf6f5cb8a0cdf602ff1a9ba098.png?wh=1660x560" title="图片来自苹果官网" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/28/98/289c7ecf6f5cb8a0cdf602ff1a9ba098.png?wh=1660x560" title="图片来自苹果官网" /></p>
 <p>可以看到，AVAssetWriterInput把编码器的编码和后续的处理和封装的工作组装到了一起，提供了更单一的接口调用，完成的功能也更加清晰，这也是iOS平台提供的多媒体API强大的地方。当然这仅限于本地文件，如果在直播场景中需要把编码后的码流推送到流媒体服务器的话，就不能使用这个API了。</p>
 <ul>
 <li>AVAssetReader</li>
 </ul>
 <p>从名字上来看，这是为了读取本地文件而存在的一个类。这个类可以方便地把本地文件中的音频和视频解码出来。下面我们来看一下怎么用VideoToolbox解码视频，然后经过处理，最终再使用VideoToolbox编码成为一个本地的视频文件。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f6/c9/f6e8c981c209eeefa5ace8f70aa01cc9.png?wh=1660x380" title="图片来自苹果官网" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f6/c9/f6e8c981c209eeefa5ace8f70aa01cc9.png?wh=1660x380" title="图片来自苹果官网" /></p>
 <p>虽然前面没有介绍怎么使用VideoToolbox解码H264数据，但是你可以认为它就是编码的一个逆过程，上图中需要我们自己写很多代码来控制多种状态，包括输入、输出等。而在AVFoundation里，针对解码部分，iOS平台直接封装了一个更高级的API，你可以看一下图片左边的内容。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/80/09/802fe3c1323cd8de98a410c42205b509.png?wh=1660x532" title="图片来自苹果官网" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/80/09/802fe3c1323cd8de98a410c42205b509.png?wh=1660x532" title="图片来自苹果官网" /></p>
 <p>AVAssetReaderOutput也只支持本地文件的解码，不支持网络媒体文件的输入。同样，在这里也不再展示代码了，你可以参考GPUImage框架里的GPUImageMovie这个类，我们在里面的离线处理操作的场景，详细地对AVAssetReaderInput这个API的使用做出了说明。</p>
 <ul>
 <li>AVAssetExportSession</li>
 </ul>
 <p>这个类可以用来拼接视频、合并音频和视频、不做任何处理的转换格式以及压缩视频等多种场景，其实它是对VideoToolbox解码、编码的一个更高层次的封装，如图所示。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c5/14/c5e790fd4a55ca5c3b76bc279c184c14.png?wh=1660x472" title="图片来自苹果官网" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c5/14/c5e790fd4a55ca5c3b76bc279c184c14.png?wh=1660x472" title="图片来自苹果官网" /></p>
 <p>通过图片可以看到，这个类不允许我们进行中间的处理操作，显然它是一个更高层次的封装，只允许我们设置一些预设和提供输入输出文件路径等，所以相比使用VideoToolbox，或者使用AVAssetReader和AVAssetWriter来实现，AVAssetExportSession提供的功能更单一，接口也更简单。</p>
 <p>在我们工作中，在不同的场景下选用不同的技术实现是非常重要的，这不单单会影响开发的效率，也会直接影响产品的体验。学习iOS平台的多媒体时，了解这些API对我们的工作有很大帮助。</p>
 <h2 id="_8">小结</h2>
@@ -6046,8 +6046,6 @@ Q5：加锁与解锁是针对内存还是缓存？</p>2022-09-02</li><br/><li><s
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

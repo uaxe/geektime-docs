@@ -14846,7 +14846,7 @@
 <p>在上节课，我介绍了一个最简单的HTTP请求，了解了一个网络数据包是如何跨过千山万水到达对端的服务器的。不过就像前面引文说的那样，这是不够的。所以这节课，让我们更近一步，来看看当数据包到达对端服务器之后，操作系统和硬件会如何处理数据包，同时我将介绍HTTP协议，带你理清Go HTTP标准库高效处理网络数据包的底层设计原理。</p>
 <h2 id="_1">操作系统处理数据包流程</h2>
 <p>当数据包到达目的地设备后，数据包需要经过复杂的逻辑处理最终到达应用程序。数据包的处理过程大致可以分为7步，我们可以根据下面这张流程图一层一层来理解。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e7/ee/e7caaee0e1dyy95176868a29779fbfee.png?wh=1645x922" title="操作系统处理数据包流程 来自《深入理解linux网络》" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e7/ee/e7caaee0e1dyy95176868a29779fbfee.png?wh=1645x922" title="操作系统处理数据包流程 来自《深入理解linux网络》" /></p>
 <p>当网络设备接收到数据，并储存到设备的缓冲区后（该缓冲区可能位于设备的内存，也可能通过 DMA 写入到主机内存），会首先通知操作系统内核对已接收的数据进行处理。</p>
 <p>接收到新的数据包后，网卡设备将生成一个硬件中断信号。这个信号通常是由设备发送给中断控制器，再由中断控制器转发给 CPU。CPU 接到信号后，当前执行的任务被打断，转而执行由设备驱动注册的中断处理程序，中断处理程序将处理对应的设备事件。</p>
 <p>Linux将中断处理程序分为两个部分：上半部和下半部，这是深思熟虑的结果。中断处理程序的上半部接受到中断时就立即执行，但是只做比较紧急的工作，这些工作都是在所有中断被禁止的情况下完成的。所以上半部要快，否则其他的中断就得不到及时的处理，导致硬件数据丢失。而耗时又不紧急的工作被推迟到下半部去做。上半部处理程序会将数据帧加入到内核的输入队列中，通知内核做进一步处理，并快速返回。</p>
@@ -14854,7 +14854,7 @@
 <p>要深入了解Linux操作系统在这一过程的细节，你还可以参考《Understanding Linux Network Internals》这本书。</p>
 <p>还记得之前提到的分层网络模型吗, 现代操作系统在处理网络协议栈时，链路层Ethernet协议、网络层IP协议、以及传输层TCP协议在当前都是在操作系统内核实现的。而应用层是在用户态，由应用程序实现的。应用程序与操作系统之间交流的接口是通过操作系统提供的Socket 系统调用API完成的。</p>
 <p>下面这张图列出了硬件、操作系统内核、用户态空间中分别对应的组件和交互。操作系统与硬件之间通过设备驱动进行通信，而应用程序与操作系统之间通过Socket系统调用API进行通信。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ce/f4/ce681ef43f89c3106779b57d48a5c5f4.jpg?wh=1920x1344" title="硬件、内核、用户空间对应的组件" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ce/f4/ce681ef43f89c3106779b57d48a5c5f4.jpg?wh=1920x1344" title="硬件、内核、用户空间对应的组件" /></p>
 <p>Socket 相关的网络编程API用于实现连接、断开、监听、IO多路复用等功能。如果你想进一步了解Socket网络编程的细节，可以参考《UNIX Network Programming》。</p>
 <p>另外，有许多工具可以方便查看、调试网络相关的状态，例如netstat工具可以查看网络连接状态，ss工具可以查看与Socket相关的信息。更多的网络工具还可以查看《Systems Performance, 2nd Edition》。</p>
 <h2 id="http">HTTP协议解析</h2>
@@ -14947,7 +14947,7 @@
 <a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>}
 </code></pre></div>
 <p>可以看到，Go标准库在这里使用了连接池来优化获取连接的过程。之前已经与服务器完成请求的连接一般不会立即被销毁（HTTP/1.1默认使用了keep-alive:true，可以复用连接），而是会调用tryPutIdleConn函数放入到连接池中。通过下图左侧的部分可以看到请求结束后连接的归宿（连接也可能会直接被销毁，例如请求头中指定了keep-alive属性为false 或者连接已经超时）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2e/3f/2ef71447e2e1f6ceae194864ae10c43f.jpg?wh=1920x1667" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2e/3f/2ef71447e2e1f6ceae194864ae10c43f.jpg?wh=1920x1667" /></p>
 <p>使用连接池的收益是非常明显的，因为复用连接之后就不用再进行TCP三次握手了，这大大减少了请求的时间。举个特别的例子，在使用了HTTPS协议时，在三次握手基础上还增加了额外的鉴权协调，初始化的建连过程甚至需要花费几十到上百毫秒。</p>
 <p>另外连接池的设计也很有讲究，例如连接池中的连接到了一定的时间需要强制关闭。获取连接时的逻辑如下：</p>
 <ul>
@@ -14955,11 +14955,11 @@
 <li>当连接池中没有对应的空闲连接时，正常情况下会通过异步与服务端建连的方式获取连接，并将当前协程放入到等待队列中。</li>
 </ul>
 <p>连接的第一步是通过Resolver.resolveAddrList方法访问DNS服务器，获取<a href="https://www.baidu.com">www.baidu.com</a> 网站对应的IP地址。下面这张图展示了借助DNS协议查找域名对应的IP地址的过程。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/66/9d/6608af192fe75a581yyf8d3411af779d.jpg?wh=1920x1047" title="DNS解析流程" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/66/9d/6608af192fe75a581yyf8d3411af779d.jpg?wh=1920x1047" title="DNS解析流程" /></p>
 <p>客户端首先查看是否有本地缓存，如果没有，则会用递归方式从权威域名服务器中获取DNS信息并缓存下来。如果你想深入了解DNS协议，可以参考《Introduction to Computer Networks and Cybersecurity》的第二章。</p>
 <p>在与远程服务器建连的过程中，当前的协程会进入阻塞等待的状态。正常情况下，当前请求的协程会等待连接完毕。但是因为建立连接的过程还是比较耗时的，所以如果在这个过程中正好有一个其他连接使用完了，协程就会优先使用该连接。</p>
 <p>这种巧妙的设计依托了轻量级协程的优势，获取连接的具体流程如下图右侧所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2e/3f/2ef71447e2e1f6ceae194864ae10c43f.jpg?wh=1920x1667" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2e/3f/2ef71447e2e1f6ceae194864ae10c43f.jpg?wh=1920x1667" /></p>
 <p>为利用协程并发的优势，Transport.roundTrip协程获取到连接后，会调用Transport.dialConn创建读写buffer以及读数据与写数据的两个协程，分别负责处理发送请求和服务器返回的消息：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>func (t *Transport) dialConn(ctx context.Context, cm connectMethod) (pconn *persistConn, err error) {
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>...
@@ -14974,7 +14974,7 @@
 <a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>}
 </code></pre></div>
 <p>整个处理流程和协程间协调如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5b/17/5b18b3086f15317c87d11yyfca965017.jpg?wh=1920x1047" title="HTTP请求的完整流程" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5b/17/5b18b3086f15317c87d11yyfca965017.jpg?wh=1920x1047" title="HTTP请求的完整流程" /></p>
 <p>HTTP请求调用的核心函数是roundTrip，它会首先传递请求给writeLoop协程，让writeLoop协程写入数据。接着，通知readLoop协程让它准备好读取数据。等writeLoop成功写入数据后，writeLoop会通知readLoop断开后是否可以重用连接。然后writeLoop会通知上游写入是否成功。如果写入失败，上游会直接关闭连接。</p>
 <p>当readLoop接收到服务器发送的响应数据之后，会通知上游并且将response数据返回到上游，应用层会获取返回的response数据，并进行相应的业务处理 。应用层读取完毕response数据后，HTTP标准库会自动调用close函数，该函数会通知readLoop“数据读取完毕”。这样readLoop就可以进一步决策了。readLoop需要判断是继续循环等待服务器消息，还是将当前连接放入到连接池中，或者是直接销毁。</p>
 <p>Go HTTP标准库使用了连接池等技术帮助我们更好地管理连接、高效读写消息、并托管了与操作系统之间的交互。</p>
@@ -15112,8 +15112,6 @@ spiderClient 组合了标准库的 http.Client，此时需要注意在并发情�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -6346,39 +6346,39 @@
 <p>所以，基于Ingress的定义，就出现了各式各样的Ingress Controller实现。</p>
 <p>我们已经见过了Nginx官方开发的Nginx Ingress Controller，但它局限于Nginx自身的能力，Ingress、Service等对象更新时必须要修改静态的配置文件，再重启进程（reload），在变动频繁的微服务系统里就会引发一些问题。</p>
 <p>而今天要说的<strong>Kong Ingress Controller</strong>，则是站在了Nginx这个巨人的肩膀之上，基于OpenResty和内嵌的LuaJIT环境，实现了完全动态的路由变更，消除了reload的成本，运行更加平稳，而且还有很多额外的增强功能，非常适合那些对Kubernetes集群流量有更高、更细致管理需求的用户（<a href="https://konghq.com/solutions/build-on-kubernetes">图片来源Kong官网</a>）。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8e/43/8ed5086bb73d01ccdcd83deec1b8d643.png?wh=400x300" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8e/43/8ed5086bb73d01ccdcd83deec1b8d643.png?wh=400x300" /></p>
 <h2 id="kong-ingress-controller_1">安装Kong Ingress Controller</h2>
 <p>接下来我们就来看看如何在Kubernetes集群里引入Kong Ingress Controller。</p>
 <p>简单起见，这次我选择了minikube环境，版本还是1.25.2，对应的Kubernetes也是之前的1.23.3：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/25/53/252d80c9a08b7ddfccceb09a63b2da53.png?wh=1266x360" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/25/53/252d80c9a08b7ddfccceb09a63b2da53.png?wh=1266x360" /></p>
 <p>目前Kong Ingress Controller的最新版本是2.7.0，你可以从GitHub上(<a href="https://github.com/Kong/kubernetes-ingress-controller">https://github.com/Kong/kubernetes-ingress-controller</a>)直接获取它的源码包：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>wget https://github.com/Kong/kubernetes-ingress-controller/archive/refs/tags/v2.7.0.tar.gz
 </code></pre></div>
 <p>Kong Ingress Controller安装所需的YAML文件，都存放在解压缩后的“deploy”目录里，提供“有数据库”和“无数据库”两种部署方式，这里我选择了最简单的“无数据库”方式，只需要一个 <code>all-in-one-dbless.yaml</code> 就可以完成部署工作，也就是执行这条 <code>kubectl apply</code> 命令：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>kubectl apply -f all-in-one-dbless.yaml
 </code></pre></div>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ee/a6/ee592a45c3b45c8335a2d1ae08bd73a6.png?wh=1920x981" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ee/a6/ee592a45c3b45c8335a2d1ae08bd73a6.png?wh=1920x981" /></p>
 <p>我们可以再对比一下两种 Ingress Controller的安装方式。Nginx Ingress Controller是由多个分散的YAML文件组成的，需要顺序执行多次 <code>kubectl apply</code> 命令，有点麻烦；<strong>而Kong Ingress Controller则把Namespace、RBAC、Secret、CRD等对象都合并在了一个文件里，安装很方便，同时也不会发生遗忘创建资源的错误。</strong></p>
 <p>安装之后，Kong Ingress Controller会创建一个新的名字空间“kong”，里面有一个默认的Ingress Controller，还有对应的Service，你可以用 <code>kubectl get</code> 来查看：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/96/9e/967cbd227fc4aa8202b2531b59341f9e.png?wh=1920x326" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/96/9e/967cbd227fc4aa8202b2531b59341f9e.png?wh=1920x326" /></p>
 <p>看这里的截图，你可能会注意到，在 <code>kubectl get pod</code> 输出的“READY”列里显示的是“2/2”，意思是这个Pod里有两个容器。</p>
 <p>这也是Kong Ingress Controller与Nginx Ingress Controller在实现架构方面的一个明显不同点。</p>
 <p>Kong Ingress Controller，在Pod里使用两个容器，分别运行管理进程Controller和代理进程Proxy，两个容器之间使用环回地址（Loopback）通信；而Nginx Ingress Controller则是因为要修改静态的Nginx配置文件，所以管理进程和代理进程必须在一个容器里（<a href="https://docs.konghq.com/kubernetes-ingress-controller/2.7.x/concepts/design/">图片</a>表示Kong架构设计）。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e7/d3/e78c0c518c6257bc5018d0df8bd536d3.png?wh=1262x644" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e7/d3/e78c0c518c6257bc5018d0df8bd536d3.png?wh=1262x644" /></p>
 <p>两种方式并没有优劣之分，但<strong>Kong Ingress Controller分离的好处是两个容器彼此独立，可以各自升级维护，对运维更友好一点</strong>。</p>
 <p>Kong Ingress Controller还创建了两个Service对象，其中的“kong-proxy”是转发流量的服务，注意它被定义成了“LoadBalancer”类型，显然是为了在生产环境里对外暴露服务，不过在我们的实验环境（无论是minikube还是kubeadm）中只能使用NodePort的形式，这里可以看到80端口被映射到了节点的32201。</p>
 <p>现在让我们尝试访问一下Kong Ingress Controller，IP就用worker节点的地址，如果你和我一样用的是minikube，则可以用 <code>$(minikube ip)</code> 的形式简单获取：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>curl $(minikube ip):32201 -i
 </code></pre></div>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a0/f5/a00aea97b464f071e9bea603f5678ef5.png?wh=1256x606" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a0/f5/a00aea97b464f071e9bea603f5678ef5.png?wh=1256x606" /></p>
 <p>从curl获取的响应结果可以看到， Kong Ingress Controller 2.7内部使用的Kong版本是3.0.1，因为现在我们没有为它配置任何Ingress资源，所以返回了状态码404，这是正常的。</p>
 <p>我们还可以用 <code>kubectl exec</code> 命令进入Pod，查看它的内部信息：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/60/32/60a4f01dd3bbb0afab4d142b1d232a32.png?wh=1920x1814" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/60/32/60a4f01dd3bbb0afab4d142b1d232a32.png?wh=1920x1814" /></p>
 <p>虽然Kong Ingress Controller里有两个容器，但我们不需要特意用 <code>-c</code> 选项指定容器，它会自动进入默认的Proxy容器（另一个Controller容器里因为不包含Shell，也是无法进入查看的）。</p>
 <h2 id="kong-ingress-controller_2">使用Kong Ingress Controller</h2>
 <p>安装好了，我们看如何使用。和第21讲里的一样，我们仍然不使用默认的Ingress Controller，而是利用Ingress Class自己创建一个新的实例，这样能够更好地理解掌握Kong Ingress Controller的用法。</p>
 <p>首先，定义后端应用，还是用Nginx来模拟，做法和<a href="https://time.geekbang.org/column/article/536829">第20讲</a>里的差不多，用ConfigMap定义配置文件再加载进Nginx Pod里，然后部署Deployment和Service，比较简单，你也比较熟悉，就不列出YAML 代码了，只看一下运行命令后的截图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a2/05/a2d859927200ca449d9e50f6122e5705.png?wh=1654x484" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a2/05/a2d859927200ca449d9e50f6122e5705.png?wh=1654x484" /></p>
 <p>显示我创建了两个Nginx Pod，Service对象的名字是ngx-svc。</p>
 <p>接下来是定义Ingress Class，名字是“<strong>kong-ink</strong>”， “spec.controller”字段的值是Kong Ingress Controller的名字“<strong>ingress-controllers.konghq.com/kong</strong>”，YAML的格式可以参考<a href="https://time.geekbang.org/column/article/538760">第21讲</a>：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">networking.k8s.io/v1</span>
@@ -6468,12 +6468,12 @@
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>kubectl apply -f ingress.yml
 <a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>kubectl apply -f kic.yml
 </code></pre></div>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7a/cc/7a00571f1c6ffc3391bda762206e74cc.png?wh=1920x442" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7a/cc/7a00571f1c6ffc3391bda762206e74cc.png?wh=1920x442" /></p>
 <p>这个截图显示了这些对象的创建结果，其中，新Service对象的NodePort端口是32521。</p>
 <p>下面我们就来用curl发送HTTP请求，注意，<strong>应该用“--resolve”或者“-H”参数指定Ingress里定义的域名“kong.test”</strong>，否则Kong Ingress Controller会找不到路由：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>curl $(minikube ip):32521 -H &#39;host: kong.test&#39; -v
 </code></pre></div>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/16/3d/16b663f31e55015a526791c22f6bcc3d.png?wh=1764x1320" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/16/3d/16b663f31e55015a526791c22f6bcc3d.png?wh=1764x1320" /></p>
 <p>你可以看到，Kong Ingress Controller正确应用了Ingress路由规则，返回了后端Nginx应用的响应数据，而且从响应头“Via”里还可以发现，它现在用的是Kong 3.1。</p>
 <h2 id="kong-ingress-controller_3">扩展Kong Ingress Controller</h2>
 <p>到这里，Kong Ingress Controller的基本用法你就掌握了。</p>
@@ -6494,15 +6494,15 @@
 <a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="nn">...</span>
 </code></pre></div>
 <p>使用 <code>kubectl apply</code> 更新Ingress，再用curl来测试一下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/34/yy/341506cde73d8b7a75eb6ee75ea77eyy.png?wh=1646x478" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/34/yy/341506cde73d8b7a75eb6ee75ea77eyy.png?wh=1646x478" /></p>
 <p>你就会发现Ingress已经支持了这几个新域名。</p>
 <p>第二个是“<strong>konghq.com/plugins</strong>”，它可以启用Kong Ingress Controller内置的各种插件（Plugins）。</p>
 <p>插件，是Kong Ingress Controller的一个特色功能，你可以理解成是“预制工件”，能够附加在流量转发的过程中，实现各种数据处理，并且这个插件机制是开放的，我们既可以使用官方插件，也可以使用第三方插件，还可以使用Lua、Go等语言编写符合自己特定需求的插件。</p>
 <p>Kong公司维护了一个经过认证的插件中心（<a href="https://docs.konghq.com/hub/">https://docs.konghq.com/hub/</a>），你可以在这里找到涉及认证、安全、流控、分析、日志等多个领域大约100多个插件，今天我们看两个常用的 Response Transformer、Rate Limiting。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ed/8d/edc8b1307a7194935d2ccc96fb4bbe8d.png?wh=1920x1164" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ed/8d/edc8b1307a7194935d2ccc96fb4bbe8d.png?wh=1920x1164" /></p>
 <p>Response Transformer插件实现了对响应数据的修改，能够添加、替换、删除响应头或者响应体；Rate Limiting插件就是限速，能够以时分秒等单位任意限制客户端访问的次数。</p>
 <p>定义插件需要使用CRD资源，名字是“<strong>KongPlugin</strong>”，你也可以用<code>kubectl api-resources</code>、<code>kubectl explain</code> 等命令来查看它的apiVersion、kind等信息：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/36/43/36a25a182b0b1b671c1336a7b0610443.png?wh=1920x791" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/36/43/36a25a182b0b1b671c1336a7b0610443.png?wh=1920x791" /></p>
 <p>下面我就给出这两个插件对象的示例定义：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configuration.konghq.com/v1</span>
 <a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">KongPlugin</span>
@@ -6544,10 +6544,10 @@
 <p>再发送curl请求：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>curl $(minikube ip):32521 -H &#39;host: kong.test&#39; -i
 </code></pre></div>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a6/15/a6cc78271975de082c140a83e581b615.png?wh=1756x1200" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a6/15/a6cc78271975de082c140a83e581b615.png?wh=1756x1200" /></p>
 <p>你就会发现响应头里多出了几个字段，其中的 <code>RateLimit-*</code> 是限速信息，而 <code>Resp-New-Header</code> 就是新加的响应头字段。</p>
 <p>把curl连续执行几次，就可以看到限速插件生效了：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b2/82/b2b321c8f7597c9ed151c2783af76282.png?wh=1756x1144" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b2/82/b2b321c8f7597c9ed151c2783af76282.png?wh=1756x1144" /></p>
 <p>Kong Ingress Controller会返回429错误，告诉你访问受限，而且会用“Retry-After”等字段来告诉你多少秒之后才能重新发请求。</p>
 <h2 id="_1">小结</h2>
 <p>好了，今天我们学习了另一种在Kubernetes管理集群进出流量的工具：Kong Ingress Controller，小结一下要点内容：</p>
@@ -6564,7 +6564,7 @@
 <li>你觉得插件这种机制有什么好处，能否列举一些其他领域里的类似项目？</li>
 </ol>
 <p>好久不见了，期待看到你的想法，我们一起讨论，留言区见。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e9/c8/e9c9050ebcd1d0fc001c53e1d75a37c8.jpg?wh=1920x2401" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e9/c8/e9c9050ebcd1d0fc001c53e1d75a37c8.jpg?wh=1920x2401" /></p>
 <div><strong>精选留言（11）</strong></div>
 <ul>
 <li><span>Sheldon</span> 👍（4） 💬（1）<p>谢谢老师的加餐，这个课程真的很超值。</p>2023-02-01</li><br/><li><span>简简单单</span> 👍（4） 💬（1）<p>赞</p>2022-12-15</li><br/><li><span>寒夜客来茶当酒</span> 👍（1） 💬（1）<p>我在文中看到了
@@ -6683,8 +6683,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

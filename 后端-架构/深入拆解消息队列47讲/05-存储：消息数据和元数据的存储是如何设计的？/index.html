@@ -14759,11 +14759,11 @@
 <li>在集群内部实现元数据的存储。</li>
 </ul>
 <p><strong>基于第三方组件来实现元数据的存储是目前业界的主流选择。</strong>比如Kafka ZooKeeper版本、Pulsar、RocketMQ 用的就是这个思路，其中Kakfa和Pulsar的元数据存储在ZooKeeper中，RocketMQ存储在NameServer中（准确说是存储在Broker+NameServer中，后面会详细说明）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3d/93/3d1f0787356054efb7fcc7806a5c7a93.jpg?wh=3228x1488" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3d/93/3d1f0787356054efb7fcc7806a5c7a93.jpg?wh=3228x1488" /></p>
 <p>这个方案最大的优点是集成方便，开发成本低，能满足消息队列功能层面的基本要求，因为我们可以直接复用第三方组件已经实现的一致性存储、高性能的读写和存储、Hook机制等能力，而且在后续集群构建中也可以复用这个组件，能极大降低开发难度和工作成本。</p>
 <p>但也有缺点。引入第三方组件会增加系统部署和运维的复杂度，而且第三方组件自身的稳定性问题会增加系统风险，第三方组件和多台Broker之间可能会出现数据信息不一致的情况，导致读写异常。</p>
 <p><strong>另一种思路，集群内部实现元数据的存储是指在集群内部完成元数据的存储和分发。</strong>也就是在集群内部实现类似第三方组件一样的元数据服务，比如基于Raft协议实现内部的元数据存储模块或依赖一些内置的数据库。目前Kafka 去ZooKeeper的版本、RabbitMQ的Mnesia、Kafka的C++版本RedPanda用的就是这个思路。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/34/b6/3411d5e9b57efebf403edc06cd2488b6.jpg?wh=3228x1488" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/34/b6/3411d5e9b57efebf403edc06cd2488b6.jpg?wh=3228x1488" /></p>
 <p>这个方案的优缺点跟第一个正好相反。优点是部署和运维成本低，不会因为依赖第三方服务导致稳定性问题，也不会有数据不一致的问题。但缺点是开发成本高，前期要投入大量的开发人力。</p>
 <p>总的来说，当前主流选择第一种方案，主要是出于开发成本考虑。</p>
 <p>用第三方组件导致的稳定性问题，大部分可以通过后期的运维、运营、编码技巧来解决规避或降低发生频率，但如果前期开发成本太大、架构太复杂，会影响项目的成型和业务的使用。所以在项目前期，大部分都会选择这个方案。</p>
@@ -14773,7 +14773,7 @@
 <h3 id="_3">数据存储结构设计</h3>
 <p>我们先看数据存储目录结构设计。在消息队列中，跟存储有关的主要是Topic和分区两个维度。用户可以将数据写入Topic或直接写入到分区。</p>
 <p>不过如果写入Topic，数据也是分发到多个分区去存储的。所以从实际数据存储的角度来看，<strong>Topic和Group不承担数据存储功能，承担的是逻辑组织的功能，实际的数据存储是在在分区维度完成的</strong>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9b/a1/9b91e1ab61c5c2c92a0e12d4ea0438a1.jpg?wh=3998x1615" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9b/a1/9b91e1ab61c5c2c92a0e12d4ea0438a1.jpg?wh=3998x1615" /></p>
 <p>从技术架构的角度，数据的落盘存储也有两个思路。</p>
 <ul>
 <li>每个分区单独一个存储“文件”。</li>
@@ -14782,7 +14782,7 @@
 <p>特别说明下，这里的“文件”是一个虚指，即表示所有分区的数据是存储在一起，还是每个分区的数据分开存储的意思。在实际的存储中，这个“文件”通常以目录的形式存在，目录中会有多个分段文件。接下来讲到的文件都是表示这个意思。</p>
 <p>第一个思路，每个分区对应一个文件的形式去存储数据。具体实现时，每个分区上的数据顺序写到同一个磁盘文件中，数据的存储是连续的。因为消息队列在大部分情况下的读写是有序的，所以<strong>这种机制在读写性能上的表现是最高的</strong>。</p>
 <p>但如果分区太多，会占用太多的系统FD资源，极端情况下有可能把节点的FD资源耗完，并且硬盘层面会出现大量的随机写情况，导致写入的性能下降很多，另外管理起来也相对复杂。Kafka在存储数据的组织上用的就是这个思路。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b6/71/b6yyc4b63b2794e877995c756000d371.jpg?wh=4977x1699" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b6/71/b6yyc4b63b2794e877995c756000d371.jpg?wh=4977x1699" /></p>
 <p>具体的磁盘的组织结构一般有“目录+分区二级结构”和“目录+分区一级结构”两种形式。不过从技术上来看，没有太大的优劣区别。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>目录+分区二级结构：
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├── topic1
@@ -14802,7 +14802,7 @@
 <a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>└── topic2-2
 </code></pre></div>
 <p>第二种思路，每个节点上所有分区的数据都存储在同一个文件中，这种方案需要为每个分区维护一个对应的索引文件，索引文件里会记录每条消息在File里面的位置信息，以便快速定位到具体的消息内容。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4e/0a/4e0ebbf928847bf60b3fd642ae654e0a.jpg?wh=5528x1581" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4e/0a/4e0ebbf928847bf60b3fd642ae654e0a.jpg?wh=5528x1581" /></p>
 <p>因为<strong>所有文件都在一份文件上，管理简单，也不会占用过多的系统FD资源，单机上的数据写入都是顺序的，写入的性能会很高</strong>。缺点是同一个分区的数据一般会在文件中的不同位置，或者不同的文件段中，无法利用到顺序读的优势，读取的性能会受到影响，但是随着SSD技术的发展，随机读写的性能也越来越高。如果使用SSD或高性能SSD，一定程度上可以缓解随机读写的性能损耗，但SSD的成本比机械硬盘高很多。</p>
 <p>目前RocketMQ、RabbitMQ和Pulsar的底层存储BookKeeper用的就是这个方案。</p>
 <p>这种方案的数据组织形式一般是这样的。假设这个统一的文件叫commitlog，则commitlog就是用来存储数据的文件，.index是每个分区的索引信息。</p>
@@ -14824,17 +14824,17 @@
 <p>但是不管是方案一还是方案二，在数据存储的过程中，如果单个文件过大，在文件加载、写入和检索的时候，性能就会有问题，并且消息队列有自动过期机制，如果单个文件过大，数据清理时会很麻烦，效率很低。所以，我们的消息数据都会分段存储。</p>
 <h3 id="_4">消息数据的分段实现</h3>
 <p>数据分段的规则一般是根据大小来进行的，比如默认1G一个文件，同时会支持配置项调整分段数据的大小。看数据目录中的文件分段示意图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1c/13/1cb88018d4yy166ecd477c766ce66a13.jpg?wh=3228x1488" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1c/13/1cb88018d4yy166ecd477c766ce66a13.jpg?wh=3228x1488" /></p>
 <p>从技术上来看，当数据段到达了规定的大小后，就会新创建一个新文件来保存数据。</p>
 <p>如果进行了分段，消息数据可能分布在不同的文件中。所以我们在读取数据的时候，就需要先定位消息数据在哪个文件中。为了满足这个需求，技术上一般有<strong>根据偏移量定位或根据索引定位</strong>两种思路。</p>
 <p>根据偏移量（Offset）来定位消息在哪个分段文件中，是指通过记录每个数据段文件的起始偏移量、中止偏移量、消息的偏移量信息，来快速定位消息在哪个文件。</p>
 <p>当消息数据存储时，通常会用一个自增的数值型数据（比如Long）来表示这条数据在分区或commitlog中的位置，这个值就是消息的偏移量。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/17/c5/17ecbd8a23fc6d5ba185e21f78bb00c5.jpg?wh=3228x1488" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/17/c5/17ecbd8a23fc6d5ba185e21f78bb00c5.jpg?wh=3228x1488" /></p>
 <p>在实际的编码过程中，记录文件的起始偏移量一般有两种思路：单独记录每个数据段的起始和结束偏移量，在文件名称中携带起始偏移量信息。因为数据是顺序存储的，每个文件记录了本文件的起始偏移量，那么下一个文件的起始偏移量就是上一个文件的结束偏移量。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1e/d0/1e87141d2f9e052d5b4a68cdff738cd0.jpg?wh=3228x1488" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1e/d0/1e87141d2f9e052d5b4a68cdff738cd0.jpg?wh=3228x1488" /></p>
 <p>如果用索引定位，会直接存储消息对应的文件信息，而不是通过偏移量来定位到具体文件。</p>
 <p>具体是通过维护一个单独的索引文件，记录消息在哪个文件和文件的哪个位置。读取消息的时候，先根据消息ID找到存储的信息，然后找到对应的文件和位置，读取数据。RabbitMQ和RocketMQ用的就是这个思路。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/24/2d/24ebd2bc36905901fdd95eac868a062d.jpg?wh=4125x2260" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/24/2d/24ebd2bc36905901fdd95eac868a062d.jpg?wh=4125x2260" /></p>
 <p><strong>这两种方案所面临的场景不一样。</strong>根据偏移量定位数据，通常用在每个分区各自存储一份文件的场景；根据索引定位数据，通常用在所有分区的数据存储在同一份文件的场景。因为在前一种场景，每一份数据都属于同一个分区，那么通过位点来二分查找数据的效率是最高的。第二种场景，这一份数据属于多个不同分区，则通过二分查找来查找数据效率很低，用哈希查找效率是最高的。</p>
 <p>接下来，我们继续看消息数据的存储格式，看看每行记录长什么样子，都存储了哪些信息。</p>
 <h3 id="_5">消息数据存储格式</h3>
@@ -14854,13 +14854,13 @@
 <p>所以，在数据的存储格式设计方面，内容的格式需要尽量完整且不要有太多冗余。</p>
 <p>听起来有点抽象，我们分析一下Kafka和RocketMQ的消息内容格式设计，让你对具体的数据存储格式有更直观的感受。</p>
 <p>以一个具体的消息内容截图为例，我们看Kakfa的V2版本存储格式的内容。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2e/c9/2ed471618360416bb4ba331eb5e092c9.png?wh=2912x186" /></p>
-<p>看每个字段的含义。<img alt="" src="https://static001.geekbang.org/resource/image/33/04/33d8678yy6b75b7663d6abcaf6d00404.jpg?wh=4000x2202" />可以看到，Kafka的消息内容包含了业务会感知到的消息的Header、Key、Value，还包含了时间戳、偏移量、协议版本、数据长度和大小、校验码等基础信息，最后还包含了压缩、事务、幂等Kafka业务相关的信息。</p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2e/c9/2ed471618360416bb4ba331eb5e092c9.png?wh=2912x186" /></p>
+<p>看每个字段的含义。<img alt="" src="https://static001.geekbang.org/resource/image/33/04/33d8678yy6b75b7663d6abcaf6d00404.jpg?wh=4000x2202" />可以看到，Kafka的消息内容包含了业务会感知到的消息的Header、Key、Value，还包含了时间戳、偏移量、协议版本、数据长度和大小、校验码等基础信息，最后还包含了压缩、事务、幂等Kafka业务相关的信息。{:referrerpolicy="no-referrer"}</p>
 <p>特别说明，因为Kafka支持Batch特性，所以消息格式中还包含base和last等Batch相关信息。</p>
 <p>再看RocketMQ的存储格式的内容。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a7/87/a797510810aeb878c11de7ab70e5d787.png?wh=856x926" title="图片来源：https://github.com/rmq-plus-plus/rocketmq-decoder" /></p>
-<p>看每个字段的含义。<img alt="" src="https://static001.geekbang.org/resource/image/4c/y3/4ccc5bfbbab55cd7486de0a87eca9yy3.jpg?wh=4000x2080" />RocketMQ的存储格式中也包含基础的Properties（相当于Kafka中的Header）、Value、时间戳、偏移量、协议版本、数据长度和大小、校验码等信息，还包含了系统标记、事务等RocketMQ特有的信息，另外还包含了数据来源和数据目标的节点信息。</p>
-<p>对比看，消息数据的存储格式虽然没有统一的规范，但是一般包含通用信息和业务信息两部分。通用信息主要包括时间戳、CRC、消息头、消息体、偏移量、长度、大小等信息，业务信息主要跟业务相关，包含事务、幂等、系统标记、数据来源、数据目标等信息。<img alt="" src="https://static001.geekbang.org/resource/image/a8/67/a8ea54c1c6f1585ebab42b4a326a2767.jpg?wh=3228x1488" />前面讲过，消息队列的数据在持久化存储后，需要在一定策略后自动过期删除。那消息队列的数据过期机制如何实现呢？</p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a7/87/a797510810aeb878c11de7ab70e5d787.png?wh=856x926" title="图片来源：https://github.com/rmq-plus-plus/rocketmq-decoder" /></p>
+<p>看每个字段的含义。<img alt="" src="https://static001.geekbang.org/resource/image/4c/y3/4ccc5bfbbab55cd7486de0a87eca9yy3.jpg?wh=4000x2080" />RocketMQ的存储格式中也包含基础的Properties（相当于Kafka中的Header）、Value、时间戳、偏移量、协议版本、数据长度和大小、校验码等信息，还包含了系统标记、事务等RocketMQ特有的信息，另外还包含了数据来源和数据目标的节点信息。{:referrerpolicy="no-referrer"}</p>
+<p>对比看，消息数据的存储格式虽然没有统一的规范，但是一般包含通用信息和业务信息两部分。通用信息主要包括时间戳、CRC、消息头、消息体、偏移量、长度、大小等信息，业务信息主要跟业务相关，包含事务、幂等、系统标记、数据来源、数据目标等信息。<img alt="" src="https://static001.geekbang.org/resource/image/a8/67/a8ea54c1c6f1585ebab42b4a326a2767.jpg?wh=3228x1488" />前面讲过，消息队列的数据在持久化存储后，需要在一定策略后自动过期删除。那消息队列的数据过期机制如何实现呢？{:referrerpolicy="no-referrer"}</p>
 <h3 id="_6">消息数据清理机制</h3>
 <p>消息队列中的数据最终都会删除，时间周期短的话几小时、甚至几分钟，正常情况一天、三天、七天，长的话可能一个月，基本很少有场景需要在消息队列中存储一年的数据。</p>
 <p>消息队列的数据过期机制一般有手动删除和自动删除两种形式，从实现上看主要有三种思路。</p>
@@ -14870,21 +14870,21 @@
 <li>ACK机制和过期机制相结合</li>
 </ul>
 <p><strong>消费完成执行ACK删除数据，技术上的实现思路一般是：</strong>当客户端成功消费数据后，回调服务端的ACK接口，告诉服务端数据已经消费成功，服务端就会标记删除该行数据，以确保消息不会被重复消费。ACK的请求一般会有单条消息ACK和批量消息ACK两种形式。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1a/10/1ab659d29a236b11yy55a834yy663410.jpg?wh=3228x1488" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1a/10/1ab659d29a236b11yy55a834yy663410.jpg?wh=3228x1488" /></p>
 <p>因为消息队列的ACK一般是顺序的，如果前一条消息无法被正确处理并ACK，就无法消费下一条数据，导致消费卡住。此时就需要死信队列的功能，把这条数据先写入到死信队列，等待后续的处理。然后ACK这条消息，确保消费正确进行。</p>
 <p>这个方案，优点是不会出现重复消费，一条消息只会被消费一次。缺点是ACK成功后消息被删除，无法满足需要消息重放的场景。</p>
 <p><strong>根据时间和保留大小删除指消息在被消费后不会被删除，只会通过提交消费位点的形式标记消费进度。</strong></p>
 <p>实现思路一般是服务端提供偏移量提交的接口，当客户端消费成功数据后，客户端会回调偏移量提交接口，告诉服务端这个偏移量的数据已经消费成功了，让服务端把偏移量记录起来。然后服务端会根据消息保留的策略，比如保留时间或保留大小来清理数据。一般通过一个常驻的异步线程来清理数据。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/77/c8/772a4735742ec4e89bb031fe84d08fc8.jpg?wh=3228x1488" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/77/c8/772a4735742ec4e89bb031fe84d08fc8.jpg?wh=3228x1488" /></p>
 <p>这个方案，一条消息可以重复消费多次。不管有没有被成功消费，消息都会根据配置的时间规则或大小规则进行删除。优点是消息可以多次重放，适用于需要多次进行重放的场景。缺点是在某些情况下（比如客户端使用不当）会出现大量的重复消费。</p>
 <p>我们结合前两个方案，就有了 <strong>ACK机制和过期机制相结合的方案</strong>。实现核心逻辑跟方案二很像，但保留了ACK的概念，不过ACK是相对于Group概念的。</p>
 <p>当消息完成后，在Group维度ACK消息，此时消息不会被删除，只是这个Group也不会再重复消费到这个消息，而新的Group可以重新消费订阅这些数据。所以在Group维度避免了重复消费的情况，也可以允许重复订阅。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/17/35/17d26f435043399134305b93f3fe1835.jpg?wh=3228x1488" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/17/35/17d26f435043399134305b93f3fe1835.jpg?wh=3228x1488" /></p>
 <p>纵观业界主流消息队列，三种方案都有在使用，RabbitMQ选择的是第一个方案，Kafka和RocketMQ选择的是第二种方案，Pulsar选择的是第三种方案。不同消息队列的方案选择，主要都是考虑架构设计和组件开发时业务场景的影响。我个人觉得第三种比较合理。</p>
 <p>前面我们虽然反复提到“删除”，但数据实际怎么删除也有讲究。</p>
 <p>我们知道消息数据是顺序存储在文件中的，会有很多分段数据，一个文件可能会有很多行数据。那么在ACK或者数据删除的时候，一个文件中可能既存在可删除数据，也存在不可删除数据。如果我们每次都立即删除数据，需要不断执行“读取文件、找到记录、删除记录、写入文件”的过程，即使批量操作，降低频率，还是得不断地重复这个过程，会导致性能明显下降。</p>
 <p>当前主流的思路都是<strong>延时删除，以段数据为单位清理</strong>，降低频繁修改文件内容和频繁随机读写文件的操作。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/98/bd/9884d62373887596b694227ef242cfbd.jpg?wh=3228x1488" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/98/bd/9884d62373887596b694227ef242cfbd.jpg?wh=3228x1488" /></p>
 <p>只有该段里面的数据都允许删除后，才会把数据删除。而删除该段数据中的某条数据时，会先对数据进行标记删除，比如在内存或 Backlog 文件中记录待删除数据，然后在消费的时候感知这个标记，这样就不会重复消费这些数据。</p>
 <h2 id="_7">总结</h2>
 <p>消息队列的存储分为元数据存储和消息数据存储两方面。</p>
@@ -15075,8 +15075,6 @@ kafka 分区太多，读写的时候导致随机 io 严重。但是 rocket mq，
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

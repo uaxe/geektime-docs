@@ -6445,9 +6445,9 @@
   <h1>第32讲   RPC协议综述：远在天边，近在眼前</h1>
 
 <p>前面我们讲了容器网络如何实现跨主机互通，以及微服务之间的相互调用。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a0/0d/a0763d50fc4e8dcec37ae25a2f6cc60d.jpeg?wh=1582%2A1080" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a0/0d/a0763d50fc4e8dcec37ae25a2f6cc60d.jpeg?wh=1582%2A1080" /></p>
 <p>网络是打通了，那服务之间的互相调用，该怎么实现呢？你可能说，咱不是学过Socket吗。服务之间分调用方和被调用方，我们就建立一个TCP或者UDP的连接，不就可以通信了？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/87/ea/87c8ae36ae1b42653565008fc47aceea.jpg?wh=1626%2A2172" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/87/ea/87c8ae36ae1b42653565008fc47aceea.jpg?wh=1626%2A2172" /></p>
 <p>你仔细想一下，这事儿没这么简单。我们就拿最简单的场景，客户端调用一个加法函数，将两个整数加起来，返回它们的和。</p>
 <p>如果放在本地调用，那是简单的不能再简单了，只要稍微学过一种编程语言，三下五除二就搞定了。但是一旦变成了远程调用，门槛一下子就上去了。</p>
 <p>首先你要会Socket编程，至少先要把咱们这门网络协议课学一下，然后再看N本砖头厚的Socket程序设计的书，学会咱们学过的几种Socket程序设计的模型。这就使得本来大学毕业就能干的一项工作，变成了一件五年工作经验都不一定干好的工作，而且，搞定了Socket程序设计，才是万里长征的第一步。后面还有很多问题呢！</p>
@@ -6467,22 +6467,22 @@
 <p>本地调用没有这个问题，但是一旦到网络上，这些问题都需要处理，因为网络是不可靠的，虽然在同一个连接中，我们还可通过TCP协议保证丢包、重传的问题，但是如果服务器崩溃了又重启，当前连接断开了，TCP就保证不了了，需要应用自己进行重新调用，重新传输会不会同样的操作做两遍，远程调用性能会不会受影响呢？</p>
 <h2 id="_7">协议约定问题</h2>
 <p>看到这么多问题，你是不是想起了我<a href="https://time.geekbang.org/column/article/7581">第一节</a>讲过的这张图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7b/33/7be56272a7e738b6cfe5bcbf658c3933.jpg?wh=2643%2A380" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7b/33/7be56272a7e738b6cfe5bcbf658c3933.jpg?wh=2643%2A380" /></p>
 <p>本地调用函数里有很多问题，比如词法分析、语法分析、语义分析等等，这些编译器本来都能帮你做了。但是在远程调用中，这些问题你都需要重新操心。</p>
 <p>很多公司的解决方法是，弄一个核心通信组，里面都是Socket编程的大牛，实现一个统一的库，让其他业务组的人来调用，业务的人不需要知道中间传输的细节。通信双方的语法、语义、格式、端口、错误处理等，都需要调用方和被调用方开会协商，双方达成一致。一旦有一方改变，要及时通知对方，否则通信就会有问题。</p>
 <p>可是不是每一个公司都有这种大牛团队，往往只有大公司才配得起，那有没有已经实现好的框架可以使用呢？</p>
 <p>当然有。一个大牛Bruce Jay Nelson写了一篇论文<a href="http://www.cs.cmu.edu/~dga/15-712/F07/papers/birrell842.pdf">Implementing Remote Procedure Calls</a>，定义了RPC的调用标准。后面所有RPC框架，都是按照这个标准模式来的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/29/db/2933bbd1ee6471b6de3824bb86f6d0db.jpg?wh=1999%2A707" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/29/db/2933bbd1ee6471b6de3824bb86f6d0db.jpg?wh=1999%2A707" /></p>
 <p>当客户端的应用想发起一个远程调用时，它实际是通过本地调用本地调用方的Stub。它负责将调用的接口、方法和参数，通过约定的协议规范进行编码，并通过本地的RPCRuntime进行传输，将调用网络包发送到服务器。</p>
 <p>服务器端的RPCRuntime收到请求后，交给提供方Stub进行解码，然后调用服务端的方法，服务端执行方法，返回结果，提供方Stub将返回结果编码后，发送给客户端，客户端的RPCRuntime收到结果，发给调用方Stub解码得到结果，返回给客户端。</p>
 <p>这里面分了三个层次，对于用户层和服务端，都像是本地调用一样，专注于业务逻辑的处理就可以了。对于Stub层，处理双方约定好的语法、语义、封装、解封装。对于RPCRuntime，主要处理高性能的传输，以及网络的错误和异常。</p>
 <p>最早的RPC的一种实现方式称为Sun RPC或ONC RPC。Sun公司是第一个提供商业化RPC库和 RPC编译器的公司。这个RPC框架是在NFS协议中使用的。</p>
 <p>NFS（Network File System）就是网络文件系统。要使NFS成功运行，要启动两个服务端，一个是mountd，用来挂载文件路径；一个是nfsd，用来读写文件。NFS可以在本地mount一个远程的目录到本地的一个目录，从而本地的用户在这个目录里面写入、读出任何文件的时候，其实操作的是远程另一台机器上的文件。</p>
 <p>操作远程和远程调用的思路是一样的，就像操作本地一样。所以NFS协议就是基于RPC实现的。当然无论是什么RPC，底层都是Socket编程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2a/eb/2a0fd84c2d3dced623511e2a5226d0eb.jpg?wh=2366%2A1704" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2a/eb/2a0fd84c2d3dced623511e2a5226d0eb.jpg?wh=2366%2A1704" /></p>
 <p>XDR（External Data Representation，外部数据表示法）是一个标准的数据压缩格式，可以表示基本的数据类型，也可以表示结构体。</p>
 <p>这里是几种基本的数据类型。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4a/af/4a649954fea1cee22fcfa8bdb34c03af.jpg?wh=3514%2A1668" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4a/af/4a649954fea1cee22fcfa8bdb34c03af.jpg?wh=3514%2A1668" /></p>
 <p>在RPC的调用过程中，所有的数据类型都要封装成类似的格式。而且RPC的调用和结果返回，也有严格的格式。</p>
 <ul>
 <li>XID唯一标识一对请求和回复。请求为0，回复为1。</li>
@@ -6493,12 +6493,12 @@
 <li>调用需要认证鉴权，如果不通过，则Deny。</li>
 <li>最后是参数列表，如果参数无法解析，则返回GABAGE_ARGS。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c7/65/c724675527afdbd43964bdf24684fa65.jpg?wh=3777%2A1506" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c7/65/c724675527afdbd43964bdf24684fa65.jpg?wh=3777%2A1506" /></p>
 <p>为了可以成功调用RPC，在客户端和服务端实现RPC的时候，首先要定义一个双方都认可的程序、版本、方法、参数等。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5c/58/5c3ebb31ac4415d7895247bf8758fa58.jpg?wh=3849%2A1878" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5c/58/5c3ebb31ac4415d7895247bf8758fa58.jpg?wh=3849%2A1878" /></p>
 <p>如果还是上面的加法，则双方约定为一个协议定义文件，同理如果是NFS、mount和读写，也会有类似的定义。</p>
 <p>有了协议定义文件，ONC RPC会提供一个工具，根据这个文件生成客户端和服务器端的Stub程序。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/27/b9/27dc1ccd0481408055c87e0e5d8b02b9.jpg?wh=4035%2A2151" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/27/b9/27dc1ccd0481408055c87e0e5d8b02b9.jpg?wh=4035%2A2151" /></p>
 <p>最下层的是XDR文件，用于编码和解码参数。这个文件是客户端和服务端共享的，因为只有双方一致才能成功通信。</p>
 <p>在客户端，会调用clnt_create创建一个连接，然后调用add_1，这是一个Stub函数，感觉是在调用本地一样。其实是这个函数发起了一个RPC调用，通过调用clnt_call来调用ONC RPC的类库，来真正发送请求。调用的过程非常复杂，一会儿我详细说这个。</p>
 <p>当然服务端也有一个Stub程序，监听客户端的请求，当调用到达的时候，判断如果是add，则调用真正的服务端逻辑，也即将两个数加起来。</p>
@@ -6506,17 +6506,17 @@
 <p>有了这个RPC的框架，前面五个问题中的前三个“如何规定远程调用的语法？”“如何传递参数？”以及“如何表示数据？”基本解决了，这三个问题我们统称为<strong>协议约定问题</strong>。</p>
 <h2 id="_8">传输问题</h2>
 <p>但是错误、重传、丢包、性能等问题还没有解决，这些问题我们统称为<strong>传输问题</strong>。这个就不用Stub操心了，而是由ONC RPC的类库来实现。这是大牛们实现的，我们只要调用就可以了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/33/e4/33e1afe4a79e81096e09b850424930e4.jpg?wh=3862%2A1882" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/33/e4/33e1afe4a79e81096e09b850424930e4.jpg?wh=3862%2A1882" /></p>
 <p>在这个类库中，为了解决传输问题，对于每一个客户端，都会创建一个传输管理层，而每一次RPC调用，都会是一个任务，在传输管理层，你可以看到熟悉的队列机制、拥塞窗口机制等。</p>
 <p>由于在网络传输的时候，经常需要等待，因而同步的方式往往效率比较低，因而也就有Socket的异步模型。为了能够异步处理，对于远程调用的处理，往往是通过状态机来实现的。只有当满足某个状态的时候，才进行下一步，如果不满足状态，不是在那里等，而是将资源留出来，用来处理其他的RPC调用。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/02/f5/0258775aac1126735504c9a6399745f5.jpg?wh=4045%2A2276" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/02/f5/0258775aac1126735504c9a6399745f5.jpg?wh=4045%2A2276" /></p>
 <p>从这个图可以看出，这个状态转换图还是很复杂的。</p>
 <p>首先，进入起始状态，查看RPC的传输层队列中有没有空闲的位置，可以处理新的RPC任务。如果没有，说明太忙了，或直接结束或重试。如果申请成功，就可以分配内存，获取服务的端口号，然后连接服务器。</p>
 <p>连接的过程要有一段时间，因而要等待连接的结果，会有连接失败，或直接结束或重试。如果连接成功，则开始发送RPC请求，然后等待获取RPC结果，这个过程也需要一定的时间；如果发送出错，可以重新发送；如果连接断了，可以重新连接；如果超时，可以重新传输；如果获取到结果，就可以解码，正常结束。</p>
 <p>这里处理了连接失败、重试、发送失败、超时、重试等场景。不是大牛真写不出来，因而实现一个RPC的框架，其实很有难度。</p>
 <h2 id="_9">服务发现问题</h2>
 <p>传输问题解决了，我们还遗留一个问题，就是问题四“如何找到RPC服务端的那个随机端口”。这个问题我们称为服务发现问题。在ONC RPC中，服务发现是通过portmapper实现的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2a/7c/2aff190d1f878749d2a5bd73228ca37c.jpg?wh=2382%2A2074" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2a/7c/2aff190d1f878749d2a5bd73228ca37c.jpg?wh=2382%2A2074" /></p>
 <p>portmapper会启动在一个众所周知的端口上，RPC程序由于是用户自己写的，会监听在一个随机端口上，但是RPC程序启动的时候，会向portmapper注册。客户端要访问RPC服务端这个程序的时候，首先查询portmapper，获取RPC服务端程序的随机端口，然后向这个随机端口建立连接，开始RPC调用。从图中可以看出，mount命令的RPC调用，就是这样实现的。</p>
 <h2 id="_10">小结</h2>
 <p>好了，这一节就到这里，我们来总结一下。</p>
@@ -6655,8 +6655,6 @@ GARBAGE_ARGS?</p>2019-08-24</li><br/><li><span>N_H</span> 👍（1） 💬（1�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -14192,7 +14192,7 @@
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>OK
 </code></pre></div>
 <p>也就是先将变量从缓存中取出，对其做-1操作，再放回到缓存当中，<strong>这是个错误做法。</strong></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/65/d1/65844557217e2e5f8d8ce606eea67dd1.jpg?wh=1920x1234" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/65/d1/65844557217e2e5f8d8ce606eea67dd1.jpg?wh=1920x1234" /></p>
 <p>如上图，原因是多个线程一起读取的时候，多个线程同时读到的是5，set回去时都是6，实际每个线程都拿到了库存，但是库存的实际数值并没有累计改变，这会导致库存超卖。如果你需要用这种方式去做，一般建议加一个自旋互斥锁，互斥其他线程做类似的操作。</p>
 <p>不过锁操作是很影响性能的，在讲锁方式之前，我先给你介绍几个相对轻量的方式。</p>
 <h3 id="_2">原子操作</h3>
@@ -14201,7 +14201,7 @@
 <p>对此，我会把库存放在一个独立的且性能很好的内存缓存服务Redis中集中管理，这样可以减少用户争抢库存导致其他服务的抖动，并且拥有更好的响应速度，这也是目前互联网行业保护库存量的普遍做法。</p>
 <p>同时，我不建议通过数据库的行锁来保证库存的修改，因为数据库资源很珍贵，使用数据库行锁去管理库存，性能会很差且不稳定。</p>
 <p>前面我们提到当有大量用户去并行修改一个变量时，只有用锁才能保证修改的正确性，但锁争抢性能很差，那怎么降低锁的粒度、减少锁的争枪呢？</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d5/ce/d5880e0908129591e4d29f7eeeacf3ce.jpg?wh=1920x1040" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d5/ce/d5880e0908129591e4d29f7eeeacf3ce.jpg?wh=1920x1040" /></p>
 <p>如上图，其实我们可以将一个热门商品的库存做拆分，放在多个key中去保存，这样可以大幅度减少锁争抢。</p>
 <p>举个例子，当前商品库存有100个，我们可以把它放在10个key中用不同的Redis实例保存，每个key里面保存10个商品库存，当用户下单的时候可以随机找一个key进行扣库存操作。如果没库存，就记录好当前key再随机找剩下的9个key，直到成功扣除1个库存。</p>
 <p>除了这种方法以外，我个人更推荐的做法是使用Redis的原子操作，因为原子操作的粒度更小，并且是高性能单线程实现，可以做到全局唯一决策。而且很多原子操作的底层实现都是通过硬件实现的，性能很好，比如文稿后面这个例子：</p>
@@ -14230,7 +14230,7 @@
 <p>提到锁，也许你会想到使用Setnx指令或数据库CAS的方式实现互斥排他锁，以此来解决库存问题。但是这个锁有自旋阻塞等待，并发高的时候用户服务需要循环多次做尝试才能够获取成功，这样很浪费系统资源，对数据服务压力较大，不推荐这样去做（<a href="https://demin.ws/blog/english/2012/05/05/atomic-spinlock-mutex/">这里附上锁性能对比参考</a>）。</p>
 <h3 id="_3">令牌库存</h3>
 <p>除了这种用数值记录库存的方式外，还有一种比较科学的方式就是“发令牌”方式，通过这个方式可以避免出现之前因为抢库存而让库存出现负数的情况。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6e/85/6e411c3a78f8caae8670b10edf9aa185.jpg?wh=1920x592" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6e/85/6e411c3a78f8caae8670b10edf9aa185.jpg?wh=1920x592" /></p>
 <p>具体是使用Redis中的list保存多张令牌来代表库存，一张令牌就是一个库存，用户抢库存时拿到令牌的用户可以继续支付：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>//放入三个库存
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>redis&gt;<span class="w"> </span>lpush<span class="w"> </span>prod_1475_stock_queue_1<span class="w"> </span>stock_1
@@ -14246,7 +14246,7 @@
 <p>到这里，关于库存的设计看起来已经很完美了，不过请你想一想，如果产品侧提出“一个商品可以抢多个库存”这样的要求，也就是一次秒杀多个同种商品（比如一次秒杀两袋大米），我们利用多个锁降低锁争抢的方案还能满足吗？</p>
 <h3 id="_4">多库存秒杀</h3>
 <p>其实这种情况经常出现，这让我们对之前的优化有了更多的想法。对于一次秒杀多个库存，我们的设计需要做一些调整。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/73/b5/73e5312737d1164418f1d158b0fddbb5.jpg?wh=1920x1234" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/73/b5/73e5312737d1164418f1d158b0fddbb5.jpg?wh=1920x1234" /></p>
 <p>之前我们为了减少锁冲突把库存拆成10个key随机获取，我们设想一下，当库存剩余最后几个商品时，极端情况下要想秒杀三件商品（如上图），我们需要尝试所有的库存key，然后在尝试10个key后最终只拿到了两个商品库存，那么这时候我们是拒绝用户下单，还是返还库存呢？</p>
 <p>这其实就要看产品的设计了，同时我们也需要加一个检测：如果商品卖完了就不要再尝试拿10个库存key了，毕竟没库存后一次请求刷10次Redis，对Redis的服务压力很大（Redis O(1)指令性能理论可以达到10w OPS，一次请求刷10次，那么理想情况下抢库存接口性能为1W QPS，压测后建议按实测性能70%漏斗式限流）。</p>
 <p>这时候你应该发现了，在“一个商品可以抢多个库存”这个场景下，拆分并没有减少锁争抢次数，同时还加大了维护难度。当库存越来越少的时候，抢购越往后性能表现越差，这个设计已经不符合我们设计的初衷（由业务需求造成我们底层设计不合适的情况经常会碰到，这需要我们在设计之初，多挖一挖产品具体的需求）。</p>
@@ -14286,13 +14286,13 @@
 <a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>//<span class="w"> </span>释放锁
 <a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>redis&gt;<span class="w"> </span>del<span class="w"> </span>prod_1475_stock_lock
 </code></pre></div>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d8/e8/d83a93c919a5e7477555f113305994e8.jpg?wh=1920x896" title="两个线程在等待锁" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d8/e8/d83a93c919a5e7477555f113305994e8.jpg?wh=1920x896" title="两个线程在等待锁" /></p>
 <p>这种方式的缺点在于，在抢锁阶段如果排队抢的线程越多，等待时间就越长，并且由于多线程一起循环check的缘故，在高并发期间Redis的压力会非常大，如果有100人下单，那么有100个线程每隔10ms就会check一次，此时Redis的操作次数就是：</p>
 <p>$$100线程\times（1000ms\div10ms）次 = 10000 ops$$</p>
 <h3 id="cas">CAS乐观锁：锁操作后置</h3>
 <p>除此之外我再推荐一个实现方式：CAS乐观锁。<strong>相对于自旋互斥锁来说，它在并发争抢库存线程少的时候效率会更好。</strong>通常，我们用锁的实现方式是先抢锁，然后，再对数据进行操作。这个方式需要先抢到锁才能继续，而抢锁是有性能损耗的，即使没有其他线程抢锁，这个消耗仍旧存在。</p>
 <p>CAS乐观锁的核心实现为：记录或监控当前库存信息或版本号，对数据进行预操作。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/42/77/42548b2b809307824e8eb02b9cc37a77.jpg?wh=1920x1234" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/42/77/42548b2b809307824e8eb02b9cc37a77.jpg?wh=1920x1234" /></p>
 <p>如上图，在操作期间如果发现监控的数值有变化，那么就回滚之前操作；如果期间没有变化，就提交事务的完成操作，操作期间的所有动作都是事务的。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>//开启事务
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>redis&gt;<span class="w"> </span>multi
@@ -14351,7 +14351,7 @@
 <p>通过这个方式，我们可以远程注入各种连贯带逻辑的操作，并且可以实现一些补库存的操作。</p>
 <h3 id="_6">总结</h3>
 <p>这节课，我们针对库存锁争抢的问题，通过Redis的特性实现了六种方案，不过它们各有优缺点。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ff/67/ff8yyee21a25136d6f2754ee2167fe67.jpg?wh=3717x3074" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ff/67/ff8yyee21a25136d6f2754ee2167fe67.jpg?wh=3717x3074" />
 以上这些方法可以根据业务需要组合使用。</p>
 <p>其实，我们用代码去实现锁定扣库存也能够实现库存争抢功能，比如本地CAS乐观锁方式，但是一般来说，我们自行实现的代码会和其他业务逻辑混在一起，会受到多方因素影响，业务代码会逐渐复杂，性能容易失控。而Redis是独立部署的，会比我们的业务代码拥有更好的系统资源去快速解决锁争抢问题。</p>
 <p>你可能发现我们这节课讲的方案大多数只有一层“锁”，但很多业务场景实际存在多个锁的情况，并不是我不想介绍，而是十分不推荐，因为多层锁及锁重入等问题引入后会导致我们系统很难维护，一个小粒度的锁能解决我们大部分问题，何乐而不为呢？</p>
@@ -14480,8 +14480,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

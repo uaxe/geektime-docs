@@ -13753,7 +13753,7 @@
 <p>接下来，我会给你介绍chan的数据结构、初始化的方法以及三个重要的操作方法，分别是send、recv和close。通过学习Channel的底层实现，你会对Channel的功能和异常情况有更深的理解。</p>
 <h2 id="chan">chan数据结构</h2>
 <p>chan类型的数据结构如下图所示，它的数据类型是<a href="https://github.com/golang/go/blob/master/src/runtime/chan.go#L32">runtime.hchan</a>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/81/dd/81304c1f1845d21c66195798b6ba48dd.jpg?wh=2334%2A2250" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/81/dd/81304c1f1845d21c66195798b6ba48dd.jpg?wh=2334%2A2250" /></p>
 <p>下面我来具体解释各个字段的意义。</p>
 <ul>
 <li>qcount：代表chan中已经接收但还没被取走的元素的个数。内建函数len可以返回这个字段的值。</li>
@@ -13768,7 +13768,7 @@
 <h2 id="_1">初始化</h2>
 <p>Go在编译的时候，会根据容量的大小选择调用makechan64，还是makechan。</p>
 <p>下面的代码是处理make chan的逻辑，它会决定是使用makechan还是makechan64来实现chan的初始化：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e9/d7/e96f2fee0633c8157a88b8b725f702d7.png?wh=1137%2A489" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e9/d7/e96f2fee0633c8157a88b8b725f702d7.png?wh=1137%2A489" /></p>
 <p><strong>我们只关注makechan就好了，因为makechan64只是做了size检查，底层还是调用makechan实现的</strong>。makechan的目标就是生成hchan对象。</p>
 <p>那么，接下来，就让我们来看一下makechan的主要逻辑。主要的逻辑我都加上了注释，它会根据chan的容量的大小和元素的类型不同，初始化不同的存储空间：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>func makechan(t *chantype, size int) *hchan {
@@ -14036,20 +14036,20 @@
 <p><a href="https://github.com/etcd-io/etcd/pull/6857">etcd issue 6857</a>是一个程序hang住的问题：在异常情况下，没有往chan实例中填充所需的元素，导致等待者永远等待。具体来说，Status方法的逻辑是生成一个chan Status，然后把这个chan交给其它的goroutine去处理和写入数据，最后，Status返回获取的状态信息。</p>
 <p>不幸的是，如果正好节点停止了，没有goroutine去填充这个chan，会导致方法hang在返回的那一行上（下面的截图中的第466行）。解决办法就是，在等待status chan返回元素的同时，也检查节点是不是已经停止了（done这个chan是不是close了）。</p>
 <p>当前的etcd的代码就是修复后的代码，如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5f/da/5f3c15c110077714be81be8eb1fd3fda.png?wh=920%2A481" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5f/da/5f3c15c110077714be81be8eb1fd3fda.png?wh=920%2A481" /></p>
 <p>其实，我感觉这个修改还是有问题的。问题就在于，如果程序执行了466行，成功地把c写入到Status待处理队列后，执行到第467行时，如果停止了这个节点，那么，这个Status方法还是会阻塞在第467行。你可以自己研究研究，看看是不是这样。</p>
 <p><a href="https://github.com/etcd-io/etcd/issues/5505">etcd issue 5505</a> 虽然没有任何的Bug描述，但是从修复内容上看，它是一个往已经close的chan写数据导致panic的问题。</p>
 <p><a href="https://github.com/etcd-io/etcd/issues/11256">etcd issue 11256</a> 是因为unbuffered chan goroutine泄漏的问题。TestNodeProposeAddLearnerNode方法中一开始定义了一个unbuffered的chan，也就是applyConfChan，然后启动一个子goroutine，这个子goroutine会在循环中执行业务逻辑，并且不断地往这个chan中添加一个元素。TestNodeProposeAddLearnerNode方法的末尾处会从这个chan中读取一个元素。</p>
 <p>这段代码在for循环中就往此chan中写入了一个元素，结果导致TestNodeProposeAddLearnerNode从这个chan中读取到元素就返回了。悲剧的是，子goroutine的for循环还在执行，阻塞在下图中红色的第851行，并且一直hang在那里。</p>
 <p>这个Bug的修复也很简单，只要改动一下applyConfChan的处理逻辑就可以了：只有子goroutine的for循环中的主要逻辑完成之后，才往applyConfChan发送一个元素，这样，TestNodeProposeAddLearnerNode收到通知继续执行，子goroutine也不会被阻塞住了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d5/9f/d53573c8fc515f78ea590bf73396969f.png?wh=1521%2A614" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d5/9f/d53573c8fc515f78ea590bf73396969f.png?wh=1521%2A614" /></p>
 <p><a href="https://github.com/etcd-io/etcd/issues/9956">etcd issue 9956</a> 是往一个已close的chan发送数据，其实它是grpc的一个bug（<a href="https://github.com/grpc/grpc-go/pull/2695">grpc issue 2695</a>），修复办法就是不close这个chan就好了：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/65/21/650f0911b1c7278cc0438c85bbc4yy21.png?wh=1052%2A185" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/65/21/650f0911b1c7278cc0438c85bbc4yy21.png?wh=1052%2A185" /></p>
 <h1 id="_3">总结</h1>
 <p>chan的值和状态有多种情况，而不同的操作（send、recv、close）又可能得到不同的结果，这是使用chan类型时经常让人困惑的地方。</p>
 <p>为了帮助你快速地了解不同状态下各种操作的结果，我总结了一个表格，你一定要特别关注下那些panic的情况，另外还要掌握那些会block的场景，它们是导致死锁或者goroutine泄露的罪魁祸首。</p>
 <p>还有一个值得注意的点是，只要一个chan还有未读的数据，即使把它close掉，你还是可以继续把这些未读的数据消费完，之后才是读取零值数据。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/51/98/5108954ea36559860e5e5aaa42b2f998.jpg?wh=3601%2A1075" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/51/98/5108954ea36559860e5e5aaa42b2f998.jpg?wh=3601%2A1075" /></p>
 <h1 id="_4">思考题</h1>
 <ol>
 <li>有一道经典的使用Channel进行任务编排的题，你可以尝试做一下：有四个goroutine，编号为1、2、3、4。每秒钟会有一个goroutine打印出它自己的编号，要求你编写一个程序，让输出的编号总是按照1、2、3、4、1、2、3、4、……的顺序打印出来。</li>
@@ -14548,8 +14548,6 @@ d &lt;- 1
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

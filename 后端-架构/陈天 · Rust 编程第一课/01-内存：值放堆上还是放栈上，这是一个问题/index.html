@@ -15138,7 +15138,7 @@
 <p>当执行 “hello world”.to_string() 时，在堆上，一块新的内存被分配出来，并把 “hello world” 逐个字节拷贝过去。</p>
 <p>当我们把堆上的数据赋值给 s 时，s 作为分配在栈上的一个变量，它需要知道堆上内存的地址，另外由于堆上的数据大小不确定且可以增长，我们还需要知道它的长度以及它现在有多大。</p>
 <p>最终，<strong>为了表述这个字符串，我们使用了三个 word</strong>：第一个表示指针、第二个表示字符串的当前长度（11）、第三个表示这片内存的总容量（11）。在 64 位系统下，三个 word 是 24 个字节。</p>
-<p>你也可以看下图，更直观一些：<img alt="" src="https://static001.geekbang.org/resource/image/a7/4c/a7e7f2334460f15f9afd04ebd710b54c.jpg?wh=2312x2043" /></p>
+<p>你也可以看下图，更直观一些：<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a7/4c/a7e7f2334460f15f9afd04ebd710b54c.jpg?wh=2312x2043" /></p>
 <p>刚才提到字符串的内容在堆上，而指向字符串的指针等信息在栈上，现在就是检验你内存基础知识是否扎实的时候了：<strong>数据什么时候可以放在栈上，什么时候需要放在堆上呢</strong>？</p>
 <p>这个问题，很多使用自动内存管理语言比如 Java/Python 的开发者，可能有一些模糊的印象或者规则：</p>
 <ul>
@@ -15151,7 +15151,7 @@
 <p>我们知道，栈是自顶向下增长的，一个程序的调用栈最底部，除去入口帧（entry frame），就是 main() 函数对应的帧，而随着 main() 函数一层层调用，栈会一层层扩展；调用结束，栈又会一层层回溯，把内存释放回去。</p>
 <p>在调用的过程中，<strong>一个新的帧会分配足够的空间存储寄存器的上下文</strong>。在函数里使用到的通用寄存器会在栈保存一个副本，当这个函数调用结束，通过副本，可以恢复出原本的寄存器的上下文，就像什么都没有经历一样。此外，函数所需要使用到的局部变量，也都会在帧分配的时候被预留出来。</p>
 <p>整个过程你可以再看看这张图辅助理解：
-<img alt="" src="https://static001.geekbang.org/resource/image/cc/bc/cce3c36426cd910feaee4c4ccb3afcbc.jpg?wh=2312x2043" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cc/bc/cce3c36426cd910feaee4c4ccb3afcbc.jpg?wh=2312x2043" /></p>
 <p>那一个函数运行时，<strong>怎么确定究竟需要多大的帧呢</strong>？</p>
 <p>这要归功于编译器。在编译并优化代码的时候，一个函数就是一个最小的编译单元。</p>
 <p>在这个函数里，编译器得知道要用到哪些寄存器、栈上要放哪些局部变量，而这些都要在编译时确定。所以编译器就需要明确每个局部变量的大小，以便于预留空间。</p>
@@ -15184,13 +15184,13 @@
 <p>上文中我们讲到，栈上的内存在函数调用结束之后，所使用的帧被回收，相关变量对应的内存也都被回收待用。所以栈上内存的生命周期是不受开发者控制的，并且局限在当前调用栈。</p>
 <p>而堆上分配出来的每一块内存需要显式地释放，<strong>这就使堆上内存有更加灵活的生命周期，可以在不同的调用栈之间共享数据</strong>。</p>
 <p>如下图所示：
-<img alt="" src="https://static001.geekbang.org/resource/image/ca/bb/ca7b49966c66b90cda6f8f6b9740c0bb.jpg?wh=2312x1394" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ca/bb/ca7b49966c66b90cda6f8f6b9740c0bb.jpg?wh=2312x1394" /></p>
 <h3 id="_5">放堆上的问题</h3>
 <p>然而，堆内存的这种灵活性也给内存管理带来很多挑战。</p>
 <p>如果手工管理堆内存的话，堆上内存分配后忘记释放，就会造成<strong>内存泄漏</strong>。一旦有内存泄漏，程序运行得越久，就越吃内存，最终会因为占满内存而被操作系统终止运行。</p>
 <p>如果堆上内存被多个线程的调用栈引用，该内存的改动要特别小心，需要加锁以独占访问，来避免潜在的问题。比如说，一个线程在遍历列表，而另一个线程在释放列表中的某一项，就可能访问野指针，导致<strong>堆越界</strong>（heap out of bounds）。而堆越界是第一大内存安全问题。</p>
 <p>如果堆上内存被释放，但栈上指向堆上内存的相应指针没有被清空，就有可能<strong>发生使用已释放内存（use after free）的情况</strong>，程序轻则崩溃，重则隐含安全隐患。根据<a href="https://github.com/Microsoft/MSRC-Security-Research/blob/master/presentations/2019_02_BlueHatIL/2019_01%20-%20BlueHatIL%20-%20Trends%2C%20challenge%2C%20and%20shifts%20in%20software%20vulnerability%20mitigation.pdf">微软安全反应中心（MSRC）的研究</a>，这是第二大内存安全问题。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/cf/0e/cfb3f358b47afd0def88186e3a31de0e.png?wh=1920x1000" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cf/0e/cfb3f358b47afd0def88186e3a31de0e.png?wh=1920x1000" /></p>
 <h3 id="gcarc">GC、ARC如何解决</h3>
 <p>为了避免堆内存手动管理造成的这些问题，以 Java 为首的一系列编程语言，采用了追踪式垃圾回收（<a href="https://en.wikipedia.org/wiki/Tracing_garbage_collection">Tracing GC</a>）的方法，来自动管理堆内存。这种方式通过定期标记（mark）找出不再被引用的对象，然后将其清理（sweep）掉，来自动管理内存，减轻开发者的负担。</p>
 <p>而 ObjC 和 Swift 则走了另一条路：自动引用计数（<a href="https://en.wikipedia.org/wiki/Automatic_Reference_Counting">Automatic Reference Counting</a>）。在编译时，它为每个函数插入 retain/release 语句来自动维护堆上对象的引用计数，当引用计数为零的时候，release 语句就释放对象。</p>
@@ -15371,8 +15371,6 @@ PS: 极客时间不能回复作者给别人的评论，所以单独发一条</p>
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

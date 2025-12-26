@@ -7270,14 +7270,14 @@
 </ol>
 <p>我这里给你准备了一个本地部署的小视频，你可以直观地感受一下。</p>
 <p>接下来，我们确认一下Spark是否部署成功。打开命令行终端，敲入“spark-shell --version”命令，如果该命令能成功地打印出Spark版本号，就表示我们大功告成了，就像这样：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/51/34/51664d2f8479aac9099a1b2736ebee34.jpg?wh=1112x726" title="验证Spark本地部署成功" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/51/34/51664d2f8479aac9099a1b2736ebee34.jpg?wh=1112x726" title="验证Spark本地部署成功" /></p>
 <p>在后续的实战中，我们会用spark-shell来演示Word Count的执行过程。spark-shell是提交Spark作业众多方式中的一种，我们在后续的课程中还会展开介绍，这里你不妨暂时把它当做是Spark中的Linux shell。spark-shell提供交互式的运行环境（REPL，Read-Evaluate-Print-Loop），以“所见即所得”的方式，让开发者在提交源代码之后，就可以迅速地获取执行结果。</p>
 <p>不过，需要注意的是，spark-shell在运行的时候，依赖于Java和Scala语言环境。因此，为了保证spark-shell的成功启动，你需要在本地预装Java与Scala。好消息是，关于Java与Scala的安装，网上的资料非常丰富，你可以参考那些资料来进行安装，咱们在本讲就不再赘述Java与Scala的安装步骤啦。</p>
 <h2 id="word-count"><strong>梳理</strong>Word Count的计算步骤</h2>
 <p>做了一番准备之后，接下来，我们就可以开始写代码了。不过，在“下手”之前，咱们不妨一起梳理下Word Count的计算步骤，先做到心中有数，然后再垒代码也不迟。</p>
 <p>之前我们提到，Word Count的初衷是对文件中的单词做统计计数，打印出频次最高的5个词汇。那么Word Count的第一步就很明显了，当然是得读取文件的内容，不然咱们统计什么呢？</p>
 <p>我们准备好的文件是wikiOfSpark.txt，它以纯文本的方式记录了关于Spark的简单介绍，我摘取了其中的部分内容给你看一下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8f/d3/8fa70d857b684ef85cd5fa92611651d3.png?wh=1292x394" title="wikiOfSpark.txt内容摘要" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8f/d3/8fa70d857b684ef85cd5fa92611651d3.png?wh=1292x394" title="wikiOfSpark.txt内容摘要" /></p>
 <p>我们知道，文件的读取往往是以行（Line）为单位的。不难发现，wikiOfSpark.txt的每一行都包含多个单词。</p>
 <p>我们要是以“单词”作为粒度做计数，就需要对每一行的文本做分词。分词过后，文件中的每一句话，都被打散成了一个个单词。这样一来，我们就可以按照单词做分组计数了。这就是Word Count的计算过程，主要包含如下3个步骤：</p>
 <ol>
@@ -7321,9 +7321,9 @@
 <p>要把lineRDD的行元素转换为单词，我们得先用分隔符对每个行元素进行分割（Split），咱们这里的分隔符是空格。</p>
 <p>分割之后，每个行元素就都变成了单词数组，元素类型也从String变成了Array[String]，像这样以元素为单位进行转换的操作，统一称作“<strong>映射</strong>”。</p>
 <p>映射过后，RDD类型由原来的RDD[String]变为RDD[Array[String]]。如果把RDD[String]看成是“数组”的话，那么RDD[Array[String]]就是一个“二维数组”，它的每一个元素都是单词。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1e/2a/1e364df2yy57857efafc1023c102942a.jpg?wh=2284x758" title="以行为单位做分词" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1e/2a/1e364df2yy57857efafc1023c102942a.jpg?wh=2284x758" title="以行为单位做分词" /></p>
 <p>为了后续对单词做分组，我们还需要对这个“二维数组”做<strong>展平</strong>，也就是去掉内层的嵌套结构，把“二维数组”还原成“一维数组”，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b5/34/b51c79dfeeb393456f2392011688c934.jpg?wh=2284x643" title="分词后做展平" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b5/34/b51c79dfeeb393456f2392011688c934.jpg?wh=2284x643" title="分词后做展平" /></p>
 <p>就这样，在flatMap算子的作用下，原来以行为元素的lineRDD，转换成了以单词为元素的wordRDD。</p>
 <p>不过，值得注意的是，我们用“空格”去分割句子，有可能会产生空字符串。所以，在完成“映射”和“展平”之后，对于这样的“单词”，我们要把其中的空字符串都过滤掉，这里我们调用RDD的filter方法来过滤：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1">// 过滤掉空字符串</span>
@@ -7334,7 +7334,7 @@
 <p>在RDD的开发框架下，聚合类操作，如计数、求和、求均值，需要依赖<strong>键值对</strong>（Key Value Pair）类型的数据元素，也就是（Key，Value）形式的“数组”元素。</p>
 <p>因此，在调用聚合算子做分组计数之前，我们要先把RDD元素转换为（Key，Value）的形式，也就是把RDD[String]映射成RDD[(String, Int)]。</p>
 <p>其中，我们统一把所有的Value置为1。这样一来，对于同一个的单词，在后续的计数运算中，我们只要对Value做累加即可，就像这样：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9c/ac/9c4c96fe9a9f48f0cb7e2e1f3374f5ac.jpg?wh=2284x866" title="把元素转换为（Key，Value）形式" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9c/ac/9c4c96fe9a9f48f0cb7e2e1f3374f5ac.jpg?wh=2284x866" title="把元素转换为（Key，Value）形式" /></p>
 <p>下面是对应的代码：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1">// 把RDD元素转换为（Key，Value）的形式</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">kvRDD</span><span class="p">:</span><span class="w"> </span><span class="nc">RDD</span><span class="p">[(</span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="nc">Int</span><span class="p">)]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cleanWordRDD</span><span class="p">.</span><span class="n">map</span><span class="p">(</span><span class="n">word</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">(</span><span class="n">word</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">))</span>
@@ -7348,16 +7348,16 @@
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">wordCounts</span><span class="p">:</span><span class="w"> </span><span class="nc">RDD</span><span class="p">[(</span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="nc">Int</span><span class="p">)]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">kvRDD</span><span class="p">.</span><span class="n">reduceByKey</span><span class="p">((</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">y</span><span class="p">)</span>
 </code></pre></div>
 <p>可以看到，我们传递给reduceByKey算子的聚合函数是(x, y) =&gt; x + y，也就是累加函数。因此，在每个单词分组之后，reduce会使用累加函数，依次折叠计算Value列表中的所有元素，最终把元素列表转换为单词的频次。对于任意一个单词来说，reduce的计算过程都是一样的，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c1/c4/c1b5022a6c8d62226ba53af3dd90b2c4.jpg?wh=2284x747" title="reduce操作示意图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c1/c4/c1b5022a6c8d62226ba53af3dd90b2c4.jpg?wh=2284x747" title="reduce操作示意图" /></p>
 <p>reduceByKey完成计算之后，我们得到的依然是类型为RDD[(String, Int)]的RDD。不过，与kvRDD不同，wordCounts元素的Value值，记录的是每个单词的统计词频。到此为止，我们就完成了Word Count主逻辑的开发与实现。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/79/33/7948a3d9c923791e139397988fcc6433.jpg?wh=2284x791" title="reduceByKey转换示意图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/79/33/7948a3d9c923791e139397988fcc6433.jpg?wh=2284x791" title="reduceByKey转换示意图" /></p>
 <p>在程序的最后，我们还要把wordCounts按照词频做排序，并把词频最高的5个单词打印到屏幕上，代码如下所示。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1">// 打印词频最高的5个词汇</span>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">wordCounts</span><span class="p">.</span><span class="n">map</span><span class="p">{</span><span class="k">case</span><span class="w"> </span><span class="p">(</span><span class="n">k</span><span class="p">,</span><span class="w"> </span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">(</span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">k</span><span class="p">)}.</span><span class="n">sortByKey</span><span class="p">(</span><span class="kc">false</span><span class="p">).</span><span class="n">take</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
 </code></pre></div>
 <h3 id="_5"><strong>代码执行</strong></h3>
 <p>应用开发完成之后，我们就可以把代码丢进已经准备好的本地Spark部署环境里啦。首先，我们打开命令行终端（Terminal），敲入“spark-shell”，打开交互式运行环境，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/65/4d/65257daf7030ca80c3da9c615edb654d.jpg?wh=1790x978" title="spark-shell启动界面" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/65/4d/65257daf7030ca80c3da9c615edb654d.jpg?wh=1790x978" title="spark-shell启动界面" /></p>
 <p>然后，把我们开发好的代码，依次敲入spark-shell。为了方便你操作，我把完整的代码实现整理到下面了：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">import</span><span class="w"> </span><span class="nn">org</span><span class="p">.</span><span class="nn">apache</span><span class="p">.</span><span class="nn">spark</span><span class="p">.</span><span class="nn">rdd</span><span class="p">.</span><span class="nc">RDD</span>
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
@@ -7381,7 +7381,7 @@
 <a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a><span class="n">wordCounts</span><span class="p">.</span><span class="n">map</span><span class="p">{</span><span class="k">case</span><span class="w"> </span><span class="p">(</span><span class="n">k</span><span class="p">,</span><span class="w"> </span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">(</span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">k</span><span class="p">)}.</span><span class="n">sortByKey</span><span class="p">(</span><span class="kc">false</span><span class="p">).</span><span class="n">take</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
 </code></pre></div>
 <p>我们把上面的代码依次敲入到spark-shell之后，spark-shell最终会把词频最高的5个单词打印到屏幕上：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6a/f4/6acf199e126b205c92c2ec03ffba33f4.png?wh=1524x84" title="打印词频最高的5个词汇" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6a/f4/6acf199e126b205c92c2ec03ffba33f4.png?wh=1524x84" title="打印词频最高的5个词汇" /></p>
 <p>在Wikipedia的Spark介绍文本中，词频最高的单词分别是the、Spark、a、and和of，除了“Spark”之外，其他4个单词都是常用的停用词（Stop Word），因此它们几个高居榜首也就不足为怪了。</p>
 <p>好啦，到此为止，我们在Spark之上，完成了“大数据领域Hello World”的开发与实现，恭喜你跨入大数据开发的大门！</p>
 <h2 id="_6">重点回顾</h2>
@@ -7626,8 +7626,6 @@ hadoop3.2.1 逐步使用Dataset，报错类型转换异常；
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

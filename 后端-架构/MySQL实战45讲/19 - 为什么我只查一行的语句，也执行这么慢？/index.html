@@ -14551,24 +14551,24 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>mysql&gt; select * from t where id=1;
 </code></pre></div>
 <p>查询结果长时间不返回。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/87/2a/8707b79d5ed906950749f5266014f22a.png?wh=436%2A70" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/87/2a/8707b79d5ed906950749f5266014f22a.png?wh=436%2A70" /></p>
 <p>图1 查询长时间不返回</p>
 <p>一般碰到这种情况的话，大概率是表t被锁住了。接下来分析原因的时候，一般都是首先执行一下show processlist命令，看看当前语句处于什么状态。</p>
 <p>然后我们再针对每种状态，去分析它们产生的原因、如何复现，以及如何处理。</p>
 <h2 id="mdl">等MDL锁</h2>
 <p>如图2所示，就是使用show processlist命令查看Waiting for table metadata lock的示意图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/50/28/5008d7e9e22be88a9c80916df4f4b328.png?wh=1312%2A213" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/50/28/5008d7e9e22be88a9c80916df4f4b328.png?wh=1312%2A213" /></p>
 <p>图2 Waiting for table metadata lock状态示意图</p>
 <p>出现<strong>这个状态表示的是，现在有一个线程正在表t上请求或者持有MDL写锁，把select语句堵住了。</strong></p>
 <p>在第6篇文章<a href="https://time.geekbang.org/column/article/69862">《全局锁和表锁 ：给表加个字段怎么有这么多阻碍？》</a>中，我给你介绍过一种复现方法。但需要说明的是，那个复现过程是基于MySQL 5.6版本的。而MySQL 5.7版本修改了MDL的加锁策略，所以就不能复现这个场景了。</p>
 <p>不过，在MySQL 5.7版本下复现这个场景，也很容易。如图3所示，我给出了简单的复现步骤。
-<img alt="" src="https://static001.geekbang.org/resource/image/74/ca/742249a31b83f4858c51bfe106a5daca.png?wh=940%2A147" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/74/ca/742249a31b83f4858c51bfe106a5daca.png?wh=940%2A147" /></p>
 <p>图3 MySQL 5.7中Waiting for table metadata lock的复现步骤</p>
 <p>session A 通过lock table命令持有表t的MDL写锁，而session B的查询需要获取MDL读锁。所以，session B进入等待状态。</p>
 <p>这类问题的处理方式，就是找到谁持有MDL写锁，然后把它kill掉。</p>
 <p>但是，由于在show processlist的结果里面，session A的Command列是“Sleep”，导致查找起来很不方便。不过有了performance_schema和sys系统库以后，就方便多了。（MySQL启动时需要设置performance_schema=on，相比于设置为off会有10%左右的性能损失)</p>
 <p>通过查询sys.schema_table_lock_waits这张表，我们就可以直接找出造成阻塞的process id，把这个连接用kill 命令断开即可。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/74/01/74fb24ba3826e3831eeeff1670990c01.png?wh=940%2A251" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/74/01/74fb24ba3826e3831eeeff1670990c01.png?wh=940%2A251" /></p>
 <p>图4 查获加表锁的线程id</p>
 <h2 id="flush">等flush</h2>
 <p>接下来，我给你举另外一种查询被堵住的情况。</p>
@@ -14577,7 +14577,7 @@
 </code></pre></div>
 <p>这里，我先卖个关子。</p>
 <p>你可以看一下图5。我查出来这个线程的状态是Waiting for table flush，你可以设想一下这是什么原因。
-<img alt="" src="https://static001.geekbang.org/resource/image/2d/24/2d8250398bc7f8f7dce8b6b1923c3724.png?wh=1221%2A147" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2d/24/2d8250398bc7f8f7dce8b6b1923c3724.png?wh=1221%2A147" /></p>
 <p>图5 Waiting for table flush状态示意图</p>
 <p>这个状态表示的是，现在有一个线程正要对表t做flush操作。MySQL里面对表做flush操作的用法，一般有以下两个：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>flush tables t with read lock;
@@ -14588,11 +14588,11 @@
 <p>但是正常这两个语句执行起来都很快，除非它们也被别的线程堵住了。</p>
 <p>所以，出现Waiting for table flush状态的可能情况是：有一个flush tables命令被别的语句堵住了，然后它又堵住了我们的select语句。</p>
 <p>现在，我们一起来复现一下这种情况，<strong>复现步骤</strong>如图6所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2b/9c/2bbc77cfdb118b0d9ef3fdd679d0a69c.png?wh=939%2A203" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2b/9c/2bbc77cfdb118b0d9ef3fdd679d0a69c.png?wh=939%2A203" /></p>
 <p>图6 Waiting for table flush的复现步骤</p>
 <p>在session A中，我故意每行都调用一次sleep(1)，这样这个语句默认要执行10万秒，在这期间表t一直是被session A“打开”着。然后，session B的flush tables t命令再要去关闭表t，就需要等session A的查询结束。这样，session C要再次查询的话，就会被flush 命令堵住了。</p>
 <p>图7是这个复现步骤的show processlist结果。这个例子的排查也很简单，你看到这个show processlist的结果，肯定就知道应该怎么做了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/39/7e/398407014180be4146c2d088fc07357e.png?wh=1224%2A212" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/39/7e/398407014180be4146c2d088fc07357e.png?wh=1224%2A212" /></p>
 <p>图 7 Waiting for table flush的show processlist 结果</p>
 <h2 id="_2">等行锁</h2>
 <p>现在，经过了表级锁的考验，我们的select 语句终于来到引擎里了。</p>
@@ -14601,16 +14601,16 @@
 <p>上面这条语句的用法你也很熟悉了，我们在第8篇<a href="https://time.geekbang.org/column/article/70562">《事务到底是隔离的还是不隔离的？》</a>文章介绍当前读时提到过。</p>
 <p>由于访问id=1这个记录时要加读锁，如果这时候已经有一个事务在这行记录上持有一个写锁，我们的select语句就会被堵住。</p>
 <p>复现步骤和现场如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3e/75/3e68326b967701c59770612183277475.png?wh=920%2A173" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3e/75/3e68326b967701c59770612183277475.png?wh=920%2A173" /></p>
 <p>图 8 行锁复现</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3c/8f/3c266e23fc307283aa94923ecbbc738f.png?wh=1285%2A223" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3c/8f/3c266e23fc307283aa94923ecbbc738f.png?wh=1285%2A223" /></p>
 <p>图 9 行锁show processlist 现场</p>
 <p>显然，session A启动了事务，占有写锁，还不提交，是导致session B被堵住的原因。</p>
 <p>这个问题并不难分析，但问题是怎么查出是谁占着这个写锁。如果你用的是MySQL 5.7版本，可以通过sys.innodb_lock_waits 表查到。</p>
 <p>查询方法是：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>mysql&gt; select * from t sys.innodb_lock_waits where locked_table=&#39;`test`.`t`&#39;\G
 </code></pre></div>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d8/18/d8603aeb4eaad3326699c13c46379118.png?wh=864%2A669" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d8/18/d8603aeb4eaad3326699c13c46379118.png?wh=864%2A669" /></p>
 <p>图10 通过sys.innodb_lock_waits 查行锁</p>
 <p>可以看到，这个信息很全，4号线程是造成堵塞的罪魁祸首。而干掉这个罪魁祸首的方式，就是KILL QUERY 4或KILL 4。</p>
 <p>不过，这里不应该显示“KILL QUERY 4”。这个命令表示停止4号线程当前正在执行的语句，而这个方法其实是没有用的。因为占有行锁的是update语句，这个语句已经是之前执行完成了的，现在执行KILL QUERY，无法让这个事务去掉id=1上的行锁。</p>
@@ -14622,7 +14622,7 @@
 </code></pre></div>
 <p>由于字段c上没有索引，这个语句只能走id主键顺序扫描，因此需要扫描5万行。</p>
 <p>作为确认，你可以看一下慢查询日志。注意，这里为了把所有语句记录到slow log里，我在连接后先执行了 set long_query_time=0，将慢查询日志的时间阈值设置为0。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d8/3c/d8b2b5f97c60ae4fc4a03c616847503c.png?wh=873%2A88" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d8/3c/d8b2b5f97c60ae4fc4a03c616847503c.png?wh=873%2A88" /></p>
 <p>图11 全表扫描5万行的slow log</p>
 <p>Rows_examined显示扫描了50000行。你可能会说，不是很慢呀，11.5毫秒就返回了，我们线上一般都配置超过1秒才算慢查询。但你要记住：<strong>坏查询不一定是慢查询</strong>。我们这个例子里面只有10万行记录，数据量大起来的话，执行时间就线性涨上去了。</p>
 <p>扫描行数多，所以执行慢，这个很好理解。</p>
@@ -14631,22 +14631,22 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>mysql&gt; select * from t where id=1；
 </code></pre></div>
 <p>虽然扫描行数是1，但执行时间却长达800毫秒。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/66/46/66f26bb885401e8e460451ff6b0c0746.png?wh=831%2A74" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/66/46/66f26bb885401e8e460451ff6b0c0746.png?wh=831%2A74" /></p>
 <p>图12 扫描一行却执行得很慢</p>
 <p>是不是有点奇怪呢，这些时间都花在哪里了？</p>
 <p>如果我把这个slow log的截图再往下拉一点，你可以看到下一个语句，select * from t where id=1 lock in share mode，执行时扫描行数也是1行，执行时间是0.2毫秒。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bd/d2/bde83e269d9fa185b27900c8aa8137d2.png?wh=832%2A73" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bd/d2/bde83e269d9fa185b27900c8aa8137d2.png?wh=832%2A73" /></p>
 <p>图 13 加上lock in share mode的slow log</p>
 <p>看上去是不是更奇怪了？按理说lock in share mode还要加锁，时间应该更长才对啊。</p>
 <p>可能有的同学已经有答案了。如果你还没有答案的话，我再给你一个提示信息，图14是这两个语句的执行输出结果。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1f/1c/1fbb84bb392b6bfa93786fe032690b1c.png?wh=595%2A353" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1f/1c/1fbb84bb392b6bfa93786fe032690b1c.png?wh=595%2A353" /></p>
 <p>图14 两个语句的输出结果</p>
 <p>第一个语句的查询结果里c=1，带lock in share mode的语句返回的是c=1000001。看到这里应该有更多的同学知道原因了。如果你还是没有头绪的话，也别着急。我先跟你说明一下复现步骤，再分析原因。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/84/ff/84667a3449dc846e393142600ee7a2ff.png?wh=936%2A322" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/84/ff/84667a3449dc846e393142600ee7a2ff.png?wh=936%2A322" /></p>
 <p>图15 复现步骤</p>
 <p>你看到了，session A先用start transaction with consistent snapshot命令启动了一个事务，之后session B才开始执行update 语句。</p>
 <p>session B执行完100万次update语句后，id=1这一行处于什么状态呢？你可以从图16中找到答案。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/46/8c/46bb9f5e27854678bfcaeaf0c3b8a98c.png?wh=1142%2A856" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/46/8c/46bb9f5e27854678bfcaeaf0c3b8a98c.png?wh=1142%2A856" /></p>
 <p>图16 id=1的数据状态</p>
 <p>session B更新完100万次，生成了100万个回滚日志(undo log)。</p>
 <p>带lock in share mode的SQL语句，是当前读，因此会直接读到1000001这个结果，所以速度很快；而select * from t where id=1这个语句，是一致性读，因此需要从1000001开始，依次执行undo log，执行了100万次以后，才将1这个结果返回。</p>
@@ -14880,8 +14880,6 @@ flush tables中close table的意思是说的把open_tables里的表全部关闭�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

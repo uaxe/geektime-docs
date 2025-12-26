@@ -14543,11 +14543,11 @@
 <p><strong>所谓副本（Replica），本质就是一个只能追加写消息的提交日志</strong>。根据Kafka副本机制的定义，同一个分区下的所有副本保存有相同的消息序列，这些副本分散保存在不同的Broker上，从而能够对抗部分Broker宕机带来的数据不可用。</p>
 <p>在实际生产环境中，每台Broker都可能保存有各个主题下不同分区的不同副本，因此，单个Broker上存有成百上千个副本的现象是非常正常的。</p>
 <p>接下来我们来看一张图，它展示的是一个有3台Broker的Kafka集群上的副本分布情况。从这张图中，我们可以看到，主题1分区0的3个副本分散在3台Broker上，其他主题分区的副本也都散落在不同的Broker上，从而实现数据冗余。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3b/77/3b5f28c6d19b2c6fe592b2b78d3ebc77.jpg?wh=3109%2A1485" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3b/77/3b5f28c6d19b2c6fe592b2b78d3ebc77.jpg?wh=3109%2A1485" /></p>
 <h2 id="_2">副本角色</h2>
 <p>既然分区下能够配置多个副本，而且这些副本的内容还要一致，那么很自然的一个问题就是：我们该如何确保副本中所有的数据都是一致的呢？特别是对Kafka而言，当生产者发送消息到某个主题后，消息是如何同步到对应的所有副本中的呢？针对这个问题，最常见的解决方案就是采用<strong>基于领导者（Leader-based）的副本机制</strong>。Apache Kafka就是这样的设计。</p>
 <p>基于领导者的副本机制的工作原理如下图所示，我来简单解释一下这张图里面的内容。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/38/c2/381eda4b56991d52727934be7c7e6ec2.jpg?wh=3591%2A1508" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/38/c2/381eda4b56991d52727934be7c7e6ec2.jpg?wh=3591%2A1508" /></p>
 <p>第一，在Kafka中，副本分成两类：领导者副本（Leader Replica）和追随者副本（Follower Replica）。每个分区在创建时都要选举一个副本，称为领导者副本，其余的副本自动称为追随者副本。</p>
 <p>第二，Kafka的副本机制比其他分布式系统要更严格一些。在Kafka中，追随者副本是不对外提供服务的。这就是说，任何一个追随者副本都不能响应消费者和生产者的读写请求。所有的请求都必须由领导者副本来处理，或者说，所有的读写请求都必须发往领导者副本所在的Broker，由该Broker负责处理。追随者副本不处理客户端请求，它唯一的任务就是从领导者副本<strong>异步拉取</strong>消息，并写入到自己的提交日志中，从而实现与领导者副本的同步。</p>
 <p>第三，当领导者副本挂掉了，或者说领导者副本所在的Broker宕机时，Kafka依托于ZooKeeper提供的监控功能能够实时感知到，并立即开启新一轮的领导者选举，从追随者副本中选一个作为新的领导者。老Leader副本重启回来后，只能作为追随者副本加入到集群中。</p>
@@ -14565,7 +14565,7 @@
 <p>基于这个想法，Kafka引入了In-sync Replicas，也就是所谓的ISR副本集合。ISR中的副本都是与Leader同步的副本，相反，不在ISR中的追随者副本就被认为是与Leader不同步的。那么，到底什么副本能够进入到ISR中呢？</p>
 <p>我们首先要明确的是，Leader副本天然就在ISR中。也就是说，<strong>ISR不只是追随者副本集合，它必然包括Leader副本。甚至在某些情况下，ISR只有Leader这一个副本</strong>。</p>
 <p>另外，能够进入到ISR的追随者副本要满足一定的条件。至于是什么条件，我先卖个关子，我们先来一起看看下面这张图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/52/5f/521ff90472a5fd2e6cfac0e6176aa75f.jpg?wh=3506%2A1040" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/52/5f/521ff90472a5fd2e6cfac0e6176aa75f.jpg?wh=3506%2A1040" /></p>
 <p>图中有3个副本：1个领导者副本和2个追随者副本。Leader副本当前写入了10条消息，Follower1副本同步了其中的6条消息，而Follower2副本只同步了其中的3条消息。现在，请你思考一下，对于这2个追随者副本，你觉得哪个追随者副本与Leader不同步？</p>
 <p>答案是，要根据具体情况来定。换成英文，就是那句著名的“It depends”。看上去好像Follower2的消息数比Leader少了很多，它是最有可能与Leader不同步的。的确是这样的，但仅仅是可能。</p>
 <p>事实上，这张图中的2个Follower副本都有可能与Leader不同步，但也都有可能与Leader同步。也就是说，Kafka判断Follower是否与Leader同步的标准，不是看相差的消息数，而是另有“玄机”。</p>
@@ -14580,7 +14580,7 @@
 <p>你可以根据你的实际业务场景决定是否开启Unclean领导者选举。不过，我强烈建议你<strong>不要</strong>开启它，毕竟我们还可以通过其他的方式来提升高可用性。如果为了这点儿高可用性的改善，牺牲了数据一致性，那就非常不值当了。</p>
 <h2 id="_3">小结</h2>
 <p>今天，我主要跟你分享了Apache Kafka的副本机制以及它们实现的原理。坦率地说，我觉得有些地方可能讲浅了，如果要百分之百地了解Replication，你还是要熟读一下Kafka相应的源代码。不过你也不用担心，在专栏后面的内容中，我会专门从源码角度分析副本机制，特别是Follower副本从Leader副本拉取消息的全过程。从技术深度上来说，那一讲应该算是本专栏中最贴近技术内幕的分析了，你一定不要错过。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d7/72/d75c01661ca5367cfd23ad92cc10e372.jpg?wh=2069%2A2535" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d7/72/d75c01661ca5367cfd23ad92cc10e372.jpg?wh=2069%2A2535" /></p>
 <h2 id="_4">开放讨论</h2>
 <p>到目前为止，我反复强调了Follower副本不对外提供服务这件事情。有意思的是，社区最近正在考虑是否要打破这个限制，即允许Follower副本处理客户端消费者发来的请求。社区主要的考量是，这能够用于改善云上数据的局部性，更好地服务地理位置相近的客户。如果允许Follower副本对外提供读服务，你觉得应该如何避免或缓解因Follower副本与Leader副本不同步而导致的数据不一致的情形？</p>
 <p>欢迎写下你的思考和答案，我们一起讨论。如果你觉得有所收获，也欢迎把文章分享给你的朋友。</p>
@@ -14716,8 +14716,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

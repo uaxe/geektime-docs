@@ -14140,11 +14140,11 @@
 <li>数据准备阶段，驱动程序和操作系统内核从网卡读取数据到socket的接收缓冲区。</li>
 <li>数据复制阶段，由应用程序将内核空间socket缓冲区的数据复制到用户空间。</li>
 </ol>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/43/45/434d1c7ac5bf2ea7e8c94af9df05c445.jpg?wh=3534x2557" title="图1 网络数据传输" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/43/45/434d1c7ac5bf2ea7e8c94af9df05c445.jpg?wh=3534x2557" title="图1 网络数据传输" /></p>
 <p>应用程序对这两个阶段的不同处理方式，就形成了不同的网络IO模型。那么应用程序对这两个阶段有哪几种处理方式呢？</p>
 <h3 id="io_1">阻塞IO</h3>
 <p>我们先来看看数据准备阶段的处理方式。就像下面的图一样，<strong>当我们的应用程序进行网络IO调用时，如果socket缓冲区还没有准备好，我们可以让应用线程阻塞在IO调用方法里，而不直接返回，这就是阻塞IO模型</strong>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4c/82/4cc6a6yy6e58c9eb3a7f6fe5e3658182.jpg?wh=3279x2167" title="图2 阻塞 IO 模型" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4c/82/4cc6a6yy6e58c9eb3a7f6fe5e3658182.jpg?wh=3279x2167" title="图2 阻塞 IO 模型" /></p>
 <p>那么使用阻塞IO的方式，会有什么问题呢？</p>
 <p>当我们使用阻塞IO模型时，为了能及时处理多个连接的读写请求，就像下面的伪代码一样，<strong>每个连接我们都需要创建一个专门的线程来处理</strong>。在高性能服务器场景，当和客户端的连接比较多时，<strong>阻塞IO会导致创建比较多的线程，增加内存占用和上下文切换成本，降低服务器处理请求的吞吐</strong>。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">for</span><span class="w"> </span><span class="p">{</span>
@@ -14160,7 +14160,7 @@
 </code></pre></div>
 <h3 id="io_2">非阻塞IO</h3>
 <p>为了解决高性能场景阻塞IO会创建较多线程的问题。操作系统给我们提供了非阻塞IO的方式，就像下面的图一样，<strong>当应用线程调用操作系统提供的读写方法时，如果socket缓冲区还没准备好，网络IO系统调用立即返回，不再阻塞应用线程。</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/37/25/37e8ee15c4690220e8554yyfaf047425.jpg?wh=4221x2167" title="图3 非阻塞 IO 模型" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/37/25/37e8ee15c4690220e8554yyfaf047425.jpg?wh=4221x2167" title="图3 非阻塞 IO 模型" /></p>
 <p>使用非阻塞IO编程模型，我们可以实现线程复用，当一个连接的socket缓冲区未就绪时，线程可以处理另一个连接的请求，而不再陷入阻塞，从而解决阻塞IO模式线程数过多的问题。就像下面的伪代码一样。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1">// 多个待服务的 fd</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nx">fds</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">[</span><span class="nx">fd1</span><span class="p">,</span><span class="nx">fd2</span><span class="p">,</span><span class="nx">fd3</span><span class="p">,</span><span class="o">...</span><span class="p">]</span>
@@ -14186,7 +14186,7 @@
 <h3 id="io_3">IO多路复用</h3>
 <p>为了能高效、及时地处理大量连接的 I/O 事件，操作系统还提供了<strong>IO多路复用</strong>的方式，让我们的应用线程能及时感知到socket缓冲区就绪的事件。</p>
 <p>就像下面的图一样，我们<strong>可以在一个线程里阻塞监听多个连接的网络IO事件</strong>，当有连接的socket缓冲区准备好，IO多路复用的方法就会返回，让应用线程能及时处理连接的网络请求。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ce/59/cee08ec7a5ff6a952b53da8afea65c59.jpg?wh=3893x2167" title="图4 IO 多路复用" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ce/59/cee08ec7a5ff6a952b53da8afea65c59.jpg?wh=3893x2167" title="图4 IO 多路复用" /></p>
 <p>使用IO多路复用的方式，就像下面的伪代码一样，当没有连接的网络IO就绪时，多路复用的epoll_wait方法会<strong>阻塞，避免线程不断轮询消耗CPU资源</strong>。同时，网络IO就绪时，epoll_wait方法会立即返回，确保应用线程能<strong>及时感知网络IO就绪事件，避免处理请求不及时</strong>。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1">// 多个待服务的 fd</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nx">fds</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">[</span><span class="nx">fd1</span><span class="p">,</span><span class="nx">fd2</span><span class="p">,</span><span class="nx">fd3</span><span class="p">,</span><span class="o">...</span><span class="p">]</span>
@@ -14209,7 +14209,7 @@
 <h3 id="io_4">异步IO</h3>
 <p>前面3种IO模型，由于在数据处理阶段或者是数据复制阶段，需要阻塞应用线程，因此属于同步IO模型。</p>
 <p>实际上，还有一种完全不需要阻塞应用线程的网络IO模型——异步IO模型。就像下面的图一样，使用异步IO模型，应用线程从网络中读数据时，直接调用操作系统的方法并立即返回，由内核负责将socket缓冲区数据复制到用户空间，然后通知线程完成，整个过程完全没阻塞。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e9/2c/e98028b230e90ae719e1419764e1a12c.jpg?wh=4083x2166" title="图5 异步 IO" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e9/2c/e98028b230e90ae719e1419764e1a12c.jpg?wh=4083x2166" title="图5 异步 IO" /></p>
 <p>当然，因为各个平台对异步I/O模型的支持程度不一，且这种方式使用起来复杂度较高，因此使用并不是很广泛。目前主流网络服务器采用的多是I/O多路复用模型。</p>
 <p>那么操作系统提供了哪些系统调用，来支持应用程序实现IO多路复用模型呢？</p>
 <h2 id="epoll">epoll技术解析</h2>
@@ -14547,8 +14547,6 @@ c. gnet，也是使用ants池，高效、可重用而且自动伸缩的内存 bu
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -6850,7 +6850,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>int pipe(int fd[2])
 </code></pre></div>
 <p>在这里，我们创建了一个管道pipe，返回了两个文件描述符，这表示管道的两端，一个是管道的读取端描述符fd[0]，另一个是管道的写入端描述符fd[1]。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8f/a7/8fa3144bf3a34ddf789884a75fa2d4a7.png?wh=823%2A817" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8f/a7/8fa3144bf3a34ddf789884a75fa2d4a7.png?wh=823%2A817" /></p>
 <p>我们来看在内核里面是如何实现的。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>SYSCALL_DEFINE1(pipe, int __user *, fildes)
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>{
@@ -6984,7 +6984,7 @@
 <p>我们回到create_pipe_files函数，创建完了inode，还需创建一个dentry和他对应。dentry和inode对应好了，我们就要开始创建struct file对象了。先创建用于写入的，对应的操作为pipefifo_fops；再创建读取的，对应的操作也为pipefifo_fops。然后把private_data设置为pipe_inode_info。这样从struct file这个层级上，就能直接操作底层的读写操作。</p>
 <p>至此，一个匿名管道就创建成功了。如果对于fd[1]写入，调用的是pipe_write，向pipe_buffer里面写入数据；如果对于fd[0]的读入，调用的是pipe_read，也就是从pipe_buffer里面读取数据。</p>
 <p>但是这个时候，两个文件描述符都是在一个进程里面的，并没有起到进程间通信的作用，怎么样才能使得管道是跨两个进程的呢？还记得创建进程调用的fork吗？在这里面，创建的子进程会复制父进程的struct files_struct，在这里面fd的数组会复制一份，但是fd指向的struct file对于同一个文件还是只有一份，这样就做到了，两个进程各有两个fd指向同一个struct file的模式，两个进程就可以通过各自的fd写入和读取同一个管道文件实现跨进程通信了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9c/a3/9c0e38e31c7a51da12faf4a1aca10ba3.png?wh=1162%2A1363" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9c/a3/9c0e38e31c7a51da12faf4a1aca10ba3.png?wh=1162%2A1363" /></p>
 <p>由于管道只能一端写入，另一端读出，所以上面的这种模式会造成混乱，因为父进程和子进程都可以写入，也都可以读出，通常的方法是父进程关闭读取的fd，只保留写入的fd，而子进程关闭写入的fd，只保留读取的fd，如果需要双向通行，则应该创建两个管道。</p>
 <p>一个典型的使用管道在父子进程之间的通信代码如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>#include &lt;unistd.h&gt;
@@ -7021,11 +7021,11 @@
 <a id="__codelineno-6-32" name="__codelineno-6-32" href="#__codelineno-6-32"></a>}
 <a id="__codelineno-6-33" name="__codelineno-6-33" href="#__codelineno-6-33"></a>}
 </code></pre></div>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/71/b6/71eb7b4d026d04e4093daad7e24feab6.png?wh=1162%2A1363" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/71/b6/71eb7b4d026d04e4093daad7e24feab6.png?wh=1162%2A1363" /></p>
 <p>到这里，我们仅仅解析了使用管道进行父子进程之间的通信，但是我们在shell里面的不是这样的。在shell里面运行A|B的时候，A进程和B进程都是shell创建出来的子进程，A和B之间不存在父子关系。</p>
 <p>不过，有了上面父子进程之间的管道这个基础，实现A和B之间的管道就方便多了。</p>
 <p>我们首先从shell创建子进程A，然后在shell和A之间建立一个管道，其中shell保留读取端，A进程保留写入端，然后shell再创建子进程B。这又是一次fork，所以，shell里面保留的读取端的fd也被复制到了子进程B里面。这个时候，相当于shell和B都保留读取端，只要shell主动关闭读取端，就变成了一管道，写入端在A进程，读取端在B进程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/81/fa/81be4d460aaa804e9176ec70d59fdefa.png?wh=2494%2A4663" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/81/fa/81be4d460aaa804e9176ec70d59fdefa.png?wh=2494%2A4663" /></p>
 <p>接下来我们要做的事情就是，将这个管道的两端和输入输出关联起来。这就要用到dup2系统调用了。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>int dup2(int oldfd, int newfd);
 </code></pre></div>
@@ -7039,7 +7039,7 @@
 <p>在A进程中，写入端可以做这样的操作：dup2(fd[1],STDOUT_FILENO)，将STDOUT_FILENO（也即第一项）不再指向标准输出，而是指向创建的管道文件，那么以后往标准输出写入的任何东西，都会写入管道文件。</p>
 <p>在B进程中，读取端可以做这样的操作，dup2(fd[0],STDIN_FILENO)，将STDIN_FILENO也即第零项不再指向标准输入，而是指向创建的管道文件，那么以后从标准输入读取的任何东西，都来自于管道文件。</p>
 <p>至此，我们才将A|B的功能完成。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c0/e2/c042b12de704995e4ba04173e0a304e2.png?wh=2149%2A1363" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c0/e2/c042b12de704995e4ba04173e0a304e2.png?wh=2149%2A1363" /></p>
 <p>为了模拟A|B的情况，我们可以将前面的那一段代码，进一步修改成下面这样：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>#include &lt;unistd.h&gt;
 <a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>#include &lt;fcntl.h&gt;
@@ -7228,11 +7228,11 @@
 <p>在这种特殊的inode里面，file_operations指向管道特殊的pipefifo_fops，这个inode对应内存里面的缓存。</p>
 <p>当我们用文件的open函数打开这个管道设备文件的时候，会调用pipefifo_fops里面的方法创建struct file结构，他的inode指向特殊的inode，也对应内存里面的缓存，file_operations也指向管道特殊的pipefifo_fops。</p>
 <p>写入一个pipe就是从struct file结构找到缓存写入，读取一个pipe就是从struct file结构找到缓存读出。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/48/97/486e2bc73abbe91d7083bb1f4f678097.png?wh=2749%2A2383" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/48/97/486e2bc73abbe91d7083bb1f4f678097.png?wh=2749%2A2383" /></p>
 <h2 id="_2">课堂练习</h2>
 <p>上面创建匿名管道的程序，你一定要运行一下，然后试着通过strace查看自己写的程序的系统调用，以及直接在命令行使用匿名管道的系统调用，做一个比较。</p>
 <p>欢迎留言和我分享你的疑惑和见解 ，也欢迎可以收藏本节内容，反复研读。你也可以把今天的内容分享给你的朋友，和他一起学习和进步。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8c/37/8c0a95fa07a8b9a1abfd394479bdd637.jpg?wh=1110%2A659" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8c/37/8c0a95fa07a8b9a1abfd394479bdd637.jpg?wh=1110%2A659" /></p>
 <div><strong>精选留言（15）</strong></div>
 <ul>
 <li><span>欢乐小熊</span> 👍（8） 💬（1）<p>- 匿名管道: 只能在管道创建进程及其后代之间通信
@@ -7362,8 +7362,6 @@ fd只是一个int，如果一个进程不停循环的用各个整数来尝试读
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

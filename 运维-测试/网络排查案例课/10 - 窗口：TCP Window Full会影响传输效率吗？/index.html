@@ -6423,7 +6423,7 @@
 <p>也是在公有云服务的时候，有个客户有这么一个需求，就是要把文件从北京机房拷贝到上海机房。但是他们发现传输速度比较慢，就做了抓包。在查看抓包文件的时候，发现Wireshark有很多<strong>TCP Window Full</strong>这样的提示，不明白这些是否跟速度慢有关系，于是找我们来协助分析。</p>
 <h3 id="expert-information">解读Expert Information</h3>
 <p>我们先要了解一下抓包文件的整体状况。怎么看呢？当然是看Expert Information了：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/72/8c/7285f181c54e6f464836e8c44f43c88c.jpg?wh=1818x234" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/72/8c/7285f181c54e6f464836e8c44f43c88c.jpg?wh=1818x234" /></p>
 <p>它确实提醒我们，有69个Warning级别报文，它们的问题是TCP Window specified by the receiver is now completely Full。在展开进一步排查之前，我们先对这个信息做一下解读。</p>
 <ul>
 <li>TCP Window：在上节课里，我介绍了TCP的三种窗口，分别是发送窗口、接收窗口、拥塞窗口。那么这里说的是哪个窗口呢？一般说到TCP Window，<strong>如果没有特别指明，就是指接收窗口</strong>。</li>
@@ -6432,23 +6432,23 @@
 </ul>
 <p>好了，这个信息解读完毕，一句话说就是：发生了69次在途数据等于接收窗口的情况。</p>
 <p>接下来我们看看TCP Window Full具体是个什么样子。比如我们选中224号报文，主界面也自动定位到了这个报文：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/49/4f/4957d1a108c78d3f73eee9b85213864f.jpg?wh=1920x960" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/49/4f/4957d1a108c78d3f73eee9b85213864f.jpg?wh=1920x960" /></p>
 <p>我们可以看到，除了224报文，也确实有很多其他报文也报了TCP Window Full的警告信息。</p>
 <h3 id="tcp-window-full_1">解读TCP Window Full</h3>
 <p>TCP Window Full这个信息非常直接明了，就是说“接收窗口满了”。不过，你可别以为这个信息是TCP报文里的某个字段。其实，它只是Wireshark通过分析得出的信息。你有没有注意到，TCP Window Full前后是有方括号的。一般来说，<strong>Wireshark自己分析得到的信息，都会用方括号括起来</strong>，而TCP报文本身的字段，是不会带这种方括号的。我们来看一个截图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b7/a5/b76369d4ef7fe6f9dd49816247351fa5.jpg?wh=1630x1062" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b7/a5/b76369d4ef7fe6f9dd49816247351fa5.jpg?wh=1630x1062" /></p>
 <p>上面是224号报文的TCP详情，里面有不少信息也带上了方括号，比如其中的 [Bytes in flight: 112000]，这也是解读出来的，而且它跟Window Full关系很大。</p>
 <p>前面提到过，在途数据（或者叫在途字节数，Bytes in flight）等于接收窗口大小的时候，Wireshark就会解读为TCP Window Full了。不过，如果你在上图中找一下Window size，会发现它是19200，而不是Bytes in flight的112000，这又是为什么呢？</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/82/98/829ee4eda487862ed761cd0bafff8d98.jpg?wh=674x396" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/82/98/829ee4eda487862ed761cd0bafff8d98.jpg?wh=674x396" /></p>
 <p>这是因为，我们把发送方和接收方的接收窗口搞混啦。这里你需要搞清楚：如果说在途数据的发送方是A，接收方是B，那么这里Window Full的窗口，<strong>是B的接收窗口</strong>，而不是A的接收窗口。上图是A的报文，自然没有我们要找的B的接收窗口信息了，那怎么找到B的接收窗口呢？</p>
 <p>因为这次通信是SCP文件传输，那么A就是客户端，它的端口是38979；B就是服务端，它的端口是22。我们的具体做法是：在抓包文件里，找到B（也就是源端口为22）的报文，而且应该是这个TCP Window Full报文之前的最近的一个，在这个报文里就有B的最近的接收窗口值。</p>
 <p>单纯用文字，可能未必容易理解，我给你画了一张示意图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2e/95/2e594ee968a7a62b307e5f22c08c4095.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2e/95/2e594ee968a7a62b307e5f22c08c4095.jpg?wh=2000x1125" /></p>
 <p>上图中，我还是用A指代发送端，用B指代接收端。当A的在途数据跟B的接收窗口大小相等时，Wireshark就会判断出，这个接收窗口满了，这意味着：A无法再从自己的发送缓冲区把数据发送出来了。只有当B回复ACK，确认了n字节的数据后，A才有可能发送最多n字节的数据（如果缓冲区有足够多的待发数据的话）。</p>
 <p>让我们回到Wireshark窗口，找到离这个TCP Window Full最近的，从源端口22发送来的报文。我们发现，它就是下图这个222号报文：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/30/60/30d13a6c4e4730742fe1bed79b6b0a60.jpg?wh=1836x1404" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/30/60/30d13a6c4e4730742fe1bed79b6b0a60.jpg?wh=1836x1404" /></p>
 <p>可以看到，这个报文的接收窗口就是112000，正好等于前面224号报文的Bytes in flight的112000字节。所以，我把前面的示意图改进一下供你参考。这里面的信息比较多，建议你耐心多花几分钟时间来充分理解其中的机制：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/84/0f/84453f815b643f6ac29062a3b9ccf90f.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/84/0f/84453f815b643f6ac29062a3b9ccf90f.jpg?wh=2000x1125" /></p>
 <p>整个过程是这样的：</p>
 <ul>
 <li>B发送了报文222给A，其中带有B自己的接收窗口112000字节。由于这是一个纯的确认报文，所以没有TCP载荷，也没有在途数据。</li>
@@ -6462,14 +6462,14 @@
 <h3 id="_1">下个序列号</h3>
 <p>下个序列号，也就是<strong>Next Sequence Number</strong>，缩写是<strong>NextSeq</strong>。它是指当前TCP段的结尾字节的位置，但不包含这个结尾字节本身。很显然，下个序列号的值就是当前序列号加上当前TCP段的长度，也就是<strong>NextSeq = Seq + Len</strong>。</p>
 <p>这也不难理解，因为TCP字节流是连续的，那么既然Seq + Len是这个报文的数据截止点，自然也是下一个报文的起始点，你可以参考这个示意图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f7/bf/f7864509fd7ff569ebbfa54e14a9e6bf.jpg?wh=2000x910" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f7/bf/f7864509fd7ff569ebbfa54e14a9e6bf.jpg?wh=2000x910" /></p>
 <p>在Wireshark里，我们也可以找到NextSeq这个解读值，比如下图这样：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/bd/7e/bd1093a136119ebf4166989e64b3637e.jpg?wh=756x201" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bd/7e/bd1093a136119ebf4166989e64b3637e.jpg?wh=756x201" /></p>
 <p>明白了NextSeq，我们来看如何手工验证TCP Window Full。比如，还是分析224号报文的这次TCP Window Full，我们可以这么做，来验证一下在途数据是否真的是112000字节。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0e/28/0ec8c879acb7526bbff8eb9650cyy928.jpg?wh=1558x550" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0e/28/0ec8c879acb7526bbff8eb9650cyy928.jpg?wh=1558x550" /></p>
 <p>首先，跟上面的步骤类似，我们要找到222号报文。在这个报文里，服务端（源端口22）告诉客户端：“我确认你发送来的198854字节的数据”。我们先把这个数字记为X。</p>
 <p>然后，我们查看224号报文里，客户端发送的数据到了哪个位置：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/22/2e/22f94b3933fb841705b28d11a3106b2e.jpg?wh=1552x984" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/22/2e/22f94b3933fb841705b28d11a3106b2e.jpg?wh=1552x984" /></p>
 <p>我们可以在224号报文的TCP详情页，看到Next sequence number: 310854，而这个数字，就是客户端发送的数据的最新的位置。我们把这个数字记为Y。当然，你也可以像前面说的那样，把Seq和Len加起来，也就是308054 + 2800，得到的自然也是310854。</p>
 <p>最后，我们做一个最简单的减法：Y - X = 310854 - 198854 = 112000！这正是前面说的在途数据的大小。</p>
 <p>恭喜你，你已经学会了如何手工计算在途数据的方法，这也意味着你对TCP的了解又更深入了一点。你可以这么来总结计算在途数据的方法：</p>
@@ -6481,12 +6481,12 @@
 <p>要知道，这种临界状况也很可能跟问题根因有关。那么你掌握了这个方法，就可以把排查做得更彻底了。或者，如果你想预防性能瓶颈，那么提前找到这种窗口临界满的状况，也是有益的。</p>
 <p>到这里，我们可以回答开始时候的问题了：为什么上节课里，没有看到TCP Window Full这种提示呢？我们看一下当时的报文状况吧。</p>
 <p>在22:30:39.067477，接收端的确认号为7105632：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/95/15/95c7e978090178984b6cb27355021e15.jpg?wh=896x61" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/95/15/95c7e978090178984b6cb27355021e15.jpg?wh=896x61" /></p>
 <p>然后在22:30:39.209712，接收端的确认号为7169872：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/4a/77/4ae7928be673fd6d2c43c7289aed0077.jpg?wh=901x59" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4a/77/4ae7928be673fd6d2c43c7289aed0077.jpg?wh=901x59" /></p>
 <p>这两个报文的时间跨度正好是141ms左右，也就是这次传输里面的<strong>往返时间</strong>。在这个往返时间里，接收端确认了多少数据呢？是7169872-7105632=64240，也就是64KB。这个就是99.9%逼近TCP Window Full了，但是因为还差小几十个字节，所以Wireshark并没有提示TCP Window Full！</p>
 <p>你可能还想追问：那为什么不把这剩余的0.1%的窗口“榨干”，非要留一点呢？我们看一下当时的接收窗口和在途数据的具体情况，就以上面选择的5864报文附近为例：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/14/d7/1439256885a585cebc96a139e41495d7.jpg?wh=900x91" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/14/d7/1439256885a585cebc96a139e41495d7.jpg?wh=900x91" /></p>
 <p>接收端（源端口为22）的接收窗口为65728，发送端（源端口为59159）的在途数据为65700，两者相差只有28字节。对于发送端来说，没有必要为了这区区28字节再发送一个小报文了，等接收窗口空余出多一点的空间后再动身不迟。</p>
 <blockquote>
 <p>如果你还没学习过上节课的内容，可能会对这些信息感到疑惑，建议先去把上节课学完，再来学习这一讲，效果更好。</p>
@@ -6495,7 +6495,7 @@
 <p>好了，现在我们已经对TCP Window Full做了充分的分析，而且也明白了：这就是<strong>接收端的接收窗口小于发送端的发送能力而出现的状况</strong>。我们也很容易得出推论：瓶颈在接收端，<strong>TCP Window Full也确实会影响传输速度</strong>。</p>
 <p>春节刚过，你可能对高速公路上的状况也感受深刻吧！很多路段出现了堵车，这就相当于TCP Window Full，更多的车辆上不了高速了，只好堵在外面。如果高速公路的路更宽、车速更快，那么就相当于接收窗口变得更大，车辆就能进更多，也就相当于Bytes in flight更大了。这么说来，TCP流量控制和高速车流控制这两个领域也有不少共通之处，说不定双方都互有借鉴呢。</p>
 <p>回到客户这次的案例。我们看看，这次的传输速度是多少呢？在上节课里，我介绍了在Wireshark里查看TCP传输速度的两种方法。比如，我们现在用I/O Graph来看一下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/50/5f/50bb15443878c7458035155f5a19425f.jpg?wh=1920x1287" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/50/5f/50bb15443878c7458035155f5a19425f.jpg?wh=1920x1287" /></p>
 <blockquote>
 <p>补充：如果你的I/O Graph显示的不是这种图，那需要像图中这样：</p>
 <ul>
@@ -6504,8 +6504,8 @@
 </ul>
 </blockquote>
 <p>这个图不能说不对，但柱子比较粗，看起来不是很精确。这是因为，它默认是以1秒为间隔而计算的速度。但是TCP传输中途，很可能每过几毫秒都有所变化，所以，如果我们要看更加精细的图，可以调整一下粒度，把Interval从1sec改为100ms，看看会怎么样：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/91/e1/91b410903c0b1f35fa0b88666ae012e1.jpg?wh=308x328" /></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/55/5b/5575a289a1aba0d303a0be0db968175b.jpg?wh=1920x1284" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/91/e1/91b410903c0b1f35fa0b88666ae012e1.jpg?wh=308x328" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/55/5b/5575a289a1aba0d303a0be0db968175b.jpg?wh=1920x1284" /></p>
 <p>这样看起来精确了很多。我已经把这个抓包文件上传到<a href="https://gitee.com/steelvictor/network-analysis/tree/master/10">Gitee</a>，你可以下载后，依照这里的步骤，把我做过的排查工作也演练一遍，这对你掌握课程知识是很有帮助的。</p>
 <blockquote>
 <p>补充：如果你用Wireshark查看到的I/O Graph跟我这里的不同，那可以对比一下Interval和SMA period这两个配置是否跟图中的一致。</p>
@@ -6516,16 +6516,16 @@
 <p>我们很容易理解，假设起始值相同，如果接收窗口增长的速度小于拥塞窗口的增长速度，那么接收窗口就成了瓶颈；反过来说，拥塞窗口增速更小，那么它就成了瓶颈。</p>
 <p>当接收窗口成为瓶颈的时候，很容易就出现这里的TCP Window Full的现象。不过，我们这么多讨论都是基于文字，如果有更加直观的方式，让我们理解这个现象就更好了。这里，我们就可以再学一个Wireshark的小工具：TCP Stream Graphs里面的 <strong>Window Scaling</strong>。</p>
 <p>我们还是打开Wireshark的Statistics下拉菜单，找到TCP Stream Graphs，在二级菜单中，选择Window Scaling：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/cf/e4/cfa2f41e1e0a52f9yyd4d226c441a4e4.jpg?wh=462x552" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cf/e4/cfa2f41e1e0a52f9yyd4d226c441a4e4.jpg?wh=462x552" /></p>
 <p>这时候就能看到Windows Scaling的趋势图了：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0c/82/0cda89fe0232b8515007fe1fc5e7aa82.jpg?wh=922x817" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0c/82/0cda89fe0232b8515007fe1fc5e7aa82.jpg?wh=922x817" /></p>
 <p>我就直接给你把关键信息标注出来了。这里主要是两个关键点。</p>
 <ul>
 <li><strong>数据流的方向要找对</strong>：比如这次传输是从客户端向SSH服务端发送数据，所以要确认这是从一个高端口向22端口发送数据的流向。如果搞反了，那图就变成了SSH服务端回复的ACK报文了，不是你要分析的传输速度了。</li>
 <li><strong>定位TCP Window Full</strong>：在这里，Receive Window是“阶梯”式的，每次变化后会保持在一个“平台”一小段时间，那么这时候Bytes Out（发送的数据，也就是Bytes in flight）就有可能触及这个“平台”，每次真的碰上的时候，就是一次TCP Window Full。</li>
 </ul>
 <p>我们可以看一个例子。图中的蓝线代表Bytes Out，绿线代表Receive Window。你可以像我这样，在这几个“平台”区域，找到蓝线和绿线的汇合点，然后在这些点上点击鼠标左键，就能定位到TCP Window Full事件了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/37/3e/37cb41aa86cce8a437c13db7374d2a3e.jpg?wh=832x573" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/37/3e/37cb41aa86cce8a437c13db7374d2a3e.jpg?wh=832x573" /></p>
 <p>上图中，我用鼠标放大了一个“平台”，然后选中了一个Receive Window和Bytes Out重合的点，它是1200号报文，主窗口也自动定位到了这个报文，果然它也是一次TCP Window Full。</p>
 <h2 id="_3">验证传输公式</h2>
 <p>在上节课里，我们推导出了TCP传输的核心公式：<strong>速度=窗口/往返时间</strong>。既然当前案例里TCP Window Full的时候，Bytes in flight跟接收窗口相等，那么在这个公式里的窗口，是否就是Bytes in flight呢？我们来验证一下。</p>
@@ -6540,14 +6540,14 @@
 <p>补充：如果对怎么添加自定义列还不清楚，可以复习<a href="https://time.geekbang.org/column/article/481042">第5讲</a>中的添加TTL自定义列的部分。</p>
 </blockquote>
 <p>另外，因为我们要集中检查发送端的Bytes in flight，就需要把源端口38979的报文过滤出来，这样就不会被另一个方向的报文给干扰了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/eb/52/ebf76c39e874a4350f8423485f0acd52.jpg?wh=1231x315" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/eb/52/ebf76c39e874a4350f8423485f0acd52.jpg?wh=1231x315" /></p>
 <p>在这里，我们看到的Bytes in flight是112000字节左右。从右边滚动条的位置来看，这是在传输过程的初期。让我们滚动到中间和后期，看看这些在途字节数是多少：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/56/eb/5633292b85320c4a309d67f06c94b0eb.jpg?wh=1152x315" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/56/eb/5633292b85320c4a309d67f06c94b0eb.jpg?wh=1152x315" /></p>
 <p>中期这里的Calculated Window Size明显增大了，到了445312字节。再看看后半程：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/55/d7/55cecd4faa33088df661d5058df379d7.jpg?wh=1158x314" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/55/d7/55cecd4faa33088df661d5058df379d7.jpg?wh=1158x314" /></p>
 <p>最后阶段已经达到863800字节。综合这三个阶段来看，折中值差不多在400KB左右，我们把它除以RTT 0.029秒，得到的是400KB/0.029s=13790KB/s。显然，这个数值远超过前面I/O Graph里看到的300~400KB/s。这是怎么回事呢？难道我们的核心公式是错的吗？</p>
 <p>不知道你有没有考虑到这个问题：Bytes in flight是指真的一直在网络上两头不着吗？一般来说，数据到了接收端，接收端就发送ACK确认这部分数据，然后TCP Window就往下降了。比如ACK 300字节，那么TCP Window就又空出来300字节，也就是发送端又可以新发送300字节了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/09/a6/097c2ccce8c3316137f4408yy24d95a6.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/09/a6/097c2ccce8c3316137f4408yy24d95a6.jpg?wh=2000x1125" /></p>
 <p>像图上这种情况：</p>
 <ul>
 <li>B通知A：“我的接收窗口是1000”；</li>
@@ -6560,11 +6560,11 @@
 <p><strong>velocity = acked_data/RTT</strong></p>
 </blockquote>
 <p>我们再用改进后的公式来计算这次的速度。我们可以选择传输中间偏后面一点的报文来做分析。比如下图中，我们选择1337号和1357号报文为起始和截止点，计算NextSeq的差值，还有时间的差值，然后两个差值相除。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d7/ec/d7174698a1e5c56357f6bd559bbb83ec.jpg?wh=978x289" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d7/ec/d7174698a1e5c56357f6bd559bbb83ec.jpg?wh=978x289" /></p>
 <p>33600/0.094 = <strong>357KB/s</strong>。是不是很接近I/O Graph的值了？看来这样计算才是正确的！</p>
 <p>那为什么在上节课里我们就可以用 <strong>窗口/往返时间</strong> 来计算速度，而且数值也很准呢？而这种方法用到这里就完全不对呢？</p>
 <p>这是因为上节课的案例，在途数据一旦到了接收端，都被及时确认了。而当前这个案例里面并没有这样。也就是说，这次的案例，出现了“滞留”现象。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/4e/e0/4e02af20ef67d67490ba5b2c00bb7de0.jpg?wh=1000x512" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4e/e0/4e02af20ef67d67490ba5b2c00bb7de0.jpg?wh=1000x512" /></p>
 <p>还是1337到1357号报文，我们去掉了过滤器 <code>tcp.srcport eq 38979</code>，这样就展示了双向报文。可以看到，服务端（B端）在这段时间内，只确认了22400字节（1495254 - 1472854），而同样时刻的在途数据，却一直维持在一个比较高的数字，在660KB上下。所以，<strong>真正完成了传输的数据量，是前者22400B，而不是“虚浮”的660KB</strong>。</p>
 <p>那你可能又要问了：既然已经确认了22400字节，为什么客户端的在途字节数还是没有变化呢？</p>
 <p>这是因为，客户端被确认了22400字节的数据，马上又把这个尺寸的数据发送出去了，事实上就<strong>维持了这个在途字节数的尺寸</strong>。</p>
@@ -6747,8 +6747,6 @@ t4时刻A收到了这个ack，才可以继续发送300B
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

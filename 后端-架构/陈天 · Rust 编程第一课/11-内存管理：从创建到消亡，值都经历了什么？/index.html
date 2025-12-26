@@ -15200,10 +15200,10 @@
 <p>栈内存“分配”和“释放”都很高效，在编译期就确定好了，因而它无法安全承载动态大小或者生命周期超出帧存活范围外的值。所以，我们需要运行时可以自由操控的内存，也就是堆内存，来弥补栈的缺点。</p>
 <p>堆内存足够灵活，然而堆上数据的生命周期该如何管理，成为了各门语言的心头大患。</p>
 <p>C 采用了未定义的方式，由开发者手工控制；C++ 在 C 的基础上改进，引入智能指针，半手工半自动。Java 和 DotNet 使用 GC 对堆内存全面接管，堆内存进入了受控（managed）时代。所谓受控代码（managed code），就是代码在一个“运行时”下工作，由运行时来保证堆内存的安全访问。</p>
-<p>整个堆内存生命周期管理的发展史如下图所示：<img alt="" src="https://static001.geekbang.org/resource/image/c7/d7/c7eec71df0fdc85c905c60ab78db15d7.jpg?wh=3624x1574" /></p>
+<p>整个堆内存生命周期管理的发展史如下图所示：<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c7/d7/c7eec71df0fdc85c905c60ab78db15d7.jpg?wh=3624x1574" /></p>
 <p>而Rust 的创造者们，重新审视了堆内存的生命周期，发现<strong>大部分堆内存的需求在于动态大小，小部分需求是更长的生命周期</strong>。所以它默认将堆内存的生命周期和使用它的栈内存的生命周期绑在一起，并留了个小口子 leaked机制，让堆内存在需要的时候，可以有超出帧存活期的生命周期。</p>
 <p>我们看下图的对比总结：
-<img alt="" src="https://static001.geekbang.org/resource/image/e3/b1/e381fa9ab73036480df9c8a182dab4b1.jpg?wh=2562x1394" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e3/b1/e381fa9ab73036480df9c8a182dab4b1.jpg?wh=2562x1394" /></p>
 <p>有了这些基本的认知，我们再看看在值的创建、使用和销毁的过程中， Rust 是如何管理内存的。</p>
 <p>希望学完今天的内容之后，看到一个 Rust 的数据结构，你就可以在脑海中大致浮现出，这个数据结构在内存中的布局：哪些字段在栈上、哪些在堆上，以及它大致的大小。</p>
 <h2 id="_2">值的创建</h2>
@@ -15212,7 +15212,7 @@
 <p>如果数据结构的大小无法确定，或者它的大小确定但是在使用时需要更长的生命周期，就最好放在堆上。</p>
 <p>接下来我们来看 struct / enum / vec&lt;T&gt; / String 这几种重要的数据结构在创建时的内存布局。</p>
 <h3 id="struct">struct</h3>
-<p>Rust 在内存中排布数据时，<strong>会根据每个域的对齐（aligment）对数据进行重排</strong>，使其内存大小和访问效率最好。比如，一个包含 A、B、C 三个域的 struct，它在内存中的布局可能是 A、C、B：<img alt="" src="https://static001.geekbang.org/resource/image/0a/c4/0a1151168af2a19a23f8db16df101cc4.jpg?wh=2483x979" /></p>
+<p>Rust 在内存中排布数据时，<strong>会根据每个域的对齐（aligment）对数据进行重排</strong>，使其内存大小和访问效率最好。比如，一个包含 A、B、C 三个域的 struct，它在内存中的布局可能是 A、C、B：<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0a/c4/0a1151168af2a19a23f8db16df101cc4.jpg?wh=2483x979" /></p>
 <p>为什么 Rust 编译器会这么做呢？</p>
 <p>我们先看看 C 语言在内存中表述一个结构体时遇到的问题。来写一段代码，其中两个数据结构 S1 和 S2 都有三个域 a、b、c，其中 a 和 c 是 u8，占用一个字节，b 是 u16，占用两个字节。S1 在定义时顺序是 a、b、c，而 S2 在定义时顺序是 a、c、b：</p>
 <p>猜猜看 S1 和 S2 的大小是多少？</p>
@@ -15243,7 +15243,7 @@
 <li>结构体的对齐大小和其最大域的对齐大小相同，而结构体的长度则四舍五入到其对齐的倍数。</li>
 </ol>
 <p>字面上看这三条规则，你是不是觉得像绕口令，别担心，我们结合刚才的代码再来看，其实很容易理解。</p>
-<p>对于 S1，字段 a 是 u8 类型，所以其长度和对齐都是 1，b 是 u16，其长度和对齐是 2。然而因为 a 只占了一个字节，b 的偏移是 1，根据第二条规则，起始位置和 b 的长度无法对齐，所以编译器会添加一个字节的 padding，让 b 的偏移为 2，这样 b 就对齐了。<img alt="" src="https://static001.geekbang.org/resource/image/f7/37/f724ce693e12745d7ba976044e5aa937.jpg?wh=2956x1113" /></p>
+<p>对于 S1，字段 a 是 u8 类型，所以其长度和对齐都是 1，b 是 u16，其长度和对齐是 2。然而因为 a 只占了一个字节，b 的偏移是 1，根据第二条规则，起始位置和 b 的长度无法对齐，所以编译器会添加一个字节的 padding，让 b 的偏移为 2，这样 b 就对齐了。<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f7/37/f724ce693e12745d7ba976044e5aa937.jpg?wh=2956x1113" /></p>
 <p>随后 c 长度和对齐都是 1，不需要 padding。这样算下来，S1 的大小是 5，但根据上面的第三条规则，S1 的对齐是 2，和 5 最接近的“2 的倍数”是 6，所以 S1 最终的长度是 6。其实，这最后一条规则是为了让 S1 放在数组中，可以有效对齐。</p>
 <p>所以，<strong>如果结构体的定义考虑地不够周全，会为了对齐浪费很多空间</strong>。我们看到，保存同样的数据，S1 和 S2 的大小相差了 50%。</p>
 <p>使用 C 语言时，定义结构体的最佳实践是，充分考虑每一个域的对齐，合理地排列它们，使其内存使用最高效。这个工作由开发者做会很费劲，尤其是嵌套的结构体，需要仔细地计算才能得到最优解。</p>
@@ -15267,14 +15267,14 @@
 <a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="fm">println!</span><span class="p">(</span><span class="s">&quot;alignof S1: {}, S2: {}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">align_of</span><span class="p">::</span><span class="o">&lt;</span><span class="n">S1</span><span class="o">&gt;</span><span class="p">(),</span><span class="w"> </span><span class="n">align_of</span><span class="p">::</span><span class="o">&lt;</span><span class="n">S2</span><span class="o">&gt;</span><span class="p">());</span>
 <a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="p">}</span>
 </code></pre></div>
-<p>你也可以看这张图来直观对比， C 和 Rust 的行为：<img alt="" src="https://static001.geekbang.org/resource/image/3d/42/3db1a2ccebf936aa10d9c1bd7fcf8a42.jpg?wh=3612x2093" /></p>
+<p>你也可以看这张图来直观对比， C 和 Rust 的行为：<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3d/42/3db1a2ccebf936aa10d9c1bd7fcf8a42.jpg?wh=3612x2093" /></p>
 <p>虽然，Rust 编译器默认为开发者优化结构体的排列，但你也可以使用<code>#[repr]</code> 宏，强制让 Rust 编译器不做优化，和 C 的行为一致，这样，Rust 代码可以方便地和 C 代码无缝交互。</p>
 <p>在明白了 Rust 下 struct 的布局后（ tuple 类似），我们看看 enum 。</p>
 <h3 id="enum">enum</h3>
 <p>enum 我们之前讲过，在 Rust 下它是一个标签联合体（tagged union），它的大小是标签的大小，加上最大类型的长度。</p>
 <p><a href="https://time.geekbang.org/column/article/411632">第三讲</a>基础语法中，我们定义 enum 数据结构时，简单提到有 Option&lt;T&gt; 和 Result&lt;T, E&gt; 两种设计举例， Option 是有值/无值这种最简单的枚举类型，Result 包括成功返回数据和错误返回数据的枚举类型，后面会详细讲到。这里我们理解其内存设计就可以了。</p>
 <p>根据刚才说的三条对齐规则，tag 后的内存，会根据其对齐大小进行对齐，所以对于 Option&lt;u8&gt;，其长度是 1 + 1 = 2 字节，而 Option&lt;f64&gt;，长度是 8 + 8 =16 字节。一般而言，64 位 CPU 下，enum 的最大长度是：最大类型的长度 + 8，因为 64 位 CPU 的最大对齐是 64bit，也就是 8 个字节。</p>
-<p>下图展示了 enum、Option&lt;T&gt;以及Result&lt;T, E&gt; 的布局：<img alt="" src="https://static001.geekbang.org/resource/image/f2/82/f22b2700de556385efbc44f04dd6b982.jpg?wh=2956x996" /></p>
+<p>下图展示了 enum、Option&lt;T&gt;以及Result&lt;T, E&gt; 的布局：<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f2/82/f22b2700de556385efbc44f04dd6b982.jpg?wh=2956x996" /></p>
 <p>值得注意的是，Rust 编译器会对 enum 做一些额外的优化，让某些常用结构的内存布局更紧凑。我们先来写一段代码，帮你更好地了解不同数据结构占用的大小（<a href="https://play.rust-lang.org/?version=stable&amp;mode=debug&amp;edition=2018&amp;gist=34c66e50a56c5e4bb3a3dd97c3a90358">代码</a>）：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">collections</span><span class="p">::</span><span class="n">HashMap</span><span class="p">;</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">mem</span><span class="p">::</span><span class="n">size_of</span><span class="p">;</span>
@@ -15337,13 +15337,13 @@
 <p>Rust 是这么处理的，我们知道，引用类型的第一个域是个指针，而指针是不可能等于 0 的，但是我们<strong>可以复用这个指针：当其为 0 时，表示 None，否则是 Some</strong>，减少了内存占用，这是个非常巧妙的优化，我们可以学习。</p>
 <h3 id="vect-string">vec&lt;T&gt; 和 String</h3>
 <p>从刚才代码的结果中，我们也看到 String 和 Vec&lt;u8&gt; 占用相同的大小，都是 24 个字节。其实，如果你打开 String 结构的<a href="https://doc.rust-lang.org/src/alloc/string.rs.html#279-281">源码</a>，可以看到，它内部就是一个 Vec&lt;u8&gt;。</p>
-<p>而 <a href="https://doc.rust-lang.org/src/alloc/vec/mod.rs.html#294-302">Vec&lt;T&gt;结构</a>是 3 个 word 的胖指针，包含：一个指向堆内存的指针pointer、分配的堆内存的容量capacity，以及数据在堆内存的长度length，如下图所示：<img alt="" src="https://static001.geekbang.org/resource/image/c2/37/c2234ab79c2eaf2c76698c8f11b24d37.jpg?wh=2368x977" /></p>
+<p>而 <a href="https://doc.rust-lang.org/src/alloc/vec/mod.rs.html#294-302">Vec&lt;T&gt;结构</a>是 3 个 word 的胖指针，包含：一个指向堆内存的指针pointer、分配的堆内存的容量capacity，以及数据在堆内存的长度length，如下图所示：<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c2/37/c2234ab79c2eaf2c76698c8f11b24d37.jpg?wh=2368x977" /></p>
 <p>很多动态大小的数据结构，在创建时都有类似的内存布局：<strong>栈内存放的胖指针，指向堆内存分配出来的数据</strong>，我们之前介绍的 Rc 也是如此。</p>
-<p>关于值在创建时的内存布局，今天就先讲这么多。如果你对其它数据结构的内存布局感兴趣，可以访问 <a href="https://cheats.rs/#data-layout">cheats.rs</a>，它是 Rust 语言的备忘清单，非常适合随时翻阅。比如，引用类型的内存布局：<img alt="" src="https://static001.geekbang.org/resource/image/98/a5/98e80265d8fbe77a9c6e53df22efafa5.png?wh=1640x402" /></p>
+<p>关于值在创建时的内存布局，今天就先讲这么多。如果你对其它数据结构的内存布局感兴趣，可以访问 <a href="https://cheats.rs/#data-layout">cheats.rs</a>，它是 Rust 语言的备忘清单，非常适合随时翻阅。比如，引用类型的内存布局：<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/98/a5/98e80265d8fbe77a9c6e53df22efafa5.png?wh=1640x402" /></p>
 <p>现在，值已经创建成功了，我们对它的内存布局有了足够的认识。那在使用期间，它的内存会发生什么样的变化呢，我们接着看。</p>
 <h2 id="_3">值的使用</h2>
 <p>在讲所有权的时候，我们知道了，对 Rust 而言，一个值如果没有实现 Copy，在赋值、传参以及函数返回时会被 Move。</p>
-<p><strong>其实 Copy 和 Move 在内部实现上，都是浅层的按位做内存复制</strong>，只不过 Copy 允许你访问之前的变量，而 Move 不允许。我们看图：<img alt="" src="https://static001.geekbang.org/resource/image/4a/55/4a0fd813e6722c9efef3c8be91b3d155.jpg?wh=2547x1578" /></p>
+<p><strong>其实 Copy 和 Move 在内部实现上，都是浅层的按位做内存复制</strong>，只不过 Copy 允许你访问之前的变量，而 Move 不允许。我们看图：<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4a/55/4a0fd813e6722c9efef3c8be91b3d155.jpg?wh=2547x1578" /></p>
 <p>在我们的认知中，内存复制是个很重的操作，效率很低。确实是这样，如果你的关键路径中的每次调用，都要复制几百 k 的数据，比如一个大数组，是很低效的。</p>
 <p>但是，如果你要复制的只是原生类型（Copy）或者栈上的胖指针（Move），不涉及堆内存的复制也就是深拷贝（deep copy），那这个效率是非常高的，我们不必担心每次赋值或者每次传参带来的性能损失。</p>
 <p>所以，无论是 Copy 还是 Move，它的效率都是非常高的。</p>
@@ -15353,9 +15353,9 @@
 <h2 id="_4">值的销毁</h2>
 <p>好，这个值的旅程已经过半，创建和使用都已经讲完了，最后我们谈谈值的销毁。</p>
 <p>之前笼统地谈到，当所有者离开作用域，它拥有的值会被丢弃。那从代码层面讲，Rust 到底是如何丢弃的呢？</p>
-<p>这里用到了 Drop trait。Drop trait 类似面向对象编程中的析构函数，<strong>当一个值要被释放，它的 Drop trait 会被调用</strong>。比如下面的代码，变量 greeting 是一个字符串，在退出作用域时，其 drop() 函数被自动调用，释放堆上包含 “hello world” 的内存，然后再释放栈上的内存：<img alt="" src="https://static001.geekbang.org/resource/image/0c/ae/0c0d83776e12a099453c837c997d93ae.jpg?wh=2170x1207" /></p>
+<p>这里用到了 Drop trait。Drop trait 类似面向对象编程中的析构函数，<strong>当一个值要被释放，它的 Drop trait 会被调用</strong>。比如下面的代码，变量 greeting 是一个字符串，在退出作用域时，其 drop() 函数被自动调用，释放堆上包含 “hello world” 的内存，然后再释放栈上的内存：<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0c/ae/0c0d83776e12a099453c837c997d93ae.jpg?wh=2170x1207" /></p>
 <p>如果要释放的值是一个复杂的数据结构，比如一个结构体，那么这个结构体在调用 drop() 时，会依次调用每一个域的 drop() 函数，如果域又是一个复杂的结构或者集合类型，就会递归下去，直到每一个域都释放干净。</p>
-<p>我们可以看这个例子：<img alt="" src="https://static001.geekbang.org/resource/image/b8/94/b80ec8eac77944512626bdfc3byy0094.jpg?wh=2170x1207" /></p>
+<p>我们可以看这个例子：<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b8/94/b80ec8eac77944512626bdfc3byy0094.jpg?wh=2170x1207" /></p>
 <p>代码中的 student 变量是一个结构体，有 name、age、scores。其中 name 是 String，scores 是 HashMap，它们本身需要额外 drop()。又因为 HashMap 的 key 是 String，所以还需要进一步调用这些 key 的 drop()。整个释放顺序从内到外是：先释放 HashMap 下的 key，然后释放 HashMap 堆上的表结构，最后释放栈上的内存。</p>
 <h3 id="_5">堆内存释放</h3>
 <p>所有权机制规定了，一个值只能有一个所有者，所以在释放堆内存的时候，整个过程简单清晰，就是单纯调用 Drop trait，不需要有其他顾虑。这种对值安全，也没有额外负担的释放能力，是 Rust 独有的。</p>
@@ -15382,7 +15382,7 @@
 <p>从 Drop trait 中我们再一次看到，从事物的本原出发解决问题，会极其优雅地解决掉很多其他关联问题。好比，所有权，几个简单规则，就让我们顺带处理掉了资源释放的大难题。</p>
 <h2 id="_7">小结</h2>
 <p>我们进一步探讨了 Rust 的内存管理，在所有权和生命周期管理的基础上，介绍了一个值在内存中创建、使用和销毁的过程，学习了数据结构在创建时，是如何在内存中布局的，大小和对齐之间的关系；数据在使用过程中，是如何 Move 和自动增长的；以及数据是如何销毁的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7d/9b/7d3760f88297fc5900c74193cae5e39b.jpg?wh=1920x900" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7d/9b/7d3760f88297fc5900c74193cae5e39b.jpg?wh=1920x900" /></p>
 <p>数据结构在内存中的布局，尤其是哪些部分放在栈上，哪些部分放在堆上，非常有助于我们理解代码的结构和效率。</p>
 <p>你不必强行记忆这些内容，只要有个思路，在需要的时候，翻阅本文或者 <a href="https://cheats.rs">cheats.rs</a> 即可。当我们掌握了数据结构如何创建、在使用过程中如何 Move 或者 Copy、最后如何销毁，我们在阅读别人的代码或者自己撰写代码时就会更加游刃有余。</p>
 <h2 id="_8">思考题</h2>
@@ -15624,8 +15624,6 @@ return 0;
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

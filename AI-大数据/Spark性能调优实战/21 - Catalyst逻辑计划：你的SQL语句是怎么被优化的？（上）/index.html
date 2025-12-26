@@ -7178,7 +7178,7 @@
 <p>上一讲我们说，Spark SQL已经取代Spark Core成为了新一代的内核优化引擎，所有Spark子框架都能共享Spark SQL带来的性能红利，所以在Spark历次发布的新版本中，Spark SQL占比最大。因此，Spark SQL的优化过程是我们必须要掌握的。</p>
 <p>Spark SQL端到端的完整优化流程主要包括两个阶段：Catalyst优化器和Tungsten。其中，Catalyst优化器又包含逻辑优化和物理优化两个阶段。为了把开发者的查询优化到极致，整个优化过程的运作机制设计得都很精密，因此我会用三讲的时间带你详细探讨。</p>
 <p>下图就是这个过程的完整图示，你可以先通过它对优化流程有一个整体的认知。然后随着我的讲解，逐渐去夯实其中的关键环节、重要步骤和核心知识点，在深入局部优化细节的同时，把握全局优化流程，做到既见树木、也见森林。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f3/72/f3ffb5fc43ae3c9bca44c1f4f8b7e872.jpg?wh=6539%2A1200" title="Spark SQL的优化过程" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f3/72/f3ffb5fc43ae3c9bca44c1f4f8b7e872.jpg?wh=6539%2A1200" title="Spark SQL的优化过程" /></p>
 <p>今天这一讲，我们先来说说Catalyst优化器逻辑优化阶段的工作原理。</p>
 <h2 id="q">案例：小Q变身记</h2>
 <p>我们先来看一个例子，例子来自电子商务场景，业务需求很简单：给定交易事实表transactions和用户维度表users，统计不同用户的交易额，数据源以Parquet的格式存储在分布式文件系统。因此，我们要先用Parquet API读取源文件。</p>
@@ -7216,25 +7216,25 @@
 <a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>result.write.parquet(&quot;_&quot;)
 </code></pre></div>
 <p>代码示例如上图所示，为了实现业务逻辑，我们对过滤之后的用户表与交易表做内关联，然后再按照用户分组去计算交易额。不难发现，这个计算逻辑实际上就是星型数仓中典型的关联查询。为了叙述方便，我们给这个关联查询起个名字：小Q。小Q的计算需要两个输入源，一个是交易表，另一个是过滤之后的用户表。今天这一讲，我们就去追随小Q，看看它在Catalyst的逻辑优化阶段都会发生哪些变化。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/20/00/205a81e95f483ce66ed019b4120ec000.jpg?wh=1281%2A1556" title="小Q的计算逻辑" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/20/00/205a81e95f483ce66ed019b4120ec000.jpg?wh=1281%2A1556" title="小Q的计算逻辑" /></p>
 <p><strong>Catalyst逻辑优化阶段分为两个环节：逻辑计划解析和逻辑计划优化。在逻辑计划解析中，Catalyst把“Unresolved Logical Plan”转换为“Analyzed Logical Plan”；在逻辑计划优化中，Catalyst基于一些既定的启发式规则（Heuristics Based Rules），把“Analyzed Logical Plan”转换为“Optimized Logical Plan”。</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0e/a3/0efa02fd8eda5a69c794871ea77030a3.jpg?wh=3436%2A1130" title="Catalyst逻辑优化阶段" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0e/a3/0efa02fd8eda5a69c794871ea77030a3.jpg?wh=3436%2A1130" title="Catalyst逻辑优化阶段" /></p>
 <p>因为“Unresolved Logical Plan”是Catalyst优化的起点，所以在进入Catalyst优化器之前，小Q先是改头换面，从代码中的查询语句，摇身变成了“Unresolved Logical Plan”。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ff/80/fff906004736005de9c83cbfc09d8380.png?wh=1306%2A390" title="小Q启程：Unresolved Logical Plan" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ff/80/fff906004736005de9c83cbfc09d8380.png?wh=1306%2A390" title="小Q启程：Unresolved Logical Plan" /></p>
 <h2 id="_1">逻辑计划解析</h2>
 <p>小Q成功进入Catalyst优化器之后，就要开始执行逻辑计划解析，也就是要从“Unresolved Logical Plan”转换为“Analyzed Logical Plan”。那么，具体该怎么做呢？</p>
 <p>从“小Q启程”那张图我们不难发现，“Unresolved Logical Plan”携带的信息相当有限，它只包含查询语句从DSL语法变换成AST语法树的信息。需要说明的是，不论是逻辑计划还是物理计划，执行的次序都是自下向上。因此，图中逻辑计划的计算顺序是从全表扫描到按性别过滤，每个步骤的含义都是准备“做什么”。</p>
 <p>例如，在计划的最底层，Relation节点“告诉”Catalyst：“你需要扫描一张表，这张表有4个字段，分别是ABCD，文件格式是Parquet”。但这些信息对于小Q的优化还远远不够，我们还需要知道这张表的Schema是啥？字段的类型都是什么？字段名是否真实存在？数据表中的字段名与计划中的字段名是一致的吗？</p>
 <p>因此，<strong>在逻辑计划解析环节，Catalyst就是要结合DataFrame的Schema信息，来确认计划中的表名、字段名、字段类型与实际数据是否一致。</strong>完成确认之后，Catalyst会生成“Analyzed Logical Plan”。这个时候，小Q就会从“Unresolved Logical Plan”转换成“Analyzed Logical Plan”。</p>
 <p>从下图中我们能够看到，逻辑计划已经完成了一致性检查，并且可以识别两张表的字段类型，比如userId的类型是int，price字段的类型是double等等。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ac/7b/ac83f9d0cdab8655a5fffc9125a93f7b.png?wh=1564%2A438" title="小Q再变身：Analyzed Logical Plan" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ac/7b/ac83f9d0cdab8655a5fffc9125a93f7b.png?wh=1564%2A438" title="小Q再变身：Analyzed Logical Plan" /></p>
 <h2 id="_2">逻辑计划优化</h2>
 <p>对于现在的小Q来说，如果我们不做任何优化，直接把它转换为物理计划也可以。但是，这种照搬开发者的计算步骤去制定物理计划的方式，它的执行效率往往不是最优的。</p>
 <p>为什么这么说呢？在运行时，Spark会先全量扫描Parquet格式的用户表，然后遴选出userId、name、age、gender四个字段，接着分别按照年龄和性别对数据进行过滤。</p>
 <p>对于这样的执行计划来说，最开始的全量扫描显然是一种浪费。原因主要有两方面：一方面，查询实际上只涉及4个字段，并不需要email这一列数据；另一方面，字段age和gender上带有过滤条件，我们完全可以利用这些过滤条件减少需要扫描的数据量。</p>
 <p>由此可见，<strong>对于同样一种计算逻辑，实现方式可以有多种，按照不同的顺序对算子做排列组合，我们就可以演化出不同的实现方式。最好的方式是，我们遵循“能省则省、能拖则拖”的开发原则，去选择所有实现方式中最优的那个</strong>。</p>
 <p>同样，在面对这种“选择题”的时候，Catalyst也有一套自己的“原则”和逻辑。因此，生成“Analyzed Logical Plan”之后，Catalyst并不会止步于此，它会基于一套启发式的规则，把“Analyzed Logical Plan”转换为“Optimized Logical Plan”。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a0/29/a0391155f57085266a7703b0cb788329.jpg?wh=3447%2A1149" title="逻辑优化环节" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a0/29/a0391155f57085266a7703b0cb788329.jpg?wh=3447%2A1149" title="逻辑优化环节" /></p>
 <p>那么问题来了，Catalyst都有哪些既定的规则和逻辑呢？基于这些规则，Catalyst又是怎么做转换的呢？别着急，我们一个一个来解答，咱们先来说说Catalyst的优化规则，然后再去探讨逻辑计划的转换过程。</p>
 <h3 id="catalyst">Catalyst的优化规则</h3>
 <p>和Catalyst相比，咱们总结出的开发原则简直就是小巫见大巫，为什么这么说呢？在新发布的Spark 3.0版本中，Catalyst总共有81条优化规则（Rules），这81条规则会分成27组（Batches），其中有些规则会被收纳到多个分组里。因此，如果不考虑规则的重复性，27组算下来总共会有129个优化规则。</p>
@@ -7252,7 +7252,7 @@
 <p>最后一类优化是常量替换，它的逻辑比较简单。假设我们在年龄上加的过滤条件是“age &lt; 12 + 18”，Catalyst会使用ConstantFolding规则，自动帮我们把条件变成“age &lt; 30”。再比如，我们在select语句中，掺杂了一些常量表达式，Catalyst也会自动地用表达式的结果进行替换。</p>
 <p>到此为止，咱们从功用和效果的角度，探讨了Catalyst逻辑优化规则的3大范畴。你可能说：“拢共就做了这么3件事，至于兴师动众地制定81条规则吗？”我们划分这3大范畴，主要是为了叙述和理解上的方便。实际上，对于开发者写出的五花八门、千奇百怪的查询语句，正是因为Catalyst不断丰富的优化规则，才让这些查询都能够享有不错的执行性能。如果没有这些优化规则的帮忙，小Q的执行性能一定会惨不忍睹。</p>
 <p>最终，被Catalyst优化过后的小Q，就从“Analyzed Logical Plan”转换为“Optimized Logical Plan”，如下图所示。我们可以看到，谓词下推和列剪裁都体现到了Optimized Logical Plan中。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/72/df/7223829502eeeca0fbfb721c6a3b61df.png?wh=1338%2A390" title="小Q再变身：Optimized Logical Plan" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/72/df/7223829502eeeca0fbfb721c6a3b61df.png?wh=1338%2A390" title="小Q再变身：Optimized Logical Plan" /></p>
 <h3 id="catalys">Catalys的优化过程</h3>
 <p>接下来，我继续来回答刚刚提出的第二个问题：基于这么多优化规则，Catalyst具体是怎么把“Analyzed Logical Plan”转换成“Optimized Logical Plan”的呢？其实，不管是逻辑计划（Logical Plan）还是物理计划（Physical Plan），它们都继承自QueryPlan。</p>
 <p>QueryPlan的父类是TreeNode，TreeNode就是语法树中对于节点的抽象。TreeNode有一个名叫children的字段，类型是Seq[TreeNode]，利用TreeNode类型，Catalyst可以很容易地构建一个树结构。</p>
@@ -7275,7 +7275,7 @@
 <li>对于所有小于5的数字，我们都把它变成0</li>
 </ul>
 <p>虽然我们的优化规则没有任何实质性的意义，仅仅是一种转换规则而已，但是这并不妨碍你去理解Catalyst中TreeNode之间的转换。当我们把这个规则应用到表达式（（6 - 4）*（1 - 9））之后，得到的结果是另外一个表达式（（1 + 0）+（0 + 1）），下面的示意图直观地展示了这个过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ea/1f/ea21ec9387e55e94d763d9ee0c4a4b1f.jpg?wh=3369%2A827" title="自顶向下对执行计划进行转换" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ea/1f/ea21ec9387e55e94d763d9ee0c4a4b1f.jpg?wh=3369%2A827" title="自顶向下对执行计划进行转换" /></p>
 <p>从“Analyzed Logical Plan”到“Optimized Logical Plan”的转换，与示例中表达式的转换过程如出一辙。最主要的区别在于，Catalyst的优化规则要复杂、精密得多。</p>
 <h3 id="cache-manager">Cache Manager优化</h3>
 <p>从“Analyzed Logical Plan”到“Optimized Logical Plan”的转换，Catalyst除了使用启发式的规则以外，还会利用Cache Manager做进一步的优化。</p>
@@ -7421,8 +7421,6 @@ Spark 之所以用偏函数，而不是普通函数来定义 Catalyst 的优化�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -6452,19 +6452,19 @@
 <p>这里你可能会问了，为什么网络是一个有向图呢？道理很简单，我们以延时作为边权的场景为例，两个节点双向通信的速度很可能是不一样的，所以自然是一个单向图。</p>
 <p>有了拓扑图的定义，我们如何在每个节点中都构建出这样一张带有整个网络信息的图呢？这个问题还是没有解决。</p>
 <p>在这个动态路由问题里，所有的节点其实都只是网络中的一部分，不同于静态路由的管理员直接有全局的上帝视角，动态路由下的每个节点能真正触达的信息，也只有和自己直接相邻的节点传来的0和1。所以，<strong>要构建网络，我们自然也只有通过通信的方式了</strong>。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/de/9a/dee13429284da262677dcde29f4b4f9a.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/de/9a/dee13429284da262677dcde29f4b4f9a.jpg?wh=1920x1145" /></p>
 <p>在各种网络选路协议中，OSPF协议采用的就是链路状态算法，它把链路状态信息的获取分成了4个主要步骤：发现节点、测量链路成本、封装链路状态包、发送链路状态包。</p>
 <h3 id="_2">发现节点</h3>
 <p>节点想要获取全局的链路信息，显然只能通过和邻居间交换自己知道的信息，才有可能构建出全局的网络图。那第一步当然是要发现和自己相邻的所有节点，并在本地维护这个邻居信息。</p>
 <p>发现节点具体怎么做呢？</p>
 <p>其实也很简单，就是直接向网络广播一条<code>hello</code>消息，我们称为<code>hello</code>包。所有能直接收到这条消息的一定都是一跳的邻居。协议规定，收到这条消息的节点必须回应一条Response消息，告知自己是谁。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6d/f4/6d3f79f85385a40ab91bc7fca110e9f4.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6d/f4/6d3f79f85385a40ab91bc7fca110e9f4.jpg?wh=1920x1145" /></p>
 <p>所以每个节点<strong>只要统计自己发出hello后收到的回应数量</strong>，就可以知道自己和哪几个节点相邻，也知道了它们的地址之类的信息，保存在本地就可以了。</p>
 <h3 id="_3">测量链路成本</h3>
 <p>现在每个路由器都有了自己的邻居信息，接下来要做的就是衡量边权也就是链路成本。</p>
 <p>每个节点想要衡量自己和邻居之间的传输成本，没什么别的办法，试一下就行了。</p>
 <p>协议规定，每个节点向自己的邻居发送一个特殊的echo包，邻居收到之后，必须原封不动地把echo再返回给发出echo的节点，这样，<strong>每个节点只需要统计一下自己从发出echo到收到echo的时间差，就可以用它来估计和邻居之间的网络传输时延了</strong>，从而也就可以计算出链路状态算法所需要的链路成本了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/df/15/df081e4805372fff841622559c273f15.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/df/15/df081e4805372fff841622559c273f15.jpg?wh=1920x1145" /></p>
 <p>当然由于网络传输是不稳定的，我们会多次测量，取出均值，这样的时间我们有时也叫RTT，round-trip-time。</p>
 <p>如果你经常打游戏，可能会在测速工具或者游戏界面中看到过这个词，RTT是最常见的用于衡量网络时延情况的指标，在许多系统里都会用到。我在工作中维护过的长连接网关就有一个这样的需求，要求采样统计消息时延作为监控指标，我们当时就会定期在应用层面上发送echo包，统计来回时间，以达到监控网络情况的效果。</p>
 <h3 id="_4">封装链路状态包</h3>
@@ -6475,13 +6475,13 @@
 <p>另外我们知道网络是在时刻动态变化的，考虑到包的有效性问题，每个包不可能是永久有效的，过了一段时间之后就应该让这个包自动失效。所以还需要一项生存期，标记这个包中的成本记录有效的时间窗口。</p>
 <p>除此之外，<strong>OSPF协议还引入了一个关键字段：序号，标示当前状态包是发送方发出的第几个包</strong>。因为在网络中传输内容时，出于各种原因可能会产生错序的情况，这个序号就能帮助接收方衡量这个包是老的包还是新的包。其实，序号这种思想贯穿了计算机网络各个层次协议的设计，在许多应用场景下也会通过序号，帮助我们进行消息传递的排序或者去重。</p>
 <p>在OSPF协议中4项内容是这样组织的，本机ID、序号、生存期、邻居｜成本，你可以看这张图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/73/9f/73d6373992031a1c06745babae8e4f9f.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/73/9f/73d6373992031a1c06745babae8e4f9f.jpg?wh=1920x1145" /></p>
 <h3 id="_5">发送链路状态包</h3>
 <p>有了链路状态包，那最后一个步骤自然是发送这些包。为了确保所有的包都能被可靠地传输到每个节点，避免出现各个节点路由构建不一致等问题，我们采用泛洪的方式进行传输。</p>
 <p><strong>泛洪，也是在计算机网络中常用的一种传播消息的机制，类似广播，每个节点都会把自己封装好的包和收到的包，发送或转发给所有除了该包发送方的节点</strong>。</p>
 <p>这样，经过一小段时间的传播，每个节点就可以收到整个网络内所有其他节点的邻居信息，从而也就相当于有了一个拓扑图中邻接表的全部信息，自然就可以在内存中构建出一张完整的带有边权的有向图了。</p>
 <p>构造方式和我们之前讲解<a href="https://time.geekbang.org/column/article/475478">拓扑排序</a>中构造图的过程是很类似的，你不熟悉的话也可以回去复习一下。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b9/68/b97b3de96aa93a504c7836195a337d68.jpg?wh=1920x1330" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b9/68/b97b3de96aa93a504c7836195a337d68.jpg?wh=1920x1330" /></p>
 <h2 id="_6">计算路由</h2>
 <p>现在每个节点都有了这样一张有向图，每个节点自然就可以利用之前我们讲解的Dijkstra算法，在有向图中计算出自己到网络中任何其他所有节点的最短路径。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">A的最短路</span>
@@ -6512,10 +6512,10 @@
 </ul>
 <p>这样简单的策略是非常强大的，以链路延时为成本的链路状态算法甚至可以非常智能地避免网络的阻塞。</p>
 <p>我们看个例子。构建网络拓扑图之后，t0时刻，发现A和许多其他节点去往H的路由都是通过G转发最快，那这个时候，大量的信息都会发送到G路由节点中待转发。
-<img alt="图片" src="https://static001.geekbang.org/resource/image/48/a4/480309ab501d9b965f0c23b2032551a4.jpg?wh=1920x1145" /></p>
+<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/48/a4/480309ab501d9b965f0c23b2032551a4.jpg?wh=1920x1145" /></p>
 <p><strong>但计算机网络中有个“拥塞”的情况，每个节点在单位时间里能处理的信息是有限的，剩余的信息转发就需要排队，总传输时间也就变得更长了</strong>。所以，当G节点处理的消息越来越多时，G节点就很容易进入拥塞的状态，经过G转发的链路成本也都会飙升。</p>
 <p>但是没有关系，我们的动态路由算法很快就会发现这件事情，G自己就会更新到H的链路成本，比如从4变成7，那再稍后的t1时刻，路由A到H的路由选择就从AGH变成了ABEFH，不再经过G转发了。
-<img alt="" src="https://static001.geekbang.org/resource/image/30/b5/30c9711a8079e431eb447c47f6dfd3b5.jpg?wh=2312x1379" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/30/b5/30c9711a8079e431eb447c47f6dfd3b5.jpg?wh=2312x1379" /></p>
 <h2 id="_8">总结</h2>
 <p>至此，整个链路状态动态路由算法我们就学完了。动态路由算法中基于Dijkstra算法的链路状态算法，核心思路就是通过节点间的通信，获得每个节点到邻居的链路成本信息，进而在每个节点里都各自独立地绘制出全局路由图，之后就可以基于我们上一讲学过的Dijkstra算法构建出路由表了。</p>
 <p>每个节点虽然有了全局的信息，但在路由表中我们依然只需要管好自己就行，只要每个节点都履行好自己的转发义务，数据包就可以正确有效地在动态变化的网络中传输了。</p>
@@ -6641,8 +6641,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

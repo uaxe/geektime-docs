@@ -6370,7 +6370,7 @@
 <p>前面两讲我们介绍了 MySQL 和 Redis 的监控，核心原理就是连到实例上执行特定语句命令拉取数据，类似的还有 MongoDB，这算是一类监控场景。这一讲我们介绍现代分布式系统中非常常用的组件——Kafka，同时引出 JMX 监控场景，丰富你的数据采集工具箱。</p>
 <p>要做好 Kafka 的监控，首先要了解 Kafka 的<a href="https://time.geekbang.org/column/article/99318">基础概念</a>，比如 Topic（主题）、Partition（分区）、Replica（副本）、AR（Assigned Replicas）、ISR（In-Sync Replicas）、OSR（Out-of-Sync Replicas）、HW（High Watermark）、LEO（Log End Offset）等等。其次是要了解 Kafka 的架构，通过架构才能知道要重点监控哪些组件，下面我们就先来看一下 Kafka 的架构图。</p>
 <h2 id="kafka">Kafka 架构</h2>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d6/84/d691yye35395bb878227c002dfcc7a84.png?wh=2306x1303" title="图片来自网络" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d6/84/d691yye35395bb878227c002dfcc7a84.png?wh=2306x1303" title="图片来自网络" /></p>
 <p>上面绿色部分 PRODUCER（生产者）和下面紫色部分 CONSUMER（消费者）是业务程序，通常由研发人员埋点解决监控问题，如果是 Java 客户端也会暴露 JMX 指标。组件运维监控层面着重关注蓝色部分的 BROKER（Kafka 节点）和红色部分的 ZOOKEEPER。</p>
 <p>ZooKeeper 也是 Java 语言写的，监控相对简单，可以复用下面介绍的 JMX 监控方式，另外 ZooKeeper 支持 mntr 四字命令，可以获取 ZooKeeper 内部健康状况。新版 ZooKeeper 连四字命令都不需要了，直接内置暴露了 Prometheus 协议的 metrics 接口，直接抓取即可。</p>
 <p>我们重点关注 Broker 节点的监控，也就是 Kafka 自身的监控，通常从四个方面着手。</p>
@@ -6417,9 +6417,9 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="err">expor</span><span class="kc">t</span><span class="w"> </span><span class="err">JMX_PORT=</span><span class="mi">3457</span><span class="err">;</span><span class="w"> </span><span class="err">./bi</span><span class="kc">n</span><span class="err">/ka</span><span class="kc">f</span><span class="err">ka</span><span class="mi">-</span><span class="err">server</span><span class="mi">-</span><span class="err">s</span><span class="kc">tart</span><span class="err">.sh</span><span class="w"> </span><span class="err">co</span><span class="kc">nf</span><span class="err">ig/server.proper</span><span class="kc">t</span><span class="err">ies</span>
 </code></pre></div>
 <p>启动之后，检查 Kafka 的端口监听，就会发现除了原本监听的 9092 端口，现在也监听了 3457 端口，我们使用 JConsole 工具连上来看看。如果你之前安装过 JDK，直接在命令行里输入 jconsole 就能打开 JConsole 页面。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/37/a5/3760f24d0d92d5d5db79edb58d8fbca5.png?wh=2425x2111" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/37/a5/3760f24d0d92d5d5db79edb58d8fbca5.png?wh=2425x2111" /></p>
 <p>我们选择远程进程，输入 localhost:3457，然后点击连接，选择不安全的连接，就进入了 JConsole 主页面。默认进来是概览页面，我们选择 MBean，左侧就看到了一个树形结构的多个对象。举个例子，依次点击 kafka.server、ReplicaManager、OfflineReplicaCount，右侧会展示 MBeanInfo，里边尤其要注意的是 ObjectName，后面我们获取 JMX 数据的时候，会频繁用到这个属性。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/63/a6/638d5f5c37f17d920e036dd14fcf33a6.png?wh=1746x1520" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/63/a6/638d5f5c37f17d920e036dd14fcf33a6.png?wh=1746x1520" /></p>
 <p>OfflineReplicaCount 是 Broker 的一个关键指标，点击下面的属性，就可以看到具体的值。</p>
 <p>通过 JConsole 的页面确实可以查到各个监控指标的数据，但真正和监控系统对接的话，还是需要使用编程的方式来获取。JMX 的端口走的是 RMI 协议，是Java独有的RPC协议，其他语言没法调用。好在有工具可以把它转为 HTTP 协议，常见的工具有两个，一个是 Prometheus 生态的 <a href="https://github.com/prometheus/jmx_exporter">jmx_exporter_javaagent</a>，一个是 <a href="https://jolokia.org/">Jolokia</a>。Jolokia 也是个 JavaAgent，jmx_exporter 可以把 JMX 指标导出为 Prometheus metrics 格式，Jolokia 可以把 JMX 指标导出为 JSON 格式，差别不大。</p>
 <p>不过 Kafka 暴露的 JMX 指标实在是太多了，如果不过滤全部导出，每个 Broker 轻轻松松就几万个JMX 指标，大型互联网公司的话，基本上都有几百个 Broker，这个量就有点儿大了。</p>
@@ -6501,11 +6501,11 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="err">./ca</span><span class="kc">te</span><span class="err">gra</span><span class="kc">f</span><span class="w"> </span><span class="mi">--</span><span class="kc">test</span><span class="w"> </span><span class="mi">--</span><span class="err">i</span><span class="kc">n</span><span class="err">pu</span><span class="kc">ts</span><span class="w"> </span><span class="err">jolokia_age</span><span class="kc">nt</span>
 </code></pre></div>
 <p>如果输出大量的指标，就说明采集逻辑是正常的，稍等片刻，重启 Categraf，再去监控系统查询一下，看看数据是否正常上报了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/62/c4/6232732758e3d64f9ba42c1d9ce497c4.png?wh=2972x1119" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/62/c4/6232732758e3d64f9ba42c1d9ce497c4.png?wh=2972x1119" /></p>
 <p>我们看下图中的指标，ThreadCount 表示 JVM 里的线程数，类似的还有 DaemonThreadCount，表示后台线程数，PeakThreadCount表示历史峰值线程数。JVM 要重点关注 GC 的情况和内存的情况，我们看下相关指标。</p>
 <p>GC 主要看次数和时间，分为 YongGC 和 FullGC，YongGC 很正常，频率也比较高，FullGC 正常情况下很少发生，如果经常发生，FullGC 程序的性能就会受影响。GC 次数的指标是kafka_java_garbage_collector_CollectionCount，是一个 Counter 类型单调递增的值。GC 时间的指标是 kafka_java_garbage_collector_CollectionTime，也是一个 Counter 类型单调递增的值。这类指标我们通常使用 increase 或 irate 函数计算增量或速率，不关心当前值是多少。</p>
 <p>内存的指标是 kafka_java_memory_pool_Usage_used，单位是 byte。有个 name 标签标识了具体是哪个区域的内存大小，比如 Eden 区、Survivor 区、Old 区。下面仪表盘的中间部分，就是这个内存指标，变化比较剧烈的是 Eden 区，每隔一段时间就会 GC 一次，Eden 区的内存使用量就会降下来，过段时间又会随着使用而上升，然后再次 GC，量又会降下来，循环往复。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c9/18/c969cb5166a66c3a6a02f907c9f2fc18.png?wh=2990x1534" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c9/18/c969cb5166a66c3a6a02f907c9f2fc18.png?wh=2990x1534" /></p>
 <p>所有 Java 类程序，都需要关注这些 JVM 的指标，相关指标的采集方法在 kafka.toml 中有样例，就是这些 java.lang 打头的 MBean。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p">[[</span><span class="err">i</span><span class="kc">nstan</span><span class="err">ces.me</span><span class="kc">tr</span><span class="err">ic</span><span class="p">]]</span>
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="kc">na</span><span class="err">me</span><span class="w">  </span><span class="err">=</span><span class="w"> </span><span class="s2">&quot;java_runtime&quot;</span>
@@ -6579,7 +6579,7 @@
 <p><strong>MBean：kafka.server:type=ReplicaManager,name=LeaderCount</strong></p>
 <p>这个指标表示某个 Broker 上面总共有多少个 leader 分区，leader 分区负责数据读写，承接流量，所以 leader 分区如果不均衡，会导致某些 Broker 过分繁忙而另一些 Broker 过分空闲，这种情况也是需要我们注意的。</p>
 <p>针对以上关键指标我制作了一张<a href="https://github.com/flashcatcloud/categraf/blob/main/inputs/kafka/dashboard-key-metrics.json">仪表盘</a>，供你参考，同时也欢迎你一起来完善。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/63/5a/63e093297a9a094fb706e9660a9f0e5a.png?wh=2972x1100" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/63/5a/63e093297a9a094fb706e9660a9f0e5a.png?wh=2972x1100" /></p>
 <p>Kafka JMX 关键指标，我们就讲解到这里。最后一个关键点是 consumer lag 监控，俗称消息队列堆积，我们一起来看一下。</p>
 <h2 id="lag">Lag 监控</h2>
 <p>每个 Topic 会分成多个 Partition，每个 Partition 都有一个当前的 offset，表示生产的消息已经堆积到了什么位置。每个 Partition 可以被多个 consumergroup 消费，consumergroup 消费的时候，针对某个 Partition 也会有一个 offset 表示消费位置。生产者的 offset 减去 consumergroup 的 offset，就表示滞后量。</p>
@@ -6594,7 +6594,7 @@
 </code></pre></div>
 <p>在 labels 中，我还是建议你加一个 cluster 标签。因为一个公司一般有多个 Kafka 集群，我们可以通过这个标签区分，其次就是 kafka_uris，一般写一两个就可以了，不用把所有 Broker 地址全部写上，Categraf 会作为一个 Kafka client 连上集群，读取 offset 数据。如果是老集群，offset 信息存在 ZooKeeper 上，这个时候就要设置 use_zookeeper_lag = true，并通过 zookeeper_uris 改写 ZooKeeper 的连接地址。</p>
 <p>Kafka 这个采集插件，采集的最核心的指标是 kafka_consumer_lag_millis，你可以看一下样例。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/13/fb/13e9c573061a675a223131cfd18bd7fb.png?wh=3950x1658" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/13/fb/13e9c573061a675a223131cfd18bd7fb.png?wh=3950x1658" /></p>
 <p>指标单位是毫秒，就是一个预估消费时长，这个指标我也放到了<a href="https://github.com/flashcatcloud/categraf/blob/main/inputs/kafka/dashboard-key-metrics.json">仪表盘</a>中，你可以直接导入夜莺使用，或者参考里边的 PromQL 自己制作 Grafana 大盘。到这里，Kafka 监控的关键点就介绍完了，这一讲的内容有点儿长，下面我们来做一个总结。</p>
 <h2 id="_10">小结</h2>
 <p>Kafka 是现代分布式系统架构中非常常见的组件，Kafka 运行是否正常，消息消费是否正常，都需要重点关注。监控可以从4个层面着手，机器、JVM、Kafka Broker、Lag。当然，ZooKeeper 作为 Kafka 重度依赖组件，也需要监控，还有就是 producer 和 consumer 也是需要监控的。不过那是应用程序层面的监控了，需要研发人员协同来做，作为组件平台方来讲，我们重点还是放在 Broker 层面。</p>
@@ -6602,7 +6602,7 @@
 <p>JVM 监控层面，重点关注 GC 和内存的情况，如果频繁发生 Old 区 Full GC，Kafka 性能肯定会受影响。所有 Java 程序都应该监控 JVM，比如 Tomcat、JBoss、Hadoop，走 JMX 这个路径是一个典型的方式。</p>
 <p>Kafka Broker JMX 指标，重点关注一些大面上的异常指标，Kafka 暴露了太多的 JMX 指标，如果无法抓取到关键指标，Kafka 监控绝对是噩梦。</p>
 <p>Lag 监控，也就是 Topic Partition 的消费者滞后监控，是 Queue 类程序需要关注的典型指标。因为一旦消费者跟不上生产者的速度，消息就会积压，数据即时性也就会受很大影响。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4y/61/4yy986291dd9dfe6976d839bcbcc9161.jpg?wh=2339x2470" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4y/61/4yy986291dd9dfe6976d839bcbcc9161.jpg?wh=2339x2470" /></p>
 <h2 id="_11">互动时刻</h2>
 <p>Kafka Broker 的 JMX 指标很多，除了这一讲我们介绍的这些之外，还有不少关键指标，比如针对 Kafka Broker 收到的 request，就有指标来统计吞吐和延时。你能否通过 JConsole 找到 ListGroups 这个 request 每秒请求数的 MBean？能否照猫画虎给出 Jolokia 抓取这个 MBean 的配置？欢迎你在留言区分享你的答案，也欢迎你把今天的内容分享给身边的朋友，邀他一起学习。我们下一讲再见！</p>
 <div><strong>精选留言（5）</strong></div>
@@ -6725,8 +6725,6 @@ Q3：关键指标的仪表盘是Prometheus的吗？</p>2023-02-10</li><br/><li><
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

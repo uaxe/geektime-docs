@@ -6412,7 +6412,7 @@
 <li>探测加密服务器的可用性，即<strong>健康检查</strong>，一旦服务不可用，客户端就要去掉这个失效的连接。</li>
 </ul>
 <p>就像下图这样：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ac/49/ac7d92d0d0a77e425byy00ef52b0a149.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ac/49/ac7d92d0d0a77e425byy00ef52b0a149.jpg?wh=2000x1125" /></p>
 <p>如果加密服务器能在<strong>1秒内</strong>对心跳包进行回复，那么客户端就认为服务端正常可用，后续的数据交互（即加密请求）将继续在这条长连接上进行。而如果服务端未能在1秒内回复，那么客户端会认为该长连接已经中断，于是重启应用，发起一条新的长连接，并在日志中记录一次报错。</p>
 <p>用类Python语法来描述，大体是这样的：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>while true:
@@ -6435,28 +6435,28 @@
 <p>补充：抓包示例文件已经上传至<a href="https://gitee.com/steelvictor/network-analysis/blob/master/07/heartbeat.pcap">Gitee</a>，建议用Wireshark打开文件，结合文稿学习。</p>
 </blockquote>
 <p>因此，通过检查应用日志，我们发现在抓包时间段内，应用日志又记下了两次报错，比如下面这个：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/84/89/84d35533cb2e21e39f5c06504dcdb689.png?wh=498x63" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/84/89/84d35533cb2e21e39f5c06504dcdb689.png?wh=498x63" /></p>
 <p>从日志上看，17:08:02这个时间点发生了一次报错，17:08:10发生了一次程序的重启。</p>
 <p>有了应用层的信息，接下来，我们就需要在抓包文件中，<strong>找到传输层和网络层的信息来与应用层信息对应</strong>，这样排查工作才能继续推进。</p>
 <p>但是日志记录的时间戳粒度太粗了，只精确到了秒级，而网络报文在Wireshark中都是微秒级的，一秒内可能会有成百上千个报文。所以，仅凭精确到秒的一个时间戳，还不足以让我们在几十个报文中，精确地找到对应的报文。这个时候，我们需要调整一下抓包文件分析工作的切入点。</p>
 <p>一个常规的做法是，<strong>跳过案例本身的问题特殊性不谈，先从宏观上把握一下排查思路</strong>。也就是先不纠结于根据日志时间来寻找报文的难题，而是先看Expert Information，找一找有没有比较可疑的报文。打开Expert Information窗口，如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/58/73/587e830687d8b9786f09dffe8fba7773.png?wh=1880x306" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/58/73/587e830687d8b9786f09dffe8fba7773.png?wh=1880x306" /></p>
 <p>可见，有80个Error级别的Malformed Packet（格式错误）报文和2个RST报文，都很可疑。</p>
 <p>我们先看这80个Malformed Packet报文，这传递了什么信息呢？在Protocol栏显示SIGCOMP，说明Wireshark认为这80个报文是SIGCOMP协议的（SIP的信令压缩协议）。不过，客户的应用不是SIP相关的，显然这些报文应该是被Wiresharek误会了。</p>
 <blockquote>
 <p>在这里，我也给你一个小小的<strong>提醒</strong>：毕竟只有被公开广泛支持的数据格式和协议才能在Wireshark中正确展示，所以如果你看到类似这种Malformed Packet的时候，还是要统筹考虑当前案例的实际情况，未必Malformed报文就真的是格式错误，也可能只是Wireshark不了解某种“方言”而已。</p>
 </blockquote>
 <p>让我们看看这些报文究竟是什么。点开Error，选中一个报文。比如我这里选择37号报文：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/07/fd/0760eb16f56ec70837ab52e27894affd.png?wh=1880x372" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/07/fd/0760eb16f56ec70837ab52e27894affd.png?wh=1880x372" /></p>
 <p>随后光标会自动定位到37号报文这里：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b5/51/b50d75ae1b923d05a6b5997067416751.png?wh=1213x177" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b5/51/b50d75ae1b923d05a6b5997067416751.png?wh=1213x177" /></p>
 <p>然后选了另外几个Malformed Packet，发现它们都是成对出现的。它们还有一个特征是：</p>
 <ul>
 <li>前一个报文的TCP载荷数据是01（十六进制）；</li>
 <li>后一个报文的TCP载荷数据是41（十六进制）。</li>
 </ul>
 <p>这就像是某种“联动”机制了，会不会就是心跳报文呢？你注意下TCP Seglen这一栏（这是我添加的表示TCP载荷长度的列），有没有发现这类报文的长度都是1 ？我们就以 <code>tcp.len eq 1</code> 为过滤器，过滤出报文：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9e/91/9e44b98d20161159yyceabc3a11cfc91.png?wh=1225x274" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9e/91/9e44b98d20161159yyceabc3a11cfc91.png?wh=1225x274" /></p>
 <p>可见，37和38是0秒发生的，76和77是45秒后发生的，然后97和98以及后面每一对报文，也都符合45秒间隔的规律，正好跟客户程序的<strong>45秒</strong>心跳包机制对上了。我们可以确认这些报文就是<strong>心跳报文</strong>了！更确切地说，每次成对出现的两个报文中：</p>
 <ul>
 <li>前一个是心跳探测包，它的TCP载荷数据为01（十六进制）；</li>
@@ -6469,24 +6469,24 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>tcp.flags.fin eq 1
 </code></pre></div>
 <p>结果发现什么报文都没有出来。可见，这次抓包里，连接的断开并不是用FIN完成的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/77/c1/7751974162ebff9452195c208f2752c1.png?wh=783x202" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/77/c1/7751974162ebff9452195c208f2752c1.png?wh=783x202" /></p>
 <p>接着就是寻找RST报文。其实，在Expert Information里面，就有2个RST报文，我们可以直接从那里入手。当然，用过滤器也同样方便，输入：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>tcp.flags.reset eq 1
 </code></pre></div>
 <p>我们能找到2个RST报文：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/25/e3/25f575477b2af6be54f51340a39040e3.png?wh=1111x79" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/25/e3/25f575477b2af6be54f51340a39040e3.png?wh=1111x79" /></p>
 <p>我们选中575号报文，然后Follow -&gt; TCP Stream，得到了这个RST所在的TCP流的全部报文：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1y/38/1yyb053e46e3dcf4702bdfa2df015f38.png?wh=1235x416" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1y/38/1yyb053e46e3dcf4702bdfa2df015f38.png?wh=1235x416" /></p>
 <p>报文很多，上图显示的只是一部分报文。我往前翻阅了更前面的报文，也能看到很多相对长的时间间隔，有17秒、39秒、11秒的，但也没有什么规律。这时候，我们就需要结合前面刚分析到的一些信息，要不然就要在报文的海洋里迷失方向了。</p>
 <p>我们通过前面的分析发现，心跳探测包的报文数据是01，心跳回复包的报文数据是41。所以，让我们再次借助强大的过滤器。在 <code>tcp.stream eq 0</code> 后面添加 <code>and tcp.payload eq 01</code>，即整体过滤器变为：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>tcp.stream eq 0 and tcp.payload eq 01
 </code></pre></div>
 <p>这样就过滤出了这个TCP流里面，<strong>所有的心跳探测包</strong>：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6c/0c/6c86e426b76f84dc529a66d05169cd0c.png?wh=1246x408" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6c/0c/6c86e426b76f84dc529a66d05169cd0c.png?wh=1246x408" /></p>
 <p>可见，这些心跳探测包也是很明显遵循了45秒间隔的规律。不过，等一下，为什么572号心跳探测包跟它的上一次心跳探测，间隔的时间是<strong>58秒</strong>，而不是45秒呢？</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/fe/18/fed696dbb35675c0fb989a9728bf7218.png?wh=1221x41" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fe/18/fed696dbb35675c0fb989a9728bf7218.png?wh=1221x41" /></p>
 <p><strong>这很反常，也是第二个很重要的发现。</strong>要知道，这45秒的机制是在代码里实现的，照理说不可能出现13秒这么大的误差。现在，我们把 <code>tcp.payload eq 01</code> 这个条件去掉，回到这个TCP流的完整报文区域来综合分析：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f7/43/f760066db14b0f950d3c71329ee22043.png?wh=1243x392" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f7/43/f760066db14b0f950d3c71329ee22043.png?wh=1243x392" /></p>
 <p>我来给你解读一下：</p>
 <ul>
 <li>572号报文（客户端发出）是心跳探测包；</li>
@@ -6496,18 +6496,18 @@
 </ul>
 <p>以上4个报文之间几乎没有时间上的停顿。这里，你可能会有个小疑问：为什么572号报文跟上一个报文的间隔是17秒而不是45秒呢？其实，这是<strong>Time列的类型</strong>导致的，我这里用的是Delta time displayed类型，是跟前一个被显示的报文的间隔时间。</p>
 <p>之前我们看到很多个整齐的45秒，是因为那个窗口里显示的报文，都是过滤过的心跳报文，跟这里<strong>显示的报文</strong>不同，所以显示的间隔时间也不同。Wireshark里的Time一列有多种配置可选，所以你一方面要理解这里面各种Time的区别，一方面自己做分析的时候，也可以根据实际需要，灵活选择Time类型。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/60/10/6020ec054ae4fc6a79062fe025fde810.png?wh=738x259" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/60/10/6020ec054ae4fc6a79062fe025fde810.png?wh=738x259" /></p>
 <p>考虑到这里的问题就是跟心跳包和挥手包直接相关，排除掉无关报文，可以让我们的分析思路也变得更加清晰。所以，我们再一次调整过滤器，改为：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>tcp.stream eq 0 and (tcp.len == 1 or tcp.flags.reset == 1)
 </code></pre></div>
 <p>就得到这个TCP流里面的心跳包和挥手包：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/2d/ec/2df9da0f4fc2a4cfbda7752e38de98ec.png?wh=1920x523" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2d/ec/2df9da0f4fc2a4cfbda7752e38de98ec.png?wh=1920x523" /></p>
 <p>我们最后再确认一下时间戳。这个隔了58秒才发出的心跳包，发送的时间是在17:08:10：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/38/c9/38ced831f878b7b94fb4d28af42e1cc9.png?wh=640x138" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/38/c9/38ced831f878b7b94fb4d28af42e1cc9.png?wh=640x138" /></p>
 <p>跟日志中restart时间一致：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7c/f3/7c9bbea46yyd3641448e2d502b8acff3.png?wh=548x73" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7c/f3/7c9bbea46yyd3641448e2d502b8acff3.png?wh=548x73" /></p>
 <p>现在，事实已经很清楚了：客户端在连接被断开之前的心跳探测包，并没有遵循客户声称的“每隔45秒”，而是很意外地隔了58秒。我们结合程序逻辑，已经可以推断出真实的状况了。看示意图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f0/7e/f03e54e7cb407456f4e324b85c8d7e7e.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f0/7e/f03e54e7cb407456f4e324b85c8d7e7e.jpg?wh=2000x1125" /></p>
 <h3 id="_3">结论：排除网络，追查代码</h3>
 <p>现在，我们已经清楚了这个报错的原因：客户端程序出了一个Bug，某一次心跳探测包发出的时候是在上一次心跳的58秒以后（也就是相对正常情况，迟了13秒）。那么，服务端虽然立即发送了心跳回复包，但也一样是在58秒以后了。程序的逻辑非常简单粗暴：一旦心跳回复包的到达时间超过了第46秒（也就是45秒+1秒超时），就认为是心跳探测失败。</p>
 <p><strong>为什么探测包本身会比预定的时间晚了13秒才发出呢？</strong>根据这个很明确的信息，客户再次检查了应用代码，终于定位到了出问题的代码段。修复代码后，问题随之解决。</p>
@@ -6551,11 +6551,11 @@
 </ul>
 <p>但是TCP本身提供的Keep-alive报文特征就非常不同了。首先，它的序列号就很奇特，是上一个报文的序列号<strong>减1</strong>，载荷<strong>为0</strong>。回复的报文也同样特别，确认号为收到的序列号<strong>加1</strong>。而且，无论是探测包还是回复包，其载荷长度都<strong>为0</strong>。</p>
 <p>文字描述不是很容易理解，我给你看一个实际的例子。这是某一次我用Chrome浏览器访问网站时做的抓包：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ed/1a/ed092d46acc5594db8ae276f927b2f1a.png?wh=1920x453" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ed/1a/ed092d46acc5594db8ae276f927b2f1a.png?wh=1920x453" /></p>
 <p>上图的红色底色的多个报文，就是Wireshark识别出来的TCP心跳包。我也把需要关注的信息用红色方框标注出来了。</p>
 <p>25号报文是离心跳包最近的一个常规报文，Wireshark告诉我们：它的下一个序列号（图中的NextSeq）是1578。也就是说，如果下一个是常规报文，那么这个常规报文的序列号就是1578。然后看同是这个客户端发出的报文27，这就是一个心跳包，它的序列号却是1577（也就是<strong>1578-1</strong>），载荷为0（Len=0）。对端对这个心跳包做了回应（包号28），确认号为1578（<strong>1577+1</strong>），载荷也为0。</p>
 <p>我们再来看一下示意图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5b/6c/5b04d1eee64f3ea50185a479b55fc06c.jpg?wh=2000x803" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5b/6c/5b04d1eee64f3ea50185a479b55fc06c.jpg?wh=2000x803" /></p>
 <p>要是你了解TCP握手和挥手阶段的确认号的话，你对这个+1机制是不是感觉很熟悉？可见，TCP认为心跳包也是十分重要的，它跟握手和挥手一样，都属于控制报文，它的确认号机制也体现了这一特点。</p>
 <p>有趣的是，RFC1122里并没有规定心跳探测包的载荷一定是0，它也可以是1。只是从我有限的抓包经验来看，心跳包都是载荷为0的，看来这是比较常见的实现方式。</p>
 <h3 id="http-keep-alive">HTTP Keep-alive</h3>
@@ -6583,13 +6583,13 @@
 <p>这个Connection头部看似简单，其实有时候也能起到很大的作用。在eBay，我们每年有大量的流量迁移的工作。其中，这个Connection头部就在迁移的<strong>平滑度和收敛速度</strong>上，起到了很关键的作用。</p>
 <p>具体来说，我们在新老两个VIP之间迁移流量，用的是名称解析（基于DNS/GSLB）的返回值的比例，来控制真实的HTTP流量比例，这就可以逐步从新老比例为1:99，到50:50，最后到100:0也就是全部到新VIP。</p>
 <p>但是这样会有这么个问题：因为流量基本都是HTTP/1.1（即默认是长连接），客户端依然坚持使用着老的VIP，造成DNS/GSLB的比值调整没有起到应有的效果，真正观察到的流量经常跟DNS/GSLB的设置值相差甚远，或者说<strong>有很强的滞后性</strong>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e2/fe/e2864876efec290dc58ebf62393d76fe.jpg?wh=2000x659" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e2/fe/e2864876efec290dc58ebf62393d76fe.jpg?wh=2000x659" /></p>
 <p>从上图中可以看到，客户端在查询GSLB（相当于智能DNS）的时候，拿到的新老IP的比例为2:2，那么访问量应该也是符合这个比例。但是因为长连接的存在，这些拥有长连接的客户端连问都不会去问GSLB，而是会继续往老的连接（也就是连着老VIP的连接）上发送流量，那么我们迁移流量的工作，就受到影响了。</p>
 <p>为了解决这个问题，我们当然可以选择等待（比如几小时甚至几天）它自然收敛，但其实我们找到了更好的办法：在新老VIP上都添加了rewrite policy，使得每一定比例的HTTP响应里面，都带上Connection: Close这个头部。</p>
 <p>客户端收到这个头部后，按照协议规定，它必须关闭这条长连接。在下一次HTTP请求的时候，客户端就会遵循“DNS解析-&gt;发起新连接-&gt;发送HTTP请求”这样的工作路径，于是新发起的连接数跟DNS解析数量基本对齐，也就达到了我们的目的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b6/5c/b608c91ef62f7b824cb8b3fa5935f65c.jpg?wh=2000x660" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b6/5c/b608c91ef62f7b824cb8b3fa5935f65c.jpg?wh=2000x660" /></p>
 <p>下图是在迁移尾声时候的流量趋势图。在这个阶段，老VIP已经从DNS/GSLB里禁用了。但原先不插入这种Connection: Close头部的话，总还是有很多请求在老的VIP上。在插入了Connection: Close头部后，老VIP上的流量几乎立刻停止，可谓立竿见影。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/64/52/641ebb1db456baebfcda566b35d4ff52.png?wh=1920x392" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/64/52/641ebb1db456baebfcda566b35d4ff52.png?wh=1920x392" /></p>
 <h2 id="_5">小结</h2>
 <p>这节课，我们通过一个奇特的案例，详细探究了一种应用层保活机制的Bug引发的报错。在这个排查过程中，<strong>Wireshark过滤器</strong>的使用，很大程度上帮助了这次排查。所以，这里我推荐你要熟悉以下这些过滤器，在你以后的网络排查工作中，应该能给到不少的帮助：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>tcp.len eq 长度
@@ -6760,8 +6760,6 @@ Delta time displayed的意思是[Time delta from previous displayed frame]，直
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -6415,7 +6415,7 @@
 <p>目前最主流的持久化存储介质还是磁盘。限于磁盘的物理结构，它读写的最小单位是扇区，大小是512B，但是每次都只读一个扇区，不利于读写效率的提升；所以文件系统普遍会把多个扇区组成一个块，也就是block。在Ext4中，逻辑块的大小是4KB，包含8个扇区。</p>
 <p>我们的数据自然也就是放在这一个个数据块上的。不过和内存一样，<strong>磁盘空间大小虽然大的多，但仍然是有限的，我们需要为不同的文件划分出自己的区域</strong>，也就是数据具体要存储在哪些块上的。</p>
 <p>为了更灵活地存储文件、更高效地利用磁盘空间、更快速地访问到每个文件的数据存储在哪些块上，Linux的做法是把文件分成几块区域：至少包括超级块、索引节点区、数据块区。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/db/9a/dbe36ee8745fdb52b7953e13fb50809a.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/db/9a/dbe36ee8745fdb52b7953e13fb50809a.jpg?wh=1920x1145" /></p>
 <ul>
 <li>超级块，是文件系统中的第一个块，用来存放文件系统本身的信息，比如可以用于记录每块区域的大小；</li>
 <li>索引节点区，每个文件对应索引节点区中的一个块，我们称为索引节点，也就是Inode，存放每个文件中所用到的数据块的地址，Inode也是元数据主要存储的地方；</li>
@@ -6428,10 +6428,10 @@
 <p>现在每个文件都对应一个Inode，它记录了所有数据块的位置，可以预想到，之后在修改、创建文件的时候，除了修改数据块区的内容，也需要修改文件的元数据和Bitmaps。比如，当我们往某个文件里追加数据，很可能就需要创建新的数据块把数据写入其中，并且在Inode上追加一个指向这个数据块的指针。</p>
 <p>总之这么看，<strong>每次写文件的操作其实都是一个操作序列，而不是一个单一的操作</strong>。但是，磁盘在同一时间里肯定只能接受一次读写的请求，因此文件系统就引入了崩溃一致性问题。</p>
 <p>这很好理解，我们看一个具体的例子。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/2e/20/2e5e7befb06b024741d5fdc0fbaf7420.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2e/20/2e5e7befb06b024741d5fdc0fbaf7420.jpg?wh=1920x1145" /></p>
 <p>已知我们写一个文件至少会碰到 Bitmaps、Inodes 和 Data Blocks 三块数据的修改，在不会遇到崩溃的时候，我们可能就像这张图一样顺利修改了每个部分，此时文件系统没有任何问题。</p>
 <p>但假设，修改完Inodes了，我们把Inodes中某个指针指向了一段即将要存放数据内容的数据块，此时如果遭遇了断电，Data Blocks 上的内容是未知的，很可能是很早之前别的程序写过的数据，我们可以认为此时上面的数据是脏的垃圾数据。等系统恢复，我们重新去读取文件数据的时候，会发现也没有什么有效的依据供我们检验文件是否正常。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/cc/fb/ccf6227b5cacab6975c67395d75328fb.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cc/fb/ccf6227b5cacab6975c67395d75328fb.jpg?wh=1920x1145" /></p>
 <p>在这种情况下，Inodes指向的文件内容和我们的预期就会不一致，从而产生文件损坏的情况。其实和我们平时说的事务性、原子性是类似的场景。</p>
 <p>这也只是不一致的一种情况。事实上，因为操作系统会对磁盘读写的顺序做调度，以提高读写的效率，我们其实不能知道这几个写磁盘的独立步骤确切的执行顺序。</p>
 <p>不过可以想见，在其他几种写Inodes、Data Blocks和Bitmaps的顺序下，<strong>如果没有执行完全部步骤就遭遇了断电等情况，文件系统在大部分时候仍然都会进入不正确的状态，这就是崩溃一致性问题</strong>，如果你感兴趣可以模拟其他几种情况。</p>
@@ -6451,17 +6451,17 @@
 <p>思想也很简单，就是<strong>每次在真正更新磁盘中的数据结构之前，我们把要做的操作先记录下来，然后再执行真正的操作，这也就是先写日志，WAL中write-ahead的意思</strong>。这样做的好处在于，如果真的发生错误的时候，没有关系，我们回去查阅一下日志，按照日志记录的操作从头到尾重新做一遍就可以了。</p>
 <p>这样我们通过每次写操作时增加一点额外的操作，就可以做到任何时候遭遇崩溃，都可以有一个修复系统状态的依据，从而永远能恢复到一个正确的状态。</p>
 <p>对于文件系统的布局，我们也只是需要增加一块区域用于存放日志就行，改动不是很大，这块区域我们叫做日志区（Journal）。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/00/8d/0003032e2ea1bb710533c19405fe2f8d.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/00/8d/0003032e2ea1bb710533c19405fe2f8d.jpg?wh=1920x1145" /></p>
 <p>那Journal区里到底要存放点什么样的内容呢？</p>
 <p>这里会涉及一次完整的写文件对磁盘的一系列操作，你不熟悉的话也没有关系，就当这是几个独立的操作就行。<strong>我们核心就是要实现：希望可以通过某种记录日志的方式，让这些操作一旦决定被提交，即使后续对磁盘上元数据和数据块上数据结构的改动进行到一半，系统断电了，仍然可以根据这个日志恢复出来</strong>。</p>
 <p>那要怎么做呢？和数据库一样，我们为了让一系列操作看起来具有原子性，需要引入“事务”的概念。</p>
 <p>我们每次进行一次对文件的写操作，除了会先在预写日志中，记录对Inodes的修改记录、对Bitmaps的修改记录，以及对具体数据块的修改记录之外，还会同时在这几条记录的前后，分别引入一个事务开始记录和一个事务结束记录。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/47/92/477680186c827738e076726c9c24e992.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/47/92/477680186c827738e076726c9c24e992.jpg?wh=1920x1145" /></p>
 <p>第一个写入的记录是TxB，也就是Transaction Begin记录，最后一个写入的记录就是TxE也就是Transaction End记录，<strong>在TxE记录完成后，就意味着整个写文件的操作全过程都被记录在案了，我们把这个步骤叫做Journal Write</strong>。</p>
 <p>从而，日志的组织形式就是由这样一个个事务拼接而成，日志的首尾是TxB和TxE块，中间是具体对元数据和数据块修改的记录块。</p>
 <p>当我们完成Journal Write操作之后，就可以放心大胆地把这些实际的元数据或文件数据覆写到磁盘上对应的数据结构中了，这个步骤我们叫做 checkpointing。</p>
 <p>当这个步骤也成功完成，我们就可以说整个写文件的操作被完成了，在全部成功的情况下当然没什么特别的，<strong>但整个设计的关键之处就在于，面对任意时刻崩溃的情况，我们也能把文件系统恢复到某一合法状态的能力</strong>。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e7/8e/e7859d16930576ceb6f9158d21c2228e.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e7/8e/e7859d16930576ceb6f9158d21c2228e.jpg?wh=1920x1145" /></p>
 <p>我们具体看看崩溃出现的时候，引入了journaling的文件系统会有什么不同吧。</p>
 <ul>
 <li>如果崩溃出现在journal write步骤中</li>
@@ -6615,8 +6615,6 @@ Inode就是元数据，还是说，Inode是存储元数据的区域啊？</p>202
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

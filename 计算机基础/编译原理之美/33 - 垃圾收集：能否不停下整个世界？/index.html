@@ -6256,11 +6256,11 @@
 <p>内存垃圾是一些保存在堆里的对象，但从程序里已经无法访问。</p>
 <p>在堆中申请一块内存时（比如Java中的对象实例），我们会用一个变量指向这块内存。这个变量可能是：全局变量、常量、栈里的变量、寄存器里的变量。<strong>我们把这些变量叫做GC根节点。</strong>它指向的对象中，可能还包含指向其他对象的指针。</p>
 <p>但是，如果给变量赋予一个新的地址，或者当栈桢弹出，该栈桢的变量全部失效，这时，变量所指向的内存就无用了（如图中的灰色块）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/94/96/9494805978d8f443d0a2bcd26c9c0296.jpg?wh=1142%2A347" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/94/96/9494805978d8f443d0a2bcd26c9c0296.jpg?wh=1142%2A347" /></p>
 <p>另外，如果A对象有一个成员变量指向C对象，那么如果A不可达，C也会不可达，也就失效了。但D对象除了被A引用，还被B引用，仍然是可达的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4c/64/4c105fc2086aa28833b964e0fec8ab64.jpg?wh=1142%2A851" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4c/64/4c105fc2086aa28833b964e0fec8ab64.jpg?wh=1142%2A851" /></p>
 <p>所以，所有可达的内存就不是垃圾，而计算可达性，重点在于知道哪些是根节点。在一个活动记录（栈桢）里，有些位置放的是指向堆中内存的指针，有的位置不是，比如，可能存放的是返回地址，或者是一个整数值。如果我们能够知道活动记录的布局，就可以找出所有的指针，然后就能计算寻找垃圾内存。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b6/2b/b627043f76490ff9e5beaa1241b0e52b.jpg?wh=1142%2A271" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b6/2b/b627043f76490ff9e5beaa1241b0e52b.jpg?wh=1142%2A271" /></p>
 <p>现在，你应该知道了内存垃圾的特点了，接下来，只要用算法找出哪些内存是不可达的，就能进行垃圾收集了。</p>
 <h2 id="mark-and-sweep">标记和清除（Mark and Sweep）</h2>
 <p>标记和清除算法是最为经典的垃圾收集算法，它分为<strong>标记阶段和清除阶段。</strong></p>
@@ -6274,23 +6274,23 @@
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>那么把v1...vn加入todo列表(去除重复成员)
 </code></pre></div>
 <p>下面的示例图中，x和y是GC根节点，标记完毕以后，A、C和D是可达的，B、E和F是可收集的（我用不同的颜色做了标注）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8a/80/8a710595f6488fa83b19926df166a880.jpg?wh=1142%2A578" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8a/80/8a710595f6488fa83b19926df166a880.jpg?wh=1142%2A578" /></p>
 <p><strong>在清除阶段中，</strong>GC遍历所有从堆里申请的对象，把标记为0的对象收回，把标记为1的内存重新置为0，等待下次垃圾收集再做标记。</p>
 <p>这个算法虽然看上去简单清晰，<strong>但存在一个潜在的问题。</strong></p>
 <p>在标记阶段，也就是遍历图的时候，必须要有一个列表作为辅助的数据结构，来保存所有待检查的对象。但这个列表要多大，只有运行时才清楚，所以没有办法提前预留出一块内存，用于清除算法。而一旦开始垃圾收集，那说明系统的内存已经比较紧张了，所以剩下的内存是否够这个辅助的数据结构用，是不确定的。</p>
 <p>可能你会说：那我可以改成递归算法，递归地查找下级节点并做标记。这是不行的，因为每次递归调用都会增加一个栈桢，来保存递归调用的参数等信息，内存消耗有可能更大。</p>
 <p>不过，方法总比问题多，针对算法的内存占用问题，你可以用<strong>指针逆转（pointer reversal）</strong>来解决。<strong>这个技术的思想是：</strong>把算法所需要的辅助数据，记录在内存对象自身的存储空间。<strong>具体做法是：</strong>顺着指针方向从A到达B时，我们把从A到B的指针逆转过来，改成从B到A。把B以及B的子节点标记完以后，再顺着这个指针找到回去的路，回到A，然后再把指针逆转回来。</p>
 <p>整个标记过程的直观示意图如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/31/bf/31c23e4c04c7eeb5bd11b9e4b0202cbf.jpg?wh=1142%2A285" /><img alt="" src="https://static001.geekbang.org/resource/image/fd/d7/fd553de3de1dcee92fba8672f289b3d7.jpg?wh=1142%2A302" /><img alt="" src="https://static001.geekbang.org/resource/image/9a/e8/9acdf18b874f1fb3dab262c47bf3b1e8.jpg?wh=1142%2A329" /><img alt="" src="https://static001.geekbang.org/resource/image/fe/bf/fe824ae8346ac347b7a1fb77218b8cbf.jpg?wh=1142%2A329" /><img alt="" src="https://static001.geekbang.org/resource/image/9f/8c/9fd1b7668d1368d94676a26fdf5de28c.jpg?wh=1142%2A263" />
-<img alt="" src="https://static001.geekbang.org/resource/image/cc/0f/cc2b26d6bc1d4aaa601d21fc2e5cad0f.png?wh=834%2A216" />
-<img alt="" src="https://static001.geekbang.org/resource/image/9c/46/9c8e0bbc06eef2f1cbb53ef6987b0546.jpg?wh=1142%2A288" /></p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/31/bf/31c23e4c04c7eeb5bd11b9e4b0202cbf.jpg?wh=1142%2A285" /><img alt="" src="https://static001.geekbang.org/resource/image/fd/d7/fd553de3de1dcee92fba8672f289b3d7.jpg?wh=1142%2A302" /><img alt="" src="https://static001.geekbang.org/resource/image/9a/e8/9acdf18b874f1fb3dab262c47bf3b1e8.jpg?wh=1142%2A329" /><img alt="" src="https://static001.geekbang.org/resource/image/fe/bf/fe824ae8346ac347b7a1fb77218b8cbf.jpg?wh=1142%2A329" /><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9f/8c/9fd1b7668d1368d94676a26fdf5de28c.jpg?wh=1142%2A263" />
+}{:referrerpolicy="no-referrer"}{:referrerpolicy="no-referrer"}{:referrerpolicy="no-referrer"}{:referrerpolicy="no-referrer"<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cc/0f/cc2b26d6bc1d4aaa601d21fc2e5cad0f.png?wh=834%2A216" />
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9c/46/9c8e0bbc06eef2f1cbb53ef6987b0546.jpg?wh=1142%2A288" /></p>
 <p><strong>关于这个技术，你需要注意其中一个技术细节：</strong>内存对象中，可能没有空间来存一个指针信息。比如下图中，B对象原来就有一个变量，用来保存指向C的指针。现在用这个变量的位置保存逆转指针，来指向A就行了。但到C的时候，发现C没有空间来存逆转到B的指针。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/09/55/0983e445ee4c732dde5fcfb5f6e3bf55.jpg?wh=1142%2A373" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/09/55/0983e445ee4c732dde5fcfb5f6e3bf55.jpg?wh=1142%2A373" /></p>
 <p><strong>这时，借助寄存器就可以了。</strong>在设置从B到A的指针之前，要把B和C的地址，临时保存在寄存器里，避免地址的丢失。进入C以后，如果C没有存指针的空间，就证明C是个叶子节点，这时，用寄存器里保存的地址返回给B就行了。</p>
 <p><strong>采用标记和清除算法，</strong>你会记住所有收集了的内存（通常是存在一个双向列表里），在下次申请内存的时候，可以从中寻找大小合适的内存块。<strong>不过，这会导致一个问题：</strong>随着我们多次申请和释放内存，内存会变得碎片化。所以，在申请内存的时候，要寻找合适的内存块，算法会有点儿复杂。而且就算你努力去寻找，当申请稍微大一点儿的内存时，也会失败。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c9/1d/c9d3a8cd707d47494986caf1cbd6ae1d.jpg?wh=1142%2A552" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c9/1d/c9d3a8cd707d47494986caf1cbd6ae1d.jpg?wh=1142%2A552" /></p>
 <p>为了避免内存碎片，你可以采用变化后的算法，<strong>标记-整理算法：</strong>在做完标记以后，做一下内存的整理，让存活的对象都移动到一边，消除掉内存碎片。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5b/99/5b8a00382aa078eb3861fb47111c8299.jpg?wh=1142%2A720" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5b/99/5b8a00382aa078eb3861fb47111c8299.jpg?wh=1142%2A720" /></p>
 <p>除此之外，停止和拷贝算法，也能够避免内存碎片化。</p>
 <h2 id="stop-and-copy">停止和拷贝（Stop and Copy）</h2>
 <p>采用这个算法后，内存被分成两块：</p>
@@ -6299,10 +6299,10 @@
 <li>一块是新空间，用于垃圾收集。</li>
 </ul>
 <p>停止和拷贝算法也可以叫做<strong>复制式收集（Coping Collection）。</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/50/bd/5040c8ae50faeb063e11092fa8b425bd.jpg?wh=1142%2A552" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/50/bd/5040c8ae50faeb063e11092fa8b425bd.jpg?wh=1142%2A552" /></p>
 <p>你需要保持一个堆指针，指向自由空间开始的位置。申请内存时，把堆指针往右移动就行了，比标记-清除算法申请内存更简单。</p>
 <p><strong>这里需要注意，</strong>旧空间里有一些对象可能已经不可达了（图中的灰色块），但你不用管。当旧空间变满时，就把所有可达的对象，拷贝到新空间，并且把新旧空间互换。这时，新空间里所有对象整齐排列，没有内存碎片。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/75/2b/75f21f379ecdc8e486b888932050422b.jpg?wh=1142%2A490" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/75/2b/75f21f379ecdc8e486b888932050422b.jpg?wh=1142%2A490" /></p>
 <p><strong>停止-拷贝算法被认为是最快的垃圾收集算法，有两点原因：</strong></p>
 <ul>
 <li>分配内存比较简单，只需要移动堆指针就可以了。</li>
@@ -6323,7 +6323,7 @@
 <p>所以，引用计数算法非常容易实现，只需要在赋值时修改引用计数就可以了。</p>
 <p><strong>不过，引用计数方法也有缺陷：</strong></p>
 <p><strong>首先，是不能收集循环引用的结构。</strong>比如图中的A、B、C和D的引用计数都是1，但它们只是互相引用，没有其他变量指向它们。而循环引用在面向对象编程里很常见，比如一棵树的结构中，父节点保存了子节点的引用，子节点也保存了父节点的引用，这会让整棵树都没有办法被收集。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/99/94/9908e44af49bca04b1dbef3667f15f94.jpg?wh=1142%2A471" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/99/94/9908e44af49bca04b1dbef3667f15f94.jpg?wh=1142%2A471" /></p>
 <p>如果你有C++工作经验，应该思考过，怎么自动管理内存。<strong>有一个思路是：</strong>实现智能指针，对指针的引用做计数。这种思路也有循环引用的问题，所以要用其他算法辅助，来解决这个问题。</p>
 <p><strong>其次，在每次赋值时，都要修改引用计数，开销大。</strong>何况修改引用计数涉及写内存的操作，而写内存是比较慢的，会导致性能的降低。</p>
 <p>其实，这三个算法都是比较单一的算法，实际上，它们可以作为更复杂、更实用算法的组成部分，<strong>比如分代收集算法。</strong></p>
@@ -6331,7 +6331,7 @@
 <p>分代收集算法在商业级的产品里很普及，比如Java和Go语言的GC。</p>
 <p><strong>它的核心思想是：</strong>在程序中，往往新创建的对象会很快死去，比如，你在一个方法中，使用临时变量指向一些新创建的对象，这些对象大多数在退出方法时，就没用了。<strong>根据这个原理，</strong>垃圾收集器将注意力集中在比较“年轻”的数据上，因为它们成为垃圾的概率比较高。</p>
 <p>我们把堆划分成若干“代”（Generation）：G0是最新代，G1就要老一些。不过GC根节点的计算有一个小小的区别：在收集G0时，根节点除了全局变量、栈和寄存器中的变量外，还要包含老一代的对象中指向G0的指针（下图中橙色的线，都是指向G0中对象的）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8a/30/8a10c9a1fa22a21c3e1160595f92e330.png?wh=1018%2A336" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8a/30/8a10c9a1fa22a21c3e1160595f92e330.png?wh=1018%2A336" /></p>
 <p><strong>所以，一个重要的问题是：</strong>记住G1、G2…中的根节点。但如果每次都去搜一遍，相当于遍历所有世代，效率很低。所以，要采用效率高一点儿的算法，比如记忆表法。</p>
 <p><strong>这个算法是指：</strong>如果A对象的x属性被设置成了B对象，那么就要把A对象加入一个向量里（记忆表），记住这个对象曾经被更新过。在垃圾收集时，要扫描这张表，寻找指向G0的老对象。</p>
 <p>因为这个算法要记的对象太多，记忆表会变得很大，不太划算。不过我们可以把内存划为2的k次方大小的一个个卡片，如果卡片上的对象被赋值，那么就把这张卡片标记一下，这叫做卡片标记法。</p>
@@ -6519,8 +6519,6 @@ GraalVM发布一段时间后，把Java编译为本地代码的工具Excelsior Je
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

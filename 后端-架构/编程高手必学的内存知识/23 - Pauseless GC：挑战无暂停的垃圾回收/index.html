@@ -14293,7 +14293,7 @@
 <h3 id="read-barrier">read barrier</h3>
 <p>通过前面的学习，我们知道CMS算法和G1算法都使用了write barrier来保证并发标记的完整性，防止漏标现象。ZGC的并发标记也不例外，这个技术我们已经深入讨论过了，这里就不再啰嗦了。除此之外，ZGC提升效率的核心关键在于并发转移阶段使用了read barrier。</p>
 <p>请你试想一下，当应用线程去读一个对象时，GC 线程刚好正在搬移这个对象。<strong>如果GC线程没有搬移完成，那么应用线程可以去读这个对象的旧地址；如果这个对象已经搬移完成，那么可以去读这个对象的新地址。那么判断这个对象是否搬移完成的动作就可以由read barrier来完成</strong>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ed/6a/ed2443f9f2b906d07yyb51c752d8086a.jpg?wh=2284x1375" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ed/6a/ed2443f9f2b906d07yyb51c752d8086a.jpg?wh=2284x1375" /></p>
 <p>上图中，对象a和对象b都引用了对象foo，当foo正在拷贝的过程中，应用线程A可以访问旧的对象foo得到正确的结果，当foo拷贝完成之后，应用线程B就可以通过read barrier来获取对象foo的新地址，然后直接访问对象foo的新地址。</p>
 <p>请你思考一下，如果这里只用 write barrier是否可行？当foo正在拷贝的过程中，应用线程A如果要写这个对象，那么只能在旧的对象foo上写，因为还没有搬移完成；如果当foo拷贝完成之后，应用线程B再去写对象foo，是写到foo的新地址，还是旧地址呢？</p>
 <p>如果写到旧地址，那么对象foo就白搬移了，如果写到新地址，那么又和线程A看到的内容不一样？所以使用write barrier是没有办法解决并发转移过程中，应用线程访问一致性问题，从而无法保证应用线程的正确性。因此，为了实现并发转移，<strong>ZGC使用了read barrier</strong>。</p>
@@ -14301,7 +14301,7 @@
 <p>为了达到这个目的，<strong>ZGC采用了用空间换时间的做法</strong>，也就是<strong>染色指针</strong>（colored pointer）技术。通过这个技术，ZGC不仅非常高效地完成了read barrier需要完成的工作，而且可以更高效的利用内存。接下来我们就看看染色指针是怎么一回事吧。</p>
 <h3 id="_2">染色指针</h3>
 <p>我们知道，在 64 位系统下，当前Linux系统上的地址指针只用到了 48 位，寻址范围也就是 256T。但实际上，当前的应用根本就用不到256T内存，也没有哪台服务器机器上面可以一下插这么多内存条。所以， ZGC 就借用了地址的第 42 ~ 45 位作为标记位，第 0 ~ 41位共 4T 的地址空间留做堆使用。我们结合 JVM 的源码来看看ZGC中对地址具体是怎么标注的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e7/be/e74043f75ec7e31026797cc3656ac1be.jpg?wh=2284x971" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e7/be/e74043f75ec7e31026797cc3656ac1be.jpg?wh=2284x971" /></p>
 <p>通过上图我们可以看出，第 46 和 47 位是预留的，也就是说标记位可以继续向左移两位，那么可以支持的堆空间就可以扩展到 16T。当前很多资料说 ZGC只支持 4T 内存，实际上现在最新版本已经支持到了 16T，如果你特别感兴趣的话，我建议你可以下载 openJDK 的源码进行查看。</p>
 <p>第 42-45 这 4 位是标记位，它将地址划分为 Marked0、Marked1、Remapped、Finalizable 四个地址视图（由于Finalizable与弱引用的实现有关系，我们这里只讨论前三个）。</p>
 <p>地址视图应该怎么理解呢？其实很简单，对一个对象来说，如果它地址的第 42 位是 1，那么它就被认为是处于 Marked0 视图。依次类推，如果第 43位是1，这个对象就处于Marked1 视图；如果第 44 位是1，该对象就处于Remapped 视图。</p>
@@ -14340,11 +14340,11 @@
 <p>上面的例子先在内存中创建了一个匿名文件（第10行），然后将这个匿名文件映射到shm0，shm1，shm2三个虚拟地址上（第12-14行）。当我们修改shm0时，shm1和shm2的内容也会跟着变化。地址视图也是用了同样的原理，三个地址视图映射的是同一块物理内存，映射地址的差异只在第42-45位上。这样一个对象可以由三个虚拟地址访问，其访问的内容是相同的。</p>
 <p>有了地址视图之后，我们就可以在一个对象转移之后，修改它的地址视图了，同时还可以维护一张映射表（下称forwarding table）。在这个映射表中，key 是旧地址，value 是新地址。当对象再次被访问时，通过插入的read barrier 来判断对象是否被搬移过。如果forwarding table中有这个对象，说明当前访问的对象已经转移，read barrier这时就会将对这个对象的引用直接更改为新地址。</p>
 <p>我还是举一个例子来说明，搬移一个对象以及访问它的引用所需要的步骤，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a0/7d/a01b4d1202816b2bc83f595e0yy7867d.jpg?wh=2284x1349" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a0/7d/a01b4d1202816b2bc83f595e0yy7867d.jpg?wh=2284x1349" /></p>
 <p>上图中，当foo对象发生转移之后，对象a再访问foo时就会触发read barrier。read barrier会查找forwarding table来确定对象是否发生了转移，确定foo被转移到新地址foo（new）之后，直接将这一次对foo的访问更改为foo（new）。由于整个过程是依托于read barrier自动完成的，这个过程也叫“自愈”。在介绍了 ZGC的关键技术之后，我们来重点讲下 ZGC 的回收原理。</p>
 <h2 id="zgc_1">ZGC的回收原理</h2>
 <p>ZGC虽然在实现上有十个左右的小步骤，但在总体思想上可以概括为三个核心步骤，我们通过<a href="https://www.usenix.org/legacy/events/vee05/full_papers/p46-click.pdf">Pauseless GC原始论文</a>的内容来介绍。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9c/2f/9c004f0c74395e78d123bfc5f3f17b2f.jpg?wh=2284x1035" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9c/2f/9c004f0c74395e78d123bfc5f3f17b2f.jpg?wh=2284x1035" /></p>
 <p>在这张图中，你可以看到 Pauseless 的三个核心步骤分别是：<strong>Mark、Relocate和 Remap</strong>。接下来我们就简单了解下这三个核心步骤都做了哪些事情。按照步骤的先后顺序，我们先来介绍Mark。</p>
 <h3 id="mark">Mark</h3>
 <p>事实上，ZGC 也不是完全没有 STW 的。在进行初始标记时，它也需要进行短暂的 STW。不过在这个阶段，ZGC只会扫描 root，之后的标记工作是并发的，所以整个初始标记阶段停顿时间很短。也正是因为这一点，ZGC 的最大停顿时间是可控的，也就是说<strong>停顿时间不会随着堆的增大而增加</strong>。</p>
@@ -14360,7 +14360,7 @@
 </ul>
 <p>关于第一点，我们前面提到ZGC是分块的，块区域叫Page；G1也是分块的，只不过被分成的块叫Region。虽然细节上有些差异，但它们总体的思想是类似的。</p>
 <p>至于forwarding table，我们在前面也提到过，它是一张维护对象搬移前和搬移后地址的映射表，key是对象的旧地址，value是对象的新地址。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/66/4c/66eyy0d67fa3eb8fbf8dda5818905b4c.jpg?wh=2284x1400" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/66/4c/66eyy0d67fa3eb8fbf8dda5818905b4c.jpg?wh=2284x1400" /></p>
 <p>在Relocate阶段，应用线程新创建的对象地址视图标记为Remapped。如果应用线程访问到一个地址视图是Marked0的对象，说明这个对象还没有被转移，那么就需要将这个对象进行转移，转移之后再加入到forwarding table，然后再对这个对象的引用直接指向新地址，完成自愈。这些动作都是发生在read barrier中的，是由应用线程完成的。</p>
 <p>当 GC 线程遍历到一个对象，如果对象地址视图是 Marked0，就将其转移，同时将地址视图置为 Remapped，并加入到forwarding table ；如果访问到一个对象地址视图已经是 Remapped，就说明已经被转移了，也就不做处理了。</p>
 <p>那么关于三个地址视图我们已经用到了其中两个，你一定好奇Marked1视图什么时候使用。接下来我们就进入Remap阶段，为你揭晓Marked1视图的作用。</p>
@@ -14369,7 +14369,7 @@
 <p>这样就会导致活跃视图不统一，需要再对对象的引用关系做一次全面的调整，这个过程也是要遍历所有对象的。不过，因为Mark阶段也需要遍历所有对象，所以，可以把当前GC周期的Remap阶段和下一个GC周期的Mark阶段复用。</p>
 <p>但是由于Remap阶段要处理上一轮的Marked0视图指针，又要同时标记下一轮的活跃对象，为了区分，可以再引入一个Mark标记，这就是Marked1标志。可以想象，Marked0和Marked1视图在每一轮GC中是交替使用的。</p>
 <p>在Remap阶段，新分配对象的地址视图是Marked1，如果遇到对象地址视图是Marked0或者Remaped，就把地址视图置为Marked1。具体过程如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d7/f3/d767c2f1ab6f9f7d2c570dba0443c7f3.jpg?wh=2284x1489" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d7/f3/d767c2f1ab6f9f7d2c570dba0443c7f3.jpg?wh=2284x1489" /></p>
 <p>这个过程结束以后，就完成了地址视图的调整，同时也完成了新一轮的Mark。可以看到，Marked0和Marked1其实是交替进行的，通过地址视图的切换，在应用线程运行的同时，默默就把活对象搬走了，把垃圾回收了。</p>
 <p>好了，关于ZGC的回收原理我们就讲到这里。ZGC的回收过程大致分为三个主要阶段，其中<strong>Mark阶段负责标记活跃对象、Relocate阶段负责活跃对象转移、ReMap阶段负责地址视图统一</strong>。因为Remap阶段也需要进行全局对象扫描，所以Remap和Mark阶段是重叠进行的。</p>
 <h2 id="_3">总结</h2>
@@ -14384,7 +14384,7 @@
 <p>好啦，以上就是无暂停垃圾回收算法的核心内容了。</p>
 <h2 id="_4">思考题</h2>
 <p>请你思考一下：ZGC在对象转移之后旧对象原来占用的内存空间是否可以重复利用？请你结合colored pointer的功能思考。一点提示：可以思考一下为什么不使用forwarding指针技术，而要使用forwarding table呢？欢迎在留言区分享你的想法，我在留言区等你。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e7/13/e71335bdb1bf497bf731b0be9a9a1c13.jpg?wh=2284x1386" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e7/13/e71335bdb1bf497bf731b0be9a9a1c13.jpg?wh=2284x1386" /></p>
 <p>好啦，这节课到这就结束啦。欢迎你把这节课分享给更多对计算机内存感兴趣的朋友。我是海纳，我们下节课再见！</p>
 <div><strong>精选留言（4）</strong></div>
 <ul>
@@ -14508,8 +14508,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

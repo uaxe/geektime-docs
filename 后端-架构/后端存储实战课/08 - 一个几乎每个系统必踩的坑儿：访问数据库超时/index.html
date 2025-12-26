@@ -14016,14 +14016,14 @@
 <p>每一个做电商的公司都梦想着做社交引流，每一个做社交的公司都梦想着做电商将流量变现。我的一个朋友他们公司做社交电商，当年很有前途的一个创业方向，当时也是有很多创业公司在做。</p>
 <p>有一天他找到我，让我帮他分析一下他们系统的问题。这个系统从圣诞节那天晚上开始，每天晚上固定十点多到十一点多这个时段，大概瘫痪一个小时左右的时间，过了这个时段系统自动就恢复了。系统瘫痪时的现象就是，网页和App都打不开，请求超时。</p>
 <p>这个系统的架构是一个非常典型的小型创业公司的微服务架构。系统的架构如下图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b7/18/b7edc46baa597b4bd6a25ee5c744b318.png?wh=802%2A641" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b7/18/b7edc46baa597b4bd6a25ee5c744b318.png?wh=802%2A641" /></p>
 <p>整个系统托管在公有云上，Nginx作为前置网关承接前端所有请求，后端按照业务，划分了若干个微服务分别部署。数据保存在MySQL中，部分数据用Memcached做了前置缓存。数据并没有按照微服务最佳实践的要求，做严格的划分和隔离，而是为了方便，存放在了一起。</p>
 <p>这样的存储设计，对于一个业务变化极快的创业公司来说，是合理的。因为它的每个微服务，随时都在随着业务改变，如果做了严格的数据隔离，反而不利于应对需求变化。</p>
 <p>听了我朋友对问题的描述，我的第一反应是，每天晚上十点到十一点这个时段，是绝大多数内容类App的访问量高峰，因为这个时候大家都躺在床上玩儿手机。初步判断，这个故障是和访问量有关系的，看下面这个系统每天的访问量的图，可以印证这个判断。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b6/f7/b6bd0e5d44075011680003338ff4bef7.png?wh=813%2A293" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b6/f7/b6bd0e5d44075011680003338ff4bef7.png?wh=813%2A293" /></p>
 <p><strong>基于这个判断，排查问题的重点应该放在那些服务于用户访问的功能上。</strong>比如说，首页、商品列表页、内容推荐这些功能。</p>
 <p>在访问量峰值的时候，请求全部超时，随着访问量减少，<strong>系统能自动恢复，基本可以排除后台服务被大量请求打死的可能性</strong>，因为如果进程被打死了，一般是不会自动恢复的。排查问题的重点应该放在MySQL上。观察下面这个MySQL的CPU利用率图，发现问题：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c7/d7/c73f64774a451cc6ce74d6b99535f0d7.png?wh=747%2A459" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c7/d7/c73f64774a451cc6ce74d6b99535f0d7.png?wh=747%2A459" /></p>
 <p>从监控图上可以看出来，故障时段MySQL的CPU利用率一直是100%。这种情况下，MySQL基本上处于一个不可用的状态，执行所有的SQL都会超时。</p>
 <p>MySQL这种CPU利用率高的现象，绝大多数情况都是由慢SQL导致的，所以我们优先排查慢SQL。MySQL和各大云厂商提供的RDS都能提供慢SQL日志，分析慢SQL日志，是查找类似问题原因最有效的方法。</p>
 <p>一般来说，慢SQL的日志中，会有这样一些信息：SQL、执行次数、执行时长。通过分析慢SQL找问题，并没有什么标准的方法，主要还是依靠经验。</p>
@@ -14046,20 +14046,20 @@
 <p>给排行榜增加了缓存后，新版本立即上线。本以为问题就此解决了，结果当天晚上，系统仍然是一样的现象，晚高峰各种请求超时，页面打不开。</p>
 <p>再次分析慢SQL日志，排行榜的慢SQL不见了，说明缓存生效了。日志中的其他慢SQL，查询次数和查询时长分布的都很均匀，也没有看出明显写的有问题的SQL。</p>
 <p>回过头来再看MySQL CPU利用率这个图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c3/1e/c330355300eca211e5b1fad50709e91e.png?wh=786%2A446" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c3/1e/c330355300eca211e5b1fad50709e91e.png?wh=786%2A446" /></p>
 <p>把这个图放大后，发现一些规律：</p>
 <ol>
 <li>CPU利用率，以20分钟为周期，非常规律的波动；</li>
 <li>总体的趋势与访问量正相关。</li>
 </ol>
 <p>那我们是不是可以猜测一下，对MySQL的CPU利用率的“贡献”来自两部分：红线以下的部分，是正常处理日常访问请求的部分，它和访问量是正相关的。红线以上的部分，来自某一个以20分钟为周期的定时任务，和访问量关系不大。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2e/2f/2ebd674e2f5ef41065ca8eb3589eb62f.png?wh=764%2A417" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2e/2f/2ebd674e2f5ef41065ca8eb3589eb62f.png?wh=764%2A417" /></p>
 <p>排查整个系统，没有发现有以20分钟为周期的定时任务，继续扩大排查范围，排查周期小于20分钟的定时任务，最终定位了问题。</p>
 <p>App的首页聚合了非常多的内容，像精选商品、标题图、排行榜、编辑推荐等等。这些内容包含了很多的数据库查询。当初设计的时候，给首页做了一个整体的缓存，缓存的过期时间是10分钟。但是需求不断变化，首页需要查询的内容越来越多，导致查询首页的全部内容越来越慢。</p>
 <p>通过检查日志发现，刷新一次缓存的时间竟然要15分钟。缓存是每隔10分钟整点刷一次，因为10分钟内刷不完，所以下次刷新就推迟到了20分钟之后，这就导致了上面这个图中，红线以上每20分钟的规律波形。</p>
 <p>由于缓存刷新慢，也会很多请求无法命中缓存，请求直接穿透缓存打到了数据库上面，这部分请求给上图红线以下的部分，做了很多“贡献”。</p>
 <p>找到了问题原因，做针对性的优化，问题很快就解决了。新版本上线之后，再没有出现过“午夜宕机”。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/68/7f/6886630263c150d8af3b5a2ff97eb67f.png?wh=805%2A406" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/68/7f/6886630263c150d8af3b5a2ff97eb67f.png?wh=805%2A406" /></p>
 <p>对比优化前后MySQL的CPU利用率，可以明显地看出优化效果。</p>
 <h2 id="_2">如何避免悲剧重演</h2>
 <p>到这里问题的原因找到了，问题也圆满解决了。单从这个案例来看，问题的原因在于，开发人员犯了错误，编写的SQL没有考虑数据量和执行时间，缓存的使用也不合理。最终导致在忙时，大量的查询打到MySQL上，MySQL繁忙无法提供服务。</p>
@@ -14237,8 +14237,6 @@ SQL的快慢是个相对标准，与数据量和设备性能有相关性，需�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

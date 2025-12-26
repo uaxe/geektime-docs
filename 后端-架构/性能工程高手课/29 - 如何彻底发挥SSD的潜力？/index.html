@@ -14474,7 +14474,7 @@
 <p>我们对应用程序设计进行了优化，使其对SSD友好之后，应用程序吞吐量提高到100,000QPS，与简单设计相比，提高了4倍。</p>
 <p>你可能会问，这是如何做到的？</p>
 <p>这其中的秘密，就是<strong>使用多个并发线程来执行I/O</strong>。如下图所示，这利用了<strong>SSD的内部并行性</strong>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d2/a0/d2b82a4a2b47c03aea570f183c49b8a0.png?wh=2000%2A902" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d2/a0/d2b82a4a2b47c03aea570f183c49b8a0.png?wh=2000%2A902" /></p>
 <p>这里你需要注意的是，在这个系统中，多个I/O线程对HDD是毫无益处的。因为HDD只有一个磁头，所以用多个I/O线程，并不能提高旧系统的吞吐量。</p>
 <p>第二种好处是<strong>更高效的存储I/O</strong>。</p>
 <p>我在<a href="https://time.geekbang.org/column/article/185154">第17讲</a>中提到过，SSD上的最小内部I/O单元是一页，比如4KB大小。因此对SSD的单字节读/写，必须在页面级进行。应用程序对SSD的写操作，可能会导致对SSD上的物理写操作变大，这就是“写入放大（参见<a href="https://time.geekbang.org/column/article/190151">第23讲</a>）”。</p>
@@ -14512,16 +14512,16 @@
 <p>你看，采用这种设计，就不需要100个Memcached节点，只需10台配备SSD的节点，节省了大量成本。</p>
 <p>在<strong>应用程序层</strong>，我们也可以对SSD进行友好的设计，以获得前面提到的三种好处（更好的应用程序性能、更高效的I/O和更长的SSD寿命）。</p>
 <p>在这一领域，我总结了七大SSD友好的设计原则，大体上分为三类：数据结构、I/O处理和线程使用。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a0/2d/a087788f0d74a2863366ca456f8c362d.png?wh=1920%2A1075" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a0/2d/a087788f0d74a2863366ca456f8c362d.png?wh=1920%2A1075" /></p>
 <h3 id="1">1.数据结构：避免就地更新优化</h3>
 <p>传统的HDD的寻址延迟很大，因此，使用HDD的应用程序通常会进行各种优化，以执行不需要寻址的就地更新，比如只在一个文件后面写入。</p>
 <p>比如下图所示，在执行随机更新时，吞吐量一般只能达到约170 QPS；而对于同一个HDD，就地更新可以达到280QPS，远高于随机更新。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ff/3b/fff29bfb9e14f2ff93e0637e8636333b.png?wh=2059%2A1067" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ff/3b/fff29bfb9e14f2ff93e0637e8636333b.png?wh=2059%2A1067" /></p>
 <p>不过在设计与SSD配合使用的应用程序时，这些考虑就没什么意义了。对SSD而言，随机读写和顺序读写性能类似，就地更新不会获得任何IOPS优势。</p>
 <p>此外，就地更新实际上是会导致SSD性能下降的。包含数据的SSD页面无法直接重写，因此在更新存储的数据时，必须先将相应的SSD页面读入SSD缓冲区，然后将数据写入干净的页面。 SSD中的“读取-修改-写入”过程与HDD上的直接“仅写入”行为形成了鲜明的对比。</p>
 <p>相比之下，SSD上的随机更新，就不会引起读取和修改步骤（即仅仅“写入”），因此速度更快。</p>
 <p>使用SSD，以上相同的应用程序，可以通过<strong>随机更新</strong>或<strong>就地更新</strong>来达到大约2万QPS；而且随机更新和就地更新的吞吐量大体相似，随机更新其实还稍微好些。如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7a/0b/7aa33a3abeef4b908f7560b23db6c20b.png?wh=2027%2A1035" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7a/0b/7aa33a3abeef4b908f7560b23db6c20b.png?wh=2027%2A1035" /></p>
 <h3 id="2">2.数据结构：区分热、冷数据</h3>
 <p>几乎所有处理存储的应用程序，磁盘上存储的数据的访问概率均不相同。</p>
 <p>用一个需要跟踪活动用户活动的社交网络应用程序来给你举个例子。对于用户数据存储，简单的解决方案，是基于用户属性（例如注册时间）将所有用户压缩在同一位置（例如某个SSD上的文件）。以后需要更新热门用户的活动时，SSD需要在页面级别进行访问（即读取/修改/写入）。</p>
@@ -14541,19 +14541,19 @@
 <h3 id="6io">6.线程：使用多个线程执行小的I/O</h3>
 <p>SSD内部大量使用了并行的设计，这种并行表现在多个层面上。一个I/O线程无法充分利用这些并行性，会导致访问时间更长。而使用多个线程，就可以充分利用SSD内部的并行性了。</p>
 <p>SSD可以有效地在可用通道之间分配读写操作，从而提供高水平的内部I/O并发性。例如，我们使用一个应用程序执行10KB写入I/O（10KB算是比较小的IO大小）。使用一个I/O线程，它可以达到115MB/秒。使用两个线程基本上使吞吐量加倍；使用四个线程再次将其加倍；使用八个线程可达到约500MB/秒，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/89/76/8984620c393a877fb47ecab219a41076.png?wh=2000%2A705" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/89/76/8984620c393a877fb47ecab219a41076.png?wh=2000%2A705" /></p>
 <p>你可能会很自然地问出一个问题：这里的“小”IO，到底有多小？</p>
 <p>答案是，只要是不能充分利用内部并行性的任何I/O大小，都被视为“小”。例如，SSD页面大小为4KB，内部并行度为16，则阈值应约为64KB。</p>
 <h3 id="7io">7.线程：使用较少的线程来执行大I/O</h3>
 <p>第七个原则同样关于线程，它与第六条原则相对应（但并不矛盾）。</p>
 <p>对于大型I/O，SSD内部已经充分优化使用了SSD的内部并行性，因此，应使用更少的线程（即小于四个）以实现最大的I/O吞吐量。从吞吐量的角度来看，用太多线程不会有太大益处。更重要的是，使用太多线程可能导致线程之间的资源竞争，以及诸如OS级的预读和回写之类的后台活动。</p>
 <p>例如，根据我们的实验，当写入大小为10MB时，一个线程可以达到414MB/秒，两个线程可以达到816MB/秒，而四个线程达到912MB/秒，八个线程实际上只有520MB/秒。如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/98/99/98feb65d9b624e057baeb97f0af6c599.png?wh=2000%2A722" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/98/99/98feb65d9b624e057baeb97f0af6c599.png?wh=2000%2A722" /></p>
 <h2 id="_1">总结</h2>
 <p>这一讲我们讨论了软硬件结合的优化。</p>
 <p>与使用HDD的应用程序相比，使用SSD的应用程序通常具有更好的性能水平。但是，如果不更改应用程序设计，则应用程序是无法获得最佳性能的。因为SSD的工作方式不同于HDD。</p>
 <p>为了发挥SSD的全部性能潜能，应用程序设计必须对SSD友好。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/48/d0/485e47b6f1103ba4304e436d066f62d0.png?wh=1939%2A1371" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/48/d0/485e47b6f1103ba4304e436d066f62d0.png?wh=1939%2A1371" /></p>
 <p>唐代的王维有一首《少年行》，讲几个好哥们一起喝酒：“新丰美酒斗十千，咸阳游侠多少年。相逢意气为君饮，系马高楼垂柳边。” 说的是性情投机的好朋友一起互相帮助，就会互相促进。</p>
 <p>硬件和软件也是如此，如果互相对对方友好，互相都受益，总体性能也就更高。</p>
 <p>我们的软件系统如果能充分考虑硬件，比如SSD的特性，做出的设计就会获得更好的性能和稳定性。基于这一点，我在这一讲里面提出了七个对SSD友好的软件设计原则，分为三类：数据结构、I/O处理和线程使用。你在设计使用SSD存储的软件时，可以参考采用。</p>
@@ -14679,8 +14679,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

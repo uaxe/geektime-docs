@@ -6283,7 +6283,7 @@
   <h1>31   时代之风（下）：HTTP 2内核剖析</h1>
 
 <p>今天我们继续上一讲的话题，深入HTTP/2协议的内部，看看它的实现细节。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/89/17/8903a45c632b64c220299d5bc64ef717.png?wh=1142%2A586" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/89/17/8903a45c632b64c220299d5bc64ef717.png?wh=1142%2A586" /></p>
 <p>这次实验环境的URI是“/31-1”，我用Wireshark把请求响应的过程抓包存了下来，文件放在GitHub的“wireshark”目录。今天我们就对照着抓包来实地讲解HTTP/2的头部压缩、二进制帧等特性。</p>
 <h2 id="_1">连接前言</h2>
 <p>由于HTTP/2“事实上”是基于TLS，所以在正式收发数据之前，会有TCP握手和TLS握手，这两个步骤相信你一定已经很熟悉了，所以这里就略过去不再细说。</p>
@@ -6301,17 +6301,17 @@
 <p>为了与“真头字段”区分开来，这些“伪头字段”会在名字前加一个“:”，比如“:authority” “:method” “:status”，分别表示的是域名、请求方法和状态码。</p>
 <p>现在HTTP报文头就简单了，全都是“Key-Value”形式的字段，于是HTTP/2就为一些最常用的头字段定义了一个只读的“<strong>静态表</strong>”（Static Table）。</p>
 <p>下面的这个表格列出了“静态表”的一部分，这样只要查表就可以知道字段名和对应的值，比如数字“2”代表“GET”，数字“8”代表状态码200。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/76/0c/769dcf953ddafc4573a0b4c3f0321f0c.png?wh=1142%2A719" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/76/0c/769dcf953ddafc4573a0b4c3f0321f0c.png?wh=1142%2A719" /></p>
 <p>但如果表里只有Key没有Value，或者是自定义字段根本找不到该怎么办呢？</p>
 <p>这就要用到“<strong>动态表</strong>”（Dynamic Table），它添加在静态表后面，结构相同，但会在编码解码的时候随时更新。</p>
 <p>比如说，第一次发送请求时的“user-agent”字段长是一百多个字节，用哈夫曼压缩编码发送之后，客户端和服务器都更新自己的动态表，添加一个新的索引号“65”。那么下一次发送的时候就不用再重复发那么多字节了，只要用一个字节发送编号就好。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5f/6f/5fa90e123c68855140e2b40f4f73c56f.png?wh=1142%2A357" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5f/6f/5fa90e123c68855140e2b40f4f73c56f.png?wh=1142%2A357" /></p>
 <p>你可以想象得出来，随着在HTTP/2连接上发送的报文越来越多，两边的“字典”也会越来越丰富，最终每次的头部字段都会变成一两个字节的代码，原来上千字节的头用几十个字节就可以表示了，压缩效果比gzip要好得多。</p>
 <h2 id="_3">二进制帧</h2>
 <p>头部数据压缩之后，HTTP/2就要把报文拆成二进制的帧准备发送。</p>
 <p>HTTP/2的帧结构有点类似TCP的段或者TLS里的记录，但报头很小，只有9字节，非常地节省（可以对比一下TCP头，它最少是20个字节）。</p>
 <p>二进制的格式也保证了不会有歧义，而且使用位运算能够非常简单高效地解析。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/61/e3/615b49f9d13de718a34b9b98359066e3.png?wh=1142%2A575" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/61/e3/615b49f9d13de718a34b9b98359066e3.png?wh=1142%2A575" /></p>
 <p>帧开头是3个字节的<strong>长度</strong>（但不包括头的9个字节），默认上限是2<sup>14，最大是2</sup>24，也就是说HTTP/2的帧通常不超过16K，最大是16M。</p>
 <p>长度后面的一个字节是<strong>帧类型</strong>，大致可以分成<strong>数据帧</strong>和<strong>控制帧</strong>两类，HEADERS帧和DATA帧属于数据帧，存放的是HTTP报文，而SETTINGS、PING、PRIORITY等则是用来管理流的控制帧。</p>
 <p>HTTP/2总共定义了10种类型的帧，但一个字节可以表示最多256种，所以也允许在标准之外定义其他类型实现功能扩展。这就有点像TLS里扩展协议的意思了，比如Google的gRPC就利用了这个特点，定义了几种自用的新帧类型。</p>
@@ -6319,7 +6319,7 @@
 <p>报文头里最后4个字节是<strong>流标识符</strong>，也就是帧所属的“流”，接收方使用它就可以从乱序的帧里识别出具有相同流ID的帧序列，按顺序组装起来就实现了虚拟的“流”。</p>
 <p>流标识符虽然有4个字节，但最高位被保留不用，所以只有31位可以使用，也就是说，流标识符的上限是2^31，大约是21亿。</p>
 <p>好了，把二进制头理清楚后，我们来看一下Wireshark抓包的帧实例：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/57/03/57b0d1814567e6317c8de1e3c04b7503.png?wh=1142%2A585" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/57/03/57b0d1814567e6317c8de1e3c04b7503.png?wh=1142%2A585" /></p>
 <p>在这个帧里，开头的三个字节是“00010a”，表示数据长度是266字节。</p>
 <p>帧类型是1，表示HEADERS帧，负载（payload）里面存放的是被HPACK算法压缩的头部信息。</p>
 <p>标志位是0x25，转换成二进制有3个位被置1。PRIORITY表示设置了流的优先级，END_HEADERS表示这一个帧就是完整的头数据，END_STREAM表示单方向数据发送结束，后续再不会有数据帧（即请求报文完毕，不会再有DATA帧/Body数据）。</p>
@@ -6330,7 +6330,7 @@
 <p>要搞明白流，关键是要理解帧头里的流ID。</p>
 <p>在HTTP/2连接上，虽然帧是乱序收发的，但只要它们都拥有相同的流ID，就都属于一个流，而且在这个流里帧不是无序的，而是有着严格的先后顺序。</p>
 <p>比如在这次的Wireshark抓包里，就有“0、1、3”一共三个流，实际上就是分配了三个流ID号，把这些帧按编号分组，再排一下队，就成了流。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/68/33/688630945be2dd51ca62515ae498db33.png?wh=1142%2A598" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/68/33/688630945be2dd51ca62515ae498db33.png?wh=1142%2A598" /></p>
 <p>在概念上，一个HTTP/2的流就等同于一个HTTP/1里的“请求-应答”。在HTTP/1里一个“请求-响应”报文来回是一次HTTP通信，在HTTP/2里一个流也承载了相同的功能。</p>
 <p>你还可以对照着TCP来理解。TCP运行在IP之上，其实从MAC层、IP层的角度来看，TCP的“连接”概念也是“虚拟”的。但从功能上看，无论是HTTP/2的流，还是TCP的连接，都是实际存在的，所以你以后大可不必再纠结于流的“虚拟”性，把它当做是一个真实存在的实体来理解就好。</p>
 <p>HTTP/2的流有哪些特点呢？我给你简单列了一下：</p>
@@ -6345,7 +6345,7 @@
 <li>第0号流比较特殊，不能关闭，也不能发送数据帧，只能发送控制帧，用于流量控制。</li>
 </ol>
 <p>这里我又画了一张图，把上次的图略改了一下，显示了连接中无序的帧是如何依据流ID重组成流的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b4/7e/b49595a5a425c0e67d46ee17cc212e7e.png?wh=1142%2A735" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b4/7e/b49595a5a425c0e67d46ee17cc212e7e.png?wh=1142%2A735" /></p>
 <p>从这些特性中，我们还可以推理出一些深层次的知识点。</p>
 <p>比如说，HTTP/2在一个连接上使用多个流收发数据，那么它本身默认就会是长连接，所以永远不需要“Connection”头字段（keepalive或close）。</p>
 <p>你可以再看一下Wireshark的抓包，里面发送了两个请求“/31-1”和“/favicon.ico”，始终用的是“56095&lt;-&gt;8443”这个连接，对比一下<a href="https://time.geekbang.org/column/article/100502">第8讲</a>，你就能够看出差异了。</p>
@@ -6355,7 +6355,7 @@
 <h2 id="_5">流状态转换</h2>
 <p>流很重要，也很复杂。为了更好地描述运行机制，HTTP/2借鉴了TCP，根据帧的标志位实现流状态转换。当然，这些状态也是虚拟的，只是为了辅助理解。</p>
 <p>HTTP/2的流也有一个状态转换图，虽然比TCP要简单一点，但也不那么好懂，所以今天我只画了一个简化的图，对应到一个标准的HTTP“请求-应答”。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d3/b4/d389ac436d8100406a4a488a69563cb4.png?wh=1142%2A941" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d3/b4/d389ac436d8100406a4a488a69563cb4.png?wh=1142%2A941" /></p>
 <p>最开始的时候流都是“<strong>空闲</strong>”（idle）状态，也就是“不存在”，可以理解成是待分配的“号段资源”。</p>
 <p>当客户端发送HEADERS帧后，有了流ID，流就进入了“<strong>打开</strong>”状态，两端都可以收发数据，然后客户端发送一个带“END_STREAM”标志位的帧，流就进入了“<strong>半关闭</strong>”状态。</p>
 <p>这个“半关闭”状态很重要，意味着客户端的请求数据已经发送完了，需要接受响应数据，而服务器端也知道请求数据接收完毕，之后就要内部处理，再发送响应数据。</p>
@@ -6380,7 +6380,7 @@
 <li>结合这两讲，谈谈HTTP/2是如何解决“队头阻塞”问题的。</li>
 </ol>
 <p>欢迎你把自己的学习体会写在留言区，与我和其他同学一起讨论。如果你觉得有所收获，也欢迎把文章分享给你的朋友。</p>
-<p><img alt="unpreview" src="https://static001.geekbang.org/resource/image/3d/49/3dfab162c427fb3a1fa16494456ae449.png?wh=1769%2A3648" /></p>
+<p><img alt="unpreview" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3d/49/3dfab162c427fb3a1fa16494456ae449.png?wh=1769%2A3648" /></p>
 <div><strong>精选留言（15）</strong></div>
 <ul>
 <li><span>-W.LI-</span> 👍（47） 💬（2）<p>1.还是无状态,流状态只是表示流是否建立，单次请求响应的状态。并非会话级的状态保持
@@ -6510,8 +6510,6 @@ HTTP&#47;2 的帧最大可以达到 16M，你觉得大帧好还是小帧好？
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

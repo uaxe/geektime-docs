@@ -6403,7 +6403,7 @@
 <p>在读写磁盘的场景中也是一样，既然B+树的多次随机写入性能不佳，<strong>我们有没有办法把多次写入合并成一次写入，从而减少磁盘寻道的开销呢？LSM Tree正是这样做的。</strong></p>
 <h3 id="lsm-tree">早期LSM Tree</h3>
 <p>早期，LSM Tree中包含了多个树状结构，C0-tree存储在内存，而C1-tree存储在磁盘中，<strong>实质就是利用内存，延迟写入磁盘的时机。</strong></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f9/98/f9a5a1ca2fc0e5a71647023b75ae2998.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f9/98/f9a5a1ca2fc0e5a71647023b75ae2998.jpg?wh=1920x1145" /></p>
 <p>C0-tree 由于常驻内存，检索起来不会产生IO，所以理论上，我们可以使用各种可用于高效索引的数据结构来存储数据，比如红黑树、跳表等等。但是因为内存成本高昂，能存储的数据必然有限，更大量的数据仍然需要存储在磁盘里。而磁盘中的C1-tree一般被实现为特殊的B+树。</p>
 <p>数据的存储也会分为两个阶段，我们会一直先在内存中存储元素，直到内存中的数据到达一个阈值，我们会开始和C1-tree中的节点进行合并和覆写，过程和多路归并有点相似。因为我们可以决定写入磁盘的时机，所以完全可以保证B+树的所有节点是满的，也就避免了许多单次的随机写操作。</p>
 <p>实现细节我们不用掌握，只需要明白设计实质就可以了，感兴趣的话你可以翻阅最早的LSM tree的<a href="http://paperhub.s3.amazonaws.com/18e91eb4db2114a06ea614f0384f2784.pdf">论文</a>了解。</p>
@@ -6429,12 +6429,12 @@
 </ol>
 <p>现在，我们拥有的是内存中的有序结构，存储了近期的记录变更，如何把这样的数据存储在磁盘上，既利用磁盘顺序读写的优势，也能保证所写的格式便于改动也便于查询呢？</p>
 <p>SSTable就是一种很巧妙的设计，它是整个LSM Tree的核心，毕竟我们的大部分数据都是存储在磁盘上的，SSTable就是在磁盘上做持久化的部分。本质其实很简单，就是一段段按照key有序排列的键值对（最早出自Google的bigtable论文，后来在工程实践中加了很多优化）：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/12/29/12860501292e4eed66119bb77f556829.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/12/29/12860501292e4eed66119bb77f556829.jpg?wh=1920x1145" /></p>
 <p>原始的SSTable，key和value可以是任意大小的，所以直接在磁盘上查询不是特别靠谱，但是SSTable本身的有序性，让我们可以采用类似Kafka的线性索引来加速查询过程，所以SSTable一般也会带上一个索引文件，值存储的是key所对应的offset，加载到内存后，我们利用二分搜索可以很快查找出要访问的key的值。</p>
 <p>好，我们知道内存中的数据一定是有序的，而持久化数据到磁盘最高效的方式就是顺序写一遍，每次内存中的数据，我们都一次性dump成磁盘上的一段自然是比较快的，这样一段段的数据，我们就称为一个个segment。所以最简单的持久化方式就是我们在磁盘上把内存中有序的键值对直接dump成一个个段，也就是segment。</p>
 <p>当然，后面存储的段和前面存储的段，key可能是重复的，因为后面的段新一些，所以在有重复的时候，最靠后的段中的记录值，就是某个key最新的状态。</p>
 <p>整个持久化的过程就像这样，<strong>我们把内存中有序的数据结构比如红黑树中的记录，dump到一段磁盘上的空间，然后按segment一段一段往后叠加</strong>。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/yy/c1/yy96792b7948a3034bc9af49cc6471c1.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/yy/c1/yy96792b7948a3034bc9af49cc6471c1.jpg?wh=1920x1145" /></p>
 <p>那在这样的存储下，检索数据的时候需要怎么做呢？很简单，就是从后面的段开始，往前遍历，看看是否有查找到目标key，有的话就返回。由于从后往前遍历，我们第一次查询到key的时候，一定就是这个key对应的最新状态。</p>
 <p>但很显然，这样的存储会有很多问题。</p>
 <ul>
@@ -6447,7 +6447,7 @@
 <p>每个segment都是有序的，那我们显然可以比较高效地对多段数据进行合并操作，之前讲外排的时候也有提到，就是“多路归并”的思路，一般，多路归并的程序我们会在后台不断运行，我们会不断地把多个老的segment合并成一个更长的、同样有序的segment。</p>
 <p>合并前老的segment长度都是一样的，在SSTable的主流实现里，<strong>我们会把不同的阶段被合并的segment放到不同的层中，并限制每一层数量，当某层segment超过一定数量，我们就会把它们删除，合并出一个更大的segment放入下一层</strong>。</p>
 <p>低层中的segment显然是更新的记录值，更高层的则是更老的记录值。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6c/37/6c8cf69f285940fbaecac7aefb1ac137.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6c/37/6c8cf69f285940fbaecac7aefb1ac137.jpg?wh=1920x1145" /></p>
 <p>在图的例子中可以看出来，我们合并segment1、2、3之后，在得到的segment4里，dog的记录就只剩更新的segment2中的记录84了。这样我们的整个存储空间就不会无尽地膨胀，最高的一层，最多也就是占用历史以来所有出现过的key和对应的记录值这样数量级的空间，而存储这些是数据库本应做到的。</p>
 <p>检索的时候，我们只需要按照“内存-&gt;level0-&gt;level1”这样的顺序，去遍历每层中不同段是否包含目标key。每个段内都是有序存储的，所以整体读的时间复杂度也是可以接受的，</p>
 <p>确实可能会比B+树的查询效率低一些，不过辅以布隆过滤器等手段，劣化也不会非常明显，在许多读写比不到1:10的场景下，顺序写带来的写性能提升是非常令人满意的。</p>
@@ -6456,7 +6456,7 @@
 <p>和B+树直接在本地进行删除的策略不同，LevelDB其实不会真的把某个数据移除，因为一旦移除，就可能需要去不同的层进行数据的清理，代价比较高昂。</p>
 <p>一个聪明的做法就是我们用和写入一样的手段，将数据标记成一种特殊的状态。这种通过标记而不是真实移除数据的方法，在业务开发中其实也很常见，有时候我们称为soft delete。在有些ORM库中会直接通过deleteAt字段，标记删除时间，来表示这个数据被删除了，想恢复这个数据的时候也很简单，直接将deleteAt置空即可。</p>
 <p>在LSM tree中也是一样，我们把这个特殊的状态称为tombstone，墓碑，看图就非常清楚了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d2/a4/d2e0abb10f18e6d00d8be8773e8230a4.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d2/a4/d2e0abb10f18e6d00d8be8773e8230a4.jpg?wh=1920x1145" /></p>
 <p>查询的时候，如果我们先查到了tombstone，就可以认为数据已经不复存在了。</p>
 <h2 id="_4">总结</h2>
 <p>今天我们学习了一个相对简化的modern LSM tree的实现，分为内存和磁盘上的数据结构两部分：</p>
@@ -6589,8 +6589,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

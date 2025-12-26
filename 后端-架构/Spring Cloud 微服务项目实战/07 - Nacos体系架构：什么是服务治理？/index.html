@@ -14315,13 +14315,13 @@
 <p>首先，让我通过一个例子告诉你服务治理解决了什么问题。</p>
 <p>我的系统包含两个微服务（服务A和服务B），每一个微服务有10个虚拟节点，两个服务组成了一个20台虚拟机的微服务集群。如果此时微服务A想要调用微服务B，我们怎么来发起这个调用呢？</p>
 <p>一种通用做法是：在服务A的配置文件中添加一个指向服务B的地址，但这个地址并不直接指向任何一台服务B集群中的节点，而是指向一个VIP（虚拟IP地址）或者是一个网关。这个VIP或网关背后维护了B集群的服务节点列表，VIP层通过负载均衡策略再将请求转到后面配置的某一台服务器。我画了一幅图来描述这个服务调用过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fc/0d/fcd15ed204d43fe615cb50acbe58010d.jpg?wh=2000x984" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fc/0d/fcd15ed204d43fe615cb50acbe58010d.jpg?wh=2000x984" /></p>
 <p>从上面的图中我们可以看出，服务A与服务B之间互相不直接通信，服务调用完全依靠VIP作为中间人来完成。我们如果想要为服务集群扩容或缩容，必须将服务器配置到对应的VIP地址上。如果你的应用是一个由数百个微服务组成的大型应用，光是管理这些VIP Pool的人力成本就够网络运维团队喝上一壶了。</p>
 <p>那在微服务架构中，怎么才能实现一种简单可靠的远程服务调用，不让VIP中间商赚差价呢？这就要说到我们的服务治理理论了。</p>
 <h2 id="_1">服务治理初探</h2>
 <p>如果我们要解决中间商赚差价的问题，那么最好的办法就是让双方直连。因此，服务治理要解决的首要任务就是<strong>服务注册</strong>与<strong>服务发现</strong>，通过这两项技术，我们就能让微服务之间发起面对面的直接调用。</p>
 <p>那么服务A怎么知道服务B中每台机器的地址呢？为了让服务A拿到服务B的机器清单，我们需要搭建一个<strong>中心化的服务注册中心</strong>，服务B只要将自己的信息添加到注册中心里，服务A就能够从注册中心获取到服务B的所有节点列表。我画了一张图来帮助你更好地理解这个过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/81/e2/81bd88faec1dd053104c3be5b6792de2.jpg?wh=2000x984" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/81/e2/81bd88faec1dd053104c3be5b6792de2.jpg?wh=2000x984" /></p>
 <p>从上图中的步骤中我们可以看出，首先，服务B集群向注册中心发起了注册，将自己的地址信息上报到注册中心，这个过程就是<strong>服务注册</strong>。接下来，每隔一段时间，服务A就会从服务中心获取服务B集群的服务列表，或者由服务中心将服务列表的变动推送给服务A，这个过程叫做<strong>服务发现</strong>；最后，服务A根据本地负载均衡策略，从服务列表中选取某一个服务B的节点，发起服务调用。</p>
 <p>在这个过程中，<strong>注册中心的角色是一个中心化的信息管理者</strong>，所有的微服务节点在启动后都会将自己的地址信息添加到注册中心。在服务注册的过程中，有两个关键信息是最为重要的，我把它们列在了这里。</p>
 <ol>
@@ -14333,7 +14333,7 @@
 <p>如果服务B集群因为未知的网络故障导致无法响应服务，这时候服务A向服务B发起了服务调用，就会发生超时或者服务无响应的异常情况。那我们如何在服务治理方案中规避这类问题呢？</p>
 <p>业界通用的解决方案是“heathcheck”或者“heartbeat”，又叫“服务探活”或“心跳检查”。注册中心可以通过这种机制来标记异常服务，这样一来，Client端在发送服务请求的时候就能避开异常节点。</p>
 <p>我将这些异常处理的步骤添加到了服务注册流程中，并画了一个完整的微服务生命周期的图，你可以参考一下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f1/e7/f1ca43ff75242242a8b97b3df63a0ae7.jpg?wh=2000x984" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f1/e7/f1ca43ff75242242a8b97b3df63a0ae7.jpg?wh=2000x984" /></p>
 <p>看了图片，你可能会问，怎么还有一个“服务剔除”呢？它是怎么实现的？</p>
 <p>先说一个大前提。所有的服务都要在注册中心进行注册，而且每个节点都需要每隔一段时间向注册中心同步自己当前的状态，我们很形象地称这个过程为heartbeat（心跳）。</p>
 <p>如果节点持续发送心跳信息，则一切正常，服务可以被发现；如果注册中心在一段时间内没有收到Client的心跳包，注册中心就会将这个节点标记为下线状态，进而将该服务从服务列表中剔除。</p>
@@ -14345,7 +14345,7 @@
 <h3 id="_2">领域模型</h3>
 <p>Nacos领域模型描述了服务与实例之间的边界和层级关系。Nacos的服务领域模型是以“服务”为维度构建起来的，这个服务并不是指集群中的单个服务器，而是指微服务的服务名。</p>
 <p>“服务”是Nacos中位于最上层的概念，在服务之下，还有集群和实例的概念。为了方便你理解这三者的层级关系，我画了一张图，你可以参考一下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/21/48/21d3938ce122a48652397c329b361948.jpg?wh=2000x984" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/21/48/21d3938ce122a48652397c329b361948.jpg?wh=2000x984" /></p>
 <p>从上面的图中你可以看出，Nacos的服务领域模型从上到下分为了服务、集群和实例三层，我分别介绍一下这三个层次所包含的重要数据内容。</p>
 <ol>
 <li><strong>服务</strong></li>
@@ -14365,7 +14365,7 @@
 <p>了解了领域模型之后，你知道服务调用的发起方是如何定位到领域模型中的服务实例的吗？这就要说起Nacos的数据模型了。</p>
 <h3 id="_3">数据模型</h3>
 <p>Nacos的数据模型有三个层次结构，分别是Namespace、Group和Service/DataId，我画了一幅图，帮你理解这三个层次之间的包含关系：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e8/ee/e89a90d5cdb2d4929a8e44cf5c747fee.jpg?wh=2000x984" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e8/ee/e89a90d5cdb2d4929a8e44cf5c747fee.jpg?wh=2000x984" /></p>
 <p>从上图中你可以看出，Namespace、Group和Service/DataId是一个依次包含的结构，我分别对每一层做一个简单介绍。</p>
 <ul>
 <li><strong>Namespace</strong>：即命名空间，它是最顶层的数据结构，我们可以用它来区分开发环境、生产环境等不同环境。默认情况下，所有服务都部署到一个叫做“public”的公共命名空间；</li>
@@ -14377,11 +14377,11 @@
 <h3 id="nacos_1">Nacos基本架构</h3>
 <p>Nacos的核心功能有两个，一个是 <strong>Naming Service</strong>，也就我们用来做服务发现的模块；另一个是 <strong>Config Service</strong>，用来提供配置项管理、动态更新配置和元数据的功能，关于配置管理的内容我会放到课程中的配置管理阶段为你详细讲解。</p>
 <p>我这里用一张Nacos社区的基本架构图来作为示例，带你看一下Nacos在功能模块层面的基本架构。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d3/59/d3a2227dcdab8b7ddc786c9653c6bc59.jpg?wh=2000x984" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d3/59/d3a2227dcdab8b7ddc786c9653c6bc59.jpg?wh=2000x984" /></p>
 <p>从上面的图中你可以看出，Provider APP和Consumer APP通过Open API和Nacos服务器的核心模块进行通信。这里的Open API是一组对外暴露的RESTful风格的HTTP接口。如果你对Open API里具体的接口感兴趣，可以从<a href="https://nacos.io/zh-cn/docs/open-api.html">Nacos官方网站</a>获取更多的关于Open API的详细信息。</p>
 <p>在Nacos和核心模块里，Naming Service提供了将对象和实体的“名字”映射到元数据的功能，这是服务发现的基础功能之一。例如，我想要调用OrderService，我手里有这个服务的Namespace和Group信息，那么我就可以通过Naming Service定位到这个服务对应的实例列表。同理，如果我有一个DNS名称，同样可以借助Naming Service获取DNS背后配置的IP列表。以上两个场景就分别对应了服务发现和DNS功能，这两个场景都是Naming Service的核心场景。</p>
 <p>Nacos还有一个相当重要的模块：<strong>Nacos Core</strong> 模块。它可以提供一系列的平台基础功能，是支撑Nacos上层业务场景的基石。我挑选了几个Nacos Core中包含的重要功能，你可以看一下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d0/12/d0c78d0c0f2bb72c45788a5c2d423512.jpg?wh=2000x984" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d0/12/d0c78d0c0f2bb72c45788a5c2d423512.jpg?wh=2000x984" /></p>
 <p>除了Nacos Core提供的这些功能以外，Nacos还有一个“一致性协议”，用来确保Nacos集群中各个节点之间的数据一致性。Nacos内部支持两种一致性协议，一种是侧重一致性的Raft协议，基于集群中选举出来的Leader节点进行数据写入；另一种是针对临时节点的Distro协议，它是一个侧重可用性（或最终一致性）的分布式一致性协议。</p>
 <p>到这里，我们就完成了Nacos的基本架构部分的学习。</p>
 <h2 id="_4">总结</h2>
@@ -14515,8 +14515,6 @@ at io.netty.resolver.dns.DnsResolveContext.finishResolve(DnsResolveContext.java:
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

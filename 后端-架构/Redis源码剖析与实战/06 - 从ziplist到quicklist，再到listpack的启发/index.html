@@ -14628,7 +14628,7 @@
 <p>好，那么接下来，我们就先来了解下ziplist在设计与实现上存在的缺陷。</p>
 <h2 id="ziplist">ziplist的不足</h2>
 <p>你已经知道，一个ziplist数据结构在内存中的布局，就是一块连续的内存空间。这块空间的起始部分是大小固定的10字节元数据，其中记录了ziplist的总字节数、最后一个元素的偏移量以及列表元素的数量，而这10字节后面的内存空间则保存了实际的列表数据。在ziplist的最后部分，是一个1字节的标识（固定为255），用来表示ziplist的结束，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/08/6d/08fe01427f264234c59951c8293d466d.jpg?wh=2000x795" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/08/6d/08fe01427f264234c59951c8293d466d.jpg?wh=2000x795" /></p>
 <p>不过，虽然ziplist通过紧凑的内存布局来保存数据，节省了内存空间，但是ziplist也面临着随之而来的两个不足：查找复杂度高和潜在的连锁更新风险。那么下面，我们就分别来了解下这两个问题。</p>
 <h3 id="_1">查找复杂度高</h3>
 <p>因为ziplist头尾元数据的大小是固定的，并且在ziplist头部记录了最后一个元素的位置，所以，当在ziplist中查找第一个或最后一个元素的时候，就可以很快找到。</p>
@@ -14653,7 +14653,7 @@
 <p>举个简单的例子，当在一个元素A前插入一个新的元素B时，A的prevlen和prevlensize都要根据B的长度进行相应的变化。</p>
 <p>那么现在，我们假设A的prevlen原本只占用1字节（也就是prevlensize等于1），而能记录的前一项长度最大为253字节。此时，如果B的长度超过了253字节，A的prevlen就需要使用5个字节来记录（prevlen具体的编码方式，你可以复习回顾下第4讲），这样就需要申请额外的4字节空间了。不过，如果元素B的插入位置是列表末尾，那么插入元素B时，我们就不用考虑后面元素的prevlen了。</p>
 <p>我画了下面这张图，以便于你理解数据插入过程对插入位置元素的影响。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/de/45/de43202b0afb4e5394c5323fc9f93a45.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/de/45/de43202b0afb4e5394c5323fc9f93a45.jpg?wh=2000x1125" /></p>
 <p>因此，为了保证ziplist有足够的内存空间，来保存插入元素以及插入位置元素的prevlen信息，<strong>__ziplistInsert函数在获得插入位置元素的prevlen和prevlensize后，紧接着就会计算插入元素的长度</strong>。</p>
 <p>现在我们已知，一个ziplist元素包括了prevlen、encoding和实际数据data三个部分。所以，在计算插入元素的所需空间时，__ziplistInsert函数也会分别计算这三个部分的长度。这个计算过程一共可以分成四步来完成。</p>
 <ul>
@@ -14706,7 +14706,7 @@
 <p>而如此一来，这种空间新增就会引起连锁更新的问题。</p>
 <p>实际上，所谓的<strong>连锁更新</strong>，就是指当一个元素插入后，会引起当前位置元素新增prevlensize的空间。而当前位置元素的空间增加后，又会进一步引起该元素的后续元素，其prevlensize所需空间的增加。</p>
 <p>这样，一旦插入位置后续的所有元素，都会因为前序元素的prevlenszie增加，而引起自身空间也要增加，这种每个元素的空间都需要增加的现象，就是连锁更新。我画了下面这张图，你可以看下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b7/4c/b7f75261e8e72832220c98bf73a0eb4c.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b7/4c/b7f75261e8e72832220c98bf73a0eb4c.jpg?wh=2000x1125" /></p>
 <p>连锁更新一旦发生，就会导致ziplist占用的内存空间要多次重新分配，这就会直接影响到ziplist的访问性能。</p>
 <p>所以说，虽然ziplist紧凑型的内存布局能节省内存开销，但是如果保存的元素数量增加了，或是元素变大了，ziplist就会面临性能问题。那么，有没有什么方法可以避免ziplist的问题呢？</p>
 <p>这就是接下来我要给你介绍的quicklist和listpack，这两种数据结构的设计思想了。</p>
@@ -14741,7 +14741,7 @@
 <a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>} quicklist;
 </code></pre></div>
 <p>然后，从quicklistNode和quicklist的结构体定义中，我们就能画出下面这张quicklist的示意图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bc/0e/bc725a19b5c1fd25ba7740bab5f9220e.jpg?wh=2000x890" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bc/0e/bc725a19b5c1fd25ba7740bab5f9220e.jpg?wh=2000x890" /></p>
 <p>而也正因为quicklist采用了链表结构，所以当插入一个新的元素时，quicklist首先就会检查插入位置的ziplist是否能容纳该元素，这是通过 <strong>_quicklistNodeAllowInsert函数</strong>来完成判断的。</p>
 <p>_quicklistNodeAllowInsert函数会计算新插入元素后的大小（new_sz），这个大小等于quicklistNode的当前大小（node-&gt;sz）、插入元素的大小（sz），以及插入元素后ziplist的prevlen占用大小。</p>
 <p>在计算完大小之后，_quicklistNodeAllowInsert函数会依次判断新插入的数据大小（sz）是否满足要求，即<strong>单个ziplist是否不超过8KB，或是单个ziplist里的元素个数是否满足要求</strong>。</p>
@@ -14778,10 +14778,10 @@
 <a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a>}
 </code></pre></div>
 <p>你可以看看下面这张图，展示的就是大小为LP_HDR_SIZE的listpack头和值为255的listpack尾。当有新元素插入时，该元素会被插在listpack头和尾之间。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d6/60/d6ef170068fc14c7d901b9ff4935yy60.jpg?wh=2000x562" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d6/60/d6ef170068fc14c7d901b9ff4935yy60.jpg?wh=2000x562" /></p>
 <p>好了，了解了listpack的整体结构后，我们再来看下listpack列表项的设计。</p>
 <p>和ziplist列表项类似，listpack列表项也包含了元数据信息和数据本身。不过，为了避免ziplist引起的连锁更新问题，listpack中的每个列表项不再像ziplist列表项那样，保存其前一个列表项的长度，<strong>它只会包含三个方面内容</strong>，分别是当前元素的编码类型（entry-encoding）、元素数据(entry-data)，以及编码类型和元素数据这两部分的长度(entry-len)，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/60/27/60833af3db19ccf12957cfe6467e9227.jpg?wh=2000x786" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/60/27/60833af3db19ccf12957cfe6467e9227.jpg?wh=2000x786" /></p>
 <p>这里，关于listpack列表项的设计，你需要重点掌握两方面的要点，分别是列表项元素的编码类型，以及列表项避免连锁更新的方法。下面我就带你具体了解下。</p>
 <h3 id="listpack_1">listpack列表项编码方法</h3>
 <p>我们先来看下listpack元素的编码类型。如果你看了listpack.c文件，你会发现该文件中有大量类似LP_ENCODING__XX_BIT_INT和LP_ENCODING__XX_BIT_STR的宏定义，如下所示：</p>
@@ -14795,15 +14795,15 @@
 <p>这些宏定义其实就对应了listpack的元素编码类型。具体来说，<strong>listpack元素会对不同长度的整数和字符串进行编码</strong>，这里我们分别来看下。</p>
 <p>首先，对于<strong>整数编码</strong>来说，当listpack元素的编码类型为LP_ENCODING_7BIT_UINT时，表示元素的实际数据是一个7 bit的无符号整数。又因为LP_ENCODING_7BIT_UINT本身的宏定义值为0，所以编码类型的值也相应为0，占1个bit。</p>
 <p>此时，编码类型和元素实际数据共用1个字节，这个字节的最高位为0，表示编码类型，后续的7位用来存储7 bit的无符号整数，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8c/fb/8c4bd520d3953f7e70b6e3f08543c6fb.jpg?wh=1752x710" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8c/fb/8c4bd520d3953f7e70b6e3f08543c6fb.jpg?wh=1752x710" /></p>
 <p>而当编码类型为LP_ENCODING_13BIT_INT时，这表示元素的实际数据是13 bit的整数。同时，因为LP_ENCODING_13BIT_INT的宏定义值为0xC0，转换为二进制值是1100 0000，所以，这个二进制值中的后5位和后续的1个字节，共13位，会用来保存13bit的整数。而该二进制值中的前3位110，则用来表示当前的编码类型。我画了下面这张图，你可以看下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3e/d7/3ecbb8412d41d0a36587dfdaf49714d7.jpg?wh=1897x712" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3e/d7/3ecbb8412d41d0a36587dfdaf49714d7.jpg?wh=1897x712" /></p>
 <p>好，在了解了LP_ENCODING_7BIT_UINT和LP_ENCODING_13BIT_INT这两种编码类型后，剩下的LP_ENCODING_16BIT_INT、LP_ENCODING_24BIT_INT、LP_ENCODING_32BIT_INT和LP_ENCODING_64BIT_INT，你应该也就能知道它们的编码方式了。</p>
 <p>这四种类型是分别用2字节（16 bit）、3字节（24 bit）、4字节（32 bit）和8字节（64 bit）来保存整数数据。同时，它们的编码类型本身占1字节，编码类型值分别是它们的宏定义值。</p>
 <p>然后，对于<strong>字符串编码</strong>来说，一共有三种类型，分别是LP_ENCODING_6BIT_STR、LP_ENCODING_12BIT_STR和LP_ENCODING_32BIT_STR。从刚才的介绍中，你可以看到，整数编码类型名称中BIT前面的数字，表示的是整数的长度。因此类似的，字符串编码类型名称中BIT前的数字，表示的就是字符串的长度。</p>
 <p>比如，当编码类型为LP_ENCODING_6BIT_STR时，编码类型占1字节。该类型的宏定义值是0x80，对应的二进制值是1000 0000，这其中的前2位是用来标识编码类型本身，而后6位保存的是字符串长度。然后，列表项中的数据部分保存了实际的字符串。</p>
 <p>下面的图展示了三种字符串编码类型和数据的布局，你可以看下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9c/25/9c17c0be0519100c509e2378acd6e125.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9c/25/9c17c0be0519100c509e2378acd6e125.jpg?wh=2000x1125" /></p>
 <h3 id="listpack_2">listpack避免连锁更新的实现方式</h3>
 <p>最后，我们再来了解下listpack列表项是如何避免连锁更新的。</p>
 <p>在listpack中，因为每个列表项只记录自己的长度，而不会像ziplist中的列表项那样，会记录前一项的长度。所以，当我们在listpack中新增或修改元素时，实际上只会涉及每个列表项自己的操作，而不会影响后续列表项的长度变化，这就避免了连锁更新。</p>
@@ -14849,7 +14849,7 @@
 <a id="__codelineno-15-19" name="__codelineno-15-19" href="#__codelineno-15-19"></a>}
 </code></pre></div>
 <p>我也画了一张图，展示了从左向右遍历listpack的基本过程，你可以再回顾下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a9/be/a9e7c837959f8d01bff8321135c484be.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a9/be/a9e7c837959f8d01bff8321135c484be.jpg?wh=2000x1125" /></p>
 <p>好，了解了从左向右正向查询listpack，我们再来看下<strong>从右向左反向查询listpack</strong>。</p>
 <p>首先，我们根据listpack头中记录的listpack总长度，就可以直接定位到listapck的尾部结束标记。然后，我们可以调用lpPrev函数，该函数的参数包括指向某个列表项的指针，并返回指向当前列表项前一项的指针。</p>
 <p>lpPrev函数中的关键一步就是调用lpDecodeBacklen函数。lpDecodeBacklen函数会从右向左，逐个字节地读取当前列表项的entry-len。</p>
@@ -14861,7 +14861,7 @@
 </ul>
 <p>而entry-len每个字节的低7位，则记录了实际的长度信息。这里你需要注意的是，entry-len每个字节的低7位采用了<strong>大端模式存储</strong>，也就是说，entry-len的低位字节保存在内存高地址上。</p>
 <p>我画了下面这张图，展示了entry-len这种特别的编码方式，你可以看下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4a/5c/4ae6140ca6b08f35b9eb245c4627245c.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4a/5c/4ae6140ca6b08f35b9eb245c4627245c.jpg?wh=2000x1125" /></p>
 <p>实际上，正是因为有了entry-len的特别编码方式，lpDecodeBacklen函数就可以从当前列表项起始位置的指针开始，向左逐个字节解析，得到前一项的entry-len值。这也是lpDecodeBacklen函数的返回值。而从刚才的介绍中，我们知道entry-len记录了编码类型和实际数据的长度之和。</p>
 <p>因此，lpPrev函数会再调用lpEncodeBacklen函数，来计算得到entry-len本身长度，这样一来，我们就可以得到前一项的总长度，而lpPrev函数也就可以将指针指向前一项的起始位置了。所以按照这个方法，listpack就实现了从右向左的查询功能。</p>
 <h2 id="_3">小结</h2>
@@ -15060,8 +15060,6 @@ else { &#47;&#47;否则，entry-len长度为5字节 ... return 5; }
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

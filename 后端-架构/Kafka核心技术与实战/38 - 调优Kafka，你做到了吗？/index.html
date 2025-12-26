@@ -14693,7 +14693,7 @@
 <p>总之，高吞吐量、低延时是我们调优Kafka集群的主要目标，一会儿我们会详细讨论如何达成这些目标。在此之前，我想先谈一谈优化漏斗的问题。</p>
 <h2 id="_2">优化漏斗</h2>
 <p>优化漏斗是一个调优过程中的分层漏斗，我们可以在每一层上执行相应的优化调整。总体来说，层级越靠上，其调优的效果越明显，整体优化效果是自上而下衰减的，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/94/59/94486dc0eb55b68855478ef7e5709359.png?wh=1950%2A1248" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/94/59/94486dc0eb55b68855478ef7e5709359.png?wh=1950%2A1248" /></p>
 <p><strong>第1层：应用程序层</strong>。它是指优化Kafka客户端应用程序代码。比如，使用合理的数据结构、缓存计算开销大的运算结果，抑或是复用构造成本高的对象实例等。这一层的优化效果最为明显，通常也是比较简单的。</p>
 <p><strong>第2层：框架层</strong>。它指的是合理设置Kafka集群的各种参数。毕竟，直接修改Kafka源码进行调优并不容易，但根据实际场景恰当地配置关键参数的值，还是很容易实现的。</p>
 <p><strong>第3层：JVM层</strong>。Kafka Broker进程是普通的JVM进程，各种对JVM的优化在这里也是适用的。优化这一层的效果虽然比不上前两层，但有时也能带来巨大的改善效果。</p>
@@ -14717,7 +14717,7 @@
 <h3 id="broker">Broker端调优</h3>
 <p>我们继续沿着漏斗往上走，来看看Broker端的调优。</p>
 <p>Broker端调优很重要的一个方面，就是合理地设置Broker端参数值，以匹配你的生产环境。不过，后面我们在讨论具体的调优目标时再详细说这部分内容。这里我想先讨论另一个优化手段，<strong>即尽力保持客户端版本和Broker端版本一致</strong>。不要小看版本间的不一致问题，它会令Kafka丧失很多性能收益，比如Zero Copy。下面我用一张图来说明一下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/53/6e/5310d7d29235b080c872e0a9eb396e6e.png?wh=816%2A388" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/53/6e/5310d7d29235b080c872e0a9eb396e6e.png?wh=816%2A388" /></p>
 <p>图中蓝色的Producer、Consumer和Broker的版本是相同的，它们之间的通信可以享受Zero Copy的快速通道；相反，一个低版本的Consumer程序想要与Producer、Broker交互的话，就只能依靠JVM堆中转一下，丢掉了快捷通道，就只能走慢速通道了。因此，在优化Broker这一层时，你只要保持服务器端和客户端版本的一致，就能获得很多性能收益了。</p>
 <h3 id="_5">应用层调优</h3>
 <p>现在，我们终于来到了漏斗的最顶层。其实，这一层的优化方法各异，毕竟每个应用程序都是不一样的。不过，有一些公共的法则依然是值得我们遵守的。</p>
@@ -14734,7 +14734,7 @@
 <p>在实际环境中，用户似乎总是愿意用较小的延时增加的代价，去换取TPS的显著提升。毕竟，从2ms到10ms的延时增加通常是可以忍受的。事实上，Kafka Producer就是采取了这样的设计思想。</p>
 <p>当然，你可能会问：发送一条消息需要2ms，那么等待8ms就能累积1000条消息吗？答案是可以的！Producer累积消息时，一般仅仅是将消息发送到内存中的缓冲区，而发送消息却需要涉及网络I/O传输。内存操作和I/O操作的时间量级是不同的，前者通常是几百纳秒级别，而后者则是从毫秒到秒级别不等，因此，Producer等待8ms积攒出的消息数，可能远远多于同等时间内Producer能够发送的消息数。</p>
 <p>好了，说了这么多，我们该怎么调优TPS呢？我来跟你分享一个参数列表。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7a/cb/7aec00207dc149bd804d20df6e3b9ccb.jpg?wh=1713%2A1983" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7a/cb/7aec00207dc149bd804d20df6e3b9ccb.jpg?wh=1713%2A1983" /></p>
 <p>我稍微解释一下表格中的内容。</p>
 <p>Broker端参数num.replica.fetchers表示的是Follower副本用多少个线程来拉取消息，默认使用1个线程。如果你的Broker端CPU资源很充足，不妨适当调大该参数值，加快Follower副本的同步速度。因为在实际生产环境中，<strong>配置了acks=all的Producer程序吞吐量被拖累的首要因素，就是副本同步性能</strong>。增加这个值后，你通常可以看到Producer端程序的吞吐量增加。</p>
 <p>另外需要注意的，就是避免经常性的Full GC。目前不论是CMS收集器还是G1收集器，其Full GC采用的是Stop The World的单线程收集策略，非常慢，因此一定要避免。</p>
@@ -14745,7 +14745,7 @@
 <p>说完了Producer端，我们来说说Consumer端。Consumer端提升吞吐量的手段是有限的，你可以利用多线程方案增加整体吞吐量，也可以增加fetch.min.bytes参数值。默认是1字节，表示只要Kafka Broker端积攒了1字节的数据，就可以返回给Consumer端，这实在是太小了。我们还是让Broker端一次性多返回点数据吧。</p>
 <h3 id="_8">调优延时</h3>
 <p>讲完了调优吞吐量，我们来说说如何优化延时，下面是调优延时的参数列表。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/26/3a/2688329a0614601fed497f3858c98e3a.jpg?wh=1803%2A1083" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/26/3a/2688329a0614601fed497f3858c98e3a.jpg?wh=1803%2A1083" /></p>
 <p>在Broker端，我们依然要增加num.replica.fetchers值以加快Follower副本的拉取速度，减少整个消息处理的延时。</p>
 <p>在Producer端，我们希望消息尽快地被发送出去，因此不要有过多停留，所以必须设置linger.ms=0，同时不要启用压缩。因为压缩操作本身要消耗CPU时间，会增加消息发送的延时。另外，最好不要设置acks=all。我们刚刚在前面说过，Follower副本同步往往是降低Producer端吞吐量和增加延时的首要原因。</p>
 <p>在Consumer端，我们保持fetch.min.bytes=1即可，也就是说，只要Broker端有能返回的数据，立即令其返回给Consumer，缩短Consumer消费延时。</p>
@@ -14754,7 +14754,7 @@
 <p>最后，我来分享一个性能调优的真实小案例。</p>
 <p>曾经，我碰到过一个线上环境的问题：该集群上Consumer程序一直表现良好，但是某一天，它的性能突然下降，表现为吞吐量显著降低。我在查看磁盘读I/O使用率时，发现其明显上升，但之前该Consumer Lag很低，消息读取应该都能直接命中页缓存。此时磁盘读突然飙升，我就怀疑有其他程序写入了页缓存。后来经过排查，我发现果然有一个测试Console Consumer程序启动，“污染”了部分页缓存，导致主业务Consumer读取消息不得不走物理磁盘，因此吞吐量下降。找到了真实原因，解决起来就简单多了。</p>
 <p>其实，我给出这个案例的真实目的是想说，对于性能调优，我们最好按照今天给出的步骤一步一步地窄化和定位问题。一旦定位了原因，后面的优化就水到渠成了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d4/38/d40b07ca7bcc0fc43c5266b0b2c81c38.jpg?wh=2069%2A2560" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d4/38/d40b07ca7bcc0fc43c5266b0b2c81c38.jpg?wh=2069%2A2560" /></p>
 <h2 id="_10">开放讨论</h2>
 <p>请分享一个你调优Kafka的真实案例，详细说说你是怎么碰到性能问题的，又是怎么解决的。</p>
 <p>欢迎写下你的思考和答案，我们一起讨论。如果你觉得有所收获，也欢迎把文章分享给你的朋友。</p>
@@ -14879,8 +14879,6 @@ This control is used to define how aggressive (sic) the kernel will swap memory 
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

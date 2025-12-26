@@ -14204,7 +14204,7 @@
 <p>事实上，OLAP有两种不同数据来源：一个是业务系统，一个是大数据。</p>
 <p>来自业务系统的数据，属性字段比较多，但平时更新量并不大。这种情况下，使用ClickHouse常常是为了做历史数据的筛选和属性共性的计算。而来自大数据的数据通常会有很多列，每个列代表不同用户行为，数据量普遍会很大。</p>
 <p>两种情况数据量不同，那优化方式自然也不同，具体ClickHouse是怎么对这这两种方式做优化的呢？我们结合后面的图片继续分析：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/68/51/68680bc0f8dbe6a3943db6161c5ec251.jpg?wh=1920x1234" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/68/51/68680bc0f8dbe6a3943db6161c5ec251.jpg?wh=1920x1234" /></p>
 <p>当我们批量输入的数据量小于min_bytes_for_wide_part设置时，会按compact part方式落盘。这种方式会将落盘的数据放到一个data.bin文件中，merge时会有很好的写效率，这种方式适合于小量业务数据筛选使用。</p>
 <p>当我们批量输入的数据量超过了配置规定的大小时，会按wide part方式落盘，落盘数据的时候会按字段生成不同的文件。这个方式适用于字段较多的数据，merge相对会慢一些，但是对于指定参与计算列的统计计算，并行吞吐写入和计算能力会更强，适合分析指定小范围的列计算。</p>
 <p>可以看到，这两种方式对数据的存储和查询很有针对性，可见字段的多少、每次的更新数据量、统计查询时参与的列个数，这些因素都会影响到我们服务的效率。</p>
@@ -14213,7 +14213,7 @@
 <p>可以看到，数据库的存储和数据如何使用、如何查询息息相关。不过，这种定期落盘的操作虽然有很好的写性能，却产生了大量的data part文件，这会对查询效率很有影响。那么ClickHouse是如何提高查询效率呢？</p>
 <p>我们再仔细分析下，新写入的parts数据保存在了 <strong>data parts</strong> 文件夹内，数据一旦写入数据内容，就不会再进行更改。</p>
 <p>一般来说，data part的文件夹名格式为 partition（分区）_min_block_max_block_level，并且为了提高查询效率，ClickHouse会对data part定期做merge合并。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ab/c9/ab1055933daff33152c3c91bcce1fdc9.jpg?wh=1920x1234" title="data part 同分区 merge 合并" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ab/c9/ab1055933daff33152c3c91bcce1fdc9.jpg?wh=1920x1234" title="data part 同分区 merge 合并" /></p>
 <p>如上图所示，merge操作会分层进行，期间会减少要扫描的文件夹个数，对数据进行整理、删除、合并操作。你还需要注意，不同分区无法合并，所以如果我们想提高一个表的写性能，多分几个分区会有帮助。</p>
 <p>如果写入数据量太大，而且数据写入速度太快，产生文件夹的速度会超过后台合并的速度，这时ClickHouse就会报Too many part错误，毕竟data parts文件夹的个数不能无限增加。</p>
 <p>面对这种报错，调整min_bytes_for_wide_part或者增加分区都会有改善。如果写入数据量并不大，你可以考虑多生成compact parts数据，这样可以加快合并速度。</p>
@@ -14223,12 +14223,12 @@
 <h3 id="_3">主键索引</h3>
 <p>ClickHouse的表使用主键索引，才能让数据查询有更好的性能，这是因为数据和索引会按主键进行排序存储，用主键索引查询数据可以很快地处理数据并返回结果。ClickHouse属于“<strong>左前缀查询”</strong>——通过索引和分区先快速缩小数据范围，然后再遍历计算，只不过遍历计算是多节点、多CPU并行处理的。</p>
 <p>那么ClickHouse如何进行数据检索？这需要我们先了解下data parts文件夹内的主要数据组成，如下图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0c/7f/0cbe8731b547c088cfc3b51240af317f.jpg?wh=1920x1234" title="data part 目录结构" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0c/7f/0cbe8731b547c088cfc3b51240af317f.jpg?wh=1920x1234" title="data part 目录结构" /></p>
 <p>结合图示，我们按从大到小的顺序看看data part的目录结构。</p>
 <p>在data parts文件夹中，bin文件里保存了一个或多个字段的数据。继续拆分bin文件，它里面是多个block数据块，block是磁盘交互读取的最小单元，它的大小取决于min_compress_block_size设置。</p>
 <p>我们继续看block内的结构，它保存了多个granule（颗粒），这是数据扫描的最小单位。每个granule默认会保存8192行数据，其中第一条数据就是主键索引数据。data part文件夹内的主键索引，保存了排序后的所有主键索引数据，而排序顺序是创建表时就指定好的。</p>
 <p>为了加快查询的速度，data parts内的主键索引（即稀疏索引）会被加载在内存中，并且为了配合快速查找数据在磁盘的位置，ClickHouse在data part文件夹中，会保存多个按字段名命名的mark文件，这个文件保存的是bin文件中压缩后的block的offset，以及granularity在解压后block中的offset，整体查询效果如下图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/57/82/579cbfe4421622f7ccfd4423eaf1d682.jpg?wh=1920x1234" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/57/82/579cbfe4421622f7ccfd4423eaf1d682.jpg?wh=1920x1234" /></p>
 <p>具体查询过程是这样的，我们先用二分法查找内存里的主键索引，定位到特定的mark文件，再根据mark查找到对应的block，将其加载到内存，之后在block里找到指定的granule开始遍历加工，直到查到需要的数据。</p>
 <p>同时<strong>由于ClickHouse允许同一个主键多次Insert的，查询出的数据可能会出现同一个主键数据出现多次的情况</strong>，需要我们人工对查询后的结果做去重。</p>
 <h3 id="_4">跳数索引</h3>
@@ -14308,7 +14308,7 @@
 <p>而最近选择 Elasticsearch还是ClickHouse更好的话题，讨论得非常火热，目前来看还没有彻底分出高下。</p>
 <p>个人建议如果硬件资源丰富，研发人员少的话，就选择Elasticsearch；硬件资源少，研发人员多的情况，可以考虑试用ClickHouse；如果硬件和人员都少，建议买云服务的云分布式数据库去做，需要根据团队具体情况来合理地决策。</p>
 <p>我还特意为你整理了一张评估表格，贴在了文稿里。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e5/43/e5831f077fd1c70f3793c7a94e36f743.jpg?wh=1920x1128" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e5/43/e5831f077fd1c70f3793c7a94e36f743.jpg?wh=1920x1128" /></p>
 <h2 id="_8">思考题</h2>
 <p>ClickHouse是不能轻易修改删除数据的，那我们要如何做历史数据的清理呢？</p>
 <p>期待你在留言区与我互动交流！如果觉得这节课内容还不错，请推荐、分享给更多朋友。</p>
@@ -14445,8 +14445,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

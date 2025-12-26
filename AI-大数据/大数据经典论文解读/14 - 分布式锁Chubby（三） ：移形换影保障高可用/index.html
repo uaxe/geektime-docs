@@ -7864,7 +7864,7 @@
 <p>事实上，把Chubby对外暴露的接口，变成一个分布式锁服务，Google是经过深思熟虑的。对于锁服务来说，大部分工程师都是非常熟悉的，无论是MySQL这样的关系数据库，还是Redis这样的KV数据库，或者是Java标准库里的Lock类，都是我们经常使用的开发工具。</p>
 <p>但是Paxos算法，大部分工程师可能都没有听说过。我们之前在<a href="https://time.geekbang.org/column/article/423595">MapReduce的论文</a>里就说过，<strong>一个好的分布式系统的设计，就是要让使用系统的开发人员意识不到分布式的存在。</strong>那么，通过把Paxos协议封装成一个分布式锁，就可以让所有开发人员立刻上手使用，而不需要让每个人都学习Paxos和共识问题，从而能够更容易地在整个组织的层面快速开发出好用的系统。</p>
 <p>而且，Chubby这个锁服务，是一个<strong>粗粒度的锁服务</strong>。所谓粗粒度，指的是外部客户端占用锁的时间是比较长的。比如说，我们的Master只要不出现故障，就可以一直占用这把锁。但是，我们并不会用这个锁做很多细粒度的动作，不会通过这个分布式的锁，在Bigtable上去实现一个多行数据写入的数据库事务。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ac/70/acca79d3b8da9be21c13bf4688cc3d70.jpg?wh=2000x1125" title="Chubby的锁，是一个粗粒度锁，持有锁的时间，可以以秒乃至分钟来计" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ac/70/acca79d3b8da9be21c13bf4688cc3d70.jpg?wh=2000x1125" title="Chubby的锁，是一个粗粒度锁，持有锁的时间，可以以秒乃至分钟来计" /></p>
 <p>这是因为，像Master的切换这样的操作，发生的频率其实很低。这就意味着，Chubby负载也很低。而像Bigtable里面的数据库事务操作，每秒可以有百万次，如果通过Chubby来实现，那Chubby的负载肯定是承受不了的。要知道，Chubby的底层算法，也是Paxos。我们上一讲刚刚一起来了解过这个算法，它的每一个共识的达成，都是需要通过至少两轮的RPC协商来完成的，性能肯定跟不上。</p>
 <p>事实上，在Bigtable里，Chubby也主要是被用来做四件事情，第一个是Master的高可用性切换；第二个是存储引导位置（Bootstrap Location），让客户端能够找到METADATA数据的存储位置；第三个是Tablet和Tablet Server之间的分配关系；最后一个是Bigtable里表的Schema。可以看到，Chubby存储的这些数据都是很少变化，但是一旦丢失就会导致数据不一致的元数据。</p>
 <p>那么相信到这里，你对Chubby在整个分布式系统中的作用应该就弄明白了。Chubby并不是提供一个底层的Paxos算法库，然后让所有的GFS、Bigtable等等，基于Paxos协议来实现数据库事务。<strong>而是把自己变成了一个分布式锁服务</strong>，主要解决GFS、Bigtable这些系统的元数据的一致性问题，以及容错场景下的灾难恢复问题。</p>
@@ -7880,10 +7880,10 @@
 <p>在论文里面，Master的生命周期被称之为<strong>租期</strong>（lease）。也就是说，Master发起的共识算法达成的共识，是在一段时间T之内，它是Master。而只要Master不崩溃，一般它都会在这个T的时间到期之前，进行续租。而如果Master崩溃了，当T的时间到了，那么所有节点都可以发起自己是Master的一次提案，最终确认一个新的Master。</p>
 <p>可以看到，虽然Paxos这样的共识算法其实是不需要单一的Master节点的。但是为了实际应用中的效率问题，我们会采用选举出一个Master的办法，来让整个系统更加简化。</p>
 <p>对于Chubby的整个服务器端来说，我们可以把它看成一个三层的系统。最底层，是一个Paxos协议实现的同步日志复制的系统，也就是我们上一讲所说的<strong>状态机复制的系统</strong>。上面一层，就是通过这个状态机实现的<strong>数据库</strong>了，Google是直接采用了BerkeleyDB作为这个数据库。换句话说，Chubby是通过Paxos在多个BerkeleyDB里，实现数据库的同步复制。在BerkeleyDB之上，才是由Chubby自己实现的<strong>锁服务</strong>。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/04/c2/0430de0becff1f1aed642a1a866e4dc2.jpg?wh=1920x1080" title="Paxos算法，就是用来同步复制BerkeleyDB里的日志" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/04/c2/0430de0becff1f1aed642a1a866e4dc2.jpg?wh=1920x1080" title="Paxos算法，就是用来同步复制BerkeleyDB里的日志" /></p>
 <p>除了服务器端，Chubby还给所有想要使用Chubby的应用提供了一个客户端。客户端会通过DNS拿到所有的Chubby的服务端的节点，然后可以去里面任何一个节点询问，哪一个是Master。无论是读还是写的请求，客户端都是通过访问Master来获取的。</p>
 <p>对于数据写入的请求，Master会作为刚才我们说过的提案者，在所有的Chubby服务器节点上通过Paxos算法进行同步复制。而对于读请求，Master直接返回本地数据就好，因为所有服务器节点上的数据是有共识的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9e/af/9e6a0b56d5275c6fe0c54fb92d8f85af.jpg?wh=1920x1080" title="来自论文中的系统架构图" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9e/af/9e6a0b56d5275c6fe0c54fb92d8f85af.jpg?wh=1920x1080" title="来自论文中的系统架构图" /></p>
 <h3 id="chubby_3">Chubby对外提供的接口</h3>
 <p>既然Chubby的底层存储系统，是BerkeleyDB这样一个KV数据库，那么我们就可以通过它做很多事情了。Chubby对外封装的访问接口，是一个类似于Unix文件系统的接口。使用这个形式，同样也降低了使用Chubby的用户的门槛。毕竟每个工程师都熟悉用ls命令，去查询目录下的子目录和文件列表。</p>
 <p>Chubby里的每一个目录或者文件，都被称之为一个节点（node）。<strong>外部应用所使用的分布式“锁”，其实就是锁在这个节点上。</strong>哪个客户端获得了锁，就可以向对应的目录或者文件里面写入数据。比如谁是真正的Master，就是看谁获得了某个特定的文件锁。</p>
@@ -7895,7 +7895,7 @@
 <p>回顾一下我们之前讲过的Bigtable的论文，Bigtable的Master一旦发现这种情况，就会尝试去Chubby里面获取这个节点对应的锁，如果能够获取到，那么说明Master到Chubby的网络没有问题，Master就会认为是Tablet Server节点下线了，它就要去调度其他的Tablet Server，去承接这个下线了的服务器之前服务的那些tablet。Master只需要监控/bigtable/tablet_servers这个目录，就能够知道线上有哪些Tablet Server可供使用了。</p>
 <p>而为了减少Chubby的负载，我们不希望所有想要知道Chubby里面节点变更的客户端，都来不断地轮询查询各个目录和文件的最新变更。因为Chubby管理的通常是各种元数据，这些数据的变更并不频繁。所以，Chubby实现了一个<strong>事件通知的机制</strong>。</p>
 <p>这是一个典型的设计模式中的<strong>观察者模型（observer pattern）</strong>。客户端可以注册它自己对哪些事件感兴趣，比如特定目录或者文件的内容变更，或者是或者是某个文件或者目录被删除了，一旦这些事件发生了，Chubby就会推送对应的事件信息给这些应用客户端，应用客户端就可以去做类似于调度Tablet Server这样的操作了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ca/7c/cace0104113ccffa85c2a56ce40b007c.jpg?wh=1920x1080" title="Chubby支持监听的事件类型" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ca/7c/cace0104113ccffa85c2a56ce40b007c.jpg?wh=1920x1080" title="Chubby支持监听的事件类型" /></p>
 <h3 id="chubby_4">Chubby作为分布式锁的挑战</h3>
 <p>现在我们知道，每一个Chubby的目录或者文件，就是一把锁。那么是不是我们有了锁之后，分布式共识的问题就被解决了呢？如果你是这么想的，那么你肯定还没有在网络延时上吃到足够的亏。</p>
 <p>首先，作为分布式锁，客户端去获取的锁都是有时效的，也就是它只能占用这个锁一段时间。这个和我们前面提到的Chubby的Master的“租约”原理类似，<strong>主要是为了避免某个客户端获取了锁之后，它因为网络或者硬件原因下线了。</strong></p>
@@ -7909,7 +7909,7 @@
 <li>当Y被写入之后，请求X才到了Bigtable。但是Bigtable并不知道谁拥有锁，它只会认为应用层面已经通过锁，实现了对于资源的保护。那么，之前客户端A的数据会覆盖掉客户端B写入的数据。但是这个情况肯定是我们不愿意接受的，因为对于客户端B来说，我明明已经持有了锁，为什么我写入的数据会被此时此刻没有锁的人覆盖掉呢？而且，客户端A的数据也是更早版本的数据。</li>
 </ul>
 <p>这个就好像你租了一个仓库，租期是一年。你呢，在租期快要到期的时候，向仓库里发了一批货。但是因为物流延误，货在路上耽搁了。当你的仓库租期到期的时候，房东把仓库租给了别人，别人也已经往仓库里面放了他自己的货物。而这个时候，你的货到了，但是因为仓库的门卫并不知道房东把仓库租给了谁，它不会检查你是不是还租着仓库，就直接把你的货物也入库了，而把新的租客的货物给“覆盖”掉了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e8/cc/e8536914798d1a31b98b2a0a1c3520cc.jpg?wh=2000x1125" title="因为网络延时，并不是获取到锁，写入数据就能保障我们期望的线性一致的表现的了" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e8/cc/e8536914798d1a31b98b2a0a1c3520cc.jpg?wh=2000x1125" title="因为网络延时，并不是获取到锁，写入数据就能保障我们期望的线性一致的表现的了" /></p>
 <p>当然，Chubby也解决了这个问题，它主要是通过两种方式来解决的。</p>
 <ul>
 <li><strong>首先是锁延迟（lock-delay）</strong></li>
@@ -7920,7 +7920,7 @@
 <li><strong>其次是锁序列器（lock-sequencer）</strong></li>
 </ul>
 <p>它本质上是一个<a href="https://en.wikipedia.org/wiki/Optimistic_concurrency_control">乐观锁</a>，或者在很多地方也叫做Fencing令牌。这种方式是这样的：客户端在获取Chubby的锁的时候，就要拿到对应的锁的序号，比方说23。在发送请求的时候，客户端会带上这个序号。而当Chubby把锁给了别的客户端之后，对应的锁的序号会变大，变成了24。而我们对应的业务服务，比如Bigtable呢，也要记录每次请求的锁序列号，通过对比锁序列号来确定是否会有之前的锁，尝试去覆盖最新的数据。当遇到这种情况的时候，我们姗姗来迟的来自上一个锁的客户端请求，就会被业务服务拒绝掉。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bb/b6/bb7cdd1e84de98e1b8ddee3ebd0f12b6.jpg?wh=2000x1125" title="通过一个锁序列器这样的一个乐观锁的解决方案，我们避免了网络延迟带来的数据不一致性" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bb/b6/bb7cdd1e84de98e1b8ddee3ebd0f12b6.jpg?wh=2000x1125" title="通过一个锁序列器这样的一个乐观锁的解决方案，我们避免了网络延迟带来的数据不一致性" /></p>
 <p>所以你会看到，Chubby的每个锁，除了文件、目录本身，以及ACL权限这样的元数据之外，还有这样四个编号。</p>
 <ul>
 <li><strong>实例编号</strong>（instance number）：当这个“节点”每次被创建的时候自增。</li>
@@ -8072,8 +8072,6 @@ The recipient server is expected to test whether the sequencer is still valid an
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

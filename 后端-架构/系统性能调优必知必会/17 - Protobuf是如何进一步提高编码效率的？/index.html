@@ -14510,28 +14510,28 @@
 <a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>}
 </code></pre></div>
 <p>接着，通过protoc程序便可以针对不同平台、编程语言，将它生成编解码类，最后通过类中自动生成的SerializeToString方法将消息序列化，编码后的信息仅有11个字节。其中，报文与字段的对应关系我放在下面这张图中。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/12/b4/12907732b38fd0c0f41330985bb02ab4.png?wh=1256%2A760" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/12/b4/12907732b38fd0c0f41330985bb02ab4.png?wh=1256%2A760" /></p>
 <p>从图中可以看出，Protobuf是按照字段名、值类型、字段值的顺序来编码的，由于编码极为紧凑，所以分析时必须基于二进制比特位进行。比如红色的00001、00010、00011等前5个比特位，就分别代表着name、id、sex字段。</p>
 <p>图中字段值的编码方式我们后面再解释，这里想必大家会有疑问，如果只有5个比特位表示字段名的值，那不是限制消息最多只有31个（25 - 1）字段吗？当然不是，字段名的序号可以从1到536870911（即229 - 1），可是，多数消息不过只有几个字段，这意味着可以用很小的序号表示它们。因此，对于小于16的序号，Protobuf仅有5个比特位表示，这样加上3位值类型，只需要1个字节表示字段名。对于大于16小于2027的序号，也只需要2个字节表示。</p>
 <p>Protobuf可以用1到5个字节来表示一个字段名，因此，每个字节的第1个比特位保留，它为0时表示这是字段名的最后一个字节。下表列出了几种典型序号的编码值（请把黑色的二进制位，从右至左排列，比如2049应为000100000000001，即2048+1）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/43/33/43983f7fcba1d26eeea952dc0934d833.jpg?wh=1668%2A656" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/43/33/43983f7fcba1d26eeea952dc0934d833.jpg?wh=1668%2A656" /></p>
 <p>说完字段名，我们再来看字段值是如何编码的。</p>
 <h2 id="_2">怎样高效地编码字段值？</h2>
 <p>Protobuf对不同类型的值，采用6种不同的编码方式，如下表所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b2/67/b20120a8bac33d985275b5a2768ad067.jpg?wh=2148%2A800" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b2/67/b20120a8bac33d985275b5a2768ad067.jpg?wh=2148%2A800" /></p>
 <p>字符串用Length-delimited方式编码，顾名思义，在值长度后顺序添加ASCII字节码即可。比如上文例子中的John，对应的ASCII码如下表所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9f/cb/9f472ea914f98a81c03a7ad309f687cb.jpg?wh=1518%2A606" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9f/cb/9f472ea914f98a81c03a7ad309f687cb.jpg?wh=1518%2A606" /></p>
 <p>这样，"John"需要5个字节进行编码，如下图所示（绿色表示长度，紫色表示ASCII码）：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6e/ae/6e45b5c7bb5e8766f6baef8c0e8b7bae.png?wh=1257%2A692" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6e/ae/6e45b5c7bb5e8766f6baef8c0e8b7bae.png?wh=1257%2A692" /></p>
 <p>这里需要注意，字符串长度的编码逻辑与字段名相同，当长度小于128（27）时，1个字节就可以表示长度。若长度从128到16384（214），则需要2个字节，以此类推。</p>
 <p>由于字符串编码时未做压缩，所以并不会节约空间，但胜在速度快。<strong>如果你的消息中含有大量字符串，那么使用Huffman等算法压缩后再编码效果更好。</strong></p>
 <p>我们再来看id：1234这个数字是如何编码的。其实Protobuf中所有数字的编码规则是一致的，字节中第1个比特位仅用于指示由哪些字节编码1个数字。例如图中的1234，将由14个比特位00010011010010表示（1024+128+64+16+2，正好是1234）。</p>
 <p><strong>由于消息中的大量数字都很小，这种编码方式可以带来很高的空间利用率！</strong>当然，如果你确定数字很大，这种编码方式不但不能节约空间，而且会导致原先4个字节的大整数需要用5个字节来表示时，你也可以使用fixed32、fixed64等类型定义数字。</p>
 <p>Protobuf还可以通过enum枚举类型压缩空间。回到第1幅图，sex: FEMALE仅用2个字节就编码完成，正是枚举值FEMALE使用数字1表示所达到的效果。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c9/c7/c9b6c10399a34d7a0e577a0397cd5ac7.png?wh=1256%2A760" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c9/c7/c9b6c10399a34d7a0e577a0397cd5ac7.png?wh=1256%2A760" /></p>
 <p>而且，由于Protobuf定义了每个字段的默认值，因此，当消息使用字段的默认值时，Protobuf编码时会略过该字段。以sex: MALE为例，由于MALE=0是sex的默认值，因此在第2幅示例图中，这2个字节都省去了。</p>
 <p>另外，当使用repeated语法将多个数字组成列表时，还可以通过打包功能提升编码效率。比如下图中，对numbers字段添加101、102、103、104这4个值后，如果不使用打包功能，共需要8个字节编码，其中每个数字前都需要添加字段名。而使用打包功能后，仅用6个字节就能完成编码，显然列表越庞大，节约的空间越多。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ce/47/ce7ed2695b1e3dd869b59c438ee66147.png?wh=1524%2A564" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ce/47/ce7ed2695b1e3dd869b59c438ee66147.png?wh=1524%2A564" /></p>
 <p>在Protobuf2版本中，需要显式设置 [packed=True] 才能使用打包功能，而在Protobuf3版本中这是默认功能。</p>
 <p>最后，从<a href="https://github.com/protocolbuffers/protobuf/blob/master/docs/performance.md">这里</a>可以查看Protobuf的编解码性能测试报告，你能看到，在保持高空间利用率的前提下，Protobuf仍然拥有飞快的速度！</p>
 <h2 id="_3">小结</h2>
@@ -14665,8 +14665,6 @@ http2还可以使用stream方式传输，这些都是protobuf没有的。</p>202
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

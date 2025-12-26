@@ -14515,29 +14515,29 @@
 <h2 id="http">通过缓存避免发送HTTP请求</h2>
 <p>如果不走网络就能获得HTTP响应，这样性能肯定最高。HTTP协议设计之初就考虑到了这一点，缓存能够让客户端在免于发送HTTP请求的情况下获得服务器的资源。</p>
 <p>缓存到底是如何做到的呢？其实很简单，它从时间维度上做文章，把第1份请求及其响应保存在客户端的本地磁盘上，其中请求的URL作为关键字（部分HTTP头部也会加入关键字，例如确定服务器域名的Host头部），而响应就是值。这样，后续发起相同的请求时，就可以先在本地磁盘上通过关键字查找，如果找到了，就直接将缓存作为服务器响应使用。读取本地磁盘耗时不过几十毫秒，这远比慢了上百倍且不稳定的网络请求快得多。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9d/ab/9dea133d832d8b7ab642bb74b48502ab.png?wh=1007%2A676" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9d/ab/9dea133d832d8b7ab642bb74b48502ab.png?wh=1007%2A676" /></p>
 <p>你可能会问，服务器上的资源更新后，客户端并不知道，它若再使用过期的缓存就会出错，这该如何解决？因此，服务器会在发送响应时预估一个过期时间并在响应头部中告诉客户端，而客户端一旦发现缓存过期则重新发起网络请求。HTTP协议控制缓存过期的头部非常多，而且通常这是在服务器端设置的，我会在本专栏的第4部分“分布式系统优化”结合服务器操作再来介绍，这里暂时略过。</p>
 <p>当然，过期的缓存也仍然可以提升性能，如下图所示，当客户端发现缓存过期后，会取出缓存的摘要（摘要是从第1次请求的响应中拿到的），把它放在请求的Etag头部中再发给服务器。而服务器获取到请求后，会将本地资源的摘要与请求中的Etag相比较，如果不同，那么缓存没有价值，重新发送最新资源即可；如果摘要与Etag相同，那么仅返回不含有包体的304 Not Modified响应，告知客户端缓存仍然有效即可，这就省去传递可能高达千百兆的文件资源。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a3/62/a394b7389d0cdb5f0866223681e19b62.png?wh=1048%2A696" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a3/62/a394b7389d0cdb5f0866223681e19b62.png?wh=1048%2A696" /></p>
 <p>至于Etag摘要究竟是怎样生成的，各类Web服务器的处理方式不尽相同，比如Nginx会将文件大小和修改时间拼接为一个字符串作为文件摘要（详见<a href="https://time.geekbang.org/course/detail/138-76358">《Nginx核心知识100讲》第97课</a>）。过期缓存在分布式系统中可以有效提升可用性，[第25课] 还会站在反向代理的角度介绍过期缓存的用法。</p>
 <p>浏览器上的缓存只能为一个用户使用，故称为私有缓存。代理服务器上的缓存可以被许多用户使用，所以称为共享缓存。可见，共享缓存带来的性能收益被庞大的客户端群体放大了。你可以看到在下面的REST架构图中，表示缓存的$符号（缓存的英文名称是cache，由于它的发音与cash很像，所以许多英文文档中用美元符号来表示缓存）既存在于User Agent浏览器中，也存在于Proxy正向代理服务器和Gateway反向代理上。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b6/ff/b6950aa62483c56438c41bc4b2f43bff.png?wh=748%2A334" title="图片来自网络" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b6/ff/b6950aa62483c56438c41bc4b2f43bff.png?wh=748%2A334" title="图片来自网络" /></p>
 <p>可见，缓存与互联网世界的网络效率密切相关，用好缓存是提升HTTP性能最重要的手段。</p>
 <h2 id="http_1">如何降低HTTP请求的次数？</h2>
 <p>如果不得不发起请求，就应该尽量减少HTTP请求的次数，这可以从减少重定向次数、合并请求、延迟发送请求等3个方面入手。</p>
 <p>首先来看看什么是重定向请求，一个资源由于迁移、维护等原因从url1移至url2后，在客户端访问原先的url1时，服务器不能简单粗暴地返回错误，而是通过302响应码及Location头部，告诉客户端资源已经改到url2了，而客户端再用url2发起新的HTTP请求。</p>
 <p>可见，重定向增加了请求的数量。尤其客户端在公网中时，由于公网速度慢、成本高、路径长、不稳定，而且为了信息安全性还要用TLS协议加密，这些都降低了网络性能。从上面的REST架构图可以看到，HTTP请求会经过多个代理服务器，如果将重定向工作交由代理服务器完成，就能减少网络消耗，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0d/2a/0d1701737956ce65f3d5ec8fa8009f2a.png?wh=724%2A842" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0d/2a/0d1701737956ce65f3d5ec8fa8009f2a.png?wh=724%2A842" /></p>
 <p>更进一步，客户端还可以缓存重定向响应。RFC规范定义了5个重定向响应码（如下表所示），其中客户端接收到301和308后都可以将重定向响应缓存至本地，之后客户端会自动用url2替代url1访问网络资源。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/85/70/85b55f50434fc1acd2ead603e5c57870.jpg?wh=2324%2A712" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/85/70/85b55f50434fc1acd2ead603e5c57870.jpg?wh=2324%2A712" /></p>
 <p>其次我们来看如何合并请求。当多个访问小文件的请求被合并为一个访问大文件的请求时，这样虽然传输的总资源体积未变，但减少请求就意味着减少了重复发送的HTTP头部，同时也减少了TCP连接的数量，因而省去了TCP握手和慢启动过程消耗的时间（参见第12课）。我们具体看几种合并请求的方式。</p>
 <p>一些WEB页面往往含有几十、上百个小图片，用<a href="https://www.tutorialrepublic.com/css-tutorial/css-sprites.php">CSS Image Sprites技术</a>可以将它们合成一张大图片，而浏览器获得后可以根据CSS数据把它切割还原为多张小图片，这可以大幅减少网络消耗。</p>
-<p><a href="https://blog.csdn.net/weixin_38055381/article/details/81504716"><img alt="" src="https://static001.geekbang.org/resource/image/e4/ed/e4a760a95542701d99b8a38ccddaebed.png?wh=1502%2A628" title="图片来自[黑染枫林的CSDN博客]" /></a></p>
+<p><a href="https://blog.csdn.net/weixin_38055381/article/details/81504716" referrerpolicy="no-referrer"><img alt="" src="https://static001.geekbang.org/resource/image/e4/ed/e4a760a95542701d99b8a38ccddaebed.png?wh=1502%2A628" title="图片来自[黑染枫林的CSDN博客]" /></a></p>
 <p>类似地，在服务器端用webpack等打包工具将Javascript、CSS等资源合并为大文件，也能起到同样的效果。</p>
 <p>除此以外，还可以将多媒体资源用base64编码后，以URL的方式嵌入HTML文件中，以减少小请求的个数（参见<a href="https://tools.ietf.org/html/rfc2397">RFC2397</a>）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/27/fb/27aa119e0104f41a6718987cdf71c8fb.png?wh=1299%2A287" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/27/fb/27aa119e0104f41a6718987cdf71c8fb.png?wh=1299%2A287" /></p>
 <p>用Chrome浏览器开发者工具的Network面板可以轻松地判断各站点是否使用了这种技术。关于Network面板的用法，我们在此就不赘述了（可参考<a href="https://time.geekbang.org/course/detail/175-93594">《Web协议详解与抓包实战》第9课</a>，那里有详细的介绍）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ab/74/ab75920b0c43e4f7fcbc5933005afb74.png?wh=534%2A700" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ab/74/ab75920b0c43e4f7fcbc5933005afb74.png?wh=534%2A700" /></p>
 <p>当然，这种合并请求的方式也会带来一个新问题，即，当其中一个资源发生变化后，客户端必须重新下载完整的大文件，这显然会带来额外的网络消耗。在落后的HTTP/1.1协议中，合并请求还算一个不错的解决方案，在下一讲将介绍的HTTP/2出现后，这种技术就没有用武之地了。</p>
 <p>最后，我们还可以从浏览页面的体验角度上，减少HTTP请求的次数。比如，有些HTML页面上引用的资源，其实在当前页面上用不上，而是供后续页面使用的，这就可以使用懒加载（<a href="https://zh.wikipedia.org/wiki/%E6%83%B0%E6%80%A7%E8%BC%89%E5%85%A5">lazy loading</a>） 技术延迟发起请求。</p>
 <p>当不得不发起请求时，还可以从服务器的角度通过减少响应包体的体积来提升性能。</p>
@@ -14545,7 +14545,7 @@
 <p>减少资源体积的唯一方式是对资源重新编码压缩，其中又分为<a href="https://zh.wikipedia.org/wiki/%E6%97%A0%E6%8D%9F%E6%95%B0%E6%8D%AE%E5%8E%8B%E7%BC%A9">无损压缩</a>与<a href="https://zh.wikipedia.org/wiki/%E6%9C%89%E6%8D%9F%E6%95%B0%E6%8D%AE%E5%8E%8B%E7%BC%A9">有损压缩</a>两种。</p>
 <p>先来看无损压缩，这是指压缩后不会损失任何信息，可以完全恢复到压缩前的原样。因此，文本文件、二进制可执行文件都会使用这类压缩方法。</p>
 <p>源代码也是文本文件，但它有自身的语法规则，所以可以依据语法先做一轮压缩。比如<a href="https://jquery.com/download/">jQuery</a> 是用javascript语言编写的库，而标准版的jQuery.js为了帮助程序员阅读含有许多空格、回车等符号，但机器解释执行时并不需要这些符号。因此，根据语法规则将这些多余的符号去除掉，就可以将jQuery文件的体积压缩到原先的三分之一。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/de/ba/de0fc2a64a100bc83fc48eb2606fedba.png?wh=1257%2A218" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/de/ba/de0fc2a64a100bc83fc48eb2606fedba.png?wh=1257%2A218" /></p>
 <p>接着可以基于信息熵原理进行通用的无损压缩，这需要对原文建立统计模型，将出现频率高的数据用较短的二进制比特序列表示，而将出现频率低的数据用较长的比特序列表示。我们最常见的Huffman算法就是一种执行速度较快的实践，在下一讲的HTTP/2协议中还会用到它。在上图中可以看到，最小版的jQuery文件经过Huffman等算法压缩后，体积还会再缩小三分之二。</p>
 <p>支持无损压缩算法的客户端会在请求中通过Accept-Encoding头部明确地告诉服务器：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Accept-Encoding: gzip, deflate, br
@@ -14554,7 +14554,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>content-encoding: gzip
 </code></pre></div>
 <p>虽然目前gzip使用最为广泛，但它的压缩效率以及执行速度其实都很一般，Google于2015年推出的<a href="https://zh.wikipedia.org/wiki/Brotli">Brotli</a> 算法在这两方面表现都更优秀（也就是上文中的br），其对比数据如下：</p>
-<p><a href="https://quixdb.github.io/squash-benchmark/"><img alt="" src="https://static001.geekbang.org/resource/image/62/cb/62e01433ad8ef23ab698e7c47b7cc8cb.png?wh=1343%2A813" title="图片来源：[https://quixdb.github.io/squash-benchmark/]" /></a></p>
+<p><a href="https://quixdb.github.io/squash-benchmark/" referrerpolicy="no-referrer"><img alt="" src="https://static001.geekbang.org/resource/image/62/cb/62e01433ad8ef23ab698e7c47b7cc8cb.png?wh=1343%2A813" title="图片来源：[https://quixdb.github.io/squash-benchmark/]" /></a></p>
 <p>再来看有损压缩，它通过牺牲质量来提高压缩比，主要针对的是图片和音视频。HTTP请求可以通过Accept头部中的q质量因子（参见<a href="https://tools.ietf.org/html/rfc7231#section-5.3.2">RFC7231</a>），告诉服务器期望的资源质量：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Accept: audio/*; q=0.2, audio/basic
 </code></pre></div>
@@ -14691,8 +14691,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

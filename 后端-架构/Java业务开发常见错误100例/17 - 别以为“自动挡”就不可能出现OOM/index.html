@@ -14589,7 +14589,7 @@
 </code></pre></div>
 <p>可以看到，一共有26838个索引（也就是所有用户名的1位、2位一直到6位有26838个组合），HashMap的Value，也就是List一共有1万个用户*6=6万个UserDTO对象。</p>
 <p>使用内存分析工具MAT打开堆dump发现，6万个UserDTO占用了约1.2GB的内存：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d1/d2/d17fdb7d5123566312f7d3888ef82bd2.png?wh=1058%2A296" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d1/d2/d17fdb7d5123566312f7d3888ef82bd2.png?wh=1058%2A296" /></p>
 <p>看到这里发现，<strong>虽然真正的用户只有1万个，但因为使用部分用户名作为索引的Key，导致缓存的Key有26838个，缓存的用户信息多达6万个</strong>。如果我们的用户名不是6位而是10位、20位，那么缓存的用户信息可能就是10万、20万个，必然会产生堆OOM。</p>
 <p>尝试调大用户名的最大长度，重启程序可以看到类似如下的错误：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>[17:30:29.858] [main] [ERROR] [ringframework.boot.SpringApplication:826 ] - Application run failed
@@ -14619,7 +14619,7 @@
 <a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>}
 </code></pre></div>
 <p>再次分析堆内存，可以看到UserDTO只有9945份，总共占用的内存不到200M。这才是我们真正想要的结果。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/34/52/34a0fc90ac8be7a20cb295c14f06d752.png?wh=1096%2A280" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/34/52/34a0fc90ac8be7a20cb295c14f06d752.png?wh=1096%2A280" /></p>
 <p>修复后的程序，不仅相同的UserDTO只有一份，总副本数变为了原来的六分之一；而且因为HashSet的去重特性，双重节约了内存。</p>
 <p>值得注意的是，我们虽然清楚数据总量，但却忽略了每一份数据在内存中可能有多份。我之前还遇到一个案例，一个后台程序需要从数据库加载大量信息用于数据导出，这些数据在数据库中占用100M内存，但是1GB的JVM堆却无法完成导出操作。</p>
 <p>我来和你分析下原因吧。100M的数据加载到程序内存中，变为Java的数据结构就已经占用了200M堆内存；这些数据经过JDBC、MyBatis等框架其实是加载了2份，然后领域模型、DTO再进行转换可能又加载了2次；最终，占用的内存达到了200M*4=800M。</p>
@@ -14659,7 +14659,7 @@
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>Exception in thread &quot;Catalina-utility-2&quot; java.lang.OutOfMemoryError: GC overhead limit exceeded
 </code></pre></div>
 <p>我们来分析一下这个问题。进行堆转储后可以看到，堆内存中有200万个UserProfie和User：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b9/e9/b9bb8ef163a07a8da92e6e66a6dd55e9.png?wh=2386%2A572" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b9/e9/b9bb8ef163a07a8da92e6e66a6dd55e9.png?wh=2386%2A572" /></p>
 <p>如下是User和UserProfile类的定义，需要注意的是，WeakHashMap的Key是User对象，而其Value是UserProfile对象，持有了User的引用：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>@Data
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>@AllArgsConstructor
@@ -14795,9 +14795,9 @@
 <a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>java.lang.OutOfMemoryError: Java heap space
 </code></pre></div>
 <p>于是，我让运维同学进行生产堆Dump。通过MAT打开dump文件后，我们一眼就看到OOM的原因是，有接近1.7GB的byte数组分配，而JVM进程的最大堆内存我们只配置了2GB：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0b/ee/0b310e7da83f272afdf51b345d8057ee.png?wh=1738%2A194" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0b/ee/0b310e7da83f272afdf51b345d8057ee.png?wh=1738%2A194" /></p>
 <p>通过查看引用可以发现，大量引用都是Tomcat的工作线程。大部分工作线程都分配了两个10M左右的数组，100个左右工作线程吃满了内存。第一个红框是Http11InputBuffer，其buffer大小是10008192字节；而第二个红框的Http11OutputBuffer的buffer，正好占用10000000字节：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/53/12/53546299958a4fecef5fd473a0579012.png?wh=2186%2A1056" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/53/12/53546299958a4fecef5fd473a0579012.png?wh=2186%2A1056" /></p>
 <p>我们先来看看第一个Http11InputBuffer为什么会占用这么多内存。查看Http11InputBuffer类的init方法注意到，其中一个初始化方法会分配headerBufferSize+readBuffer大小的内存：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>void init(SocketWrapperBase&lt;?&gt; socketWrapper) {
 <a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>
@@ -14813,7 +14813,7 @@
 <a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a>}
 </code></pre></div>
 <p>在<a href="https://tomcat.apache.org/tomcat-8.0-doc/config/http.html">Tomcat文档</a>中有提到，这个Socket的读缓冲，也就是readBuffer默认是8192字节。显然，问题出在了headerBufferSize上：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0c/68/0c14d6aff749d74b3ee0e159e4552168.png?wh=2650%2A246" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0c/68/0c14d6aff749d74b3ee0e159e4552168.png?wh=2650%2A246" /></p>
 <p>向上追溯初始化Http11InputBuffer的Http11Processor类，可以看到，传入的headerBufferSize配置的是MaxHttpHeaderSize：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>inputBuffer = new Http11InputBuffer(request, protocol.getMaxHttpHeaderSize(),
 <a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>protocol.getRejectIllegalHeaderName(), httpParser);
@@ -14984,8 +14984,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

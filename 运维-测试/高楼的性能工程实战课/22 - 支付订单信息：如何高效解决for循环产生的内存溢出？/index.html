@@ -6353,16 +6353,16 @@
 <p>不过，在此之前，我们会先处理一个熟悉的问题，就是数据库表加索引。很显然，我们在测试这个接口时又遇到它了。虽然我在<a href="https://time.geekbang.org/column/article/367285">第16讲</a>中给你重点讲过这个问题，但是这一次的每秒全表扫描比之前要高得多。通过这次的讲解，我希望你能明白只要存在全表扫描，CPU消耗很快就会达到100%。同时，也希望你能借此看清楚全表扫描对CPU消耗的影响。</p>
 <h2 id="_1">场景运行数据</h2>
 <p>首先，我们来运行一下场景：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/02/e1/02f5facd8d0196ae07c223b8dc1e4ae1.png?wh=1832%2A636" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/02/e1/02f5facd8d0196ae07c223b8dc1e4ae1.png?wh=1832%2A636" /></p>
 <p>这是一个典型的TPS太低、响应时间不断上升的性能瓶颈，对于这种瓶颈的分析逻辑，我在前面的课程里已经写过很多次了，相信你已经掌握。下面我们来看一下具体的问题是什么。</p>
 <h2 id="_2">架构图</h2>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/72/8f/72b7b04b1e2323d4fae9fcc30cb3be8f.png?wh=979%2A286" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/72/8f/72b7b04b1e2323d4fae9fcc30cb3be8f.png?wh=979%2A286" /></p>
 <p>这个接口的链路比较简单：User - Gateway - Order - MySQL，我们大概记在脑子里就好。</p>
 <h2 id="_3">第一阶段</h2>
 <p>在这里我就不拆分时间了，我们直接来看全局监控。因为第一阶段的问题相对来说比较简单，只是性能瓶颈的表现形式和之前不太一样。</p>
 <h3 id="_4">全局监控分析</h3>
 <p>全局监控的数据如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0a/3a/0a2471dca622df4a813e8c06d31e5b3a.png?wh=1880%2A424" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0a/3a/0a2471dca622df4a813e8c06d31e5b3a.png?wh=1880%2A424" /></p>
 <p>看到这张图，你是不是有一种终于见到典型性能瓶颈的感觉？CPU使用率这么高！那还不简单？打栈看代码呀！</p>
 <p>不过，我们得先查一下是什么东西导致k8s-worker-1的CPU使用率这么高的。这个worker上运行的服务如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>[root@k8s-master-2 ~]# kubectl get pods -o wide | grep worker-1
@@ -6371,7 +6371,7 @@
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>[root@k8s-master-2 ~]#
 </code></pre></div>
 <p>可以看到，有两个服务在这个worker上跑着，一个是初始化容器，另一个是MySQL。初始化容器已经是完成的状态，那CPU使用率高肯定是因为MySQL了。因此，我们就进到容器中，执行下top，看看资源消耗到什么程度。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a4/5f/a420ef3454ee13f4f37834eyy0e5045f.png?wh=846%2A279" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a4/5f/a420ef3454ee13f4f37834eyy0e5045f.png?wh=846%2A279" /></p>
 <p>什么情况？CPU使用率这么高吗？既然这样，我们就得来查一下MySQL的全局监控了。</p>
 <p>在这里，<strong>查看全局监控其实是分析MySQL的必要步骤</strong>。如果直接查看trx表，中间其实是有些跳跃的，因为查看MySQL的全局监控数据，才是承上启下的一步。我现在把这个过程写全一些，以免你产生困惑。</p>
 <p>于是，我们执行一个mysqlreport命令，看看mysql的全局监控数据是怎样的。这里我截取了其中的一些重要信息：</p>
@@ -6409,26 +6409,26 @@
 <p>看到这里，我想你应该非常清楚我接下来的套路了吧，就是找SQL，看执行计划，然后确定优化方案。如果你不太清楚，可以再看一下<a href="https://time.geekbang.org/column/article/367285">第</a><a href="https://time.geekbang.org/column/article/367285">16</a><a href="https://time.geekbang.org/column/article/367285">讲</a>或<a href="https://time.geekbang.org/column/article/370723">第</a><a href="https://time.geekbang.org/column/article/370723">20</a><a href="https://time.geekbang.org/column/article/370723">讲</a>，其中都有描述。</p>
 <h3 id="_5">定向监控分析</h3>
 <p>于是，我们现在进入到了定向监控分析阶段。通过查看innodb_trx表，我们看到了SQL中执行慢的语句，它的执行计划如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/82/4c/82c5c3ba11f32184972ef2ce32127f4c.png?wh=1030%2A480" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/82/4c/82c5c3ba11f32184972ef2ce32127f4c.png?wh=1030%2A480" /></p>
 <p>这是很典型的全表扫描，虽然数据量并不大，但是我们也要添加索引。添加索引的语句如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e5/c7/e510e1a94a6d59c11204d062da9ed4c7.png?wh=742%2A35" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e5/c7/e510e1a94a6d59c11204d062da9ed4c7.png?wh=742%2A35" /></p>
 <p>这里你要注意一下，在创建索引的时候，如果数据量太大，创建索引可能会卡住很长时间，这要取决于机器单CPU的能力。</p>
 <h3 id="_6">优化效果</h3>
 <p>添加索引之后，我们直接来看一下优化效果：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5d/1a/5d245afc0a324280d9d93c0102a0f81a.png?wh=1828%2A857" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5d/1a/5d245afc0a324280d9d93c0102a0f81a.png?wh=1828%2A857" /></p>
 <p>你看，TPS要上千了！</p>
 <p>其实，对于SQL的优化，如果我们只是加一个索引，那就算是非常简单的步骤了，并且效果也会非常好，TPS增加上千倍、甚至上万倍都有可能。可是，如果优化涉及到了业务逻辑，那就麻烦一些了。</p>
 <p>如果你觉得这节课只是为了给你讲一个加索引的案例，那你就有些单纯了。下面，我们来看一个复杂的问题。</p>
 <h2 id="_7">第二阶段</h2>
 <p>在我接着执行压力的时候，看到了一个非常有意思的情况，我们来一起折腾折腾！</p>
 <h3 id="_8">场景运行数据</h3>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/29/a4/291ee16344ffbdd94cd0ae1yy62a11a4.png?wh=1814%2A662" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/29/a4/291ee16344ffbdd94cd0ae1yy62a11a4.png?wh=1814%2A662" /></p>
 <p>你看这张图，在压力持续大概6分钟之后，TPS不稳定也就算了，居然还掉下来了！你掉下来也就算了，居然还断开了！你断开了也就算了，响应时间居然也不增加！</p>
 <p>这可怎么分析呢？想要拆分时间都没有一个适合的理由呀！</p>
 <p>这时候，就得用上哥的性能分析决策树了。我们把相关的全局监控计数器都看一看，一层层查下去，还好这个接口的逻辑链路也不怎么长。</p>
 <h3 id="_9">全局监控分析</h3>
 <p>按照高老师的习惯，我们首先来看全局监控：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/62/78/62412b8c7159df58cbdcce7b196yya78.png?wh=1810%2A511" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/62/78/62412b8c7159df58cbdcce7b196yya78.png?wh=1810%2A511" /></p>
 <p>从这张图上，我们什么也没看出来。所以，我们接着查性能分析决策树，一层层地看下去。当看到Order的GC健康状态时，我们看到了下面这些数据：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>[root@svc-mall-order-568bd9b79-twhcw /]# jstat -gcutil 1 1s
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>​S0     S1     E      O      M     CCS    YGC     YGCT    FGC    FGCT     GCT
@@ -6523,18 +6523,18 @@
 </code></pre></div>
 <p>然后，我们再把生成的堆Dump下载下来，用MAT打开。</p>
 <p>在我打开堆文件的过程中出现了一个小插曲，这也是你需要留意的地方，那就是如果堆Dump的内存太大的话，我们打开堆Dump就会报这样的错：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/be/85/be3dc22bf50e7cdab4c3ea474a050d85.png?wh=629%2A374" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/be/85/be3dc22bf50e7cdab4c3ea474a050d85.png?wh=629%2A374" /></p>
 <p>这个时候我们就要到MemoryAnalyzer.ini文件中，把JVM的最大值参数-Xmx给调大。-Xmx的默认值是1G，至于要调到多大就要看你想打开多大的文件了。如果-Xmx调整得不够大，还会出现下面这样的错误：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/da/0e/dac4692b9da8b5680131aa4ea16b470e.png?wh=350%2A287" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/da/0e/dac4692b9da8b5680131aa4ea16b470e.png?wh=350%2A287" /></p>
 <p>在我们费了九牛二虎之力，终于打开堆文件后，看到这样的信息：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1d/7f/1d6964cyy56e5934b8657234ea2cf47f.png?wh=897%2A849" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1d/7f/1d6964cyy56e5934b8657234ea2cf47f.png?wh=897%2A849" /></p>
 <p>有一段内存居然消耗了2.6G！这个可疑的内存点在上图中也出现了（用MAT或jmap来看对象的内存消耗，是两种不同的手段，你可以自己选择。只是在MAT上，我们可以看到可疑的内存消耗点的提醒，而在jmap中是不会给出这样的提醒的，需要我们自己判断），我们点进去看一眼，看看可疑的内存点里具体的对象是什么：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/02/bc/02cb9099ec17332ab42e2564c2a106bc.png?wh=1214%2A560" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/02/bc/02cb9099ec17332ab42e2564c2a106bc.png?wh=1214%2A560" /></p>
 <p>你看，确实是SQL返回的数据量比较大，在上图的列表中居然有1千多万条记录。我们再把相应的栈展开看看：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4e/94/4e2dea48f6969a4a6f3919bddd4c3594.png?wh=1403%2A774" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4e/94/4e2dea48f6969a4a6f3919bddd4c3594.png?wh=1403%2A774" /></p>
 <p>看到OmsOrderDetail这个类了没？你可能会想，是支付订单信息这个接口有问题！但是证明还不足，我们要确定OmsOrderDetail是不是在这个接口中调用或生成的，才能判断出是不是这个接口的问题。</p>
 <p>由于当前使用的接口是paySuccess，我们看一下paySuccess的调用逻辑，发现paySuccess有一个getDetail函数。看到这个“getDetail”，还有其中这个“Detail”字符，你是不是感觉和OmsOrderDetail可以对应上？那我们就来查看一下getDetail对应的代码，看看它和OmsOrderDetail之间是什么关系：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/51/4a/5133a446f6e72549a40daace912f794a.png?wh=857%2A597" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/51/4a/5133a446f6e72549a40daace912f794a.png?wh=857%2A597" /></p>
 <p>不难发现，getDetail是一个OmsOrderDetail类。这么看来，我们的接口确实用到了OmsOrderDetail类，你是不是有一种抓住元凶的兴奋感？别着急，让人无奈的事情总是会出现的，下面我们看一下这段代码对应的SQL语句是一个什么样的逻辑。</p>
 <p>通过查看代码，可以看到这个接口中有两个update和一个select，这三个语句分别是：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>&lt;update id=&quot;updateByPrimaryKeySelective&quot; parameterType=&quot;com.dunshan.mall.model.OmsOrder&quot;&gt;
@@ -6558,7 +6558,7 @@
 </code></pre></div>
 <p>在我查了这三个SQL语句对应的SQL、表和索引之后，发现它们都是精准查找，并且索引也在第一阶段的分析中创建完了，按理说不会出现大的数据量。可是，我们在前面的确看到OmsOrderDetail产生了巨大的数据量，这是怎么一回事？</p>
 <p>为了搞清楚这个问题，我们查查还有谁调用了OmsOrderDetail：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/74/44/745a6dcedd341c57eededccfb5804344.png?wh=1267%2A735" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/74/44/745a6dcedd341c57eededccfb5804344.png?wh=1267%2A735" /></p>
 <p>我们找啊找，终于看到了两个for循环（其实在前面的代码段中，也可以看出来）。我点进去一看，发现它们是定时任务。这个时候，问题产生的逻辑就变得清晰了：由于存在for循环，接口调用时就会循环执行某段代码，这就成了JVM内存不断增加的一种可能性。</p>
 <p>你还记得吗？在<a href="https://time.geekbang.org/column/article/370976">上</a><a href="https://time.geekbang.org/column/article/370976">节课</a>中，我们其实也定位到了“for循环对应的SQL执行慢”这个问题，但是由于压力持续的时间不够长，内存没有被耗尽，所以内存被消耗光的问题并没有体现出来。而当场景执行的时间变长时，就出现了TPS断断续续的奇怪现象。</p>
 <h3 id="_11">优化效果</h3>
@@ -6604,7 +6604,7 @@
 <p>从GC的状态来看，内存现在可以回收得正常一些了。这里我要说明一下，上面的JVM数据不是在场景一开始的时候抓取的，而是在场景执行了很久之后才抓取的。因为我们从上面的数据看到JVM内存已经可以正常回收了，所以，上面的数据是在确定没有内存溢出的前提下得到的有效数据。</p>
 <p>不过，这里还是有问题的，不知道你有没有发现，那就是YGC过快。你通过YGC这一列就能看到，我一秒打印一次，一秒就有四五次的YGC，平均每次YGC时间大概在10～20毫秒。虽然这个问题还没有对TPS造成明显的影响，但是也在危险的边缘了。不过，也正因为它现在对TPS还没有造成明显的影响，所以，我在这里先不处理YGC快的问题了。</p>
 <p>我们再来重新执行一遍场景，得到的场景执行结果如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/73/36/730851a50364bde422aef5f69c29ce36.png?wh=1834%2A580" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/73/36/730851a50364bde422aef5f69c29ce36.png?wh=1834%2A580" /></p>
 <p>你看，TPS是不是有改善？而且不会再出现第二阶段刚开始的那种情况了，因为当时是压到了6分钟之后就开始出现问题了，而在这里，我们压了30多分钟，仍然没有出现掉下来的情况。</p>
 <p>可以欢呼了，对不对？对的！我们不用再等翻车了。</p>
 <h2 id="_12">总结</h2>
@@ -6768,8 +6768,6 @@ b. jstack 进程pid | grep 线程pid   ：top，top -Hp 进程pid，printf &quot
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

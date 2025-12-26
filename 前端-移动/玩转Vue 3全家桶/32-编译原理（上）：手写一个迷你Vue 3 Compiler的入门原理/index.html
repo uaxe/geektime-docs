@@ -5948,14 +5948,14 @@
 <p>前面我们用了四讲，学习了Vue在浏览器中是如何执行的，你可以参考上一讲结尾的Vue执行全景图来回顾一下。在Vue中，组件都是以虚拟DOM的形式存在，加载完毕之后注册effect函数。这样组件内部的数据变化之后，用Vue的响应式机制做到了通知组件更新，内部则使用patch函数实现了虚拟DOM的更新，中间我们也学习了位运算、最长递增子序列等算法。</p>
 <p>这时候你肯定还有一个疑问，那就是虚拟DOM是从哪来的？我们明明写的是template和JSX，这也是吃透Vue源码最后一个难点：Vue中的Compiler。</p>
 <p>下图就是Vue核心模块依赖关系图，reactivity和runtime我们已经剖析完毕，迷你版本的代码你可以在<a href="https://github.com/shengxinjing/weiyouyi">GitHub</a>中看到。今天开始我将用三讲的内容，给你详细讲解一下Vue在编译的过程中做了什么。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/59/15/59f10ba0b6a6ed5fb956ca05016fde15.jpg?wh=1888x982" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/59/15/59f10ba0b6a6ed5fb956ca05016fde15.jpg?wh=1888x982" /></p>
 <p>编译原理也属于计算机中的一个重要学科，Vue的compiler是在Vue场景下的实现，目的就是实现template到render函数的转变。</p>
 <p>我们第一步需要先掌握编译原理的基本概念。Vue官方提供了模板编译的<a href="https://vue-next-template-explorer.netlify.app/#%7B%22src%22%3A%22%3Cdiv%20id%3D%5C%22app%5C%22%3E%5Cn%20%20%20%20%3Cdiv%20%40click%3D%5C%22%28%29%3D%3Econsole.log%28xx%29%5C%22%20%3Aid%3D%5C%22name%5C%22%3E%7B%7Bname%7D%7D%3C%2Fdiv%3E%5Cn%20%20%20%20%3Ch1%20%3Aname%3D%5C%22title%5C%22%3E%E7%8E%A9%E8%BD%ACvue3%3C%2Fh1%3E%5Cn%20%20%20%20%3Cp%20%3E%E7%BC%96%E8%AF%91%E5%8E%9F%E7%90%86%3C%2Fp%3E%5Cn%3C%2Fdiv%3E%5Cn%22%2C%22ssr%22%3Afalse%2C%22options%22%3A%7B%22mode%22%3A%22module%22%2C%22filename%22%3A%22Foo.vue%22%2C%22prefixIdentifiers%22%3Afalse%2C%22hoistStatic%22%3Atrue%2C%22cacheHandlers%22%3Atrue%2C%22scopeId%22%3Anull%2C%22inline%22%3Afalse%2C%22ssrCssVars%22%3A%22%7B%20color%20%7D%22%2C%22compatConfig%22%3A%7B%22MODE%22%3A3%7D%2C%22whitespace%22%3A%22condense%22%2C%22bindingMetadata%22%3A%7B%22TestComponent%22%3A%22setup-const%22%2C%22setupRef%22%3A%22setup-ref%22%2C%22setupConst%22%3A%22setup-const%22%2C%22setupLet%22%3A%22setup-let%22%2C%22setupMaybeRef%22%3A%22setup-maybe-ref%22%2C%22setupProp%22%3A%22props%22%2C%22vMySetupDir%22%3A%22setup-const%22%7D%2C%22optimizeBindings%22%3Afalse%7D%7D">在线演示</a>。下图左侧代码是我们写的template，右侧代码就是compiler模块解成的render函数，我们今天的任务就是能够实现一个迷你的compiler。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/33/23/3326bd4f65d0714c4920e6d37e1be923.png?wh=1920x608" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/33/23/3326bd4f65d0714c4920e6d37e1be923.png?wh=1920x608" /></p>
 <h2 id="_1">整体流程</h2>
 <p>上述转化的过程可以分为下面的示意图几步来实现。</p>
 <p>首先，代码会被解析成一个对象，这个对象有点像虚拟DOM的概念，用来描述template的代码关系，这个对象就是抽象语法树（简称AST，后面我们细讲）。然后通过transform模块对代码进行优化，比如识别Vue中的语法，静态标记、最后通过generate模块生成最终的render函数。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9a/6d/9aaa7b24f6b9ff0cef5f70151ddd926d.jpg?wh=1920x1747" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9a/6d/9aaa7b24f6b9ff0cef5f70151ddd926d.jpg?wh=1920x1747" /></p>
 <p>理清了流程，我们动手完成具体代码实现。用下面的代码就能实现上述的流程图里的内容。其中parse函数负责生成抽象语法树AST，transform函数负责语义转换，generate函数负责最终的代码生成。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kd">function</span><span class="w"> </span><span class="nx">compiler</span><span class="p">(</span><span class="nx">template</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">ast</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">parse</span><span class="p">(</span><span class="nx">template</span><span class="p">);</span>
@@ -6329,7 +6329,7 @@
 </code></pre></div>
 <h2 id="_5">总结</h2>
 <p>我们总结一下今天所学的内容。今天，我带你手写了一个非常迷你的Vue compiler，这也是我们学习框架源码的时候一个比较正确的思路：在去看实际的源码之前，先通过迷你版本的实现，熟悉整个Vue compiler工作的主体流程。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ce/0d/ce5d04ae043d4247b4yy03e91353620d.jpg?wh=1920x453" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ce/0d/ce5d04ae043d4247b4yy03e91353620d.jpg?wh=1920x453" /></p>
 <p>通过这个迷你的compiler，我们学习了编译原理的入门知识：包括parser的实现、AST是什么，AST的语义化优化和代码生成generate模块，这给我们下一讲弄清楚Vue的compiler的核心逻辑打下了良好的理论基础。</p>
 <p>我想提醒你注意一个优化方法，我们实现的迷你compiler也实现了属性的静态标记，通过在编译期间的标记方式，让虚拟DOM在运行时有更多的状态，从而能够精确地控制更新。这种编译时的优化也能够对我们项目开发有很多指引作用，我会在剖析完Vue的compiler之后，在第34讲那里跟你分享一下实战中如何使用编译优化的思想。</p>
 <h2 id="_6">思考题</h2>
@@ -6455,8 +6455,6 @@ const [key, val] = token.val.split(&#39;=&#39;)
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

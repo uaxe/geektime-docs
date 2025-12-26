@@ -14238,7 +14238,7 @@
 消息集群的客户端通常使用长连接。但大数据领域很多数据抽取都是批处理任务，而批处理任务使用的是短连接，所以大数据领域这种我们会规划到单独的集群；另外在定时消息、大消息等场景下，也要规划专属集群。</li>
 </ul>
 <p>规划了这么多的集群，集群的管理就成了难点。我们专门开发一个消息运维平台ZMS，它支持在线安装RocketMQ、Kafka、ZooKeeper等中间件，安装原理如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e4/56/e4aebb2739826fb56fae7975b6395a56.jpg?wh=1920x1160" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e4/56/e4aebb2739826fb56fae7975b6395a56.jpg?wh=1920x1160" /></p>
 <p>我们对集群部署设计原理中的关键角色一一做个说明。</p>
 <ul>
 <li>service instance
@@ -14257,19 +14257,19 @@ zms-agent通过supervisor对主机上的进程进行管理，可实现进程状�
 <p>“双十一”、618等大促活动时，各快递公司的业务量往往是平时的几倍。所以，在大促来临之前，我们都会对现有系统进行压测，评估容量，压测后通常会采取扩容等手段以扛住大促前后的巨大流量。那怎么对消息集群进行扩容呢？</p>
 <p>我们分别讨论RocketMQ、Kafka这两种中间件。</p>
 <p>先说RocketMQ。例如现在已经有一个两主的集群了，部署如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/74/92/74417369a636e606e34d2eea7acbf092.jpg?wh=1581x810" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/74/92/74417369a636e606e34d2eea7acbf092.jpg?wh=1581x810" /></p>
 <p>现在需要扩容到3个主节点，我们首先要在新添加的机器192.168.3.106上也安装一个Broker，命名为broker-c。扩容后的部署图为：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/40/22/405198f8870ba415938745ec3c152e22.jpg?wh=1920x783" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/40/22/405198f8870ba415938745ec3c152e22.jpg?wh=1920x783" /></p>
 <p>这样就把broker-c扩容到集群了。但这个时候你会发现，新增加的Broker并没有任何流量，这是因为broker-c上目前没有创建任何主题，自然就没有消息写入。</p>
 <p>为了快速让broker-c上拥有集群内其他节点中的主题定义，我们通常可以拷贝集群内其他节点的主题定义文件，具体要复制的文件路径为：{ROCKETMQ_HOME}/store/config/topics.json文件。其中，ROCKETMQ_HOME 表示集群的主目录，具体的文件存储如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a2/8a/a2ae7c93aa638eda8e5ca91cc6a1ce8a.png?wh=1086x572" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a2/8a/a2ae7c93aa638eda8e5ca91cc6a1ce8a.png?wh=1086x572" /></p>
 <p>如果Broker关闭了自动创建消费组（autoCreateSubscriptionGroup=false），还需要拷贝subscriptionGroup.json文件。</p>
 <p>这样，再次重启新加入的机器，就可以承担读写流量，实现负载均衡了。</p>
 <p>我们再来说一下Kafka中集群节点的扩容。</p>
 <p>第一步和RocketMQ一样，也就是在新节点上安装一个Kafka，并与原先节点使用相同的ZooKeeper集群。这时，节点会扩容到集群中，但是与RocketMQ相同，这个节点暂时也不会有任何流量进来。那要如何使新节点承担数据的读写呢？</p>
 <p><strong>我们需要进行分区重分配，手动将部分主题的分区分配到新的节点。</strong></p>
 <p>在介绍具体的分配方式之前，我们先来看一下dw_test_topic_0709003的分区分布情况：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e5/27/e57251a83f8eaca90078f13c0bf8f027.png?wh=1862x491" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e5/27/e57251a83f8eaca90078f13c0bf8f027.png?wh=1862x491" /></p>
 <p>你可以重点关注一下Leader这一项，它表示分区所在的Broker节点。</p>
 <p>好了，下面我们具体来看一下怎么对分区进行重分配。这里总共有三个步骤。</p>
 <p><strong>第一步：</strong>挑选出一部分重要主题，或者是当前TPS排名靠前的主题，整理成JSON文件。</p>
@@ -14284,7 +14284,7 @@ zms-agent通过supervisor对主机上的进程进行管理，可实现进程状�
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>./kafka-reassign-partitions.sh --bootstrap-server 127.0.0.1:9092 --topics-to-move-json-file ./tmp/dw_test_topic_0709003-topics-to-move.json --broker-list &quot;0,1,2,4&quot; --generate --zookeeper 127.0.0.1:2181
 </code></pre></div>
 <p>该命令运行后的截图如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/98/5f/98f4aa8e177e038d8b80fc736fd0e45f.png?wh=943x288" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/98/5f/98f4aa8e177e038d8b80fc736fd0e45f.png?wh=943x288" /></p>
 <p>执行命令后会输出下面两部分内容。</p>
 <ul>
 <li>Current partition replica assignment：表示主题分区迁移之前的结果，通常把这部分内容保存在一个文件中，用于回滚操作。</li>
@@ -14294,11 +14294,11 @@ zms-agent通过supervisor对主机上的进程进行管理，可实现进程状�
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>./kafka-reassign-partitions.sh --bootstrap-server 127.0.0.1:9092 --reassignment-json-file  ./tmp/dw_test_topic_0709003-reassignment-json-file.json  --execute --zookeeper 127.0.0.1:2181/kafka_cluster_01
 </code></pre></div>
 <p>该命令的执行结果如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/cb/4d/cb8a51322471824c0c83c0ecdf51764d.png?wh=940x227" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cb/4d/cb8a51322471824c0c83c0ecdf51764d.png?wh=940x227" /></p>
 <p>响应结果还会返回迁移之前的分区情况，可用作回滚操作。值得注意的是，这个操作只会触发分区重分配，不会影响客户端的写入和读取。但如果分区的数据比较多的话，由于分区数据需要在节点之间进行迁移，所以需要一个过程。</p>
 <p><strong>如果在紧急情况下， 通常在修改操作之前会首先修改主题的存储时间，适当降低存储数据量</strong>，这样可以加快数据的迁移。</p>
 <p>分区重分配成功后，结果如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/2c/a3/2c3636fd37fdd69b2e3d7605a512f8a3.png?wh=1920x547" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2c/a3/2c3636fd37fdd69b2e3d7605a512f8a3.png?wh=1920x547" /></p>
 <p>可以看到，新扩容的节点4上已经有主分区了，这样它就可以接受数据的读写请求了。</p>
 <h2 id="_3">集群缩容</h2>
 <p>大促结束后，为了节省资源，通常需要对集群进行缩容处理。将节点从集群中移除的基本原则是，存储在这些节点上的消息必须完成消费，否则会造成消息消费丢失。</p>
@@ -14342,18 +14342,18 @@ zms-agent通过supervisor对主机上的进程进行管理，可实现进程状�
 <li>yyyy-MM-dd#HH:mm:ss:SSS 表示具体的时间戳。在执行命令时，需要严格按照格式，否则会抛出空指针异常，这个错误会让人看得莫名其妙。</li>
 </ul>
 <p>运行的结果如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/be/c9/be85a10c72ab7a2cfb146d4d23bcbec9.png?wh=1920x159" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/be/c9/be85a10c72ab7a2cfb146d4d23bcbec9.png?wh=1920x159" /></p>
 <p>我们再来看一下Kafka的位点回溯。</p>
 <p>kafka中在进行位点重置之前，首先需要停止该消费组内所有的消费者，然后执行如下命令：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>./kafka-consumer-groups.sh --bootstrap-server 127.0.0.1:9092 --group dw_test_consumer_20220710001 --reset-offsets --to-datetime &#39;2022-07-10T00:00:00.000&#39; --topic dw_test_topic_0709003  --execute
 </code></pre></div>
 <p>命令的运行结果如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/76/20/76e147d8667203da55257a5e103d3320.png?wh=948x338" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/76/20/76e147d8667203da55257a5e103d3320.png?wh=948x338" /></p>
 <p>其中，NEW-OFFSET表示当时的位点，消费组启动时会从该位点开始消费。</p>
 <h2 id="rocketmq-nameserver"><strong>RocketMQ NameServer的扩容与下线</strong></h2>
 <p>在生产环境中，RocketMQ还有一个重要组件是NameServer。它的扩容与缩容也需要特别注意，避免操作过程造成人为的数据不一致。</p>
 <p>举个例子，如果现在我们需要将2个节点的NameServer扩容为3个节点，需求如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/46/b4/465a32ee8315ba55351be2c6e98634b4.jpg?wh=1920x798" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/46/b4/465a32ee8315ba55351be2c6e98634b4.jpg?wh=1920x798" /></p>
 <p>首先要在新的机器上安装好NameServer。</p>
 <p>然后更新两台Broker的配置文件，让Broker能够感知NameServer的存在，具体的配置项：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>namesrvAddr=192.168.3.100:9876;192.168.3.101:9876;192.168.3.107:9876
@@ -14427,7 +14427,7 @@ zms-agent通过supervisor对主机上的进程进行管理，可实现进程状�
 <div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>sh ./mqadmin updateTopic -h
 </code></pre></div>
 <p>同样Kafka的运维命令也在bin目录下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f5/e5/f533de2cdc1c95a39b9cd9075c8df0e5.png?wh=1480x1258" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f5/e5/f533de2cdc1c95a39b9cd9075c8df0e5.png?wh=1480x1258" /></p>
 <h2 id="_8"><strong>总结</strong></h2>
 <p>好了，这节课就讲到这里。</p>
 <p>中间件的稳定性大于一切，一旦发生故障，影响范围也比较大。所以我们不能把所有的鸡蛋放到一个“篮子”中，而是应该按照使用场景、应用特性等维度对集群进行合理规划，规划出一个一个的小集群。</p>
@@ -14552,8 +14552,6 @@ zms-agent通过supervisor对主机上的进程进行管理，可实现进程状�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

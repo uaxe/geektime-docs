@@ -7169,9 +7169,9 @@
 <h3 id="dag">什么是DAG？</h3>
 <p>DAG全称Direct Acyclic Graph，中文叫有向无环图。顾名思义，DAG 是一种“图”。我们知道，任何一种图都包含两种基本元素：顶点（Vertex）和边（Edge），顶点通常用于表示实体，而边则代表实体间的关系。<strong>在Spark的DAG中，顶点是一个个RDD，边则是RDD之间通过dependencies属性构成的父子关系。</strong></p>
 <p>从理论切入去讲解DAG，未免枯燥乏味，所以我打算借助上一讲土豆工坊的例子，来帮助你直观地认识DAG。上一讲，土豆工坊成功地实现了同时生产 3 种不同尺寸的桶装“原味”薯片。但是，在将“原味”薯片推向市场一段时间以后，工坊老板发现季度销量直线下滑，不由得火往上撞、心急如焚。此时，工坊的工头儿向他建议：“老板，咱们何不把流水线稍加改造，推出不同风味的薯片，去迎合市场大众的多样化选择？”然后，工头儿把改装后的效果图交给老板，老板看后甚是满意。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3a/86/3a7f115eaa6c2c307f80e3616e7e9c86.jpg?wh=11713%2A5238" title="土豆工坊流水线效果图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3a/86/3a7f115eaa6c2c307f80e3616e7e9c86.jpg?wh=11713%2A5238" title="土豆工坊流水线效果图" /></p>
 <p>不过，改造流水线可是个大工程，为了让改装工人能够高效协作，工头儿得把上面的改造设想抽象成一张施工流程图。有了这张蓝图，工头儿才能给负责改装的工人们分工，大伙儿才能拧成一股绳、劲儿往一处使。在上一讲中，我们把食材形态类比成RDD，把相邻食材形态的关系看作是RDD间的依赖，那么显然，流水线的施工流程图就是DAG。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/25/75/25a9c00533032886c00c23a351ac9a75.jpg?wh=4861%2A2364" title="DAG：土豆工坊流水线的设计流程图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/25/75/25a9c00533032886c00c23a351ac9a75.jpg?wh=4861%2A2364" title="DAG：土豆工坊流水线的设计流程图" /></p>
 <p>因为DAG中的每一个顶点都由RDD构成，对应到上图中就是带泥的土豆potatosRDD，清洗过的土豆cleanedPotatosRDD，以及调料粉flavoursRDD等等。DAG的边则标记了不同RDD之间的依赖与转换关系。很明显，上图中DAG的每一条边都有指向性，而且整张图不存在环结构。</p>
 <p>那DAG是怎么生成的呢？</p>
 <p>我们都知道，在Spark的开发模型下，应用开发实际上就是灵活运用算子实现业务逻辑的过程。开发者在分布式数据集如RDD、 DataFrame或Dataset之上调用算子、封装计算逻辑，这个过程会衍生新的子RDD。与此同时，子RDD会把dependencies属性赋值到父RDD，把compute属性赋值到算子封装的计算逻辑。以此类推，在子RDD之上，开发者还会继续调用其他算子，衍生出新的RDD，如此往复便有了DAG。</p>
@@ -7188,20 +7188,20 @@
 <p>刚才我们说了，内存计算的第二层含义在stages内部，因此这一讲我们只要搞清楚DAG是怎么划分Stages就够了。至于后面的3个阶段更偏向调度系统的范畴，所以我会在下一讲给你讲清楚其中的来龙去脉。</p>
 <p>如果用一句话来概括从DAG到Stages的转化过程，那应该是：<strong>以Actions算子为起点，从后向前回溯DAG，以Shuffle操作为边界去划分Stages</strong>。</p>
 <p>接下来，我们还是以土豆工坊为例来详细说说这个过程。既然DAG是以Shuffle为边界去划分Stages，我们不妨先从上帝视角出发，看看在土豆工坊设计流程图的DAG中，都有哪些地方需要执行数据分发的操作。当然，在土豆工坊，数据就是各种形态的土豆和土豆片儿。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3f/5f/3fcb3e400db91198a7499c016ccfb45f.jpg?wh=4674%2A1786" title="DAG以Shuffle为边界划分出3个Stages" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3f/5f/3fcb3e400db91198a7499c016ccfb45f.jpg?wh=4674%2A1786" title="DAG以Shuffle为边界划分出3个Stages" /></p>
 <p>仔细观察上面的设计流程图，我们不难发现，有两个地方需要分发数据。第一个地方是薯片经过烘焙烤熟之后，把即食薯片按尺寸大小分发到下游的流水线上，这些流水线会专门处理固定型号的薯片，也就是图中从bakedChipsRDD到flavouredBakedChipsRDD的那条线。同理，不同的调料粉也需要按照风味的不同分发到下游的流水线上，用于和固定型号的即食薯片混合，也就是图中从flavoursRDD到flavouredBakedChipsRDD那条分支。</p>
 <p>同时，我们也能发现，土豆工坊的DAG应该划分3个Stages出来，如图中所示。其中，Stage 0包含四个RDD，从带泥土豆potatosRDD到即食薯片bakedChipsRDD。Stage 1比较简单，它只有一个RDD，就是封装调味粉的flavoursRDD。Stage 2包含两个RDD，一个是加了不同风味的即食薯片flavouredBakedChipsRDD，另一个表示组装成桶已经准备售卖的桶装薯片bucketChipsRDD。</p>
 <p>你可能会问：“费了半天劲，把DAG变成Stages有啥用呢？”还真有用！内存计算的第二层含义，就隐匿于从DAG划分出的一个又一个Stages之中。不过，要弄清楚Stage内的流水线式计算模式，我们还是得从Hadoop MapReduce的计算模型说起。</p>
 <h3 id="stage_1">Stage中的内存计算</h3>
 <p>基于内存的计算模型并不是凭空产生的，而是根据前人的教训和后人的反思精心设计出来的。这个前人就是Hadoop MapReduce，后人自然就是Spark。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fb/d7/fbb396536260f43c8764a8e6452a4fd7.jpg?wh=4454%2A1635" title="Hadoop MapReduce的计算模型" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fb/d7/fbb396536260f43c8764a8e6452a4fd7.jpg?wh=4454%2A1635" title="Hadoop MapReduce的计算模型" /></p>
 <p>MapReduce提供两类计算抽象，分别是Map和Reduce：Map抽象允许开发者通过实现map 接口来定义数据处理逻辑；Reduce抽象则用于封装数据聚合逻辑。MapReduce计算模型最大的问题在于，所有操作之间的数据交换都以磁盘为媒介。例如，两个Map操作之间的计算，以及Map与Reduce操作之间的计算都是利用本地磁盘来交换数据的。不难想象，这种频繁的磁盘I/O必定会拖累用户应用端到端的执行性能。</p>
 <p>那么，这和Stage内的流水线式计算模式有啥关系呢？我们再回到土豆工坊的例子中，把目光集中在即食薯片分发之前，也就是刚刚划分出来的Stage 0。这一阶段包含3个处理操作，即清洗、切片和烘焙。按常理来说，流水线式的作业方式非常高效，带泥土豆被清洗过后，会沿着流水线被传送到切片机，切完的生薯片会继续沿着流水线再传送到烘焙烤箱，整个过程一气呵成。如果把流水线看作是计算节点内存的话，那么清洗、切片和烘焙这3个操作都是在内存中完成计算的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6e/3b/6e9863b69aca6072b81e6d8e6826903b.jpg?wh=2496%2A1041" title="Stage 0包含清洗、切片、烘焙3个操作" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6e/3b/6e9863b69aca6072b81e6d8e6826903b.jpg?wh=2496%2A1041" title="Stage 0包含清洗、切片、烘焙3个操作" /></p>
 <p>你可能会说：“内存计算也不过如此，跟MapReduce相比，不就是把数据和计算都挪到内存里去了吗？”事情可能并没有你想象的那么简单。</p>
 <p>在土豆工坊的例子里，Stage 0中的每个加工环节都会生产出中间食材，如清洗过的土豆、土豆片、即食薯片。我们刚刚把流水线比作内存，这意味着每一个算子计算得到的中间结果都会在内存中缓存一份，以备下一个算子运算，这个过程与开发者在应用代码中滥用RDD cache简直如出一辙。如果你曾经也是逢RDD便cache，应该不难想象，采用这种计算模式，Spark的执行性能不见得比MapReduce强多少，尤其是在Stages中的算子数量较多的时候。</p>
 <p>既然不是简单地把数据和计算挪到内存，那Stage内的流水线式计算模式到底长啥样呢？在Spark中，<strong>流水线计算模式指的是：在同一Stage内部，所有算子融合为一个函数，Stage的输出结果由这个函数一次性作用在输入数据集而产生</strong>。这也正是内存计算的第二层含义。下面，我们用一张图来直观地解释这一计算模式。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/03/03/03052d8fc98dcf1740ec4a7c29234403.jpg?wh=4816%2A1786" title="内存计算的第二层含义" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/03/03/03052d8fc98dcf1740ec4a7c29234403.jpg?wh=4816%2A1786" title="内存计算的第二层含义" /></p>
 <p>如图所示，在上面的计算流程中，如果你把流水线看作是内存，每一步操作过后都会生成临时数据，如图中的clean和slice，这些临时数据都会缓存在内存里。但在下面的内存计算中，所有操作步骤如clean、slice、bake，都会被捏合在一起构成一个函数。这个函数一次性地作用在“带泥土豆”上，直接生成“即食薯片”，在内存中不产生任何中间数据形态。</p>
 <p><strong>因此你看，所谓内存计算，不仅仅是指数据可以缓存在内存中，更重要的是让我们明白了，通过计算的融合来大幅提升数据在内存中的转换效率，进而从整体上提升应用的执行性能。</strong></p>
 <p>这个时候，我们就可以回答开头提出的第二个问题了：费劲去重写代码、消除Shuffle，能有多大的性能收益？</p>
@@ -7343,8 +7343,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

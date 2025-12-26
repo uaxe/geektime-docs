@@ -6330,27 +6330,27 @@
 <p>下面，我们一起进入今天的内容。</p>
 <h2 id="_1">场景运行数据</h2>
 <p>对于支付前查询订单列表接口，我们先来看第一次运行的性能场景结果：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0f/d2/0f78445ef87c78dc2bb856cb25f8d4d2.png?wh=1835%2A831" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0f/d2/0f78445ef87c78dc2bb856cb25f8d4d2.png?wh=1835%2A831" /></p>
 <p>从运行的场景数据来看，这个接口的TPS一开始还是挺高的，达到了800多。但是，响应时间也增加了，瓶颈已经出现。我们只要知道瓶颈在哪，就能知道这个接口有没有优化空间。</p>
 <p>根据高老师的分析逻辑，在正式分析之前，我们看一下架构图。</p>
 <h2 id="_2">架构图</h2>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/64/04/64df3dd5f9ae4e5d8e4d4a1e33130d04.png?wh=1091%2A749" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/64/04/64df3dd5f9ae4e5d8e4d4a1e33130d04.png?wh=1091%2A749" /></p>
 <p>这张架构图是非常清楚的，可以看到，当前接口的逻辑为：Gateway - Order - Member，其中也使用到了MySQL和Redis。</p>
 <p>下面我们来看看，响应时间消耗到哪里去了。</p>
 <h2 id="_3">拆分响应时间</h2>
 <ul>
 <li>Gateway：
-<img alt="" src="https://static001.geekbang.org/resource/image/a9/a9/a977967f392a21e349a4190864cf5fa9.png?wh=322%2A178" /></li>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a9/a9/a977967f392a21e349a4190864cf5fa9.png?wh=322%2A178" /></li>
 <li>Order：
-<img alt="" src="https://static001.geekbang.org/resource/image/b3/1b/b3e37c3ed659a04d3673ce8371edd11b.png?wh=323%2A180" /></li>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b3/1b/b3e37c3ed659a04d3673ce8371edd11b.png?wh=323%2A180" /></li>
 <li>Member：
-<img alt="" src="https://static001.geekbang.org/resource/image/fb/1a/fb52b79c98b57408482dc8fc43d1e61a.png?wh=318%2A183" /></li>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fb/1a/fb52b79c98b57408482dc8fc43d1e61a.png?wh=318%2A183" /></li>
 </ul>
 <p>从响应时间的分布来看，Gateway（网关）上消耗的时间要长一些。所以，我们接下来得从Gateway下手，分析一下到底是哪里消耗了时间。</p>
 <h2 id="_4">第一阶段</h2>
 <h3 id="_5">全局监控分析</h3>
 <p>按照“<strong>先看全局监控，后看定向监控</strong>”的逻辑，我们先看这个接口的全局监控：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/58/e8/5895f1645bc9524f69374c0cd7e06fe8.png?wh=1802%2A473" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/58/e8/5895f1645bc9524f69374c0cd7e06fe8.png?wh=1802%2A473" /></p>
 <p>由于Gateway消耗的响应时间长，我们看过全局监控视图之后，要判断出Gateway在哪个worker上：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>[root@k8s-master-2 ~]# kubectl get pods -o wide | grep gateway
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>gateway-mall-gateway-757659dbc9-tdwnm       1/1     Running     0          3d16h   10.100.79.96     k8s-worker-4   &lt;none&gt;           &lt;none&gt;
@@ -6359,23 +6359,23 @@
 <p>这个Gateway服务在worker-4上，同时，在全局监控图上可以看到，虽然Gateway只消耗了70%的CPU，但它还是消耗了最多的响应时间。既然这样，我们就要关注一下Gateway的线程状态，看看它在处理什么。</p>
 <h3 id="_6">定向监控分析</h3>
 <p>在做定向监控时，我们先来看一下线程的CPU消耗：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/74/fb/745fa375415efdbe60cbe04efacb0dfb.png?wh=1920%2A1048" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/74/fb/745fa375415efdbe60cbe04efacb0dfb.png?wh=1920%2A1048" /></p>
 <p>通过上图可以看到，在Gateway中有两类重要的工作线程，分别是reactor-http-epoll和boundedElastic。</p>
 <p>在官方的说明中提到，reactor-http-epoll线程的设置最好与CPU个数一致。我们当前的reactor-http-epoll线程是4个，而这个worker有6C，所以还能增加两个，增加多了意义也不大。至于boundedElastic，它是有边界的弹性线程池，默认为CPU核x10，也没啥可优化的。</p>
 <p>我们再持续看一会儿Gateway服务中的线程所消耗的时间比例，看一下方法级的时间消耗有没有异常的情况，也就是比例非常高的，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0c/e2/0cff8cd7771508150e0d341cee1b9de2.png?wh=1920%2A1040" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0c/e2/0cff8cd7771508150e0d341cee1b9de2.png?wh=1920%2A1040" /></p>
 <p>你看，当前的执行方法也都没啥异常的。</p>
 <p>现在我们就把线程增加到6个，看能不能把CPU用高一点。如果CPU用多了之后，仍然是Gateway消耗的时间长，那我们就只有再继续加CPU了。</p>
 <p>请你注意，在性能项目中，不要轻易给出加CPU这样的建议。一定要在你分析了逻辑之后，确定没有其他优化空间了，再给这样的建议。</p>
 <h3 id="_7">优化效果</h3>
 <p>我们来看一下优化效果：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/32/a2/32faf723ede915a7ca66547c591522a2.png?wh=1805%2A328" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/32/a2/32faf723ede915a7ca66547c591522a2.png?wh=1805%2A328" /></p>
 <p>通过回归测试，我们看到TPS有一点增加，只是在图的后半段（由于在测试过程中，Gateway重启过，前面的TPS就当是预热了）增加的并不明显，大概有50多TPS的样子。不过，也算是有了效果。</p>
 <p>我们优化到这里并没有结束，因为在查看各个Worker的过程中，我还发现一个奇怪的现象，那就是数据库里有两个CPU的使用率非常高。下面我们来扒一扒。</p>
 <h2 id="_8">第二阶段</h2>
 <h3 id="_9">全局监控分析</h3>
 <p>因为前面优化的效果并不怎么样，所以我们要重新开始分析。让我们从全局监控开始：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8b/21/8bf119287eab532f8f01bf09ffff6721.png?wh=1817%2A481" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8b/21/8bf119287eab532f8f01bf09ffff6721.png?wh=1817%2A481" /></p>
 <p>看起来倒是没啥，数据库所在的worker-1也不见有什么大的资源消耗。</p>
 <p>请你注意，我在文章中经常用这个界面来看全局监控的数据。但这并不是说，我只看这个界面。当我在这个界面中看不到明显的问题点时，我也会去看一些命令，像top/vmstat等，这和我一直说的全局监控的完整计数器有关。因此，你的脑袋里要有全局监控计数器的视图，然后才能真正看全第一层的计数器。</p>
 <p>我们再来看数据库所在的worker上的top数据，发现了这样的现象：</p>
@@ -6512,8 +6512,8 @@
 <a id="__codelineno-4-32" name="__codelineno-4-32" href="#__codelineno-4-32"></a>AND o.create_time &lt; date_add(NOW(), INTERVAL - 120 MINUTE)
 </code></pre></div>
 <p>我们提到多次，要想看SQL慢，就得看SQL对应的执行计划（在MySQL中，如果执行计划看得不清楚，还可以看Profile信息）。这两个SQL对应的执行计划如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9e/61/9e41ba801dd20e46ff00386067670f61.png?wh=1032%2A419" /></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/95/31/95b6efa2ddda492a8bf61abe8e483831.png?wh=1075%2A297" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9e/61/9e41ba801dd20e46ff00386067670f61.png?wh=1032%2A419" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/95/31/95b6efa2ddda492a8bf61abe8e483831.png?wh=1075%2A297" /></p>
 <p>依然是常见的全表扫描。看到这里，你是不是有一种索然无味的感觉？但是，我们还是需要知道这两个语句为什么会产生。</p>
 <p>其实，支付前查询订单列表这个接口并没有用到这两个SQL。于是，我到代码中看了一下这两个SQL的生成过程，反向查找到如下代码：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>@Scheduled(cron = &quot;0 0/20 * ? * ?&quot;)
@@ -6656,8 +6656,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

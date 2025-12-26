@@ -6380,20 +6380,20 @@
 <p>小结一下，要拍摄一个MP4视频，我们需要将视轨 + 音轨分别编码，然后作为MP4的数据流，再合成出一个MP4文件。</p>
 <p><strong>2. 音视频编码的流程</strong></p>
 <p>接下来，我们再来看看一个视频是怎么拍摄出来的。首先，既然是拍摄，少不了跟摄像头、麦克风打交道。从流程来说，以H.264/AAC编码为例，录制视频的总体流程是：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/40/73/406204beab2de273ecdb436d4bf66773.png?wh=1920%2A424" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/40/73/406204beab2de273ecdb436d4bf66773.png?wh=1920%2A424" /></p>
 <p>我们分别从摄像头/录音设备采集数据，将数据送入编码器，分别编码出视轨/音轨之后，再送入合成器（MediaRemuxer或者类似mp4v2、FFmpeg之类的处理库），最终输出MP4文件。接下来，我主要以视轨为例，来介绍下编码的流程。</p>
 <p>首先，直接使用系统的<a href="https://developer.android.com/reference/android/media/MediaRecorder">MediaRecorder</a>录制整个视频，这是最简单的方法，直接就能输出MP4文件。但是这个接口可定制化很差，比如我们想录制一个正方形的视频，除非摄像头本身支持宽高一致的分辨率，否则只能后期处理或者各种Hack。另外，在实际App中，除非对视频要求不是特别高，一般也不会直接使用MediaRecorder。</p>
 <p>视轨的处理是录制视频中相对比较复杂的部分，输入源头是Camera的数据，最终输出是编码的H.264/H.265数据。下面我来介绍两种处理模型。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fb/82/fb9fe38693f3a86af745b97fc8d22882.png?wh=1698%2A200" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fb/82/fb9fe38693f3a86af745b97fc8d22882.png?wh=1698%2A200" /></p>
 <p>第一种方法是利用Camera获取摄像头输出的原始数据接口（例如onPreviewFrame），经过预处理，例如缩放、裁剪之后，送入编码器，输出H.264/H.265。</p>
 <p>摄像头输出的原始数据格式为NV21，这是<a href="https://zh.wikipedia.org/wiki/YUV">YUV</a>颜色格式的一种。区别于RGB颜色，YUV数据格式占用空间更少，在视频编码领域使用十分广泛。</p>
 <p>一般来说，因为摄像头直接输出的NV21格式大小跟最终视频不一定匹配，而且编码器往往也要求输入另外一种YUV格式（一般来说是YUV420P），因此在获取到NV21颜色格式之后，还需要进行各种缩放、裁剪之类的操作，一般会使用<a href="https://www.ffmpeg.org/">FFmpeg</a>、<a href="https://chromium.googlesource.com/libyuv/libyuv/">libyuv</a>这样的库处理YUV数据。</p>
 <p>最后会将数据送入到编码器。在视频编码器的选择上，我们可以直接选择系统的MediaCodec，利用手机本身的硬件编码能力。但如果对最终输出的视频大小要求比较严格的话，使用的码率会偏低，这种情况下大部分手机的硬件编码器输出的画质可能会比较差。另外一种常见的选择是利用<a href="https://www.videolan.org/developers/x264.html">x264</a>来进行编码，画质表现相对较好，但是比起硬件编码器，速度会慢很多，因此在实际使用时最好根据场景进行选择。</p>
 <p>除了直接处理摄像头原始数据以外，还有一种常见的处理模型，利用Surface作为编码器的输入源。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/50/06/5003363cbda442463e50b7c6a245b306.png?wh=1692%2A198" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/50/06/5003363cbda442463e50b7c6a245b306.png?wh=1692%2A198" /></p>
 <p>对于Android摄像头的预览，需要设置一张Surface/SurfaceTexture来作为摄像头预览数据的输出，而MediaCodec在API 18+之后，可以通过<a href="https://developer.android.com/reference/android/media/MediaCodec#createInputSurface">createInputSurface</a>来创建一张Surface作为编码器的输入。这里所说的另外一种方式就是，将摄像头预览Surface的内容，输出到MediaCodec的InputSurface上。</p>
 <p>而在编码器的选择上，虽然InputSurface是通过MediaCodec来创建的，乍看之下似乎只能通过MediaCodec来进行编码，无法使用x264来编码，但利用PreviewSurface，我们可以创建一个OpenGL的上下文，这样所有绘制的内容，都可以通过glReadPixel来获取，然后再讲读取数据转换成YUV再输入到x264即可（另外，如果是在GLES 3.0的环境，我们还可以利用<a href="http://www.songho.ca/opengl/gl_pbo.html">PBO</a>来加速glReadPixles的速度）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/98/cb/98ae4dbac4cac80639d7dfe4682414cb.png?wh=1534%2A560" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/98/cb/98ae4dbac4cac80639d7dfe4682414cb.png?wh=1534%2A560" /></p>
 <p>由于这里我们创建了一个OpenGL的上下文，对于目前的视频类App来说，还有各种各样的滤镜和美颜效果，实际上都可以基于OpenGL来实现。</p>
 <p>而至于这种方式录制视频具体实现代码，你可以参考下grafika中<a href="https://github.com/google/grafika/blob/master/app/src/main/java/com/android/grafika/CameraCaptureActivity.java">示例</a>。</p>
 <h2 id="_2">视频处理</h2>
@@ -6404,17 +6404,17 @@
 <li>多个视频进行拼接。</li>
 </ul>
 <p>对于视频裁剪、拼接来说，Android直接提供了<a href="https://developer.android.com/reference/android/media/MediaExtractor">MediaExtractor</a>的接口，结合seek以及对应读取帧数据readSampleData的接口，我们可以直接获取对应时间戳的帧的内容，这样读取出来的是已经编码好的数据，因此无需重新编码，直接可以输入合成器再次合成为MP4。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/61/ad/61b18d372ba93905b547d60da313a1ad.png?wh=1920%2A189" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/61/ad/61b18d372ba93905b547d60da313a1ad.png?wh=1920%2A189" /></p>
 <p>我们只需要seek到需要裁剪原视频的时间戳，然后一直读取sampleData，送入MediaMuxer即可，这是视频裁剪最简单的实现方式。</p>
 <p>但在实践时会发现，<a href="https://developer.android.com/reference/android/media/MediaExtractor#seekTo">seekTo</a>并不会对所有时间戳都生效。比如说，一个<strong>4min</strong>左右的视频，我们想要seek到大概<strong>2min</strong>左右的位置，然后从这个位置读取数据，但实际调用seekTo到2min这个位置之后，再从MediaExtractor读取数据，你会发现实际获取的数据上可能是从2min这里前面一点或者后面一点位置的内容。这是因为MediaExtractor这个接口只能seek到视频<a href="https://zh.wikipedia.org/wiki/%E9%97%9C%E9%8D%B5%E6%A0%BC#%E8%A6%96%E8%A8%8A%E7%B7%A8%E8%BC%AF%E7%9A%84%E9%97%9C%E9%8D%B5%E6%A0%BC">关键帧</a>的位置，而我们想要的位置并不一定有关键帧。这个问题还是要回到视频编码，在视频编码时两个关键帧之间是有一定间隔距离的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9a/7b/9a59d62bc13f09d9ccf971ce6d8d5b7b.jpg?wh=1248%2A532" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9a/7b/9a59d62bc13f09d9ccf971ce6d8d5b7b.jpg?wh=1248%2A532" /></p>
 <p>如上图所示，关键帧被成为<strong>I帧</strong>，可以被认为是一帧没有被压缩的画面，解码的时候无需要依赖其他视频帧。但是在两个关键帧之间，还存在这<strong>B帧</strong>、<strong>P帧</strong>这样的压缩帧，需要依赖其他帧才能完整解码出一个画面。至于两个关键帧之间的间隔，被称为一个<a href="https://zh.wikipedia.org/wiki/%E5%9C%96%E5%83%8F%E7%BE%A4%E7%B5%84">GOP</a> ，在GOP内的帧，MediaExtractor是无法直接seek到的，因为这个类不负责解码，只能seek到前后的关键帧。但如果GOP过大，就会导致视频编辑非常不精准了（实际上部分手机的ROM有改动，实现的MediaExtractor也能精确seek）。</p>
 <p>既然如此，那要实现精确裁剪也就只能去依赖解码器了。解码器本身能够解出所有帧的内容，在引入解帧之后，整个裁剪的流程就变成了下面的样子。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/89/53/89f6cf7d68677a1a6225905117877853.png?wh=1920%2A211" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/89/53/89f6cf7d68677a1a6225905117877853.png?wh=1920%2A211" /></p>
 <p>我们需要先seek到需要位置的前一I帧上，然后送入解码器，解码器解除一帧之后，判断当前帧的<a href="https://en.wikipedia.org/wiki/Presentation_timestamp">PTS</a>是否在需要的时间戳范围内，如果是的话，再将数据送入编码器，重新编码再次得到H.264视轨数据，然后合成MP4文件。</p>
 <p>上面是基础的视频裁剪流程，对于视频拼接，也是类似得到多段H.264数据之后，才一同送入合成器。</p>
 <p>另外，在实际视频编辑中，我们还会添加不少视频特效和滤镜。前面在视频拍摄的场景下，我们利用Surface作为MediaCodec的输入源，并且利用Surface创建了OpenGL的上下文。而MediaCodec作为解码器的时候，也可以在<a href="https://developer.android.com/reference/android/media/MediaCodec#configure">configure</a>的时候，指定一张Surface作为其解码的输出。大部分视频特效都是可以通过OpenGL来实现的，因此要实现视频特效，一般的流程是下面这样的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0f/5d/0f4a26fd743155b102887758056ba85d.png?wh=1920%2A207" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0f/5d/0f4a26fd743155b102887758056ba85d.png?wh=1920%2A207" /></p>
 <p>我们将解码之后的渲染交给OpenGL，然后输出到编码器的InputSurface上，来实现整套编码流程。</p>
 <p><strong>2. 视频播放</strong></p>
 <p>任何视频类App都会涉及视频播放，从录制、剪辑再到播放，构成完整的视频体验。对于要播放一个MP4文件，最简单的方式莫过于直接使用系统的<a href="https://developer.android.com/reference/android/media/MediaPlayer">MediaPlayer</a>，只需要简单几行代码，就能直接播放视频。对于本地视频播放来说，这是最简单的实现方式，但实际上我们可能会有更复杂的需求：</p>
@@ -6432,7 +6432,7 @@
 <p>而对于第二个问题来说，没法精确seek的问题在有些App上是致命的，产品可能无法接受这样的体验。那同视频编辑一样，我们只能直接基于MediaCodec来自行实现播放器，这部分内容就比较复杂了。当然你也可以直接使用Google开源的<a href="https://github.com/google/ExoPlayer">ExoPlayer</a>，简单又快捷，而且也能支持设置在线视频URL。</p>
 <p>看似所有问题都有了解决方案，是不是就万事大吉了呢？</p>
 <p>常见的网络边下边播视频的格式都是MP4，但有些视频直接上传到服务器上的时候，我们会发现无论是使用MediaPlayer还是ExoPlayer，似乎都只能等待到整个视频都下载完才能开始播放，没有达到边下边播的体验。这个问题的原因实际上是因为MP4的格式导致的，具体来看，是跟MP4<a href="http://l.web.umkc.edu/lizhu/teaching/2016sp.video-communication/ref/mp4.pdf">格式</a>中的moov有关。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/64/42/6439de8111b1ad7173291c0723071142.png?wh=1172%2A330" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/64/42/6439de8111b1ad7173291c0723071142.png?wh=1172%2A330" /></p>
 <p>MP4格式中有一个叫作moov的地方存储这当前MP4文件的元信息，包括当前MP4文件的音轨视轨格式、视频长度、播放速率、视轨关键帧位置偏移量等重要信息，MP4文件在线播放的时候，需要moov中的信息才能解码音轨视轨。</p>
 <p>而上述问题发生的原因在于，当moov在MP4文件尾部的时候，播放器没有足够的信息来进行解码，因此视频变得需要直接下载完之后才能解码播放。因此，要实现MP4文件的边下边播，则需要将moov放到文件头部。目前来说，业界已经有非常成熟的工具，<a href="https://ffmpeg.org/ffmpeg-formats.html#Options-8">FFmpeg</a>跟<a href="https://code.google.com/archive/p/mp4v2/">mp4v2</a>都可以将一个MP4文件的moov提前放到文件头部。例如使用FFmpeg，则是如下命令：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ffmpeg -i input.mp4 -movflags faststart -acodec copy -vcodec copy output.mp4
@@ -6583,8 +6583,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -6991,7 +6991,7 @@
 <p>有了这六部分，一个内核模块就基本合格了，可以工作了。</p>
 <h2 id="_2">打开字符设备</h2>
 <p>字符设备可不是一个普通的内核模块，它有自己独特的行为。接下来，我们就沿着打开一个字符设备的过程，看看字符设备这个内核模块做了哪些特殊的事情。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2e/e6/2e29767e84b299324ea7fc524a3dcee6.jpeg?wh=3037%2A3400" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2e/e6/2e29767e84b299324ea7fc524a3dcee6.jpeg?wh=3037%2A3400" /></p>
 <p>要使用一个字符设备，我们首先要把写好的内核模块，通过insmod加载进内核。这个时候，先调用的就是module_init调用的初始化函数。</p>
 <p>例如，在lp.c的初始化函数lp_init对应的代码如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>static int __init lp_init (void)
@@ -7185,7 +7185,7 @@
 <p>最后，我们需要调用设备驱动程序的file_operations的open函数，真正打开设备。对于打印机，调用的是lp_open。对于鼠标调用的是input_proc_devices_open，最终会调用到logibm_open。这些多和设备相关，你不必看懂它们。</p>
 <h2 id="_3">写入字符设备</h2>
 <p>当我们像打开一个文件一样打开一个字符设备之后，接下来就是对这个设备的读写。对于文件的读写咱们在文件系统那一章详细讲述过，读写的过程是类似的，所以这里我们只解析打印机驱动写入的过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9b/e2/9bd3cd8a8705dbf69f889ba3b2b5c2e2.jpeg?wh=3037%2A3400" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9b/e2/9bd3cd8a8705dbf69f889ba3b2b5c2e2.jpeg?wh=3037%2A3400" /></p>
 <p>写入一个字符设备，就是用文件系统的标准接口write，参数文件描述符fd，在内核里面调用的sys_write，在sys_write里面根据文件描述符fd得到struct file结构。接下来再调用vfs_write。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>ssize_t __vfs_write(struct file *file, const char __user *p, size_t count, loff_t *pos)
 <a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>{
@@ -7249,7 +7249,7 @@
 <p>这个设备驱动程序的写入函数的实现还是比较典型的。先是调用copy_from_user将数据从用户态拷贝到内核态的缓存中，然后调用parport_write写入外部设备。这里还有一个schedule函数，也即写入的过程中，给其他线程抢占CPU的机会。然后，如果count还是大于0，也就是数据还没有写完，那我们就接着copy_from_user，接着parport_write，直到写完为止。</p>
 <h2 id="ioctl">使用IOCTL控制设备</h2>
 <p>对于I/O设备来讲，我们前面也说过，除了读写设备，还会调用ioctl，做一些特殊的I/O操作。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c3/1d/c3498dad4f15712529354e0fa123c31d.jpeg?wh=1666%2A703" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c3/1d/c3498dad4f15712529354e0fa123c31d.jpeg?wh=1666%2A703" /></p>
 <p>ioctl也是一个系统调用，它在内核里面的定义如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>SYSCALL_DEFINE3(ioctl, unsigned int, fd, unsigned int, cmd, unsigned long, arg)
 <a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>{
@@ -7443,11 +7443,11 @@
 <p>第一，有一个设备驱动程序的ko模块，里面有模块初始化函数、中断处理函数、设备操作函数。这里面封装了对于外部设备的操作。加载设备驱动程序模块的时候，模块初始化函数会被调用。在内核维护所有字符设备驱动的数据结构cdev_map里面注册，我们就可以很容易根据设备号，找到相应的设备驱动程序。</p>
 <p>第二，在/dev目录下有一个文件表示这个设备，这个文件在特殊的devtmpfs文件系统上，因而也有相应的dentry和inode。这里的inode是一个特殊的inode，里面有设备号。通过它，我们可以在cdev_map中找到设备驱动程序，里面还有针对字符设备文件的默认操作def_chr_fops。</p>
 <p>第三，打开一个字符设备文件和打开一个普通的文件有类似的数据结构，有文件描述符、有struct file、指向字符设备文件的dentry和inode。字符设备文件的相关操作file_operations一开始指向def_chr_fops，在调用def_chr_fops里面的chrdev_open函数的时候，修改为指向设备操作函数，从而读写一个字符设备文件就会直接变成读写外部设备了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fb/cd/fba61fe95e0d2746235b1070eb4c18cd.jpeg?wh=2323%2A2671" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fb/cd/fba61fe95e0d2746235b1070eb4c18cd.jpeg?wh=2323%2A2671" /></p>
 <h2 id="_5">课堂练习</h2>
 <p>这节我用打印机驱动程序作为例子来给你讲解字符设备，请你仔细看一下它的代码，设想一下，如果让你自己写一个字符设备驱动程序，应该实现哪些函数呢？</p>
 <p>欢迎留言和我分享你的疑惑和见解 ，也欢迎可以收藏本节内容，反复研读。你也可以把今天的内容分享给你的朋友，和他一起学习和进步。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8c/37/8c0a95fa07a8b9a1abfd394479bdd637.jpg?wh=1110%2A659" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8c/37/8c0a95fa07a8b9a1abfd394479bdd637.jpg?wh=1110%2A659" /></p>
 <div><strong>精选留言（14）</strong></div>
 <ul>
 <li><span>geraltlaush</span> 👍（7） 💬（2）<p>另外贴上一个字符设备或者块设备都有一个主设备号和次设备号。主设备号和次设备号统称为设备号。主设备号用来表示一个特定的驱动程序。次设备号用来表示使用该驱动程序的各设备。</p>2019-06-10</li><br/><li><span>有铭</span> 👍（4） 💬（1）<p>问一下老师你的这些图是用啥工具画的？</p>2019-06-10</li><br/><li><span>geraltlaush</span> 👍（3） 💬（1）<p>还有个收获就是程序设计的面向对象的思想，之前开发一个音视频推流服务器，一个音视频类型的操作编码解码都是类中完成，现在看来可以把操作单独设计成一个基类，各种类型的音视频操作都可以继承这个类，代码可以设计的更为优雅</p>2019-06-10</li><br/><li><span>ezra.xu</span> 👍（0） 💬（1）<p>除了open，close，read，write等，是不是可以加入些异常捕获，异步操作，多线程的函数……</p>2019-06-11</li><br/><li><span>西山薄凉</span> 👍（31） 💬（2）<p>课代表不在了，我来当课代表。
@@ -7605,8 +7605,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

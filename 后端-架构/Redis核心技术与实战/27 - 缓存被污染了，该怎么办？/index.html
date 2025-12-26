@@ -14687,7 +14687,7 @@
 <p>首先，我们看下<strong>volatile-random和allkeys-random</strong>这两种策略。它们都是采用随机挑选数据的方式，来筛选即将被淘汰的数据。</p>
 <p>既然是随机挑选，那么Redis就不会根据数据的访问情况来筛选数据。如果被淘汰的数据又被访问了，就会发生缓存缺失。也就是说，应用需要到后端数据库中访问这些数据，降低了应用的请求响应速度。所以，volatile-random和allkeys-random策略，在避免缓存污染这个问题上的效果非常有限。</p>
 <p>我给你举个例子吧。如下图所示，假设我们配置Redis缓存使用allkeys-random淘汰策略，当缓存写满时，allkeys-random策略随机选择了数据20进行淘汰。不巧的是，数据20紧接着又被访问了，此时，Redis就会发生了缓存缺失。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d8/c8/d8e81168d83b411524a91c2f5554e3c8.jpg?wh=1684%2A683" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d8/c8/d8e81168d83b411524a91c2f5554e3c8.jpg?wh=1684%2A683" /></p>
 <p>我们继续看<strong>volatile-ttl</strong>策略是否能有效应对缓存污染。volatile-ttl针对的是设置了过期时间的数据，把这些数据中剩余存活时间最短的筛选出来并淘汰掉。</p>
 <p>虽然volatile-ttl策略不再是随机选择淘汰数据了，但是剩余存活时间并不能直接反映数据再次访问的情况。所以，按照volatile-ttl策略淘汰数据，和按随机方式淘汰数据类似，也可能出现数据被淘汰后，被再次访问导致的缓存缺失问题。</p>
 <p>这时，你可能会想到一种例外的情况：业务应用在给数据设置过期时间的时候，就明确知道数据被再次访问的情况，并根据访问情况设置过期时间。此时，Redis按照数据的剩余最短存活时间进行筛选，是可以把不会再被访问的数据筛选出来的，进而避免缓存污染。例如，业务部门知道数据被访问的时长就是一个小时，并把数据的过期时间设置为一个小时后。这样一来，被淘汰的数据的确是不会再被访问了。</p>
@@ -14700,7 +14700,7 @@
 <p>但是，也正是<strong>因为只看数据的访问时间，使用LRU策略在处理扫描式单次查询操作时，无法解决缓存污染</strong>。所谓的扫描式单次查询操作，就是指应用对大量的数据进行一次全体读取，每个数据都会被读取，而且只会被读取一次。此时，因为这些被查询的数据刚刚被访问过，所以lru字段值都很大。</p>
 <p>在使用LRU策略淘汰数据时，这些数据会留存在缓存中很长一段时间，造成缓存污染。如果查询的数据量很大，这些数据占满了缓存空间，却又不会服务新的缓存请求，此时，再有新数据要写入缓存的话，还是需要先把这些旧数据替换出缓存才行，这会影响缓存的性能。</p>
 <p>为了方便你理解，我给你举个例子。如下图所示，数据6被访问后，被写入Redis缓存。但是，在此之后，数据6一直没有被再次访问，这就导致数据6滞留在缓存中，造成了污染。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/76/75/76909482d30097da81273f7bda18b275.jpg?wh=2197%2A1403" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/76/75/76909482d30097da81273f7bda18b275.jpg?wh=2197%2A1403" /></p>
 <p>所以，对于采用了LRU策略的Redis缓存来说，扫描式单次查询会造成缓存污染。为了应对这类缓存污染问题，Redis从4.0版本开始增加了LFU淘汰策略。</p>
 <p>与LRU策略相比，LFU策略中会从两个维度来筛选并淘汰数据：一是，数据访问的时效性（访问时间离当前时间的远近）；二是，数据的被访问次数。</p>
 <p>那Redis的LFU策略是怎么实现的，又是如何解决缓存污染问题的呢？我们来看一下。</p>
@@ -14734,7 +14734,7 @@
 </code></pre></div>
 <p>使用了这种计算规则后，我们可以通过设置不同的lfu_log_factor配置项，来控制计数器值增加的速度，避免counter值很快就到255了。</p>
 <p>为了更进一步说明LFU策略计数器递增的效果，你可以看下下面这张表。这是Redis<a href="https://redis.io/topics/lru-cache">官网</a>上提供的一张表，它记录了当lfu_log_factor取不同值时，在不同的实际访问次数情况下，计数器的值是如何变化的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8e/3e/8eafa57112b01ba0yyf93034ca109f3e.jpg?wh=2572%2A630" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8e/3e/8eafa57112b01ba0yyf93034ca109f3e.jpg?wh=2572%2A630" /></p>
 <p>可以看到，当lfu_log_factor取值为1时，实际访问次数为100K后，counter值就达到255了，无法再区分实际访问次数更多的数据了。而当lfu_log_factor取值为100时，当实际访问次数为10M时，counter值才达到255，此时，实际访问次数小于10M的不同数据都可以通过counter值区分出来。</p>
 <p>正是因为使用了非线性递增的计数器方法，即使缓存数据的访问次数成千上万，LFU策略也可以有效地区分不同的访问次数，从而进行合理的数据筛选。从刚才的表中，我们可以看到，当lfu_log_factor取值为10时，百、千、十万级别的访问次数对应的counter值已经有明显的区分了，所以，我们在应用LFU策略时，一般可以将lfu_log_factor取值为10。</p>
 <p>前面我们也提到了，应用负载的情况是很复杂的。在一些场景下，有些数据在短时间内被大量访问后就不会再被访问了。那么再按照访问次数来筛选的话，这些数据会被留存在缓存中，但不会提升缓存命中率。为此，Redis在实现LFU策略时，还设计了一个counter值的衰减机制。</p>
@@ -14911,8 +14911,6 @@ b) lfu-log-factor设置越大，递增概率越低
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

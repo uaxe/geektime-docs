@@ -14504,7 +14504,7 @@
 <p>但是，如果备库执行日志的速度持续低于主库生成日志的速度，那这个延迟就有可能成了小时级别。而且对于一个压力持续比较高的主库来说，备库很可能永远都追不上主库的节奏。</p>
 <p>这就涉及到今天我要给你介绍的话题：备库并行复制能力。</p>
 <p>为了便于你理解，我们再一起看一下第24篇文章<a href="https://time.geekbang.org/column/article/76446">《MySQL是怎么保证主备一致的？》</a>的主备流程图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1a/ef/1a85a3bac30a32438bfd8862e5a34eef.png?wh=1142%2A856" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1a/ef/1a85a3bac30a32438bfd8862e5a34eef.png?wh=1142%2A856" /></p>
 <p>图1 主备流程图</p>
 <p>谈到主备的并行复制能力，我们要关注的是图中黑色的两个箭头。一个箭头代表了客户端写入主库，另一箭头代表的是备库上sql_thread执行中转日志（relay log）。如果用箭头的粗细来代表并行度的话，那么真实情况就如图1所示，第一个箭头要明显粗于第二个箭头。</p>
 <p>在主库上，影响并发度的原因就是各种锁了。由于InnoDB引擎支持行锁，除了所有并发事务都在更新同一行（热点行）这种极端场景外，它对业务并发度的支持还是很友好的。所以，你在性能测试的时候会发现，并发压测线程32就比单线程时，总体吞吐量高。</p>
@@ -14512,7 +14512,7 @@
 <p>在官方的5.6版本之前，MySQL只支持单线程复制，由此在主库并发高、TPS高时就会出现严重的主备延迟问题。</p>
 <p>从单线程复制到最新版本的多线程复制，中间的演化经历了好几个版本。接下来，我就跟你说说MySQL多线程复制的演进过程。</p>
 <p>其实说到底，所有的多线程复制机制，都是要把图1中只有一个线程的sql_thread，拆成多个线程，也就是都符合下面的这个模型：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bc/45/bcf75aa3b0f496699fd7885426bc6245.png?wh=1142%2A856" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bc/45/bcf75aa3b0f496699fd7885426bc6245.png?wh=1142%2A856" /></p>
 <p>图2 多线程模型</p>
 <p>图2中，coordinator就是原来的sql_thread, 不过现在它不再直接更新数据了，只负责读取中转日志和分发事务。真正更新日志的，变成了worker线程。而work线程的个数，就是由参数slave_parallel_workers决定的。根据我的经验，把这个值设置为8~16之间最好（32核物理机的情况），毕竟备库还有可能要提供读查询，不能把CPU都吃光了。</p>
 <p>接下来，你需要先思考一个问题：事务能不能按照轮询的方式分发给各个worker，也就是第一个事务分给worker_1，第二个事务发给worker_2呢？</p>
@@ -14531,7 +14531,7 @@
 <h3 id="_1">按表分发策略</h3>
 <p>按表分发事务的基本思路是，如果两个事务更新不同的表，它们就可以并行。因为数据是存储在表里的，所以按表分发，可以保证两个worker不会更新同一行。</p>
 <p>当然，如果有跨表的事务，还是要把两张表放在一起考虑的。如图3所示，就是按表分发的规则。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8b/76/8b6976fedd6e644022d4026581fb8d76.png?wh=1142%2A856" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8b/76/8b6976fedd6e644022d4026581fb8d76.png?wh=1142%2A856" /></p>
 <p>图3 按表并行复制程模型</p>
 <p>可以看到，每个worker线程对应一个hash表，用于保存当前正在这个worker的“执行队列”里的事务所涉及的表。hash表的key是“库名.表名”，value是一个数字，表示队列中有多少个事务修改这个表。</p>
 <p>在有事务分配给worker时，事务里面涉及的表会被加到对应的hash表中。worker执行完成后，这个表会被从hash表中去掉。</p>
@@ -14569,7 +14569,7 @@
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>insert into t1 values(1,1,1),(2,2,2),(3,3,3),(4,4,4),(5,5,5);
 </code></pre></div>
 <p>假设，接下来我们要在主库执行这两个事务：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f1/78/f19916e27b8ff28e87ed3ad9f5473378.png?wh=937%2A149" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f1/78/f19916e27b8ff28e87ed3ad9f5473378.png?wh=937%2A149" /></p>
 <p>图4 唯一键冲突示例</p>
 <p>可以看到，这两个事务要更新的行的主键值不同，但是如果它们被分到不同的worker，就有可能session B的语句先执行。这时候id=1的行的a的值还是1，就会报唯一键冲突。</p>
 <p>因此，基于行的策略，事务hash表中还需要考虑唯一键，即key应该是“库名+表名+索引a的名字+a的值”。</p>
@@ -14626,10 +14626,10 @@
 <p>当时，这个策略出来的时候是相当惊艳的。因为，之前业界的思路都是在“分析binlog，并拆分到worker”上。而MariaDB的这个策略，目标是“模拟主库的并行模式”。</p>
 <p>但是，这个策略有一个问题，它并没有实现“真正的模拟主库并发度”这个目标。在主库上，一组事务在commit的时候，下一组事务是同时处于“执行中”状态的。</p>
 <p>如图5所示，假设了三组事务在主库的执行情况，你可以看到在trx1、trx2和trx3提交的时候，trx4、trx5和trx6是在执行的。这样，在第一组事务提交完成的时候，下一组事务很快就会进入commit状态。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8f/c3/8fec5fb48d6095aecc80016826efbfc3.png?wh=1142%2A856" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8f/c3/8fec5fb48d6095aecc80016826efbfc3.png?wh=1142%2A856" /></p>
 <p>图5 主库并行事务</p>
 <p>而按照MariaDB的并行复制策略，备库上的执行效果如图6所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8a/22/8ac3799c1ff2f9833619a1624ca3e622.png?wh=1142%2A856" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8a/22/8ac3799c1ff2f9833619a1624ca3e622.png?wh=1142%2A856" /></p>
 <p>图6 MariaDB 并行复制，备库并行效果</p>
 <p>可以看到，在备库上执行的时候，要等第一组事务完全执行完成后，第二组事务才能开始执行，这样系统的吞吐量就不够。</p>
 <p>另外，这个方案很容易被大事务拖后腿。假设trx2是一个超大事务，那么在备库应用的时候，trx1和trx3执行完成后，就只能等trx2完全执行完成，下一组才能开始执行。这段时间，只有一个worker线程在工作，是对资源的浪费。</p>
@@ -14645,7 +14645,7 @@
 <p>因为，这里面可能有由于锁冲突而处于锁等待状态的事务。如果这些事务在备库上被分配到不同的worker，就会出现备库跟主库不一致的情况。</p>
 <p>而上面提到的MariaDB这个策略的核心，是“所有处于commit”状态的事务可以并行。事务处于commit状态，表示已经通过了锁冲突的检验了。</p>
 <p>这时候，你可以再回顾一下两阶段提交，我把前面<a href="https://time.geekbang.org/column/article/76161">第23篇文章</a>中介绍过的两阶段提交过程图贴过来。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5a/28/5ae7d074c34bc5bd55c82781de670c28.png?wh=1142%2A1522" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5a/28/5ae7d074c34bc5bd55c82781de670c28.png?wh=1142%2A1522" /></p>
 <p>图7 两阶段提交细化过程图</p>
 <p>其实，不用等到commit阶段，只要能够到达redo log prepare阶段，就表示事务已经通过锁冲突的检验了。</p>
 <p>因此，MySQL 5.7并行复制策略的思想是：</p>
@@ -14903,8 +14903,6 @@ id是主键、每次delete 300条、sleep 500ms、这种延迟可能是什么造
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

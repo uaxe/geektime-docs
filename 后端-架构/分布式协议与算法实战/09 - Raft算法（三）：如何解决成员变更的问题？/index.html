@@ -14046,37 +14046,37 @@
 <p>的确，配置是成员变更中一个非常重要的概念，我建议你这么理解：它就是在说集群是哪些节点组成的，是集群各节点地址信息的集合。比如节点A、B、C组成的集群，那么集群的配置就是[A, B, C]集合。</p>
 <p>理解了这一点之后，咱们先来看一道思考题。</p>
 <p>假设我们有一个由节点A、B、C组成的Raft集群，现在我们需要增加数据副本数，增加2个副本（也就是增加2台服务器），扩展为由节点A、B、C、D、E， 5个节点组成的新集群：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/85/04/853b678cb8a088ce1bc9f91fc62bde04.jpg?wh=1142%2A400" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/85/04/853b678cb8a088ce1bc9f91fc62bde04.jpg?wh=1142%2A400" /></p>
 <p>那么Raft算法是如何保障在集群配置变更时，集群能稳定运行，不出现2个领导者呢？带着这个问题，我们正式进入今天的学习。</p>
 <p>老话说得好，“认识问题，才能解决问题”。为了帮你更好地理解单节点变更的方法，我们先来看一看，成员变更时，到底会出现什么样的问题？</p>
 <h2 id="_1">成员变更的问题</h2>
 <p>在我看来，在集群中进行成员变更的最大风险是，可能会同时出现2个领导者。比如在进行成员变更时，节点A、B和C之间发生了分区错误，节点A、B组成旧配置中的“大多数”，也就是变更前的3节点集群中的“大多数”，那么这时的领导者（节点A）依旧是领导者。</p>
 <p>另一方面，节点C和新节点D、E组成了新配置的“大多数”，也就是变更后的5节点集群中的“大多数”，它们可能会选举出新的领导者（比如节点C）。那么这时，就出现了同时存在2个领导者的情况。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/82/9e/827a4616e65633015c1f77f3425b1a9e.jpg?wh=1142%2A293" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/82/9e/827a4616e65633015c1f77f3425b1a9e.jpg?wh=1142%2A293" /></p>
 <p>如果出现了2个领导者，那么就违背了“领导者的唯一性”的原则，进而影响到集群的稳定运行。你要如何解决这个问题呢？也许有的同学想到了一个解决方法。</p>
 <p>因为我们在启动集群时，配置是固定的，不存在成员变更，在这种情况下，Raft的领导者选举能保证只有一个领导者。也就是说，这时不会出现多个领导者的问题，那我可以先将集群关闭再启动新集群啊。也就是先把节点A、B、C组成的集群关闭，然后再启动节点A、B、C、D、E组成的新集群。</p>
 <p><strong>在我看来，这个方法不可行。</strong> 为什么呢？因为你每次变更都要重启集群，意味着在集群变更期间服务不可用，肯定不行啊，太影响用户体验了。想象一下，你正在玩王者荣耀，时不时弹出一个对话框通知你：系统升级，游戏暂停3分钟。这体验糟糕不糟糕？</p>
 <p>既然这种方法影响用户体验，根本行不通，那到底怎样解决成员变更的问题呢？<strong>最常用的方法就是单节点变更。</strong></p>
 <h2 id="_2">如何通过单节点变更解决成员变更的问题？</h2>
 <p>单节点变更，就是通过一次变更一个节点实现成员变更。如果需要变更多个节点，那你需要执行多次单节点变更。比如将3节点集群扩容为5节点集群，这时你需要执行2次单节点变更，先将3节点集群变更为4节点集群，然后再将4节点集群变更为5节点集群，就像下图的样子。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7e/55/7e2b1caf3c68c7900d6a7f71e7a3a855.jpg?wh=1142%2A790" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7e/55/7e2b1caf3c68c7900d6a7f71e7a3a855.jpg?wh=1142%2A790" /></p>
 <p>现在，让我们回到开篇的思考题，看看如何用单节点变更的方法，解决这个问题。为了演示方便，我们假设节点A是领导者：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/25/40/25cabfbad4627ec4c39b8d32a567d440.jpg?wh=1142%2A670" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/25/40/25cabfbad4627ec4c39b8d32a567d440.jpg?wh=1142%2A670" /></p>
 <p>目前的集群配置为[A, B, C]，我们先向集群中加入节点D，这意味着新配置为[A, B, C, D]。成员变更，是通过这么两步实现的：</p>
 <ul>
 <li>第一步，领导者（节点A）向新节点（节点D）同步数据；</li>
 <li>第二步，领导者（节点A）将新配置[A, B, C, D]作为一个日志项，复制到新配置中所有节点（节点A、B、C、D）上，然后将新配置的日志项应用（Apply）到本地状态机，完成单节点变更。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7f/07/7f687461706f3b226d79a55b618e4c07.jpg?wh=1142%2A486" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7f/07/7f687461706f3b226d79a55b618e4c07.jpg?wh=1142%2A486" /></p>
 <p>在变更完成后，现在的集群配置就是[A, B, C, D]，我们再向集群中加入节点E，也就是说，新配置为[A, B, C, D, E]。成员变更的步骤和上面类似：</p>
 <ul>
 <li>第一步，领导者（节点A）向新节点（节点E）同步数据；</li>
 <li>第二步，领导者（节点A）将新配置[A, B, C, D, E]作为一个日志项，复制到新配置中的所有节点（A、B、C、D、E）上，然后再将新配置的日志项应用到本地状态机，完成单节点变更。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7d/43/7d3b5da84db682359ab82579fdd2e243.jpg?wh=1142%2A427" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7d/43/7d3b5da84db682359ab82579fdd2e243.jpg?wh=1142%2A427" /></p>
 <p>这样一来，我们就通过一次变更一个节点的方式，完成了成员变更，保证了集群中始终只有一个领导者，而且集群也在稳定运行，持续提供服务。</p>
 <p>我想说的是，在正常情况下，<strong>不管旧的集群配置是怎么组成的，旧配置的“大多数”和新配置的“大多数”都会有一个节点是重叠的。</strong> 也就是说，不会同时存在旧配置和新配置2个“大多数”：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5f/b8/5fe7c8d90857737d7314263eae2166b8.jpg?wh=1142%2A906" /><img alt="" src="https://static001.geekbang.org/resource/image/4a/27/4a00b7e1b89922cd9f785c6f153aca27.jpg?wh=1142%2A899" /></p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/5f/b8/5fe7c8d90857737d7314263eae2166b8.jpg?wh=1142%2A906" /><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4a/27/4a00b7e1b89922cd9f785c6f153aca27.jpg?wh=1142%2A899" />}{:referrerpolicy="no-referrer"</p>
 <p>从上图中你可以看到，不管集群是偶数节点，还是奇数节点，不管是增加节点，还是移除节点，新旧配置的“大多数”都会存在重叠（图中的橙色节点）。</p>
 <p>需要你注意的是，在分区错误、节点故障等情况下，如果我们并发执行单节点变更，那么就可能出现一次单节点变更尚未完成，新的单节点变更又在执行，导致集群出现2个领导者的情况。</p>
 <p>如果你遇到这种情况，可以在领导者启动时，创建一个NO_OP日志项（也就是空日志项），只有当领导者将NO_OP日志项应用后，再执行成员变更请求。这个解决办法，你记住就可以了，可以自己在课后试着研究下。具体的实现，可参考Hashicorp Raft的源码，也就是runLeader()函数中：</p>
@@ -14232,8 +14232,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

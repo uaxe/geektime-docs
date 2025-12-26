@@ -13812,14 +13812,14 @@
 <h2 id="nioservlet">NIO与Servlet的协同</h2>
 <p>我们来探讨支持NIO的另一件事情：Servlet协同。我们得先描述一下，前面说了，改成NIO模式之后，网络连接这一部分现在是非阻塞的模式了，主线程不用阻塞等待网络返回，而是可以接着做别的工作了。反映在程序上，我们现在拿到的不再是一个普通的Java socket了，而是SocketChannel。</p>
 <p>但是Servlet的行为呢？按照通常的理解，是要阻塞地对数据进行读取，也就是说Servlet程序员写程序的时候，头脑里总是想象数据同步读写完成。这样我们就了解到了，现在网络连接和Servlet调用之间存在一个模式的差别。你可以结合我给出的示意图来理解。</p>
-<p><img alt="111" src="https://static001.geekbang.org/resource/image/06/67/06101abf0d29981582489e1cbdce5767.png?wh=2590x870" /></p>
+<p><img alt="111" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/06/67/06101abf0d29981582489e1cbdce5767.png?wh=2590x870" /></p>
 <p>这个差别根本上来自于哪里呢？在发布的Servlet规范中有要求同步阻塞读写吗？并没有，没有任何一段文本表明这一点。但是我们看API，输入输出是用的InputStream和OutputStream，这就表明了在实际的实现中，Servlet的行为是同步阻塞的。</p>
 <p>所以为了将NIO模式与Servlet的阻塞读写行为协调起来，我们需要模拟同步阻塞：在一个非阻塞的网络连接上，数据读取的行为看起来又得是同步阻塞的。</p>
 <p>我们编程的时候，碰到这类同步异步结合的问题，常用一个编程“技巧”：死循环等待。一方通过一个死循环不停地尝试从另一方获取数据，直到取得全部数据。这个死循环就是在模拟同步过程，我们是可以考虑这个办法的，比较简单，所以后面你会看到我们的MiniTomcat借鉴了这个办法。</p>
 <h2 id="tomcat">Tomcat如何模拟阻塞式读写?</h2>
 <p>Tomcat一样要考虑这个事情，所以我们要学习Tomcat自身是怎么处理这个问题的，它的办法也就是我们的办法。以前我就说过，MiniTomcat不是创造新东西，而是为了学习Tomcat而抽取出来的简化版的Tomcat。</p>
 <p>你可以看一下我从Tomcat的主页里截取的一张图。</p>
-<p><img alt="222" src="https://static001.geekbang.org/resource/image/2f/4b/2fd7af33bfcc476f876d1546af2bb34b.png?wh=1833x401" /></p>
+<p><img alt="222" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2f/4b/2fd7af33bfcc476f876d1546af2bb34b.png?wh=1833x401" /></p>
 <p>可以看出，对Request和Response的body进行读写，Tomcat一律采用的阻塞模式。那么Tomcat是如何做到的呢？它也是用的模拟方式。我们一点一点来看。</p>
 <p>Servlet永远在使用HttpServletRequest，而对于Tomcat来说，在这里用的是RequestFacade。程序要从这里面获得Inputstream，如果我们直接使用JDK的ServletInputStream，肯定是不行的，那还是默认的blocking通道，所以这里要偷梁换柱一下，我们看到Tomcat使用了CoyoteInputStream，这个类它继承了ServletInputStream。这个CoyoteInputStream重新实现了read()。具体来讲，就是用里面的InputBuffer来读的，而最后一步步追下去，就会落在一个NIOSocketWrapper的读操作上。</p>
 <p>我们通过主体代码来看看Tomcat怎么用NIO来读数据的。</p>
@@ -14035,8 +14035,6 @@ Q3：能否讲一下Tomcat中的设计模式？</p>2024-01-21</li><br/>
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

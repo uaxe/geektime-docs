@@ -13984,7 +13984,7 @@
 <p>到今天为止，我们已经把 RPC 通信过程中要用到的所有基础知识都讲了一遍，但这些内容多属于理论。<strong>这一讲我们就来实战一下，看看具体落实到代码上，我们应该怎么实现一个 RPC 框架？</strong></p>
 <p>为了能让咱们快速达成共识，我选择剖析 gRPC 源码（源码地址：<a href="https://github.com/grpc/grpc-java">https://github.com/grpc/grpc-java</a>）。通过分析 gRPC 的通信过程，我们可以清楚地知道在 gRPC 里面这些知识点是怎么落地到具体代码上的。</p>
 <p>gRPC 是由 Google 开发并且开源的一款高性能、跨语言的 RPC 框架，当前支持 C、Java 和 Go 等语言，当前 Java 版本最新 Release 版为 1.27.0。gRPC 有很多特点，比如跨语言，通信协议是基于标准的 HTTP/2 设计的，序列化支持 PB（Protocol Buffer）和 JSON，整个调用示例如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/86/0d/8671942cd89feea3a2544d3530da450d.jpg?wh=3183%2A1769" title="gRPC调用示例图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/86/0d/8671942cd89feea3a2544d3530da450d.jpg?wh=3183%2A1769" title="gRPC调用示例图" /></p>
 <p>如果你想快速地了解一个全新框架的工作原理，我个人认为最快的方式就是从使用示例开始，所以现在我们就以最简单的 HelloWord 为例开始了解。</p>
 <p>在这个例子里面，我们会定义一个 say 方法，调用方通过 gRPC 调用服务提供方，然后服务提供方会返回一个字符串给调用方。</p>
 <p>为了保证调用方和服务提供方能够正常通信，我们需要先约定一个通信过程中的契约，也就是我们在 Java 里面说的定义一个接口，这个接口里面只会包含一个 say 方法。在 gRPC 里面定义接口是通过写 Protocol Buffer 代码，从而把接口的定义信息通过 Protocol Buffer 语义表达出来。HelloWord 的 Protocol Buffer 代码如下所示：</p>
@@ -14083,7 +14083,7 @@
 <li>最后我们可以用生成的这个 Stub 调用 say 方法发起真正的 RPC 调用，后续其它的 RPC 通信细节就对我们使用者透明了。</li>
 </ul>
 <p>为了能看清楚里面具体发生了什么，我们需要进入到 ClientCalls.blockingUnaryCall 方法里面看下逻辑细节。但是为了避免太多的细节影响你理解整体流程，我在下面这张图中只画下了最重要的部分。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/57/5d/57c7d1c005c1d426ccee48a84e286b5d.jpg?wh=5429%2A1517" title="整体流程图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/57/5d/57c7d1c005c1d426ccee48a84e286b5d.jpg?wh=5429%2A1517" title="整体流程图" /></p>
 <p>我们可以看到，在调用端代码里面，我们只需要一行（第48行）代码就可以发起一个 RPC 调用，而具体这个请求是怎么发送到服务提供者那端的呢？这对于我们 gRPC 使用者来说是完全透明的，我们只要关注是怎么创建出 stub 对象的就可以了。</p>
 <p>比如入参是一个字符对象，gRPC 是怎么把这个对象传输到服务提供方的呢？因为在<a href="https://time.geekbang.org/column/article/202779">[第 03 讲]</a> 中我们说过，只有二进制才能在网络中传输，但是目前调用端代码的入参是一个字符对象，那在 gRPC 里面我们是怎么把对象转成二进制数据的呢？</p>
 <p>回到上面流程图的第3步，在 writePayload 之前，ClientCallImpl 里面有一行代码就是 method.streamRequest(message)，看方法签名我们大概就知道它是用来把对象转成一个 InputStream，有了 InputStream 我们就很容易获得入参对象的二进制数据。这个方法返回值很有意思，就是为啥不直接返回我们想要的二进制数组，而是返回一个 InputStream 对象呢？你可以先停下来想下原因，我们会在最后继续讨论这个问题。</p>
@@ -14093,7 +14093,7 @@
 <p>我们在 gRPC 文档中可以看到，gRPC 的通信协议是基于标准的 HTTP/2 设计的，而 HTTP/2 相对于常用的 HTTP/1.X 来说，它最大的特点就是多路复用、双向流，该怎么理解这个特点呢？这就好比我们生活中的单行道和双行道，HTTP/1.X 就是单行道，HTTP/2 就是双行道。</p>
 <p>那既然在请求收到后需要进行请求“断句”，那肯定就需要在发送的时候把断句的符号加上，我们看下在 gRPC 里面是怎么加的？</p>
 <p>因为 gRPC 是基于 HTTP/2 协议，而 HTTP/2 传输基本单位是 Frame，Frame 格式是以固定 9 字节长度的 header，后面加上不定长的 payload 组成，协议格式如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d5/75/d5554644aefe5aaab42718d75a47de75.jpg?wh=3796%2A1143" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d5/75/d5554644aefe5aaab42718d75a47de75.jpg?wh=3796%2A1143" /></p>
 <p>那在 gRPC 里面就变成怎么构造一个 HTTP/2 的 Frame 了。</p>
 <p>现在回看我们上面那个流程图的第 4 步，在 write 到 Netty 里面之前，我们看到在 MessageFramer.writePayload 方法里面会间接调用 writeKnownLengthUncompressed 方法，该方法要做的两件事情就是构造 Frame Header 和 Frame Body，然后再把构造的 Frame 发送到 NettyClientHandler，最后将 Frame 写入到 HTTP/2 Stream 中，完成请求消息的发送。</p>
 <h2 id="_2">接收原理</h2>
@@ -14167,9 +14167,9 @@
 <a id="__codelineno-3-56" name="__codelineno-3-56" href="#__codelineno-3-56"></a>}
 </code></pre></div>
 <p>服务对外暴露的目的是让过来的请求在被还原成信息后，能找到对应接口的实现。在这之前，我们需要先保证能正常接收请求，通俗地讲就是要先开启一个 TCP 端口，让调用方可以建立连接，并把二进制数据发送到这个连接通道里面，这里依然只展示最重要的部分。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b4/cd/b43a3fb6d6929bb862893aebd7cd40cd.jpg?wh=4614%2A1541" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b4/cd/b43a3fb6d6929bb862893aebd7cd40cd.jpg?wh=4614%2A1541" /></p>
 <p>这四个步骤是用来开启一个 Netty Server，并绑定编解码逻辑的，如果你暂时看不懂，没关系的，我们可以先忽略细节。我们重点看下 NettyServerHandler 就行了，在这个 Handler 里面会绑定一个 FrameListener，gRPC 会在这个 Listener 里面处理收到数据请求的 Header 和 Body，并且也会处理 Ping、RST 命令等，具体流程如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/98/f5/98d0ecec8e2c9b75159e86253c6c3cf5.jpg?wh=4606%2A1527" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/98/f5/98d0ecec8e2c9b75159e86253c6c3cf5.jpg?wh=4606%2A1527" /></p>
 <p>在收到 Header 或者 Body 二进制数据后，NettyServerHandler 上绑定的FrameListener 会把这些二进制数据转到 MessageDeframer 里面，从而实现 gRPC 协议消息的解析 。</p>
 <p>那你可能会问，这些 Header 和 Body 数据是怎么分离出来的呢？按照我们前面说的，调用方发过来的是一串二进制数据，这就是我们前面开启 Netty Server 的时候绑定 Default HTTP/2FrameReader 的作用，它能帮助我们按照 HTTP/2 协议的格式自动切分出 Header 和 Body 数据来，而对我们上层应用 gRPC 来说，它可以直接拿拆分后的数据来用。</p>
 <h2 id="_3">总结</h2>
@@ -14305,8 +14305,6 @@ gRPC Python Quick Start：https:&#47;&#47;grpc.io&#47;docs&#47;quickstart&#47;py
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -5884,10 +5884,10 @@
 <p>要想明白这些问题，你就需要去了解CPU是如何执行任务的，只有明白了CPU的执行逻辑，你才能更好地控制你的任务执行，从而获得更好的性能。</p>
 <h2 id="cpu">CPU是如何读写数据的 ？</h2>
 <p>我先带你来看下CPU的架构，因为你只有理解了CPU的架构，你才能更好地理解CPU是如何执行指令的。CPU的架构图如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a4/7f/a418fbfc23d96aeb4813f1db4cbyy17f.jpg?wh=2598%2A1617" title="CPU架构" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a4/7f/a418fbfc23d96aeb4813f1db4cbyy17f.jpg?wh=2598%2A1617" title="CPU架构" /></p>
 <p>你可以直观地看到，对于现代处理器而言，一个实体CPU通常会有两个逻辑线程，也就是上图中的Core 0和Core 1。每个Core都有自己的L1 Cache，L1 Cache又分为dCache和iCache，对应到上图就是L1d和L1i。L1 Cache只有Core本身可以看到，其他的Core是看不到的。同一个实体CPU中的这两个Core会共享L2 Cache，其他的实体CPU是看不到这个L2 Cache的。所有的实体CPU会共享L3 Cache。这就是典型的CPU架构。</p>
 <p>相信你也看到，在CPU外还会有内存（DRAM）、磁盘等，这些存储介质共同构成了体系结构里的金字塔存储层次。如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6e/3d/6eace3466bc42185887a351c6c3e693d.jpg?wh=2535%2A1705" title="金字塔存储层次" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6e/3d/6eace3466bc42185887a351c6c3e693d.jpg?wh=2535%2A1705" title="金字塔存储层次" /></p>
 <p>在这个“金字塔”中，越往下，存储容量就越大，它的速度也会变得越慢。Jeff Dean曾经研究过CPU对各个存储介质的访问延迟，具体你可以看下<a href="https://gist.github.com/jboner/2841832">latency</a>里的数据，里面详细记录了每个存储层次的访问延迟，这也是我们在性能优化时必须要知道的一些延迟数据。你可不要小瞧它，在某些场景下，这些不同存储层次的访问延迟差异可能会导致非常大的性能差异。</p>
 <p>我们就以Cache访问延迟（L1 0.5ns，L2 10ns）和内存访问延迟（100ns）为例，我给你举一个实际的案例来说明访问延迟的差异对性能的影响。</p>
 <p>之前我在做网络追踪系统时，为了更方便地追踪TCP连接，我给Linux Kernel提交了一个PATCH来记录每个连接的编号，具体你可以参考这个commit：<a href="https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?h=v5.9-rc4&amp;id=c6849a3ac17e336811f1d5bba991d2a9bdc47af1">net: init sk_cookie for inet socket</a>。该PATCH的大致作用是，在每次创建一个新的TCP连接时（关于TCP这部分知识，你可以去温习上一个模块的内容），它都会使用net namespace（网络命名空间）中的cookie_gen生成一个cookie给这个新建的连接赋值。</p>
@@ -5895,7 +5895,7 @@
 <p>正因为这个PATCH给高并发建连这种场景带来了如此严重的性能损耗，所以它就被我们给回退（Revert）了，你具体可以看<a href="https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?h=v5.9-rc4&amp;id=a06ac0d67d9fda7c255476c6391032319030045d">Revert "net: init sk_cookie for inet socket"</a>这个commit。不过，cookie_gen对于网络追踪还是很有用的，比如说在使用ebpf来追踪cgroup的TCP连接时，所以后来Facebook的一个工程师把它从net namespace这个结构体里移了出来，<a href="https://github.com/torvalds/linux/commit/cd48bdda4fb82c2fe569d97af4217c530168c99c">改为了一个全局变量</a>。</p>
 <p>由于net namespace被很多TCP连接共享，因此这个结构体非常容易产生这类Cache伪共享问题，Eric Dumazet也在这里引入过一个Cache伪共享问题：<a href="https://github.com/torvalds/linux/commit/2a06b8982f8f2f40d03a3daf634676386bd84dbc">net: reorder ‘struct net’ fields to avoid false sharing</a>。</p>
 <p>接下来，我们就来看一下Cache伪共享问题究竟是怎么回事。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ed/9f/ed552cedfb95d0a3af920eca78c3069f.jpg?wh=2780%2A1583" title="Cache Line False Sharing" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ed/9f/ed552cedfb95d0a3af920eca78c3069f.jpg?wh=2780%2A1583" title="Cache Line False Sharing" /></p>
 <p>如上图所示，两个CPU上并行运行着两个不同线程，它们同时从内存中读取两个不同的数据，这两个数据的地址在物理内存上是连续的，它们位于同一个Cache Line中。CPU从内存中读数据到Cache是以Cache Line为单位的，所以该Cache Line里的数据被同时读入到了这两个CPU的各自Cache中。紧接着这两个线程分别改写不同的数据，每次改写Cache中的数据都会将整个Cache Line置为无效。因此，虽然这两个线程改写的数据不同，但是由于它们位于同一个Cache Line中，所以一个CPU中的线程在写数据时会导致另外一个CPU中的Cache Line失效，而另外一个CPU中的线程在读写数据时就会发生cache miss，然后去内存读数据，这就大大降低了性能。</p>
 <p>Cache伪共享问题可以说是性能杀手，我们在写代码时一定要留意那些频繁改写的共享数据，必要的时候可以将它跟其他的热数据放在不同的Cache Line中避免伪共享问题，就像我们在内核代码里经常看到的____cacheline_aligned所做的那样。</p>
 <p>那怎么来观测Cache伪共享问题呢？你可以使用<a href="https://man7.org/linux/man-pages/man1/perf-c2c.1.html">perf c2c</a>这个命令，但是这需要较新版本内核支持才可以。不过，perf同样可以观察cache miss的现象，它对很多性能问题的分析还是很有帮助的。</p>
@@ -5924,9 +5924,9 @@
 <p>Linux内核里的task_struct结构体就是用来表示一个线程的，每个线程都有唯一对应的task_struct结构体，它也是内核进行调度的基本单位。我们继续来看下CPU是如何选择线程来执行的。</p>
 <h2 id="cpu_1">CPU是如何选择线程执行的 ？</h2>
 <p>你知道，一个系统中可能会运行着非常多的线程，这些线程数可能远超系统中的CPU核数，这时候这些任务就需要排队，每个CPU都会维护着自己运行队列（runqueue）里的线程。这个运行队列的结构大致如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/66/62/6649d7e5984a3b9cd003fcbc97bfde62.jpg?wh=3245%2A1930" title="CPU运行队列" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/66/62/6649d7e5984a3b9cd003fcbc97bfde62.jpg?wh=3245%2A1930" title="CPU运行队列" /></p>
 <p>每个CPU都有自己的运行队列（runqueue），需要运行的线程会被加入到这个队列中。因为有些线程的优先级高，Linux内核为了保障这些高优先级任务的执行，设置了不同的调度类（Scheduling Class），如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/15/b1/1507d0ef23d5d1cd33769dd1953cffb1.jpg?wh=3017%2A1218" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/15/b1/1507d0ef23d5d1cd33769dd1953cffb1.jpg?wh=3017%2A1218" /></p>
 <p>这几个调度类的优先级如下：Deadline &gt; Realtime &gt; Fair。Linux内核在选择下一个任务执行时，会按照该顺序来进行选择，也就是先从dl_rq里选择任务，然后从rt_rq里选择任务，最后从cfs_rq里选择任务。所以实时任务总是会比普通任务先得到执行。</p>
 <p>如果你的某些任务对延迟容忍度很低，比如说在嵌入式系统中就有很多这类任务，那就可以考虑将你的任务设置为实时任务，比如将它设置为SCHED_FIFO的任务：</p>
 <blockquote>
@@ -6081,8 +6081,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

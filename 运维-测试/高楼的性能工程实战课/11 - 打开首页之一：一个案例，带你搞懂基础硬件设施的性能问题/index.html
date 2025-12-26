@@ -6253,7 +6253,7 @@
 <p>好，不啰嗦了，下面我们就把打开首页接口的性能瓶颈仔细扒一扒。</p>
 <h2 id="_1">看架构图</h2>
 <p>在每次分析性能瓶颈之前，我都会画这样一张图，看看这个接口会涉及到哪些服务和技术组件，这对我们后续的性能分析会有很大的帮助。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/69/8d/6913fb342aa32fae5b46c6f1ecddc58d.png?wh=845%2A685" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/69/8d/6913fb342aa32fae5b46c6f1ecddc58d.png?wh=845%2A685" /></p>
 <p>如果你有工具可以直接展示，那就更好了。如果没有，那我建议你不要自信地认为自己可以记住一个简单的架构。相信我，哪怕是在纸上简单画一画，都会对你后面的分析思路有很大的帮助。</p>
 <p>回到上面这张图，我们可以清楚地看到这个打开首页的逻辑是：User - Gateway(Redis)- Portal - (Redis,MySQL)。</p>
 <h2 id="_2">顺便看下代码逻辑</h2>
@@ -6287,10 +6287,10 @@
 <h2 id="_3">确定压力数据</h2>
 <p>了解完代码逻辑后，我们上10个线程试运行一下，看看在一个个线程递增的过程中，TPS会有什么样的趋势。</p>
 <p>运行之后，我们得到这样的结果：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/87/0f/876yya208a923dd9c42fe9538063b10f.png?wh=1830%2A535" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/87/0f/876yya208a923dd9c42fe9538063b10f.png?wh=1830%2A535" /></p>
 <p>从结果来看，在一开始，一个线程会产生40左右的TPS。这里我们就要思考一下了：<strong>如果想要执行一个场景，并且这个场景可以压出打开首页接口的最大TPS，我们应该怎么设置压力工具中的线程数、递增策略和持续执行策略呢？</strong></p>
 <p>对此，我们先看看Portal应用节点所在机器的硬件使用情况，了解一下TPS趋势和资源使用率之间的关系。这个机器的情况如下图所示（注意，我跳过了Gateway所在的节点）：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d9/67/d991a5548f72d6f7bcf0257c40da6b67.png?wh=1828%2A912" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d9/67/d991a5548f72d6f7bcf0257c40da6b67.png?wh=1828%2A912" /></p>
 <p>可以看到，当前Portal节点所在的机器是8C16G（虚拟机），并且这个机器基本上没什么压力。</p>
 <p>现在我们先不计算其他资源，只考虑8C16G的配置情况。如果TPS是线性增长的话，那么当该机器的CPU使用率达到 100%的时候，TPS大概就是800左右。因此，我们压力工具中的线程数应该设置为：</p>
 <p>$$ 线程数 = 800 TPS \div 40 TPS = 20 个线程$$</p>
@@ -6307,30 +6307,30 @@
 <p>你可能会疑惑：难道不用更高的线程了吗？如果你想做一个正常的场景，那确实不需要用更高的线程了；如果你就是想知道压力线程加多了是什么样子，那你可以试试。我在性能场景执行时，也经常用各种方式压着玩。</p>
 <p>不过，话说回来，确实有一种情况需要我们正儿八经地增加更多的压力，那就是你的响应时间已经增加了，可是增加得又不多，TPS也不再上升。这时候，我们拆分响应时间是比较困难的，特别是当一些系统很快的时候，响应时间可能只是几个毫秒之间。所以，在这种情况下，我们需要多增加一些线程，让响应时间慢的地方更清晰地表现出来，这样也就更容易拆分时间。</p>
 <p>通过压力场景的递增设置（前面算的是只需要20个线程即可达到最大值，而这里，我把压力线程设置为100启动场景，目的是为了看到递增到更大压力时的TPS趋势以及响应时间的增加，这样更容易做时间的拆分），我们看到这个接口的响应时间确实在慢慢增加，并且随着线程数的增加，响应时间很快就上升到了几百毫秒。这是一个明显的瓶颈，我们自然是不能接受的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b5/b9/b51a9979095ba9bd963e657b96fyy0b9.png?wh=1834%2A474" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b5/b9/b51a9979095ba9bd963e657b96fyy0b9.png?wh=1834%2A474" /></p>
 <p>接下来，我们就要好好分析一下这个响应时间究竟消耗到了哪里。</p>
 <h2 id="_4">拆分时间</h2>
 <p>我们前面提到，打开首页的逻辑是：User - Gateway(Redis)- Portal - (Redis,MySQL)，那我们就按照这个逻辑，借助链路监控工具SkyWalking把响应时间具体拆分一下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1d/99/1d3b42340dd5dfdda16bdf1332d34c99.png?wh=1803%2A761" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1d/99/1d3b42340dd5dfdda16bdf1332d34c99.png?wh=1803%2A761" /></p>
 <ul>
 <li><strong>User —Gateway之间的时间消耗</strong></li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bd/b9/bd8117bdc6124d95893b16c7653be7b9.png?wh=266%2A661" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bd/b9/bd8117bdc6124d95893b16c7653be7b9.png?wh=266%2A661" /></p>
 <p>我们看到，User - Gateway之间的时间消耗慢慢上升到了150毫秒左右。</p>
 <ul>
 <li><strong>Gateway响应时间</strong></li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/73/37/733a7e7f13ea455826aee0bbb2393237.png?wh=268%2A472" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/73/37/733a7e7f13ea455826aee0bbb2393237.png?wh=268%2A472" /></p>
 <p>gateway上也消耗了150毫秒，这就说明user到gateway之间的网络并没有多少时间消耗，在毫秒级。</p>
 <ul>
 <li><strong>Gateway —Portal之间的时间消耗</strong></li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f9/fe/f9ac563b64d7a1c6e923d8222fdfyyfe.png?wh=263%2A666" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f9/fe/f9ac563b64d7a1c6e923d8222fdfyyfe.png?wh=263%2A666" /></p>
 <p>在Portal上，响应时间只消耗了50毫秒左右。我们再到Portal上看一眼。</p>
 <ul>
 <li><strong>Portal响应时间</strong></li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/72/49/721ae8d7ef027fdc56dd05860cafa849.png?wh=258%2A467" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/72/49/721ae8d7ef027fdc56dd05860cafa849.png?wh=258%2A467" /></p>
 <p>Portal的响应时间是50毫秒左右，和我们上面看到的时间一致。</p>
 <p>通过上述对响应时间的拆分，我们可以确定是Gateway消耗了响应时间，并且这个时间达到了近100毫秒。所以，我们下一步定位的目标就是Gateway了。</p>
 <h2 id="gateway">定位Gateway上的响应时间消耗</h2>
@@ -6338,10 +6338,10 @@
 <p>既然Gateway上的响应时间消耗很高，我们自然就要查一下这台主机把时间消耗在了哪里。</p>
 <p>我们的分析逻辑仍然是<strong>先看全局监控，后看定向监控</strong>。全局监控要从整个架构开始看起，然后再确定某个节点上的资源消耗。注意，在看全局监控时，我们要从最基础的查起，而分析的过程中最基础的就是操作系统了。</p>
 <p>通过top命令，我们可以看到Gateway节点上的资源情况，具体如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c5/f5/c5af9b566db8bdeb7fc8d6ea448aa2f5.png?wh=1298%2A559" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c5/f5/c5af9b566db8bdeb7fc8d6ea448aa2f5.png?wh=1298%2A559" /></p>
 <p>其中，st cpu达到了15%左右。我们知道，st cpu是指虚拟机被宿主机上的其他应用或虚拟机抢走的CPU，它的值这么高显然是不太正常的。所以，我们要进一步查看st cpu异常的原因。</p>
 <p>我们用mpstat命令先来看看宿主机（运行Gateway的虚拟机所在的物理机）上的资源表现：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f4/90/f40e7c2f2a790b289b6d2332dbc47390.png?wh=1186%2A448" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f4/90/f40e7c2f2a790b289b6d2332dbc47390.png?wh=1186%2A448" /></p>
 <p>可以看到，CPU还有20%没有用完，说明宿主机还有空间。不过，宿主机的CPU使用率已经不小了，而消耗这些宿主机的就只有虚拟机里的应用。所以，我们要查一下是不是某个虚拟机的CPU消耗特别高。宿主机上的KVM列表如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>[root@dell-server-3 ~]# virsh list --all
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>Id    名称                         状态
@@ -6539,7 +6539,7 @@
 </code></pre></div>
 <p>可以看到，没有一个物理机是运行在performance模式之下的。</p>
 <p>在这里，我们需要对CPU的运行模式有一个了解：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8c/82/8cd3a3bee80eb77bf348b1a063a90682.jpg?wh=2000%2A1263" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8c/82/8cd3a3bee80eb77bf348b1a063a90682.jpg?wh=2000%2A1263" /></p>
 <p>既然我们是性能分析人员，那自然要用performance模式了，所以我们把CPU模式修改如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>-- 物理机器1
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>[root@hp-server ~]# cpupower -c all frequency-set -g performance
@@ -6777,8 +6777,6 @@ windows服务怎么查看虚拟机被宿主机上的其他应用或虚拟机抢�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

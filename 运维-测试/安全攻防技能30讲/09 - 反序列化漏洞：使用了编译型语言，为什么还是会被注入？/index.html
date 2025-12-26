@@ -6630,14 +6630,14 @@
 <p>下面我们来分析一下这段代码的逻辑。</p>
 <p>在Java通过<code>ObjectInputStream.readObject()</code>进行反序列化操作的时候，ObjectInputStream会根据序列化数据寻找对应的实现类（在payload中是<code>sun.reflect.annotation.AnnotationInvocationHandler</code>）。如果实现类存在，Java就会调用其readObject方法。因此，<code>AnnotationInvocationHandler.readObject</code>方法在反序列化过程中会被调用。</p>
 <p><code>AnnotationInvocationHandler在readObject</code>的过程中会调用<code>streamVals.entrySet()</code>。其中，<code>streamVals</code>是<code>AnnotationInvocationHandler</code>构造函数中的第二个参数。这个参数可以在数据中进行指定。而黑客定义的是Proxy类，也就是说，黑客会让这个参数的实际值等于Proxy。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/29/d7/294747330236323f2539ce1656eb9ed7.jpg?wh=1142%2A604" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/29/d7/294747330236323f2539ce1656eb9ed7.jpg?wh=1142%2A604" /></p>
 <p>Proxy是动态代理，它会基于Java反射机制去动态实现代理类的功能。在Java中，调用一个Proxy类的entrySet()方法，实际上就是在调用<code>InvocationHandler中的invoke</code>方法。在invoke方法中，Java又会调用<code>memberValues.get(member)</code>。其中，<code>memberValues</code>是<code>AnnotationInvocationHandler</code>构造函数中的第二个参数。</p>
 <p>同样地，<code>memberValues</code>这个参数也能够在数据中进行指定，而这次黑客定义的就是LazyMap类。member是方法名，也就是entrySet。因此，我们最终会调用到<code>LazyMap.get("entrySet")</code>这个逻辑。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f8/fe/f8390216be34758ef0ee27946369c9fe.jpg?wh=958%2A858" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f8/fe/f8390216be34758ef0ee27946369c9fe.jpg?wh=958%2A858" /></p>
 <p>当LazyMap需要get某个参数的时候，如果之前没有获取过，则会调用<code>ChainedTransformer.transform</code>进行构造。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d6/57/d6540c248b8dfc16ae66767a1382da57.jpg?wh=740%2A324" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d6/57/d6540c248b8dfc16ae66767a1382da57.jpg?wh=740%2A324" /></p>
 <p><code>ChainedTransformer.transform</code>会将我们构造的几个InvokerTransformer顺次执行。而在<code>InvokerTransformer.transform</code>中，它会通过反射的方法，顺次执行我们定义好的Java语句，最终调用<code>Runtime.getRuntime().exec("open -a calculator")</code>实现命令执行的功能。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6b/ae/6ba2e4e30bf7a0e6b8973a22f2deefae.jpg?wh=820%2A252" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6b/ae/6ba2e4e30bf7a0e6b8973a22f2deefae.jpg?wh=820%2A252" /></p>
 <p>好了，讲了这么多，不知道你理解了多少？这个过程的确比较烧脑。我带你再来总结一下，简单来说，其实就是以下4步：</p>
 <ol>
 <li>黑客构造一个恶意的<strong>调用链</strong>（专业术语为POP，Property Oriented Programming），并将其序列化成数据，然后发送给应用；</li>
@@ -6650,7 +6650,7 @@
 <h2 id="_2">通过反序列化漏洞，黑客能做什么？</h2>
 <p>学习了前面的例子，我们已经知道，通过反序列化漏洞，黑客可以调用到<code>Runtime.exec()</code>来进行命令执行。换一句话说，黑客已经能够在服务器上执行任意的命令，这就相当于间接掌控了你的服务器，能够干任何他想干的事情了。</p>
 <p>即使你对服务器进行了一定的安全防护，控制了黑客掌控服务器所产生的影响，黑客还是能够利用反序列化漏洞，来发起拒绝服务攻击。比如，曾经有人就提出过这样的方式，通过HashSet的相互引用，构造出一个100层的HashSet，其中包含200个HashSet的实例和100个String，结构如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/db/03/dbc68b00d365fba99361a49128a69703.jpg?wh=846%2A535" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/db/03/dbc68b00d365fba99361a49128a69703.jpg?wh=846%2A535" /></p>
 <p>对于多层嵌套的对象，Java在反序列化过程中，需要调用的方法呈指数增加。因此，尽管这个序列化的数组大概只有6KB，但是面对这种100层的数据，Java所需要执行的方法数是近乎无穷的（n的100次方）。也就是说，黑客可以通过构建一个体积很小的数据，增加应用在反序列化过程中需要调用的方法数，以此来耗尽CPU资源，达到影响服务器可用性的目的。</p>
 <h2 id="_3">如何进行反序列化漏洞防护 ？</h2>
 <p>现在，你应该对序列化和反序列化的操作产生了一些警惕。那你可能要问了，既然反序列化漏洞危害这么大，我们能不能直接剔除它们呢？显然是不可能的，尤其是JSON，作为目前最热门的跨平台数据交换格式之一，其易用性是显而易见的，你不可能因为这些还没发生的危害就剔除它们。因此，我们要采取一些有效的手段，在把反序列化操作的优势发挥出来的同时，去避免反序列化漏洞的出现。我们来看3种具体的防护方法：认证、限制类和RASP检测。</p>
@@ -6671,7 +6671,7 @@
 <p>我们首先讲了反序列化漏洞的产生原理，即黑客通过构造恶意的序列化数据，从而控制应用在反序列化过程中需要调用的类方法，最终实现任意方法调用。如果在这些方法中有命令执行的方法，黑客就可以在服务器上执行任意的命令。</p>
 <p>对于反序列化漏洞的防御，我们主要考虑两个方面：认证和检测。对于面向内部的接口和服务，我们可以采取认证的方式，杜绝它们被黑客利用的可能。另外，我们也需要对反序列化数据中的调用链进行黑白名单检测。成熟的第三方序列化插件都已经包含了这个功能，暂时可以不需要考虑。最后，如果没有过多的性能考量，我们可以通过RASP的方式，来进行一个更全面的检测和防护。</p>
 <p>最后，为了方便你记忆，我把今天的内容总结成一张知识脑图，你可以通过它对今天的重点内容进行复习巩固。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b7/37/b79f722212c5a2582d9f5fbf15081337.jpg?wh=1142%2A888" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b7/37/b79f722212c5a2582d9f5fbf15081337.jpg?wh=1142%2A888" /></p>
 <h2 id="_5">思考题</h2>
 <p>最后，给你留一个思考题。</p>
 <p>你可以去了解一下，你所使用的序列化和反序列化插件（比如Fastjson、Gson和Jackson等），是否被曝出过反序列化漏洞？然后结合今天的内容思考一下，这些反序列化漏洞，可能会给你带来什么影响。</p>
@@ -6792,8 +6792,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

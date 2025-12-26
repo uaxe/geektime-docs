@@ -14228,15 +14228,15 @@
 </code></pre></div>
 <p>上述代码定义了一个 Map，包含了 2 个表单参数，然后使用 RestTemplate 的 postForObject 提交这个表单。</p>
 <p>测试后你会发现事与愿违，返回提示 400 错误，即请求出错：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e2/a6/e25c882b09431822921f757a387db2a6.png?wh=1722%2A280" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e2/a6/e25c882b09431822921f757a387db2a6.png?wh=1722%2A280" /></p>
 <p>具体而言，就是缺少 para1 表单参数。为什么会出现这个错误呢？我们提交的表单最后又成了什么？</p>
 <h3 id="_1">案例解析</h3>
 <p>在具体解析这个问题之前，我们先来直观地了解下，当我们使用上述的 RestTemplate 提交表单，最后的提交请求长什么样？这里我使用 Wireshark 抓包工具直接给你抓取出来：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/dc/4f/dcdc5353ae0c4315908f3d3a0994464f.png?wh=761%2A531" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dc/4f/dcdc5353ae0c4315908f3d3a0994464f.png?wh=761%2A531" /></p>
 <p>从上图可以看出，我们实际上是将定义的表单数据以 JSON 请求体（Body）的形式提交过去了，所以我们的接口处理自然取不到任何表单参数。</p>
 <p>那么为什么会以 JSON 请求体来提交数据呢？这里我们不妨扫一眼 RestTemplate 中执行上述代码时的关键几处代码调用。</p>
 <p>首先，我们看下上述代码的调用栈：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e1/54/e13f82051d9daeff50cc489d339f5254.png?wh=1081%2A226" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e1/54/e13f82051d9daeff50cc489d339f5254.png?wh=1081%2A226" /></p>
 <p>确实可以验证，我们最终使用的是 Jackson 工具来对表单进行了序列化。使用到 JSON 的关键之处在于其中的关键调用 RestTemplate.HttpEntityRequestCallback#doWithRequest：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>public void doWithRequest(ClientHttpRequest httpRequest) throws IOException {
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>super.doWithRequest(httpRequest);
@@ -14283,7 +14283,7 @@
 <a id="__codelineno-2-43" name="__codelineno-2-43" href="#__codelineno-2-43"></a>}
 </code></pre></div>
 <p>上述代码看起来比较复杂，实际上功能很简单：根据当前要提交的 Body 内容，遍历当前支持的所有编解码器，如果找到合适的编解码器，就使用它来完成 Body 的转化。这里我们不妨看下 JSON 的编解码器对是否合适的判断，参考 AbstractJackson2HttpMessageConverter#canWrite：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c3/b8/c3b85b4bd1606628fe630f9aa8a217b8.png?wh=935%2A429" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c3/b8/c3b85b4bd1606628fe630f9aa8a217b8.png?wh=935%2A429" /></p>
 <p>可以看出，当我们使用的 Body 是一个 HashMap 时，是可以完成 JSON 序列化的。所以在后续将这个表单序列化为请求 Body 也就不奇怪了。</p>
 <p>但是这里你可能会有一个疑问，为什么适应表单处理的编解码器不行呢？这里我们不妨继续看下对应的编解码器判断是否支持的实现，即 FormHttpMessageConverter#canWrite：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>public boolean canWrite(Class&lt;?&gt; clazz, @Nullable MediaType mediaType) {
@@ -14327,7 +14327,7 @@
 <a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>}
 </code></pre></div>
 <p>发送出的数据截图如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/53/40/53a9691b6ed93b4cf1768fdb2183d640.png?wh=728%2A520" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/53/40/53a9691b6ed93b4cf1768fdb2183d640.png?wh=728%2A520" /></p>
 <p>这样就满足我们的需求了。</p>
 <p>实际上，假设你仔细看文档的话，你可能也会规避这个问题，文档关键行如下：</p>
 <blockquote>
@@ -14366,7 +14366,7 @@
 <p>即服务器并不认为 #2 是 para1 的内容。如何理解这个现象呢？接下来我们可以具体解析下。</p>
 <h3 id="_3">案例解析</h3>
 <p>类似案例 1 解析的套路，在具体解析之前，我们可以先直观感受下问题出在什么地方。我们使用调试方式去查看解析后的 URL，截图如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/33/8c/336c87351e732cdd2e2d6e13c725628c.png?wh=817%2A406" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/33/8c/336c87351e732cdd2e2d6e13c725628c.png?wh=817%2A406" /></p>
 <p>可以看出，para1 丢掉的 #2 实际是以 Fragment 的方式被记录下来了。这里顺便科普下什么是 Fragment，这得追溯到 URL 的格式定义：</p>
 <blockquote>
 <p>protocol://hostname[:port]/path/[?query]#fragment</p>
@@ -14385,7 +14385,7 @@
 <a href="http://example.com/data.csv#col=2">http://example.com/data.csv#col=2</a> – Selects 2nd column.</p>
 </blockquote>
 <p>了解了这些补充知识后，我们其实就能知道问题出在哪了。不过本着严谨的态度，我们还是翻阅下源码。首先，我们先看下 URL 解析的调用栈，示例如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bf/0f/bffa69910360ebbeb23e1da5cc515f0f.png?wh=1194%2A272" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bf/0f/bffa69910360ebbeb23e1da5cc515f0f.png?wh=1194%2A272" /></p>
 <p>参考上述调用栈，解析 URL 的关键点在于 UriComponentsBuilder#fromUriString 实现：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>private static final Pattern URI_PATTERN = Pattern.compile(
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>&quot;^(&quot; + SCHEME_PATTERN + &quot;)?&quot; + &quot;(//(&quot; + USERINFO_PATTERN + &quot;@)?&quot; + HOST_PATTERN + &quot;(:&quot; + PORT_PATTERN +
@@ -14444,7 +14444,7 @@
 <p>helloworld:1#2</p>
 </blockquote>
 <p>与之前的案例代码进行比较，你会发现 URL 的组装方式发生了改变。但最终可以获取到我们预期的效果，调试视图参考如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/11/2e/1176447ec6a6a370590ee13b88c17d2e.png?wh=818%2A428" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/11/2e/1176447ec6a6a370590ee13b88c17d2e.png?wh=818%2A428" /></p>
 <p>可以看出，参数 para1 对应的值变成了我们期待的"1#2"。</p>
 <p>如果你想了解更多的话，还可以参考 UriComponentsBuilder#fromHttpUrl，并与之前使用的 UriComponentsBuilder#fromUriString 进行比较：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>private static final Pattern HTTP_URL_PATTERN = Pattern.compile(
@@ -14527,20 +14527,20 @@ UriComponentsBuilder#fromUriString</p>
 <a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>}
 </code></pre></div>
 <p>查询调用栈，结果如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c6/18/c69263f6aa82278f48e2cd9c2fb06b18.png?wh=1076%2A211" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c6/18/c69263f6aa82278f48e2cd9c2fb06b18.png?wh=1076%2A211" /></p>
 <p>而当我们把 URL 转化成 String，再通过下面的语句来发送请求时：</p>
 <blockquote>
 <p>//url 是一个 string
 restTemplate.getForEntity(url, String.class);</p>
 </blockquote>
 <p>我们会发现，它会再进行一次编码：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/22/7a/226c1f7dd944cba75e987535ea4b197a.png?wh=1086%2A328" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/22/7a/226c1f7dd944cba75e987535ea4b197a.png?wh=1086%2A328" /></p>
 <p>看到这里，你或许已经明白问题出在哪了，即我们按照案例的代码会执行 2 次编码（Encode），所以最终我们反而获取不到想要的结果了。</p>
 <p>另外，我们还可以分别查看下两次编码后的结果，示例如下：</p>
 <p>1 次编码后：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ae/5a/ae27fbb9aa532af7f7d875e1e198595a.png?wh=802%2A147" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ae/5a/ae27fbb9aa532af7f7d875e1e198595a.png?wh=802%2A147" /></p>
 <p>2 次编码后：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ab/01/ab7042159955050800077dc390db4901.png?wh=1001%2A99" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ab/01/ab7042159955050800077dc390db4901.png?wh=1001%2A99" /></p>
 <h3 id="_6">问题修正</h3>
 <p>如何修正? 直接上代码：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>RestTemplate restTemplate = new RestTemplate();
@@ -14707,8 +14707,6 @@ restTemplate.getForEntity(url, String.class);</p>
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -15513,7 +15513,7 @@
 <a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a><span class="p">}</span>
 </code></pre></div>
 <p>设置好 tracing 后，就在系统的主流程上添加相应的 instrument：
-<img alt="" src="https://static001.geekbang.org/resource/image/f1/a1/f1680244d5c7901ec26181c01bfea8a1.jpg?wh=2312x1379" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f1/a1/f1680244d5c7901ec26181c01bfea8a1.jpg?wh=2312x1379" /></p>
 <p>新添加的代码你可以看 repo 中的 diff_telemetry。注意 instrument 可以用不同的名称，比如，对于 TlsConnector::new() 函数，可以用 <code>#[instrument(name = "tls_connector_new")]</code>，这样它的名字辨识度高一些。</p>
 <p>为主流程中的函数添加完 instrument 后，你需要先打开一个窗口，运行 jaeger（需要 docker）：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span>-p6831:6831/udp<span class="w"> </span>-p6832:6832/udp<span class="w"> </span>-p16686:16686<span class="w"> </span>-p14268:14268<span class="w"> </span>jaegertracing/all-in-one:latest
@@ -15531,9 +15531,9 @@
 <p>并没有做任何事情，似乎只是换了个系统，性能就提升了很多，这给我们一个 tip：也许问题出在 OS X 和 Linux 系统相关的部分。</p>
 <p>不管怎样，已经发送了不少数据给 jaeger，我们到 jaeger 上看看问题出在哪里。</p>
 <p>打开 <a href="http://localhost:16686/">http://localhost:16686/</a>，service 选 kv-bench，Operation 选 app_start，点击 “Find Traces”，我们可以看到捕获的 trace。因为运行了两次 benchmark，所以有两个 app_start 的查询结果：
-<img alt="" src="https://static001.geekbang.org/resource/image/ec/77/ecd9b1d06debe7fb3fe507befd803877.png?wh=1920x1048" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ec/77/ecd9b1d06debe7fb3fe507befd803877.png?wh=1920x1048" /></p>
 <p>可以看到，每次 start_client_with_config 都要花 1.6-2.5ms，其中有差不多一小半时间花在了 TlsClientConnector::new() 上：
-<img alt="" src="https://static001.geekbang.org/resource/image/fe/b6/fe574ccac09ce5434027fce2afebaeb6.png?wh=1920x1210" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fe/b6/fe574ccac09ce5434027fce2afebaeb6.png?wh=1920x1210" /></p>
 <p>如果说 TlsClientConnector::connect() 花不少时间还情有可原，因为这是整个 TLS 协议的握手过程，涉及到网络调用、包的加解密等。<strong>但 TlsClientConnector::new() 就是加载一些证书、创建 TlsConnector 这个数据结构而已，为何这么慢</strong>？</p>
 <p>仔细阅读 TlsClientConnector::new() 的代码，你可以对照注释看：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="cp">#[instrument(name = </span><span class="s">&quot;tls_connector_new&quot;</span><span class="cp">, skip_all)]</span>
@@ -15608,11 +15608,11 @@
 </code></pre></div>
 <p>完成这个修改后，我们再运行 <code>RUST_LOG=info cargo bench</code>，现在的性能达到了 1.64ms，相比之前的 1.95ms，提升了 16%。</p>
 <p>打开 jaeger，看最新的 app_start 结果，发现 TlsClientConnector::new() 所花时间降到了 ~12us 左右。嗯，虽然没有抓到服务器本身的 bug，但客户端的 bug 倒是解决了一个。
-<img alt="" src="https://static001.geekbang.org/resource/image/3c/0b/3cfde740dbe0d4a897e2d4c3684b530b.png?wh=1920x1164" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3c/0b/3cfde740dbe0d4a897e2d4c3684b530b.png?wh=1920x1164" /></p>
 <p>至于服务器，如果我们看 Service::execute 的主流程，执行速度在 40-60us，问题不大：
-<img alt="" src="https://static001.geekbang.org/resource/image/7b/31/7be6139668c82fb8b79fb66f3ed06d31.png?wh=1920x1215" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7b/31/7be6139668c82fb8b79fb66f3ed06d31.png?wh=1920x1215" /></p>
 <p>再看服务器的主流程 server_process：
-<img alt="" src="https://static001.geekbang.org/resource/image/07/63/076402ac25b507295d022b980378e363.png?wh=1920x1040" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/07/63/076402ac25b507295d022b980378e363.png?wh=1920x1040" /></p>
 <p>这是我们在 start_tls_server() 里额外添加的 tracing span：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="k">loop</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="kd">let</span><span class="w"> </span><span class="n">root</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">span</span><span class="o">!</span><span class="p">(</span><span class="n">tracing</span><span class="p">::</span><span class="n">Level</span><span class="p">::</span><span class="n">INFO</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;server_process&quot;</span><span class="p">);</span>
@@ -15621,7 +15621,7 @@
 <a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="p">}</span>
 </code></pre></div>
 <p>把右上角的 trace timeline 改成 trace graph，然后点右侧的 time：
-<img alt="" src="https://static001.geekbang.org/resource/image/14/41/1499657924a241e43c9d1be467793041.png?wh=1920x1207" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/14/41/1499657924a241e43c9d1be467793041.png?wh=1920x1207" /></p>
 <p>可以看到，主要的服务器时间都花在了 TLS accept 上，所以，<strong>目前服务器没有太多值得优化的地方</strong>。</p>
 <p>由于 tracing 本身也占用不少 CPU，所以我们直接 <code>cargo bench</code> 看看目前的结果：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>preparing<span class="w"> </span>server<span class="w"> </span>and<span class="w"> </span>subscribers....................................................................................................Done!
@@ -15663,7 +15663,7 @@
 <a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>No change in performance detected.
 </code></pre></div>
 <p>criterion 还会生成漂亮的 report，你可以用浏览器打开 ./target/criterion/publishing/report/index.html 查看（名字是publishing ，因为 benchmark ID 是 publishing）：
-<img alt="" src="https://static001.geekbang.org/resource/image/d3/85/d3cebd8e3c164171febbe34e43916885.png?wh=1860x2308" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d3/85/d3cebd8e3c164171febbe34e43916885.png?wh=1860x2308" /></p>
 <p>好，处理完性能相关的问题，我们来<strong>为 server 添加日志和性能监测的支持</strong>：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">env</span><span class="p">;</span>
 <a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>
@@ -15878,7 +15878,7 @@ tracing 和 opentelemetry 还支持 <a href="https://github.com/prometheus/prome
 <a id="__codelineno-28-66" name="__codelineno-28-66" href="#__codelineno-28-66"></a><span class="nt">destination_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ env.RELEASE_VERSION }}</span>
 </code></pre></div>
 <p>这样，每次 push tag 时，都可以打包出来 Linux 的 kvs 版本：
-<img alt="" src="https://static001.geekbang.org/resource/image/1c/19/1c61b7f58dd176bd25a565577d75af19.png?wh=2000x853" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1c/19/1c61b7f58dd176bd25a565577d75af19.png?wh=2000x853" /></p>
 <p>如果你不希望直接使用编译出来的二进制，也可以打包成 docker，在 Kubernetes 下使用。</p>
 <p><strong>在做 CI 的过程中，我们也可以触发 CD</strong>，比如：</p>
 <ul>
@@ -15889,7 +15889,7 @@ tracing 和 opentelemetry 还支持 <a href="https://github.com/prometheus/prome
 </ul>
 <p>一般来说，每家企业都有自己的 CI/CD 的工具链，这里为了展示方便，我们演示了如何使用 github action 对 Rust 代码做 CI，你可以按照自己的需要来处理。</p>
 <p>在刚才的 action 代码中，还编译并上传了文档，所以我们可以通过 github pages 很方便地访问文档：
-<img alt="" src="https://static001.geekbang.org/resource/image/88/a7/885d092273f8cacda1a65867a2489ea7.png?wh=2000x1563" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/88/a7/885d092273f8cacda1a65867a2489ea7.png?wh=2000x1563" /></p>
 <h2 id="_5">小结</h2>
 <p>我们的 KV server 之旅就到此为止了。在整整 7 堂课里，我们一点点从零构造了一个完整的 KV server，包括注释在内，撰写了近三千行代码：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>❯<span class="w"> </span>tokei<span class="w"> </span>.
@@ -15907,7 +15907,7 @@ tracing 和 opentelemetry 还支持 <a href="https://github.com/prometheus/prome
 </code></pre></div>
 <p>这是一个非常了不起的成就！我们应该为自己感到自豪！</p>
 <p>在这个系列里，我们大量使用 trait 和泛型，构建了很多复杂的数据结构；还为自己的类型实现了 AsyncRead / AsyncWrite / Stream / Sink 这些比较高阶的 trait。通过良好的设计，我们把网络层和业务层划分地非常清晰，网络层的变化不会影响到业务层，反之亦然：
-<img alt="" src="https://static001.geekbang.org/resource/image/53/f3/53f5e5cf68b4300c3231885b10c784f3.jpeg?wh=2312x1379" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/53/f3/53f5e5cf68b4300c3231885b10c784f3.jpeg?wh=2312x1379" /></p>
 <p>我们还模拟了比较真实的开发场景，通过大的需求变更，引发了一次不小的代码重构。</p>
 <p>最终，通过性能测试，发现了一个客户端实现的小 bug。在处理这个 bug 的时候，我们欣喜地看到，Rust 有着非常强大的测试工具链，除了我们使用的单元测试、集成测试、性能测试，Rust 还支持模糊测试（fuzzy testing）和基于特性的测试（property testing）。</p>
 <p>对于测试过程中发现的问题，Rust 有着非常完善的 tracing 工具链，可以和整个 opentelemetry 生态系统（包括 jaeger、prometheus 等工具）打通。我们就是通过使用 jaeger 找到并解决了问题。除此之外，Rust tracing 工具链还支持生成 <a href="https://github.com/tokio-rs/tracing/tree/master/tracing-flame">flamegraph</a>，篇幅关系，没有演示，你感兴趣的话可以试试。</p>
@@ -16039,8 +16039,6 @@ tracing 和 opentelemetry 还支持 <a href="https://github.com/prometheus/prome
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

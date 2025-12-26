@@ -7231,7 +7231,7 @@
 </code></pre></div>
 <h2 id="_2">数据倾斜</h2>
 <p>接下来，我们再说说，当参与Join的两张表存在数据倾斜问题的时候，我们该如何应对“大表Join大表”的计算场景。对于“大表Join大表”的数据倾斜问题，根据倾斜位置的不同，我们可以分为3种情况来讨论。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/be/73/beb46de87f456924fc1414b93f8c0a73.jpeg?wh=1256%2A588" title="大表Join大表数据倾斜的3种情况" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/be/73/beb46de87f456924fc1414b93f8c0a73.jpeg?wh=1256%2A588" title="大表Join大表数据倾斜的3种情况" /></p>
 <p>其实，不管哪种表倾斜，它们的调优技巧都是类似的。因此，我们就以第一种情况为例，也就是外表倾斜、内表分布均匀的情况，去探讨数据倾斜的应对方法。</p>
 <h3 id="task">以Task为粒度解决数据倾斜</h3>
 <p>学过AQE之后，要应对数据倾斜，想必你很快就会想到AQE的特性：自动倾斜处理。给定如下配置项参数，Spark SQL在运行时可以将策略OptimizeSkewedJoin插入到物理计划中，自动完成Join过程中对于数据倾斜的处理。</p>
@@ -7240,31 +7240,31 @@
 <li>spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes，判定倾斜的最低阈值。</li>
 <li>spark.sql.adaptive.advisoryPartitionSizeInBytes，以字节为单位定义拆分粒度。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/33/a9/33a112480b1c1bf8b21d26412a7857a9.jpg?wh=4359%2A1224" title="AQE中的自动倾斜处理" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/33/a9/33a112480b1c1bf8b21d26412a7857a9.jpg?wh=4359%2A1224" title="AQE中的自动倾斜处理" /></p>
 <p>Join过程中的自动倾斜处理如上图所示，当AQE检测到外表存在倾斜分区之后，它会以spark.sql.adaptive.advisoryPartitionSizeInBytes配置的数值为拆分粒度，把倾斜分区拆分为多个数据分区。与此同时，AQE还需要对内表中对应的数据分区进行复制，来保护两表之间的关联关系。</p>
 <p>有了AQE的自动倾斜处理特性，在应对数据倾斜问题的时候，我们确实能够大幅节省开发成本。不过，天下没有免费的午餐，AQE的倾斜处理是以Task为粒度的，这意味着原本Executors之间的负载倾斜并没有得到根本改善。这到底是什么意思呢？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f4/72/f4fe3149112466174bdefcc0ee573d72.jpg?wh=2889%2A1614" title="以Task为粒度的负载均衡" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f4/72/f4fe3149112466174bdefcc0ee573d72.jpg?wh=2889%2A1614" title="以Task为粒度的负载均衡" /></p>
 <p>我们来举个例子，假设某张表在Shuffle过后有两个倾斜分区如上图，它们又刚好都被Shuffle到了同一个执行器：Executor 0。在AQE的自动倾斜处理机制下，两个倾斜分区分别被拆分变成了4个尺寸适中的数据分区。如此一来，Executor 0中所有Task的计算负载都得到了平衡。但是，相比Executor 1，Executor 0整体的计算负载还是那么多，并没有因为AQE的自动处理而得到任何缓解。</p>
 <h3 id="executor">以Executor为粒度解决数据倾斜</h3>
 <p>你也许会说：“哪会那么凑巧，倾斜的分区刚好全都落在同一个Executor上？”确实，刚才的例子主要是为了帮你解释清楚倾斜粒度这个概念，如果实际应用中倾斜分区在集群中的分布比较平均的话，AQE的自动倾斜处理机制确实就是开发者的“灵丹妙药”。</p>
 <p>然而，凡事总有个万一，我们在探讨调优方案的时候，还是要考虑周全：如果你的场景就和咱们的例子一样，倾斜分区刚好落在集群中少数的Executors上，你该怎么办呢？答案是：“分而治之”和“两阶段Shuffle”。</p>
 <p>这里的分而治之与上一讲的分而治之在思想上是一致的，都是以任务分解的方式来解决复杂问题。区别在于我们今天要讲的，是以Join Key是否倾斜为依据来拆解子任务。具体来说，对于外表中所有的Join Keys，我们先按照是否存在倾斜把它们分为两组。一组是存在倾斜问题的Join Keys，另一组是分布均匀的Join Keys。因为给定两组不同的Join Keys，相应地我们把内表的数据也分为两份。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c2/e2/c22de99104b0a9cb0d5cfdffebd42ee2.jpg?wh=4899%2A1449" title="分而治之：按照Join Keys是否倾斜对数据进行分组" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c2/e2/c22de99104b0a9cb0d5cfdffebd42ee2.jpg?wh=4899%2A1449" title="分而治之：按照Join Keys是否倾斜对数据进行分组" /></p>
 <p>那么，分而治之的含义就是，对于内外表中两组不同的数据，我们分别采用不同的方法做关联计算，然后通过Union操作，再把两个关联计算的结果集做合并，最终得到“大表Join大表”的计算结果，整个过程如上图所示。</p>
 <p>对于Join Keys分布均匀的数据部分，我们可以沿用把Shuffle Sort Merge Join转化为Shuffle Hash Join的方法。对于Join Keys存在倾斜问题的数据部分，我们就需要借助“两阶段Shuffle”的调优技巧，来平衡Executors之间的工作负载。那么，什么是“两阶段Shuffle”呢？</p>
 <h4 id="shuffle">如何理解“两阶段Shuffle”？</h4>
 <p>用一句话来概括，“两阶段Shuffle”指的是，通过“加盐、Shuffle、关联、聚合”与“去盐化、Shuffle、聚合”这两个阶段的计算过程，在不破坏原有关联关系的前提下，在集群范围内以Executors为粒度平衡计算负载 。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/34/21/348ddabcd5f9980de114ae9d5b96d321.jpg?wh=5394%2A1689" title="两阶段Shuffle" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/34/21/348ddabcd5f9980de114ae9d5b96d321.jpg?wh=5394%2A1689" title="两阶段Shuffle" /></p>
 <p>我们先来说说第一阶段，也就是“加盐、Shuffle、关联、聚合”的计算过程。显然，这个阶段的计算分为4个步骤，其中最为关键的就是第一步的加盐。加盐来源于单词Salting，听上去挺玄乎，实际上就是给倾斜的Join Keys添加后缀。加盐的核心作用就是把原本集中倾斜的Join Keys打散，在进行Shuffle操作的时候，让原本应该分发到某一个Executor的倾斜数据，均摊到集群中的多个Executors上，从而以这种方式来消除倾斜、平衡Executors之间的计算负载。</p>
 <p>对于加盐操作，我们首先需要确定加盐的粒度，来控制数据打散的程度，粒度越高，加盐后的数据越分散。由于加盐的初衷是以Executors为粒度平衡计算负载，因此通常来说，取Executors总数#N作为加盐粒度往往是一种不错的选择。其次，为了保持内外表的关联关系不被破坏，外表和内表需要同时做加盐处理，但处理方法稍有不同。</p>
 <p>外表的处理称作“随机加盐”，具体的操作方法是，对于任意一个倾斜的Join Key，我们都给它加上1到#N之间的一个随机后缀。以Join Key = ‘黄小乙’来举例，假设N = 5，那么外表加盐之后，原先Join Key = ‘黄小乙’的所有数据记录，就都被打散成了Join Key为（‘黄小乙_1’，‘黄小乙_2’，‘黄小乙_3’，‘黄小乙_4’，‘黄小乙_5’）的数据记录。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cd/4f/cd1858531a08371047481120b0c3544f.jpg?wh=2724%2A579" title="外表加盐" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cd/4f/cd1858531a08371047481120b0c3544f.jpg?wh=2724%2A579" title="外表加盐" /></p>
 <p>内表的处理称为“复制加盐”，具体的操作方法是，对于任意一个倾斜的Join Key，我们都把原数据复制（#N – 1）份，从而得到#N份数据副本。对于每一份副本，我们为其Join Key追加1到#N之间的固定后缀，让它与打散后的外表数据保持一致。对于刚刚Join Key = ‘黄小乙’的例子来说，在内表中，我们需要把‘黄小乙’的数据复制4份，然后依次为每份数据的Join Key追加1到5的固定后缀，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8d/22/8d843fb98d834df38080a68064522322.jpg?wh=2724%2A579%3Fwh%3D2724%2A579" title="内表加盐" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8d/22/8d843fb98d834df38080a68064522322.jpg?wh=2724%2A579%3Fwh%3D2724%2A579" title="内表加盐" /></p>
 <p>内外表分别加盐之后，数据倾斜问题就被消除了。这个时候，我们就可以使用常规优化方法，比如，将Shuffle Sort Merge Join转化为Shuffle Hash Join，去继续执行Shuffle、关联和聚合操作。到此为止，“两阶段Shuffle” 的第一阶段执行完毕，我们得到了初步的聚合结果，这些结果是以打散的Join Keys为粒度进行计算得到的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8d/22/8d843fb98d834df38080a68064522322.jpg?wh=2724%2A579%3Fwh%3D2724%2A579" title="一阶段Shuffle、关联、聚合" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8d/22/8d843fb98d834df38080a68064522322.jpg?wh=2724%2A579%3Fwh%3D2724%2A579" title="一阶段Shuffle、关联、聚合" /></p>
 <p>我们刚刚说，第一阶段加盐的目的在于将数据打散、平衡计算负载。现在我们已经得到了数据打散之后初步的聚合结果，离最终的计算结果仅有一步之遥。不过，为了还原最初的计算逻辑，我们还需要把之前加上的“盐粒”再去掉。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/36/53/36d1829e2b550a3079707eee9712d253.jpg?wh=2319%2A1359" title="二阶段Shuffle、聚合" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/36/53/36d1829e2b550a3079707eee9712d253.jpg?wh=2319%2A1359" title="二阶段Shuffle、聚合" /></p>
 <p>第二阶段的计算包含“去盐化、Shuffle、聚合”这3个步骤。首先，我们把每一个Join Key的后缀去掉，这一步叫做“去盐化”。然后，我们按照原来的Join Key再做一遍Shuffle和聚合计算，这一步计算得到的结果，就是“分而治之”当中倾斜部分的计算结果。</p>
 <p>经过“两阶段Shuffle”的计算优化，我们终于得到了倾斜部分的关联结果。将这部分结果与“分而治之”当中均匀部分的计算结果合并，我们就能完成存在倾斜问题的“大表Join大表”的计算场景。</p>
 <h4 id="executors">以Executors为粒度的调优实战</h4>
@@ -7511,8 +7511,6 @@ var saltedskewOrders = skewOrders.withColumn(“joinKey”, concat($“orderId�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

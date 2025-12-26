@@ -6265,7 +6265,7 @@
 <p>如果服务是首次请求，或者是容器实例在服务请求后被回收了，就会触发冷启动。那么，冷启动具体是怎么工作的呢？</p>
 <h3 id="_2">冷启动都有哪些步骤？</h3>
 <p>业界中，云厂商或者开源项目因为优化手段的不同，导致冷启动耗时或多或少会有些不一样，但基本的原理是差不多的。我们看一下冷启动都有哪些步骤。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/35/3e/357a9bef6612d7c2a57ff4ecbfbec13e.jpeg?wh=1920x695" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/35/3e/357a9bef6612d7c2a57ff4ecbfbec13e.jpeg?wh=1920x695" /></p>
 <p><strong>第一步，容器创建</strong>。这一步通常会体现在扩缩容过程，当所有容器实例都在处理请求时，就需要向集群申请创建新的容器。</p>
 <p>这里需要提一下，函数计算平台通常会支持多种语言的运行时，这些运行时一般来说会打包一个镜像，以DeamonSet的方式运行在Kubernetes集群中。我们在冷启动的时候，会根据不同的参数请求，动态挂载所需的运行时到对应的运行路径下。这个运行的过程，我没有体现在图上，而是把它算作资源调度层面了。</p>
 <p><strong>第二步，代码、层依赖下载</strong>。这一步应该是整个冷启动耗时比较长的过程。函数计算本身并不具备持久化的能力，代码包和层依赖通常都是从其他存储服务端拉取。因此，这一步的耗时会受到<strong>用户上传代码包大小、网速</strong>等因素的影响。当然，代码包通常是压缩包的形式，下载到本地后，还需要解压。</p>
@@ -6287,7 +6287,7 @@
 <p>从上述的分析，我们基本可以看出，优化冷启动的手段不是一方的事情，需要平台和用户双方努力去完成，遵循的逻辑就是“哪里慢就让哪里快”。下面，我们一起让“慢”的地方“快”起来。</p>
 <h2 id="_4">平台侧的优化手段</h2>
 <p>细心的你应该能看到，在这张图里，我将不同的阶段用平台侧和用户侧两个阶段进行了标识。那么首先，我们按照函数实例加载运行的时间顺序来看看平台侧的优化。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/35/3e/357a9bef6612d7c2a57ff4ecbfbec13e.jpeg?wh=1920x695" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/35/3e/357a9bef6612d7c2a57ff4ecbfbec13e.jpeg?wh=1920x695" /></p>
 <h3 id="_5">资源调度和容器创建</h3>
 <p>我们知道，容器启动时一般会先检查本地有无相关镜像，如果没有的话，需要从远端仓库拉取，而函数所处的容器环境通常都是一个Alpine或者Ubuntu之类的基础镜像，应用层的资源对象则会基于基础镜像之上进行打包，如果出现远端拉取的情况，还是比较耗时的。</p>
 <p>传统容器运行需要将全量的镜像数据下载后再解压，一方面导致容器启动耗时较长，另一方面也可能因为集群规模过大，下载解压环节造成了较大的网络、磁盘读写压力，进而导致大规模容器启动不符合部署预期。但实际上在启动容器时，可能又仅使用容器镜像内的部分数据。</p>
@@ -6321,19 +6321,19 @@
 <li>弹性网卡占用用户VPC的IP资源，如果没有空闲的资源，会导致创建失败；</li>
 <li>造成弹性网卡较大的浪费。</li>
 </ol>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ae/c6/aece336385654e152ca8078fb66e28c6.jpeg?wh=1920x732" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ae/c6/aece336385654e152ca8078fb66e28c6.jpeg?wh=1920x732" /></p>
 <p>那么我们可以怎么改进呢？目前，我比较推荐<strong>在集群VPC内部创建代理</strong>的方式。这个方式的核心在于IP隧道技术的使用，使得平台可以在保持函数原始目标IP地址的情况下，将流量通过Proxy代理节点的方式触达用户端VPC。</p>
 <p>当然，函数平台会为关联了VPC的函数创建轻量的虚机，将弹性网卡绑定在代理虚机上，所有关联该VPC网络的流量最终都会通过代理进行发送。</p>
 <p>为了确保服务的稳定，Proxy代理机通常采用主备的方式进行，正常情况下，Node的出口都是通过Master Proxy来代理请求。但Mater Proxy挂掉之后，平台会切换到Slave Proxy来转发。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/5d/89/5d35678ff0eccb382fae75aa281bca89.jpeg?wh=1920x928" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5d/89/5d35678ff0eccb382fae75aa281bca89.jpeg?wh=1920x928" /></p>
 <p>这种方法，可以通过监听用户在Console关联VPC的操作时，提前进行创建。这样，在函数第一次请求处理的时候，由于只需要转发操作，就可以直接带来一个数量级的性能提升。</p>
 <p>需要注意的是，这种方式虽好，但也有一定的瑕疵，我们需要额外消耗Proxy的Node资源。现在，你可以先想想它的具体实现方式是怎么样的，之后我也会在小试牛刀中跟你仔细来演练和讲解。</p>
 <h3 id="_7">用户实例提前预加载</h3>
 <p>涉及到预加载的过程，一般都跟算法和策略有关系了。我在这里基于一线的经验给你提供一些思路，当然，在应用前，你还是需要根据自己平台的实际调用量和场景进行训练调优，才可以达到不错的效果。下面，我们可以看看一些常用的预加载用户代码实例方法。</p>
 <p>第一种，基于函数互相调用的场景进行提前预测。这里，你可以参考腾讯函数计算公开的函数链式调用预热的方法。如下图所示，函数A调用B和C，我们可以根据它们之间的调用拓扑关系，提前进行预启动函数B和C。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a4/2a/a4ae61020ecb83bde947efbb42ee362a.png?wh=554x222" title="资料来源于网络" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a4/2a/a4ae61020ecb83bde947efbb42ee362a.png?wh=554x222" title="资料来源于网络" /></p>
 <p>第二种，基于函数的版本进行预测，如果流量版本1的流量比例是不足100%的，那么我们可以推测另一个占据流量的版本X，也应该加载起来。这种方式，在腾讯函数计算中也公布过。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/89/75/89a92737d174a259beca9999fde40375.png?wh=554x185" title="资料来源于网络" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/89/75/89a92737d174a259beca9999fde40375.png?wh=554x185" title="资料来源于网络" /></p>
 <p>第三种，我们还可以根据提前加载镜像的方式，部署到Node中，尤其是对于一些大镜像，如10G的镜像，提前分发，然后通过单机侧的Agent上报标记。流量到来时，直接分发到预加载过的Node的容器上，以快速应对函数的执行处理。</p>
 <p>类似的方法还有不少，你还可以在机器学习和预测预取的思路上进一步思考，也欢迎你随时和我讨论。</p>
 <p>到这里，我们平台侧的优化手段就讨论得差不多了。Serverless的技术在不停地进步，如果你是一个平台的开发人员，可以看看还有没有哪些方法可以更好地优化你的函数计算平台。当然，我们优化的时候，也不要忘了ROI。经营成本也是我们每个平台开发者需要关注的重点。</p>
@@ -6354,8 +6354,8 @@
 <h3 id="_10">选择性能较高的运行时</h3>
 <p>在冷启动的耗时流程分析中，我们知道编程语言的类型会影响程序的启动速度。通常来说，Python、Node.js这类解释型语言的速度都会比较快，Golang这种编译形成的可执行二进制文件，加载速度也是非常快的。但像Java这一类需要在JVM中运行的程序，速度相对来说比较慢。</p>
 <p>这里，我以阿里云函数计算平台为例，通过一个Hello World的程序来跟你直观地看一下语言运行时选取带来的差别。我选取了Golang和Java来做一个对比，通过Trace链路跟踪，结果如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9e/f0/9e43625841347c9e0bd4ef6d6e71fdf0.png?wh=1920x524" /></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/55/5d/559a51bab1e15b1b7593d0348304ff5d.png?wh=1920x536" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9e/f0/9e43625841347c9e0bd4ef6d6e71fdf0.png?wh=1920x524" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/55/5d/559a51bab1e15b1b7593d0348304ff5d.png?wh=1920x536" /></p>
 <p>你可以很明显地看到，Java的冷启动耗时282.342ms，Golang耗时67.771ms，Java的冷启动耗时是Golang的4.166倍。另外，我们从调用链路还可以发现，在运行Invocation过程中，Golang的优势也是比较明显的。</p>
 <h3 id="_11">成本可控范围内合理使用预留实例</h3>
 <p>目前主流的公有云函数计算平台（阿里云FC、腾讯云SCF、百度智能云CFC等）都提供了预留实例功能。</p>
@@ -6513,8 +6513,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

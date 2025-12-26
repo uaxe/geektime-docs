@@ -14181,10 +14181,10 @@
 <p>我们预计Fuxi需要管理的短URL规模在百亿级别，并发吞吐量达到数万级别。这个量级的数据对应的存储方案是什么样的？用传统的关系数据库存储，还是有其他更简单的办法？此外，如何提升系统的并发处理能力呢？这些是我们今天要重点考虑的问题。</p>
 <h2 id="_1">需求分析</h2>
 <p>短URL生成器，也称作短链接生成器，就是将一个比较长的URL生成一个比较短的URL，当浏览器通过短URL生成器访问这个短URL的时候，重定向访问到原始的长URL目标服务器，访问时序图如下。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1e/1a/1e72b4e05d0884718b5a7ee2058a061a.jpg?wh=1920x873" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1e/1a/1e72b4e05d0884718b5a7ee2058a061a.jpg?wh=1920x873" /></p>
 <p>对于需要展示短URL的应用程序，由该应用调用短URL生成器生成短URL，并将该短URL展示给用户，用户在浏览器中点击该短URL的时候，请求发送到短URL生成器（短URL生成器以HTTP服务器的方式对外提供服务，短URL域名指向短URL生成器），短URL生成器返回HTTP重定向响应，将用户请求重定向到最初的原始长URL，浏览器访问长URL服务器，完成请求服务。</p>
 <p><strong>短URL生成器的用例图</strong></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/79/5f/79b4e289b47b98e796a5b86d6d378b5f.jpg?wh=1920x873" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/79/5f/79b4e289b47b98e796a5b86d6d378b5f.jpg?wh=1920x873" /></p>
 <ol>
 <li>用户client程序可以使用短URL生成器Fuxi为每个长URL生成唯一的短URL，并存储起来。</li>
 <li>用户可以访问这个短URL，Fuxi将请求重定向到原始长URL。</li>
@@ -14228,7 +14228,7 @@
 <p>短URL生成器的设计核心就是短URL的生成，即长URL通过某种函数，计算得到一个6个字符的短URL。短URL有几种不同的生成算法。</p>
 <h4 id="url">单项散列函数生成短URL</h4>
 <p>通常的设计方案是，将长URL利用MD5或者SHA256等单项散列算法，进行Hash计算，得到128bit或者256bit的Hash值。然后对该Hash值进行Base64编码，得到22个或者43个Base64字符，再截取前面的6个字符，就得到短URL了，如图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a0/10/a04dd6f9f1d916e66aa555c608a4dc10.jpg?wh=1920x288" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a0/10/a04dd6f9f1d916e66aa555c608a4dc10.jpg?wh=1920x288" /></p>
 <p>但是这样得到的短URL，可能会发生Hash冲突，即不同的长URL，计算得到的短URL是相同的（MD5或者SHA256计算得到的Hash值几乎不会冲突，但是Base64编码后再截断的6个字符有可能会冲突）。所以在生成的时候，需要先校验该短URL是否已经映射为其他的长URL，如果是，那么需要重新计算（换单向散列算法，或者换Base64编码截断位置）。重新计算得到的短URL依然可能冲突，需要再重新计算。</p>
 <p>但是这样的冲突处理需要多次到存储中查找URL，无法保证Fuxi的性能要求。</p>
 <h4 id="url_1">自增长短URL</h4>
@@ -14239,14 +14239,14 @@
 <p>预生成短URL的算法可以采用随机数来实现，6个字符，每个字符都用随机数产生（用0~63的随机数产生一个Base64编码字符）。为了避免随机数产生的短URL冲突，需要在预生成的时候检查该URL是否已经存在（用布隆过滤器检查）。因为预生成短URL是离线的，所以这时不会有性能方面的问题。事实上，Fuxi在上线之前就已经生成全部需要的144亿条短URL并存储在文件系统中（预估需要短URL120亿，Fuxi预生成的时候进行了20%的冗余，即144亿。）</p>
 <h4 id="fuxi"><strong>Fuxi的整体部署模型</strong></h4>
 <p>Fuxi的业务逻辑比较简单，相对比较有挑战的就是<strong>高并发的读请求如何处理、预生成的短URL如何存储以及访问</strong>。高并发访问主要通过负载均衡与分布式缓存解决，而海量数据存储则通过HDFS以及HBase来完成。具体架构图如下。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7b/a8/7b4a85e1f5864d284541957a6bff3fa8.jpg?wh=1920x1112" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7b/a8/7b4a85e1f5864d284541957a6bff3fa8.jpg?wh=1920x1112" /></p>
 <p>系统调用可以分成两种情况，一种是用户请求生成短URL的过程；另一种是用户访问短URL，通过Fuxi跳转到长URL的过程。</p>
 <p>对于用户请求生成短URL的过程，在短URL系统Fuxi上线前，已经通过随机数算法预生成144亿条短URL并将其存储在HDFS文件系统中。系统上线运行后，应用程序请求生成短URL的时候（即输入长URL，请求返回短URL），请求通过负载均衡服务器被发送到短URL服务器集群，短URL服务器再通过负载均衡服务器调用短URL预加载服务器集群。</p>
 <p>短URL预加载服务器此前已经从短URL预生成文件服务器（HDFS）中加载了一批短URL存放在自己的内存中，这时，只需要从内存中返回一个短URL即可，同时将短URL与长URL的映射关系存储在HBase数据库中，时序图如下。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d6/e3/d66dd516a71dba3a43225b0063127fe3.jpg?wh=1920x720" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d6/e3/d66dd516a71dba3a43225b0063127fe3.jpg?wh=1920x720" /></p>
 <p>对于用户通过客户端请求访问短URL的过程（即输入短URL，请求返回长URL），请求通过负载均衡服务器发送到短URL服务器集群，短URL服务器首先到缓存服务器中查找是否有该短URL，如果有，立即返回对应的长URL，短URL生成服务器构造重定向响应返回给客户端应用。</p>
 <p>如果缓存没有用户请求访问的短URL，短URL服务器将访问HBase短URL数据库服务器集群。如果数据库中存在该短URL，短URL服务器会将该短URL写入缓存服务器集群，并构造重定向响应返回给客户端应用。如果HBase中没有该短URL，短URL服务器将构造404响应返回给客户端应用，时序图如下。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/bd/12/bdb18fb9931eb8c52379e8eea9690d12.jpg?wh=1920x968" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bd/12/bdb18fb9931eb8c52379e8eea9690d12.jpg?wh=1920x968" /></p>
 <p>过期短URL清理服务器会每个月启动一次，将已经超过有效期（2年）的URL数据删除，并将这些短URL追加写入到短URL预生成文件中。</p>
 <p>为了保证系统<strong>高可用</strong>，Fuxi的应用服务器、文件服务器、数据库服务器都采用集群部署方案，单个服务器故障不会影响Fuxi短URL的可用性。</p>
 <p>对于Fuxi的<strong>高性能</strong>要求，80%以上的访问请求将被设计为通过缓存返回。Redis的缓存响应时间1ms左右，服务器端请求响应时间小于3ms，满足80%请求小于5ms的性能目标。对于缓存没有命中的数据，通过HBase获取，HBase平均响应时间10ms，也可以满足设计目标中的性能指标。</p>
@@ -14269,7 +14269,7 @@
 <p>加载到预加载短URL服务器的1万个短URL会以链表的方式存储，每使用一个短URL，链表头指针就向后移动一位，并设置前一个链表元素的next对象为null。这样用过的短URL对象可以被垃圾回收。</p>
 <p>当剩余链表长度不足2000的时候，触发一个异步线程，从文件中加载1万个新的短URL，并链接到链表的尾部。</p>
 <p>与之对应的URL链表类图如下。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ae/dc/ae5375d4f8abd5d907666c9080875ddc.jpg?wh=1920x541" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ae/dc/ae5375d4f8abd5d907666c9080875ddc.jpg?wh=1920x541" /></p>
 <p><strong>URLNode</strong>：URL链表元素类，成员变量uRL即短URL字符串，next指向下一个链表元素。</p>
 <p><strong>LinkedURL</strong>：URL链表主类，成员变量head指向链表头指针元素，uRLAmount表示当前链表剩余元素个数。acquireURL()方法从链表头指针指向的元素中取出短URL字符串，并执行urlAmount-- 操作。当urlAmount &lt; 2000的时候，调用私有方法loadURL()，该方法调用一个线程从文件中加载1万个短URL并构造成链表添加到当前链表的尾部，并重置uRLAmount。</p>
 <h4 id="url_4">用户自定义短URL</h4>
@@ -14277,11 +14277,11 @@
 <p>但是用户自定义短URL依然可能和其他用户自定义短URL冲突，所以Fuxi生成自定义短URL的时候需要到数据库中检查冲突，是否指定的URL已经被使用，如果发生冲突，要求用户重新指定。</p>
 <h4 id="url-base64">URL Base64编码</h4>
 <p>标准Base64编码表如下。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/01/59/017c0d655cd16b3c2f1a05fd65948459.jpg?wh=1920x1227" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/01/59/017c0d655cd16b3c2f1a05fd65948459.jpg?wh=1920x1227" /></p>
 <p>其中“+”和“/”在URL中会被编码为“%2B”以及“%2F”，而“%”在写入数据库的时候又和SQL编码规则冲突，需要进行再编码，因此直接使用标准Base64编码进行短URL编码并不合适。URL保留字符编码表如下。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/76/3a/7677e6defe8b938ef78cec2394ef793a.png?wh=1814x164" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/76/3a/7677e6defe8b938ef78cec2394ef793a.png?wh=1814x164" /></p>
 <p>所以，我们需要针对URL场景对Base64编码进行改造，使用URL保留字符表以外的字符对Base64编码表中的62，63进行编码：将“+”改为“-”，将“/”改为“_”，Fuxi最终采用的URL Base64编码表如下。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/91/1c/916925eb570d1bc38297954a141aa91c.jpg?wh=1920x1227" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/91/1c/916925eb570d1bc38297954a141aa91c.jpg?wh=1920x1227" /></p>
 <h2 id="_7">小结</h2>
 <p>我们开头提到，Fuxi是一个高并发（2万QPS）、海量存储（144亿条数据）、还需要10ms的高性能平均响应时间的系统。但是我们后面看到，Fuxi的架构并不复杂。</p>
 <p>这一方面是源于Fuxi的业务逻辑非常简单，只需要完成短URL与长URL的映射关系生成与获取就可以了。另一方面则是源于开源技术体系的成熟，比如一个HDFS集群可支持百万TB规模的数据存储，而我们需要的存储空间只有区区不到100GB，都有点大材小用了。事实上，Fuxi选择HDFS更多的考量是利用HDFS的高可用，HDFS的自动备份策略为我们提供了<strong>高可用的数据存储解决方案</strong>。</p>
@@ -14450,8 +14450,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

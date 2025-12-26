@@ -6644,7 +6644,7 @@
 <p>除此之外，DMAC其实也是一个特殊的I/O设备，它和CPU以及其他I/O设备一样，通过连接到总线来进行实际的数据传输。总线上的设备呢，其实有两种类型。一种我们称之为<strong>主设备</strong>（Master），另外一种，我们称之为<strong>从设备</strong>（Slave）。</p>
 <p>想要主动发起数据传输，必须要是一个主设备才可以，CPU就是主设备。而我们从设备（比如硬盘）只能接受数据传输。所以，如果通过CPU来传输数据，要么是CPU从I/O设备读数据，要么是CPU向I/O设备写数据。</p>
 <p>这个时候你可能要问了，那我们的I/O设备不能向主设备发起请求么？可以是可以，不过这个发送的不是数据内容，而是控制信号。I/O设备可以告诉CPU，我这里有数据要传输给你，但是实际数据是CPU拉走的，而不是I/O设备推给CPU的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/99/bc/9998b67238044aad60d2aa0735b98ebc.jpeg?wh=2269%2A1513" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/99/bc/9998b67238044aad60d2aa0735b98ebc.jpeg?wh=2269%2A1513" /></p>
 <p>不过，DMAC就很有意思了，它既是一个主设备，又是一个从设备。对于CPU来说，它是一个从设备；对于硬盘这样的IO设备来说呢，它又变成了一个主设备。那使用DMAC进行数据传输的过程究竟是什么样的呢？下面我们来具体看看。</p>
 <p>1.首先，CPU还是作为一个主设备，向DMAC设备发起请求。这个请求，其实就是在DMAC里面修改配置寄存器。</p>
 <p>2.CPU修改DMAC的配置的时候，会告诉DMAC这样几个信息：</p>
@@ -6663,7 +6663,7 @@
 <p>8.DMAC会反复进行上面第6、7步的操作，直到DMAC的寄存器里面设置的数据长度传输完成。</p>
 <p>9.数据传输完成之后，DMAC重新回到第3步的空闲状态。</p>
 <p>所以，整个数据传输的过程中，我们不是通过CPU来搬运数据，而是由DMAC这个芯片来搬运数据。但是CPU在这个过程中也是必不可少的。因为传输什么数据，从哪里传输到哪里，其实还是由CPU来设置的。这也是为什么，DMAC被叫作“协处理器”。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c9/8e/c9ed34b47b0cd33867c581772d8eff8e.jpeg?wh=1456%2A1336" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c9/8e/c9ed34b47b0cd33867c581772d8eff8e.jpeg?wh=1456%2A1336" /></p>
 <p>现在的外设里面，很多都内置了DMAC</p>
 <p>最早，计算机里是没有DMAC的，所有数据都是由CPU来搬运的。随着人们对于数据传输的需求越来越多，先是出现了主板上独立的DMAC控制器。到了今天，各种I/O设备越来越多，数据传输的需求越来越复杂，使用的场景各不相同。加之显示器、网卡、硬盘对于数据传输的需求都不一样，所以各个设备里面都有自己的DMAC芯片了。</p>
 <h2 id="kafka">为什么那么快？一起来看Kafka的实现原理</h2>
@@ -6681,7 +6681,7 @@
 <p>第二次传输，需要从内核缓冲区里面的数据，复制到我们应用分配的内存里面。这个传输是通过CPU搬运的。</p>
 <p>第三次传输，要从我们应用的内存里面，再写到操作系统的Socket的缓冲区里面去。这个传输，还是由CPU搬运的。</p>
 <p>最后一次传输，需要再从Socket的缓冲区里面，写到网卡的缓冲区里面去。这个传输又是通过DMA搬运的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e0/d5/e0e85505e793e804e3b396fc50871cd5.jpg?wh=2376%2A1653" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e0/d5/e0e85505e793e804e3b396fc50871cd5.jpg?wh=2376%2A1653" /></p>
 <p>这个时候，你可以回过头看看这个过程。我们只是要“搬运”一份数据，结果却整整搬运了四次。而且这里面，从内核的读缓冲区传输到应用的内存里，再从应用的内存里传输到Socket的缓冲区里，其实都是把同一份数据在内存里面搬运来搬运去，特别没有效率。</p>
 <p>像Kafka这样的应用场景，其实大部分最终利用到的硬件资源，其实又都是在干这个搬运数据的事儿。所以，我们就需要尽可能地减少数据搬运的需求。</p>
 <p>事实上，Kafka做的事情就是，把这个数据搬运的次数，从上面的四次，变成了两次，并且只有DMA来进行数据搬运，而不需要CPU。</p>
@@ -6692,7 +6692,7 @@
 </code></pre></div>
 <p>如果你层层追踪Kafka的代码，你会发现，最终它调用了Java NIO库里的transferTo方法</p>
 <p>Kafka的代码调用了Java NIO库，具体是FileChannel里面的transferTo方法。我们的数据并没有读到中间的应用内存里面，而是直接通过Channel，写入到对应的网络设备里。并且，对于Socket的操作，也不是写入到Socket的Buffer里面，而是直接根据描述符（Descriptor）写入到网卡的缓冲区里面。于是，在这个过程之中，我们只进行了两次数据传输。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/59/ab/596042d111ad9b871045d970a10464ab.jpg?wh=2116%2A1578" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/59/ab/596042d111ad9b871045d970a10464ab.jpg?wh=2116%2A1578" /></p>
 <p>第一次，是通过DMA，从硬盘直接读到操作系统内核的读缓冲区里面。第二次，则是根据Socket的描述符信息，直接从读缓冲区里面，写入到网卡的缓冲区里面。</p>
 <p>这样，我们同一份数据传输的次数从四次变成了两次，并且没有通过CPU来进行数据搬运，所有的数据都是通过DMA来进行传输的。</p>
 <p>在这个方法里面，我们没有在内存层面去“复制（Copy）”数据，所以这个方法，也被称之为<strong>零拷贝</strong>（Zero-Copy）。</p>
@@ -6842,8 +6842,6 @@ deliver bytes in a log segment file from a broker to a consumer.</p>2019-08-20</
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

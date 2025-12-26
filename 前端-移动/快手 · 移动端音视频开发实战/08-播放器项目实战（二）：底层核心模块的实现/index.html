@@ -5561,9 +5561,9 @@
 <p>你好，我是展晓凯。今天我们来学习实现播放器中的各个核心模块。</p>
 <p><a href="https://time.geekbang.org/column/article/548457">上一节课</a>我们设计了播放器的架构，架构中包含各种模块，其中解码模块、音视频播放模块以及画面播放模块是架构中的核心模块。为了让我们设计的架构快速落地，这节课我会带你来分别实现这三个核心模块。我们先来看看解码模块是如何实现的吧。</p>
 <h2 id="_1">解码模块的实现</h2>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e9/35/e945e0dde7cfe05c5242cba0f95d2735.png?wh=1920x1078" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e9/35/e945e0dde7cfe05c5242cba0f95d2735.png?wh=1920x1078" /></p>
 <p>我们一起来构建输入模块，也就是来做类图中的VideoDecoder类的实现。这里我们使用FFmpeg这个开源库来完成输入模块的协议解析、封装格式拆分、解码操作等行为，你可以看一下FFmpeg在解码场景下的核心流程。
-<img alt="" src="https://static001.geekbang.org/resource/image/08/f7/08119d9fbbedd74c730a7c643eff61f7.png?wh=2626x1591" title="FFmpeg在解码场景下的核心流程" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/08/f7/08119d9fbbedd74c730a7c643eff61f7.png?wh=2626x1591" title="FFmpeg在解码场景下的核心流程" /></p>
 <p>整体的运行流程分为以下几个阶段：</p>
 <ul>
 <li>建立连接、准备资源阶段：使用openInput方法向外提供接口。</li>
@@ -5573,7 +5573,7 @@
 <p>以上就是我们输入端的整体流程，其中第二个阶段是一个循环并且会放在单独的线程中来运行。接下来我们具体看一下这个类中最重要的几个接口是如何设计与实现的。</p>
 <h3 id="openinput">openInput</h3>
 <p>这个方法的职责是建立与媒体资源的连接通道，并且分配一些全局需要用到的资源，最后将建立连接通道与分配资源的结果返回给调用端。这个方法的实现主要分为三个核心部分。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b4/10/b4ce66b6a73a2b74742d57d14e585810.png?wh=1732x1204" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b4/10/b4ce66b6a73a2b74742d57d14e585810.png?wh=1732x1204" /></p>
 <ol>
 <li>建立连接与找出流信息</li>
 </ol>
@@ -5592,7 +5592,7 @@
 <p>这个机制要想生效，需要在建立连接通道之前，将自己定义的函数给AVFormatContext的interrupt_callback赋值。一般在销毁资源的时候，直接让这个函数返回0，或者为弱网也提供一个超时的读取时间，这个设置是非常有用的，它可以<strong>保证你的解码模块不会因为一些阻塞的IO调用变得不可用。</strong></p>
 <h3 id="decodeframes">decodeFrames</h3>
 <p>我们再看decodeFrames这个方法的实现，这个接口主要负责将音视频压缩数据解码成裸数据，然后经过处理封装成自定义的结构体，最后返回给调用端。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/da/f6/da82d66abff545cab7dca9bbdc3c48f6.png?wh=1920x1079" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/da/f6/da82d66abff545cab7dca9bbdc3c48f6.png?wh=1920x1079" /></p>
 <p>如图所示，先调用read_frame读出一个压缩数据帧来，压缩数据在FFmpeg中使用AVPacket这个结构体来表示。在视频流中，一个AVPacket里面只包含一个视频帧，在音频流中，一个AVPacket里面有可能包含多个音频帧，所以我们需要根据AVPacket的类型决定它所走的解码流程，这里我们可以根据AVPacket里面的stream_index来判定它是音频类型还是视频类型。</p>
 <p>视频部分只需要解码一次，就可以得到AVFrame的视频裸数据（一般是YUV格式）。音频部分需要判定这个AVPacket里面的压缩数据是否被全部消耗干净了，并以此作为一次解码结束的条件。</p>
 <p>解码成功之后，需要提取出对应的裸数据填充到我们自定义的结构体中，并返回给外界调用端。为什么需要填充到自定义的结构体中呢？</p>
@@ -5604,7 +5604,7 @@
 <h3 id="releaseresource">releaseResource</h3>
 <p>最后是销毁资源这个方法的实现，它的过程正好与打开流阶段相反。第一步是销毁音频相关的资源，包括分配的AVFrame以及音频解码器，另外如果分配了重采样上下文以及重采样输出的音频缓冲buffer，那么也要一并销毁掉。然后是销毁视频相关的资源，包括分配的AVFrame与视频解码器，另外如果分配了格式转换上下文与转换后的AVPicture，也要一并销毁掉。最后断开连接通道以及销毁掉上下文。</p>
 <h2 id="_2">音频播放模块的实现</h2>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ec/84/ece11c976d62f6333d768016829aea84.png?wh=1920x1077" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ec/84/ece11c976d62f6333d768016829aea84.png?wh=1920x1077" /></p>
 <p>下面，我们来一起学习音频播放模块的实现，也就是类图中的AudioOutput类的实现，这一部分对于Android和iOS平台的实现是不同的。前面我们已经详细地学习了多种音频渲染的方法，基础概念与实现代码这里就不再赘述了，这个部分我们会将重点放在AudioOutput的接口设计与内部实现上。</p>
 <h3 id="android">Android平台的音频渲染</h3>
 <p>Android平台我们选用OpenSL ES来渲染音频，建立AudioOutput这个类之后，按照之前的架构设计，第一步需要在这个类里面定义一个回调函数，来获取要播放的PCM数据buffer，回调函数如下：</p>
@@ -5640,12 +5640,12 @@
 <p>在这个方法的实现中，首先要构造一个AVAudioSession，然后给这个Session设置用途类型以及采样率等；接下来设置音频被中断的监听器，方便应用程序在特殊情况下可以给出相应的处理；最后就是核心流程构造AUGraph，用来实现音频播放。</p>
 <p>这里需要注意的是，在AUGraph中需要添加一个ConvertNode，将调用端填充的SInt16格式音频数据转换为Float32格式的音频数据，Float32格式是RemoteIONode可以播放出来的。最后需要给ConvertNode配置一个InputCallback，在这个InputCallback的实现中调用Delegate的fillAudioData方法，让调用端来填充数据。</p>
 <p>配置好整个AUGraph之后，调用AUGraphInitialize方法来初始化整个AUGraph。最终构造出来的AUGraph以及和客户端代码的调用关系如图所示。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1e/ca/1ee332b6bb5f9c21519ca3550c31d7ca.png?wh=1920x753" title="AUGraph和客户端代码的调用关系" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1e/ca/1ee332b6bb5f9c21519ca3550c31d7ca.png?wh=1920x753" title="AUGraph和客户端代码的调用关系" /></p>
 <p>接下来是play方法的实现，直接调用AUGraphStart方法启动这个AUGraph就可以了。一旦启动，RemoteIO这个AudioUnit就会启动播放，需要音频数据的时候，就向前一级AudioUnit（ConvertNode）去拉取数据，而ConvertNode则会去找到自己的InputCallback，在InputCallback的实现中，会去和delagate（调用端）要数据，然后就在实现这个Protocol的客户端代码中填充数据，最终就可以播放出来了。</p>
 <p>至于pause方法，直接调用AUGraphStop方法就可以停掉AUGraph的运行，音频就会停止渲染。如果想恢复的话，重新调用play方法即可。</p>
 <p>最后是销毁方法，在销毁方法中要先停掉AUGraph，然后调用AUGraphClose方法关闭这个AUGraph，并移除掉AUGraph里面所有的Node，最终调用DisposeAUGraph，这样就可以彻底销毁整个AUGraph了。</p>
 <h2 id="_3">视频（画面）播放模块的实现</h2>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e8/1b/e8b513a2518735913681867f0137d21b.png?wh=1920x1078" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e8/1b/e8b513a2518735913681867f0137d21b.png?wh=1920x1078" /></p>
 <p>接下来我们介绍视频（画面）播放模块的实现，也就是类图中的VideoOutput类的实现，这部分的实现也是依赖于平台的，虽然底层都是使用的OpenGL ES，但是需要为不同平台构建自己的上下文环境以及窗口管理，具体细节我们<a href="https://time.geekbang.org/column/article/546501">第5节课</a>已经学过了，所以这节课我们会把重点放在讲解VideoOutput的接口设计与内部实现上。</p>
 <h3 id="android_1">Android平台的视频渲染</h3>
 <p>根据我们之前的学习，无论在哪个平台使用OpenGL ES渲染视频画面，都需要单独开辟一个线程，并且为这个线程绑定一个OpenGL ES的上下文。</p>
@@ -5709,7 +5709,7 @@
 <h2 id="_4">小结</h2>
 <p>最后，我们来整体回顾一下这节课的内容吧！</p>
 <p>视频播放器几个底层模块的实现中，解码模块内部使用FFmpeg实现，但是对外界会隐藏内部的实现，提供统一的封装接口。音频播放模块也会隐藏内部的实现，提供一个获取PCM数据的方法来拉取要播放的数据。画面播放模块直接获取出YUV数据使用OpenGL ES进行绘制，需要注意的是所有OpenGL ES的操作必须要在构建的GL线程中进行操作。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/5b/33/5bbbae5f2c12a60f1d6144c20a062b33.png?wh=1920x984" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5b/33/5bbbae5f2c12a60f1d6144c20a062b33.png?wh=1920x984" /></p>
 <p>这三个模块是视频播放器最底层的三个模块，而如何把这三个模块有机地结合起来让视频播放器流畅地运转起来，还需要我们一起用音视频同步模块以及中控模块把他们串联起来的，下节课我们会继续学习这两个模块的实现。</p>
 <h2 id="_5">思考题</h2>
 <p>在解码模块中，为了方便你理解和掌握视频播放器流程，我把demux和decoder放到了一个线程中，但是这两个部分其实消耗的资源是不同的，demux是IO密集型的操作，decoder是CPU密集型的操作，所以如果让你去优化这部分的架构设计，应该如何做呢？</p>
@@ -5836,8 +5836,6 @@ YUV是通用的视频表示格式，在在手机上，这种数据并不能用�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

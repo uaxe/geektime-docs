@@ -7396,7 +7396,7 @@
 <h3 id="_2">准备数据</h3>
 <p>应用所需的数据，我已经帮你准备好，也上传到了网盘，你可以点击<a href="https://pan.baidu.com/s/1Vys1Z1mofQFoU52ye7SKuw">这个地址</a>，输入提取码<strong>ajs6</strong> 进行下载。</p>
 <p>数据的文件名是“2011-2019小汽车摇号数据.tar.gz”，解压之后的目录结构如下图所示。根目录下有apply和lucky两个子目录，apply的目录内容是2011-2019年各个批次参与摇号的申请编号，lucky目录包含的是各个批次中签的申请编号。方便起见，我们把参与过摇号的人叫“申请者”，把中签的人叫“中签者”。apply和lucky的下一级子目录是各个摇号批次，而摇号批次目录下包含的是Parquet格式的数据分片。
-<img alt="" src="https://static001.geekbang.org/resource/image/74/4f/7472040477c9b7756102890f2819284f.jpg?wh=2799%2A2112" title="数据的文件目录结构" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/74/4f/7472040477c9b7756102890f2819284f.jpg?wh=2799%2A2112" title="数据的文件目录结构" /></p>
 <p>apply和lucky两个子目录，在逻辑上分别对应着事实表和维度表，也可以叫做“申请者表”和“中签者表”。两张表的Schema都是（batchNum，carNum），也就是（摇号批次，申请编号）。总之，事实表和维度表在存储方式上都做了分区设计，且分区键都是batchNum。</p>
 <h3 id="_3">准备开发环境</h3>
 <p>数据下载、解压完成之后，然后我们再来准备开发环境。首先，我们来说说开发语言。要完成“趋势分析应用”的开发，你可以结合个人偏好，使用Python、Java、Scala三种语言中的任意一种。由于我本人习惯使用Scala做开发，因此整个项目的代码都是用Scala实现的。如果你是Java或是Python开发者，也完全不必担心，结合后续应用逻辑的讲解与Scala版本的参考实现，我相信你也很快能完成应用的开发。</p>
@@ -7405,7 +7405,7 @@
 <p>最后是运行环境，由于咱们的应用比较轻量，而且数据量较小，解压之后的Parquet文件总大小还不超4GB，因此，你甚至可以用手里的笔记本电脑或是台式PC，就可以把应用从头到尾地跑通。选择“轻装上阵”主要是考虑到，不少同学可能不方便搭建分布式的物理集群，我们要确保这部分同学不会因为硬件的限制而不能参与实战。</p>
 <p>不过，毕竟咱们这两讲的初衷和重点是性能调优实践，网络开销优化是其中关键的一环。因此，<strong>有条件的同学，我还是鼓励你搭建分布式的物理集群，或是采用云原生的分布式环境</strong>。一来这样的分布式环境更接近实际工作中的真实情况，二来调优前后的性能差异会更加地显著，有利于你加深理解不同调优技巧的作用和效果。</p>
 <p>我这边选择了3台物理节点，它们的资源配置分别如下。其实，为了跑通应用和做性能对比，你并不需要这么强悍的机器配置。我这么做主要是贪图执行效率，因为想要说明不同调优技巧的作用与功效，我只需要拿到调优前后的对比结果就可以了，这样的配置可以减少我的等待时间。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/51/f5/514bfaa1696ce723fcdcbbef2e72fff5.jpeg?wh=1209%2A612" title="硬件资源配置" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/51/f5/514bfaa1696ce723fcdcbbef2e72fff5.jpeg?wh=1209%2A612" title="硬件资源配置" /></p>
 <h2 id="_5">应用开发</h2>
 <p>准备好了数据、开发环境和执行环境之后，我们就步入正题，开始进行“趋势分析应用”的开发。为了解答大家关于小汽车摇号的种种困惑，在这个应用中，我们主要分析如下几个案例：</p>
 <ul>
@@ -7450,7 +7450,7 @@
 <a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>result02_01.write.format(&quot;csv&quot;).save(&quot;_&quot;)
 </code></pre></div>
 <p>将上述代码付诸执行，我们会得到如下图所示的计算结果。其中，横坐标代表申请者参与过的摇号批次次数，纵坐标是对应的参与人数。从2011年到2013年，摇号是每月一次的。而从2014开始，摇号是每两个月一次的。因此，截至到2019年底，总共有72（12 * 3 + 6 * 6）次摇号。所以，我们看到横坐标的值域是从1到72，1表示摇过1次的人，72就比较惨了，它表示摇过72次的人。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d2/1c/d2e28f14e580916c8b0e1b37db9e7f1c.jpeg?wh=1920%2A769" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d2/1c/d2e28f14e580916c8b0e1b37db9e7f1c.jpeg?wh=1920%2A769" /></p>
 <p>从图中我们不难发现，随着摇号次数的逐级递增，人数分布基本上呈现出了逐级递减的趋势。那这意味着什么呢？这意味着每隔两个月就会有新人从驾校毕业，加入到庞大的摇号大军中来。仔细观察上图的左半部分我们会发现，摇号次数凡是遇到3的倍数，对应的人数往往比其“左邻右舍”多出甚至两倍，这是为什么呢？</p>
 <p>我们刚刚说过，从2014年开始，摇号是每两个月进行一次。因此，摇号次数相差3则意味着两次摇号之间的时间差是半年左右。比如说，摇了3次的人就比摇了6次的人晚半年加入摇号大军。那么，半年意味着什么呢？我们不妨脑洞一下，尽管每个月都有从驾校毕业的学员，但是，寒暑假往往是大批量“生产”学员的高峰时期，而寒暑假恰好相差半年左右。你觉得我这个推测合理吗？</p>
 <h4 id="2_1">场景2：幸运的中签者</h4>
@@ -7464,7 +7464,7 @@
 <a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>result02_02.write.format(&quot;csv&quot;).save(&quot;_&quot;)
 </code></pre></div>
 <p>将上述代码付诸执行，我们会得到如下图所示的计算结果，其中横纵坐标的含义与场景1一样，分别是摇号批次数和对应的人数分布。我们发现，随着摇号次数的逐级递增，人数的分布完全是单调递减的。也就是说，摇号的次数越多，中签者的数量越少。我能想到的一个原因是，摇号的次数越高，对应的参与人数就越少，这一点在场景1已经得到了验证。这个其实也不难理解，能一直坚持摇60次以上的玩家，真的都是骨灰级玩家。那么，参与的人基数小，中签者的数量自然就更少。
-<img alt="" src="https://static001.geekbang.org/resource/image/f8/4b/f8e20abc26316a4e7ab9abda09c0344b.jpeg?wh=1920%2A581" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f8/4b/f8e20abc26316a4e7ab9abda09c0344b.jpeg?wh=1920%2A581" /></p>
 <p>不过，如果假设申请者两个月摇一次号，那么我们就会得出一个非常扎心的结论：摇号中签的人往往不需要等待太长的时间，绝大多数都是在2-3年内摇中了购车资格，因为前半部分的总数占到了绝大多数。而等待3年以上才摇上号的人，反而成了幸运儿群体中的“少数派”。这不禁让我想起了当年大家开玩笑的那句话：“你要是人品够用，早就该摇上了。超过3年还没摇上，就说明你人品余额不足，摇号这件事以后也就不用指望了”。</p>
 <h3 id="3">案例3：中签率的变化趋势</h3>
 <p>从摇号次数的分布来看，申请者和中签者的变化趋势是一致的，那这是否意味着二者相除之后的比例是稳定的呢？二者的商实际上就是中签率。接下来，我们就去探究一下中签率的变化趋势。要计算中签率，我们需要分别统计每一个摇号批次中的申请者和中签者人数，然后再把它们做关联、聚合，代码实现如下所示。</p>
@@ -7486,7 +7486,7 @@
 <a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>result03.write.format(&quot;csv&quot;).save(&quot;_&quot;)
 </code></pre></div>
 <p>我们得到的中签率示意图如下所示。其中，横坐标为各个摇号批次，从201101到201906，也就是从2011年的第一批到2019年的第72批，纵坐标就是中签率。从中我们可以很直观地看到，随着摇号批次的推进，中签率呈锐减的趋势。201101批次的中签率在9.4%左右，不到10%。而201906批次的中签率为1.9‰，也就是千分之一点九。这么看来，1000个人里面能摇上号的还凑不够两个人，这也难怪摇号如此之难了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/92/13/92c3ae9b999f697e6b568a5107f45713.jpeg?wh=1920%2A711" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/92/13/92c3ae9b999f697e6b568a5107f45713.jpeg?wh=1920%2A711" /></p>
 <h3 id="4">案例4：中签率局部洞察</h3>
 <p>第4个案例与案例3的区别在于，我们只关注2018年的中签率变化趋势。这样做的原因有二：一来，通过计算和对比，我发现2018年的中签率相比2017年几乎经历了“断崖式”的下跌，因此我想给2018年一个特写；二来，只关注2018年的数据，可以让我们有机会对比启用AQE Join策略调整前后的性能差异。</p>
 <p>基于案例3的代码实现，要关注2018年，我们只需要在batchNum之上添加个过滤条件就好了。</p>
@@ -7504,7 +7504,7 @@
 <a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>
 <a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>result04.write.format(&quot;csv&quot;).save(&quot;_&quot;)
 </code></pre></div>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2d/de/2db2d2751c7930b271b8e456d2f5abde.jpeg?wh=1920%2A924" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2d/de/2db2d2751c7930b271b8e456d2f5abde.jpeg?wh=1920%2A924" /></p>
 <p>结合案例3与案例4的执行结果，我们至少有两点发现。第一点，2018年内各批次中签率下降较为平缓，从201801批次的2.3‰下降至201806批次的2.1‰，整体下降幅度不超过10%。第二点，2017年最后一个批次，也就是201706批次的中签率在4.9‰左右，而201801批次的中签率为2.3‰，在短短两个月之内，中签率惨遭“腰斩”，并在接下来的两年里，一路阴跌，最终在201906批次破掉2‰。</p>
 <h3 id="5">案例5：倍率分析</h3>
 <p>那么，在中签率如此之低的情况下，倍率这玩意还有意义吗？接下来，我们先去探索倍率的分布情况，然后再去观察，不同倍率的人群，他们的中签比例是怎样分布的。</p>
@@ -7525,7 +7525,7 @@
 <a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>result05_01.write.format(&quot;csv&quot;).save(&quot;_&quot;)
 </code></pre></div>
 <p>中签者的倍率分布如下图所示。其中，横坐标为中签者的倍率，更准确地说，是中签者在参与的摇号批次中最大的副本数量，纵坐标是人数分布。通过观察执行结果我们不难发现，中签者的倍率呈现明显的正态分布。因此，从这张图我们可以得到初步结论：要想摇中车牌号，你并不需要很高的倍率。换句话说，对于中签这件事来说，倍率的作用和贡献并不是线性递增的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5d/93/5d75f65cd115d560b1b3d19cd78eb393.jpeg?wh=1920%2A811" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5d/93/5d75f65cd115d560b1b3d19cd78eb393.jpeg?wh=1920%2A811" /></p>
 <p>不过，和案例2类似，这里同样存在一个基数的问题。也就是说，倍率高的人本来就少，其中的中签者数量自然也少。因此，我们还要结合申请者的倍率分布，去计算不同倍率下的中签比例，才能更加完备地对倍率的作用下结论。</p>
 <h4 id="2_2">场景2：不同倍率下的中签比例</h4>
 <p>对倍率分布有了初步认知之后，我们再来计算不同倍率人群的中签比例，去探究倍率本身对于中签的贡献究竟有多大。有了场景1中签者的倍率分布，我们只需要去计算申请者的倍率分布，然后把两份数据做关联、聚合，就可以得到我们想要的结果。</p>
@@ -7549,12 +7549,12 @@
 <a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a>result05_02.write.format(&quot;csv&quot;).save(&quot;_&quot;)
 </code></pre></div>
 <p>不同倍率下的中签比例如下图所示。其中横坐标为倍率，纵坐标有两个。蓝色柱状图体代表中签人数，它的分布与场景1的分布是一致的；绿色柱状条表示的是中签比例，它表示在同一个倍率下，中签人数与申请人数的比值。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6e/ab/6e302d72dd4d036c12a5fdd5d4fa04ab.jpeg?wh=1918%2A963" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6e/ab/6e302d72dd4d036c12a5fdd5d4fa04ab.jpeg?wh=1918%2A963" /></p>
 <p>与中签人数一样，中签比例在不同的倍率下，也呈现出了正态分布。有了这份数据做补充，我们可以夯实场景1中得出的结论。也就是，倍率对中签的贡献极其有限。这个结论很好地解释了，为什么摇号很久，倍率很高的人也难以中签。</p>
 <p>到此为止，通过以上几个案例的分析，我们就对摇号次数分布、中签率变化趋势、倍率分布与中签比例有了答案。</p>
 <h2 id="_6">小结</h2>
 <p>今天这一讲，我们重点开发了一个趋势分析应用，来解答北京市小汽车摇号的各个问题。这个应用主要实现了5个案例，分别是摇号次数分布、中签率变化趋势、中签率的大变动、倍率分布与中签比例。为了方便理解，我把它们要解决的问题、答案、主要的实现思路都总结在了下面的脑图中，你可以看一看。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cd/15/cdde310d7636209202587308e2938315.jpg?wh=7500%2A2871" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cd/15/cdde310d7636209202587308e2938315.jpg?wh=7500%2A2871" /></p>
 <p>至于这5个案例的代码实现和执行结果，我把它们都上传到了公用的GitHub仓库，你可以从<a href="https://github.com/wulei-bj-cn/potatoes.git">这个地址</a>获取完整内容。</p>
 <p>当然，目前的代码肯定存在很多可以优化的地方，至于怎么优化，我先卖个关子，下一讲再详细来说。</p>
 <h2 id="_7">每日一练</h2>
@@ -7718,8 +7718,6 @@ aa.times;</p>2021-09-03</li><br/><li><span>斯盖丸</span> 👍（3） 💬（1
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

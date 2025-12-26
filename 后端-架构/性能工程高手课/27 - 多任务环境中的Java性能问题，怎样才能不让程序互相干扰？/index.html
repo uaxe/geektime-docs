@@ -14353,48 +14353,48 @@
 <p>我们先看应用程序启动时的场景。当几个共存的应用程序共享有限的计算资源（包括内存和cpu）时，它们之间会相互影响。如果各自独立地运行，导致对系统计算资源的消耗无法协调一致，那么某些应用程序会出现问题。</p>
 <p>我们要做个实验来暴露这些性能问题，看看这个问题的表象是什么，然后一起分析产生问题的原因。</p>
 <p>这个实验采用了两个相同的Java程序。我们首先启动第一个程序，来占用一些内存，系统剩下约20GB的未使用内存。然后我们开始启动另外一个Java程序，这个程序需要20GB的堆。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/25/87/250f92b847f23868da8910e7134e2687.png?wh=2000%2A1020" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/25/87/250f92b847f23868da8910e7134e2687.png?wh=2000%2A1020" /></p>
 <p>在图中你可以看到，启动第二个程序之后，它的吞吐量是12K/秒，持续时间约30秒。然后，吞吐量开始急剧下降。最坏的情况，在大约20秒的时间内，吞吐量几乎为零。有趣的是，过了一会儿，吞吐量又再次回到了稳定状态：12KB/秒。</p>
 <p>下图显示了同一时间段的GC暂停信息。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2e/d5/2e76dec3ff4a1928dd1162da13dabed5.png?wh=1945%2A975" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2e/d5/2e76dec3ff4a1928dd1162da13dabed5.png?wh=1945%2A975" /></p>
 <p>最初的GC暂停很低，都低于50毫秒；然后暂停就跳到数百毫秒之大。你甚至可以看到两次大于1秒的超大的暂停！大约1分钟后，GC暂停再次下降至低于50毫秒，并变得稳定。</p>
 <p>我们看到在启动期间，Java程序的性能很差。因为问题是在启动JVM时发生的，我们有理由怀疑这与JVM的启动方式有关。我们检查了程序的的内存驻留大小（RES，Resident Size），也就是进程使用的未交换的物理内存，图示如下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d9/7b/d96aaba8c8ef2119901a914985170d7b.png?wh=1980%2A983" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d9/7b/d96aaba8c8ef2119901a914985170d7b.png?wh=1980%2A983" /></p>
 <p>从图中你可以看到，尽管我们在启动JVM时，用参数将JVM的堆大小指定为20GB（-Xmx20g和-Xms20g），但是JVM并不会从内存中一次全部拿到20GB的堆空间。相反，操作系统会在JVM的运行过程中不断地分配。也就是说，随着JVM实例化越来越多的对象，JVM会从操作系统逐渐拿到更多的内存页面来容纳它们。</p>
 <p>在分配过程中，操作系统将不断地检查空闲页面列表。如果发现可用内存量低于一定水平，操作系统就会开始回收页面，这个过程会花费CPU的时间。根据可用内存短缺的严重程度，回收过程可能会严重阻塞应用程序。在下图中，我们看到，可用内存明显地下降到了非常低的水平。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/db/ec/db352ff5d0cf5ac1cb0a65e1d14d67ec.png?wh=2000%2A1005" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/db/ec/db352ff5d0cf5ac1cb0a65e1d14d67ec.png?wh=2000%2A1005" /></p>
 <p>下面这张图显示了CPU的空闲百分比（CPU空闲百分比和繁忙百分比的和是100%）。对比时间线，我们可以清楚地看到，页面回收过程会导致CPU开销，也就是空闲百分比下降了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b1/12/b1daec744f3ec004c0b48260b1d06d12.png?wh=1958%2A995" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b1/12/b1daec744f3ec004c0b48260b1d06d12.png?wh=1958%2A995" /></p>
 <p>那么怎么进行内存回收呢？</p>
 <p>在Linux上，当可用内存不足时，操作系统会唤醒<strong>kswapd守护程序</strong>，开始在后台回收空闲页面。如果内存压力很大，操作系统就会被迫采取另外一种措施，就是<strong>直接地同步释放内存的前台</strong>。具体来讲，当可用空闲页面降到一个阈值之下，就会触发这种直接前台回收。</p>
 <p>当发生直接前台回收时，Linux会冻结正在申请内存的执行代码的应用程序，从而间接地导致大量的GC暂停。</p>
 <p>此外，直接回收通常会扫描大量内存页面，以释放未使用的页面。那么我们就来看看Linux直接回收内存页面的繁忙程度。下图就画出了Linux通过直接回收路径扫描的页面数。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/58/95/58acbaa1b20764b08a0cc7725cfff795.png?wh=2000%2A988" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/58/95/58acbaa1b20764b08a0cc7725cfff795.png?wh=2000%2A988" /></p>
 <p>我们看到，在峰值时，通过直接回收，每秒扫描约48K个页面（即200 MB）；这个回收工作量是很大的，CPU会不堪重负。</p>
 <h2 id="_3">运行中的应用程序为什么会被别的程序干扰？</h2>
 <p>了解过程序启动时互相干扰的场景，我们再来考虑第二个场景：应用程序在持续运行中。</p>
 <p>我们的实验是这样进行的。第一个Java程序以20GB的堆启动，并进入稳定状态。然后另外一个程序启动，并开始分配50GB的内存。</p>
 <p>下图中体现了第一个程序的吞吐量。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a9/45/a9b05fb6c7d9cec5085b86f06196f645.png?wh=2000%2A1006" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a9/45/a9b05fb6c7d9cec5085b86f06196f645.png?wh=2000%2A1006" /></p>
 <p>从图中我们看到，第一个程序从一开始就实现了稳定的12K/秒的吞吐量。然后，吞吐量急剧下降到零，这个零吞吐量的过程持续了约2分钟。从那时起，吞吐量一直在发生相当大的变化：有时吞吐量是12K/秒，其他时候又降为零。</p>
 <p>我们也观察了JVM的暂停，用下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ed/5d/eded62489c1d07997998bd460d8d8e5d.png?wh=2017%2A1014" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ed/5d/eded62489c1d07997998bd460d8d8e5d.png?wh=2017%2A1014" /></p>
 <p>从图中我们看到，在稳定状态下，GC暂停几乎为零，然后居然有一个超级大的暂停；多大呢？55秒！从那时起，GC暂停持续变化，但很少恢复为零。大多数暂停时间为几秒钟。</p>
 <p>我们观察到，其他应用程序的运行会严重影响本程序的性能。各种观察的结论是，系统处于内存压力之下，操作系统内存会有很多和外部存储的页面交换活动。在下图中，我们看到操作系统交换出了很多内存页面到外部存储空间。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3f/57/3f9408097dcdb03ec54c5f49a71f5657.png?wh=2050%2A983" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3f/57/3f9408097dcdb03ec54c5f49a71f5657.png?wh=2050%2A983" /></p>
 <p>这些换出的内存页面很多属于Java程序（也就是堆空间）。如果JVM需要进行堆上的垃圾回收，也就是GC，那么GC需要扫描JVM对象，以收集失效的对象。如果扫描的对象恰好是分配在换出的页面上，那么JVM需要先将它们从外部存储交换空间重新载入到内存中。从外部存储载入内存需要一些时间，因为交换空间通常位于磁盘驱动器上。</p>
 <p>所有这些时间，都会算在GC暂停之中。因此，程序会看到较大的GC暂停。下图就显示了大量的从外部存储载入页面的活动。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e4/62/e4207f1105b7b8ef720f1eb1cdc19a62.png?wh=2000%2A1021" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e4/62/e4207f1105b7b8ef720f1eb1cdc19a62.png?wh=2000%2A1021" /></p>
 <p>尽管页面交换活动会增加GC暂停时间，似乎可以解释刚刚看到的JVM暂停。但是，我怀疑，仅是这个原因根本无法解释生产中看到的很大暂停，比如超过55秒的暂停。你可能会问，我为什么有这样的怀疑？因为我在许多GC暂停的过程中，观察到了较高的系统CPU使用。</p>
 <p>比如在下图中，我们观察到，系统也处于严重的CPU压力下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f9/4c/f946efa1b98a07302d7fd2b52daf9b4c.png?wh=1962%2A1005" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f9/4c/f946efa1b98a07302d7fd2b52daf9b4c.png?wh=1962%2A1005" /></p>
 <p>CPU的高使用率不能完全归因于页面交换活动，因为页面交换通常不会占用大量CPU。所以，其中“必有隐情”：一定是有其他活动在大量使用CPU。我们通过检查了各种系统性能指标，最终确定了根因：是由于THP的机制，该机制严重加剧了程序性能和系统性能的下降。</p>
 <p>具体来说，Linux启用THP后，当应用程序分配内存时，会优先选择2MB大小的透明大页面，而不是4KB的常规页面。这一点我们可以轻易验证，比如下图中显示了透明大页面的瞬时数量。在峰值时，我们看到约34,000个THP，即约68GB的内存量。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0b/aa/0b948557e64c10edf711532d3d6647aa.png?wh=1977%2A1006" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0b/aa/0b948557e64c10edf711532d3d6647aa.png?wh=1977%2A1006" /></p>
 <p>我们还观察到，THP的数量一开始很高，一段时间后开始下降。这是因为某些THP被拆分成小的常规页面，以补充可用内存的不足。</p>
 <p>为什么需要拆分大页面呢？是因为当Linux在有内存压力时，它会将THP分为常规的、要准备交换的页面。为什么必需拆分大页面？这是因为当前的Linux，仅支持常规大小页面的交换。</p>
 <p>拆分活动的数量我们也用下图画出来了。你可以看到，在五分钟内大约有5K个THP页面被拆分，对应于10GB的内存。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c0/3a/c07ba59fbb545d1e9cb9f11e650e1c3a.png?wh=1964%2A988" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c0/3a/c07ba59fbb545d1e9cb9f11e650e1c3a.png?wh=1964%2A988" /></p>
 <p>除了大页面拆分，同时，Linux也会尝试将常规页面重新聚合为THP大页面，这就需要额外的页面扫描，并消耗CPU。如果你在实践中注意观察的话，可以发现这种活动会占用大量CPU。</p>
 <p>使用THP可能遇到的更糟糕的情况是，<strong>聚合</strong>和<strong>拆分</strong>这两个相互矛盾的活动，是来回执行的。也就是说，当系统承受内存压力时，THP被拆分成常规页面，而不久之后，常规页面则又被聚合成THP，依此类推。我们已经观察到，这种行为会严重损害我们生产系统中的应用程序性能。</p>
 <h2 id="_4">如何解决多程序互相干扰？</h2>
@@ -14416,7 +14416,7 @@
 <p>此外，常规页面需要聚合成THP，才能将大页面分配给应用程序。因此，这个元素的另外一部分机制是进行微调，是决定何时允许THP聚合。我建议你根据<strong>操作系统的直接页面扫描率</strong>和<strong>聚合进程的CPU使用率</strong>来决定。</p>
 <h2 id="_5">总结</h2>
 <p>今天我们讲述了，将多个应用程序放置在同一台服务器上时，由于应用程序和操作系统机制的互相作用，引发的一系列性能问题。这些问题的根本原因，就是程序之间的互相影响。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/df/ef/dfe49c970e5a67b8f6a3993b9fc39aef.png?wh=2000%2A1546" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/df/ef/dfe49c970e5a67b8f6a3993b9fc39aef.png?wh=2000%2A1546" /></p>
 <p>应用程序之间的关系和人际关系一样，有时和谐，有时不和谐。唐代诗人刘禹锡有几句诗说：“常恨言语浅，不如人意深。今朝两相视，脉脉万重心。”说的是，语言的表达能力通常很有限，所以两人只能用眼神传达更复杂的情感。应用程序之间的关系，甚至程序和操作系统及硬件之间的关系，也会很复杂，也需要做足够的性能分析，才能理清它们之间的关系。</p>
 <p>今天的讲述，主要集中在多任务共存环境中的两个问题，重点在分析问题产生的复杂根因。 如果你对这方面的具体算法和生产验证有兴趣，可以参考我的一篇论文。这篇论文发表在<a href="https://www.researchgate.net/publication/282348773">International Journal of Cloud Computing</a>上面。</p>
 <h2 id="_6">思考题</h2>
@@ -14540,8 +14540,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

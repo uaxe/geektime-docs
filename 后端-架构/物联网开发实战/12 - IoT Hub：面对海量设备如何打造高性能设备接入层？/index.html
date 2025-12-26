@@ -14202,7 +14202,7 @@
 <p>前面两讲，我们一直在谈物联网云平台针对海量数据的处理和存储技术。顺着物联网的数据技术体系继续往下探索，我们自然就会面临一个问题：物联网云平台的服务器需要管理海量设备的接入，并且接收来自设备的海量数据的输入，那么服务器要怎么应对这样的挑战呢？</p>
 <p>我们来分析一下这个问题。物联网设备是通过某种通信协议接入云平台的，比如常用的MQTT协议，那么设备接入的服务器就是MQTT Broker服务器。</p>
 <p>从架构设计来说，负责设备接入的这一部分一般叫作<strong>设备接入层</strong>，也被称为<strong>IoT Hub</strong>。设备接入层之后，才是和互联网系统类似的<strong>业务层</strong>。具体的系统架构图可能是下面这样的：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fd/5b/fdb74fcd872c299459bbb2f28383325b.jpg?wh=2700%2A1886" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fd/5b/fdb74fcd872c299459bbb2f28383325b.jpg?wh=2700%2A1886" /></p>
 <p>不过，估计你也发现问题了，这样的架构根本无法支撑物联网场景中海量设备的接入和海量数据的输入。单台MQTT Broker服务器很容易面临性能瓶颈。所以前面提到的“服务器怎么应对挑战”的问题就变成了：怎么打造高性能的设备接入层？</p>
 <p>我们再继续深入分析，把关键点定位得更具体一点。打造<strong>高性能</strong>的设备接入层，最重要的技术难点是，如何实现接入层的<strong>高并发</strong>。因为只有具备高并发的能力，才能有效地、可靠地实现数据的传输。</p>
 <p>所以，现在问题又变成了：物联网云平台中，怎么实现高并发的设备接入层？</p>
@@ -14215,7 +14215,7 @@
 <li><strong>负载</strong>是指服务器面对的网络连接和服务请求的<strong>压力</strong>，也就是 “困难”。</li>
 <li><strong>均衡</strong>是针对服务器压力的解决办法，多个服务器一起来处理任务，并且这几个服务器的压力要达到<strong>平衡</strong>的状态，也就是“分担”。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1e/32/1e6b6eeff26f3ed5c15debfc3df2fe32.jpg?wh=2700%2A1270" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1e/32/1e6b6eeff26f3ed5c15debfc3df2fe32.jpg?wh=2700%2A1270" /></p>
 <p>这种平衡状态要怎么实现呢？我们需要设计一种任务<strong>分配策略</strong>。</p>
 <p>最简单、直接的办法就是<strong>平均分配</strong>。</p>
 <p>比如有3个服务器都在等待分配。当一个服务请求到来时，负载均衡服务器先将它给服务器1处理；接着第二个请求到来时，给服务器2处理，以此类推。</p>
@@ -14242,7 +14242,7 @@
 <p>但是，数据流处理和把数据写入数据库都是花时间的操作，它们和数据传入的速度并不一致。为了可以让MQTT Broker服务器高效地完成数据的传输，同时保证数据流处理和写入数据库的操作可靠执行，我们需要在MQTT Broker服务器和数据流处理服务器之间加入<strong>异步处理</strong>机制。</p>
 <p>那么，异步处理机制要怎么实现呢？行业内一般通过<strong>消息队列</strong>来实现。你可以把消息队列想象成双十一购物节后的快递公司，它收到商家大量的运单，然后快递公司按照一定的节奏完成这些运单的递送任务。</p>
 <p>在我们的系统中，MQTT Broker 服务器将数据给到消息队列，就完成了数据传输的工作。在这之后，数据流处理和写入数据库的操作只要按照自己的节奏，消费消息队列内的数据就行了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/86/b9/86cf475dda27dcc25758b976e4d935b9.jpg?wh=2700%2A2050" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/86/b9/86cf475dda27dcc25758b976e4d935b9.jpg?wh=2700%2A2050" /></p>
 <p>另外，消息队列还提供了额外的两个好处：</p>
 <ol>
 <li>实现了 MQTT Broker 服务器和数据流处理服务器之间的解耦，双方没有直接的依赖，所以维护更新会更加方便。</li>
@@ -14258,7 +14258,7 @@
 <p>缓存系统一般会将数据暂时存储在内存中，这样数据流处理应用就不需要直接与低速的磁盘打交道了。而且，如果我们读取的是经常用到的热点数据时，这些数据全都不需要重复从磁盘读取。这样既减轻了数据库的压力，又提高了数据处理速度，一举两得。</p>
 <p>缓存系统的常用开源选择有<strong>Redis</strong>和<strong>Memcached</strong>等。其中Redis更是在数据持久机制和主从节点复制的高可用特性上做了很多工作，不但功能强大，而且效率也很高。</p>
 <p>加入缓存系统之后，设备接入层的整体系统架构就完成了，你可以参考下面这张图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/11/88/11ef8db8026f1d9578d9c974a3af8b88.jpg?wh=2700%2A2315" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/11/88/11ef8db8026f1d9578d9c974a3af8b88.jpg?wh=2700%2A2315" /></p>
 <h2 id="_4">小结</h2>
 <p>总结一下，物联网云平台的服务器为了应对海量设备接入和海量数据输入的挑战，需要打造高并发的设备接入层。所以在这一讲中，我带你设计并完善了设备接入层的整体架构，并讲解了需要用到的<strong>负载均衡</strong>、<strong>消息队列</strong>和<strong>缓存系统</strong>等技术。</p>
 <ol>
@@ -14392,8 +14392,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

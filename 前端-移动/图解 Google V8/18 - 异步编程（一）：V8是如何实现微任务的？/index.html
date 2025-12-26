@@ -5375,7 +5375,7 @@
 <p><strong>微任务</strong>稍微复杂一点，其实你可以把<strong>微任务看成是一个需要异步执行的函数，执行时机是在主函数执行结束之后、当前宏任务结束之前。</strong></p>
 <p>JavaScript中之所以要引入微任务，主要是由于主线程执行消息队列中宏任务的时间颗粒度太粗了，无法胜任一些对精度和实时性要求较高的场景，那么<strong>微任务可以在实时性和效率之间做一个有效的权衡</strong>。另外使用微任务，可以改变我们现在的异步编程模型，使得我们可以使用同步形式的代码来编写异步调用。</p>
 <p>虽然微任务如此重要，但是理解起来并不是太容易。我们先看下和微任务相关的知识栈，具体内容如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1b/46/1b0ea2180dd2406b988b424cc2933746.jpg?wh=2284%2A864" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1b/46/1b0ea2180dd2406b988b424cc2933746.jpg?wh=2284%2A864" /></p>
 <p>从图中可以看出，微任务是基于消息队列、事件循环、UI主线程还有堆栈而来的，然后基于微任务，又可以延伸出协程、Promise、Generator、await/async等现代前端经常使用的一些技术。也就是说，如果对<strong>消息队列、主线程</strong>还有<strong>调用栈</strong>理解的不够深入，你在研究微任务时，就容易一头雾水。</p>
 <p>今天，我们就先来打通微任务的底层技术，搞懂消息队列、主线程、调用栈的关联，然后抽丝剥茧地剖析微任务的实现机制。</p>
 <h2 id="_1">主线程、调用栈、消息队列</h2>
@@ -5388,15 +5388,15 @@
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>foo(bar)
 </code></pre></div>
 <p>当V8准备执行这段代码时，会先将全局执行上下文压入到调用栈中，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/82/62/82360525fb2bb064eb6a9916e4a81062.jpg?wh=2284%2A1285" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/82/62/82360525fb2bb064eb6a9916e4a81062.jpg?wh=2284%2A1285" /></p>
 <p>然后V8便开始在主线程上执行foo函数，首先它会创建foo函数的执行上下文，并将其压入栈中，那么此时调用栈、主线程的关系如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6b/1e/6ba964d00e3528b4040a4ae12cc91e1e.jpg?wh=2284%2A1285" title="准备执行" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6b/1e/6ba964d00e3528b4040a4ae12cc91e1e.jpg?wh=2284%2A1285" title="准备执行" /></p>
 <p>然后，foo函数又调用了bar函数，那么当V8执行bar函数时，同样要创建bar函数的执行上下文，并将其压入栈中，最终效果如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/28/fa/288d80945985a1cf0c0a4d4be9674ffa.jpg?wh=2284%2A1285" title="调用bar函数" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/28/fa/288d80945985a1cf0c0a4d4be9674ffa.jpg?wh=2284%2A1285" title="调用bar函数" /></p>
 <p>等bar函数执行结束，V8就会从栈中弹出bar函数的执行上下文，此时的效果如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9b/a6/9b7474d3e2d5ca840f2119ca64d40da6.jpg?wh=2284%2A1285" title="bar函数执行结束" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9b/a6/9b7474d3e2d5ca840f2119ca64d40da6.jpg?wh=2284%2A1285" title="bar函数执行结束" /></p>
 <p>最后，foo函数执行结束，V8会将foo函数的执行上下文从栈中弹出，效果如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e9/ab/e9e2e01d56b9546745eaa24ac00d74ab.jpg?wh=2284%2A1285" title="foo函数执行结束" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e9/ab/e9e2e01d56b9546745eaa24ac00d74ab.jpg?wh=2284%2A1285" title="foo函数执行结束" /></p>
 <p>以上就是调用栈管理主线程上函数调用的方式，不过，这种方式会带来一种问题，那就是栈溢出。比如下面这段代码：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>function foo(){
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>foo()
@@ -5404,7 +5404,7 @@
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>foo()
 </code></pre></div>
 <p>由于foo函数内部嵌套调用它自己，所以在调用foo函数的时候，它的栈会一直向上增长，但是由于栈空间在内存中是连续的，所以通常我们都会限制调用栈的大小，如果当函数嵌套层数过深时，过多的执行上下文堆积在栈中便会导致栈溢出，最终如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/81/25/814b88dc157ef6f43403f46e271ae625.jpg?wh=2284%2A1285" title="栈溢出" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/81/25/814b88dc157ef6f43403f46e271ae625.jpg?wh=2284%2A1285" title="栈溢出" /></p>
 <p>我们可以使用setTimeout来解决栈溢出的问题，setTimeout的本质是将同步函数调用改成异步函数调用，这里的异步调用是将foo封装成事件，并将其添加进<strong>消息队列</strong>中，然后主线程再按照一定规则循环地从消息队列中读取下一个任务。使用setTimeout改造后代码代码如下所示：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>function foo() {
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>setTimeout(foo, 0)
@@ -5413,15 +5413,15 @@
 </code></pre></div>
 <p>那么现在我们就可以从<strong>调用栈</strong>、<strong>主线程</strong>、<strong>消息队列</strong>这三者的角度来分析这段代码的执行流程了。</p>
 <p>首先，主线程会从消息队列中取出需要执行的宏任务，假设当前取出的任务就是要执行的这段代码，这时候主线程便会进入代码的执行状态。这时关于主线程、消息队列、调用栈的关系如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bf/65/bfea2ecc835f8324e034db33339ed965.jpg?wh=2284%2A1204" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bf/65/bfea2ecc835f8324e034db33339ed965.jpg?wh=2284%2A1204" /></p>
 <p>接下来V8就要执行foo函数了，同样执行foo函数时，会创建foo函数的执行上下文，并将其压入栈中，最终效果如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/48/dc/48706d55e9c490d84d676b5000d56bdc.jpg?wh=2284%2A1170" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/48/dc/48706d55e9c490d84d676b5000d56bdc.jpg?wh=2284%2A1170" /></p>
 <p>当V8执行执行foo函数中的setTimeout时，setTimeout会将foo函数封装成一个新的宏任务，并将其添加到消息队列中，在V8执行setTimeout函数时的状态图如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/dc/e1/dc84bd1ee456789905e734415eecdce1.jpg?wh=2284%2A1058" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dc/e1/dc84bd1ee456789905e734415eecdce1.jpg?wh=2284%2A1058" /></p>
 <p>等foo函数执行结束，V8就会结束当前的宏任务，调用栈也会被清空，调用栈被清空后状态如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2a/89/2aeacb651b6aec591105ce2e4a8ed889.jpg?wh=2284%2A1088" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2a/89/2aeacb651b6aec591105ce2e4a8ed889.jpg?wh=2284%2A1088" /></p>
 <p>当一个宏任务执行结束之后，忙碌的主线程依然不会闲下来，它会一直重复这个取宏任务、执行宏任务的过程。刚才通过setTimeout封装的回调宏任务，也会在某一时刻被主线取出并执行，这个执行过程，就是foo函数的调用过程。具体示意图如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/26/bc/260d8a7294472f4ee7b194bdb7d513bc.jpg?wh=2284%2A1065" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/26/bc/260d8a7294472f4ee7b194bdb7d513bc.jpg?wh=2284%2A1065" /></p>
 <p>因为foo函数并不是在当前的父函数内部被执行的，而是封装成了宏任务，并丢进了消息队列中，然后等待主线程从消息队列中取出该任务，再执行该回调函数foo，这样就解决了栈溢出的问题。</p>
 <h2 id="_2">微任务解决了宏任务执行时机不可控的问题</h2>
 <p>不过，对于栈溢出问题，虽然我们可以通过将某些函数封装成宏任务的方式来解决，但是宏任务需要先被放到消息队列中，如果某些宏任务的执行时间过久，那么就会影响到消息队列后面的宏任务的执行，而且这个影响是不可控的，因为你无法知道前面的宏任务需要多久才能执行完成。</p>
@@ -5477,7 +5477,7 @@
 <li>微任务队列为空。</li>
 </ul>
 <p>此时的消息队列、主线程、调用栈的状态图如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b9/2a/b9bf0027185405e762b46cd4b77c892a.jpg?wh=2284%2A1171" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b9/2a/b9bf0027185405e762b46cd4b77c892a.jpg?wh=2284%2A1171" /></p>
 <p>然后，执行foo函数的调用，V8会先创建foo函数的执行上下文，并将其压入到栈中。接着执行Promise.resolve，这会触发一个micro-foo1微任务，V8会将该微任务添加进微任务队列。然后执行setTimeout方法。该方法会触发了一个macro-foo1宏任务，V8会将该宏任务添加进消息队列。那么此时：</p>
 <ul>
 <li>调用栈中包含了<strong>全局执行上下文</strong>、<strong>foo函数的执行上下文</strong>；</li>
@@ -5485,7 +5485,7 @@
 <li>消息队列中存放了一个通过setTimeout设置的宏任务，<strong>macro-foo。</strong></li>
 </ul>
 <p>此时的消息队列、主线程和调用栈的状态图如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f8/2d/f85b1b316f669316cef23c4714d4ce2d.jpg?wh=2284%2A1197" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f8/2d/f85b1b316f669316cef23c4714d4ce2d.jpg?wh=2284%2A1197" /></p>
 <p>接下来，foo函数调用了bar函数，那么V8需要再创建bar函数的执行上下文，并将其压入栈中，接着执行Promise.resolve，这会触发一个micro-bar微任务，该微任务会被添加进微任务队列。然后执行setTimeout方法，这也会触发一个macro-bar宏任务，宏任务同样也会被添加进消息队列。那么此时：</p>
 <ul>
 <li>调用栈中包含了<strong>全局执行上下文</strong>、<strong>foo函数的执行上下文、bar的执行上下文</strong>；</li>
@@ -5493,7 +5493,7 @@
 <li>消息队列中，宏任务的状态是<strong>macro-foo、macro-bar。</strong></li>
 </ul>
 <p>此时的消息队列、主线程和调用栈的状态图如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/33/1c/338875c3ff58e389af86cf2acab5bd1c.jpg?wh=2284%2A1207" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/33/1c/338875c3ff58e389af86cf2acab5bd1c.jpg?wh=2284%2A1207" /></p>
 <p>接下来，bar函数执行结束并退出，bar函数的执行上下文也会从栈中弹出，紧接着foo函数执行结束并退出，foo函数的执行上下文也随之从栈中被弹出。那么此时：</p>
 <ul>
 <li>调用栈中包含了<strong>全局执行上下文，</strong>因为bar函数和foo函数都执行结束了，所以它们的执行上下文都被弹出调用栈了；</li>
@@ -5501,7 +5501,7 @@
 <li>消息队列中宏任务的状态同样还是<strong>macro-foo、macro-bar。</strong></li>
 </ul>
 <p>此时的消息队列、主线程和调用栈的状态图如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d2/e0/d24acef2cc39b1688dff9f19b9cdb9e0.jpg?wh=2284%2A1153" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d2/e0/d24acef2cc39b1688dff9f19b9cdb9e0.jpg?wh=2284%2A1153" /></p>
 <p>主线程执行完了foo函数，紧接着就要执行全局环境中的代码Promise.resolve了，这会触发一个micro-global微任务，V8会将该微任务添加进微任务队列。接着又执行setTimeout方法，该方法会触发了一个macro-global宏任务，V8会将该宏任务添加进消息队列。那么此时：</p>
 <ul>
 <li>调用栈中包含的是<strong>全局执行上下文</strong>；</li>
@@ -5509,13 +5509,13 @@
 <li>消息队列中宏任务的状态同样还是<strong>macro-foo、macro-bar、macro-global。</strong></li>
 </ul>
 <p>此时的消息队列、主线程和调用栈的状态图如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/34/db/34fb1a481b60708360b48ba04821f6db.jpg?wh=2284%2A1143" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/34/db/34fb1a481b60708360b48ba04821f6db.jpg?wh=2284%2A1143" /></p>
 <p>等到这段代码即将执行完成时，V8便要销毁这段代码的环境对象，此时环境对象的析构函数被调用（注意，这里的析构函数是C++中的概念），这里就是V8执行微任务的一个检查点，这时候V8会检查微任务队列，如果微任务队列中存在微任务，那么V8会依次取出微任务，并按照顺行执行。因为微任务队列中的任务分别是：micro-foo、micro-bar、micro-global，所以执行的顺序也是如此。</p>
 <p>此时的消息队列、主线程和调用栈的状态图如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/26/c9/267e549592913e25bdb6dfe716eeddc9.jpg?wh=2284%2A1142" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/26/c9/267e549592913e25bdb6dfe716eeddc9.jpg?wh=2284%2A1142" /></p>
 <p>等微任务队列中的所有微任务都执行完成之后，当前的宏任务也就执行结束了，接下来主线程会继续重复执行取出任务、执行任务的过程。由于正常情况下，取出宏任务的顺序是按照先进先出的顺序，所有最后打印出来的顺序是：macro-foo、macro-bar、macro-global。</p>
 <p>等所有的任务执行完成之后，消息队列、主线程和调用栈的状态图如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6c/4a/6caa4a24f1ddd918af62f6dbcb1c464a.jpg?wh=2284%2A1171" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6c/4a/6caa4a24f1ddd918af62f6dbcb1c464a.jpg?wh=2284%2A1171" /></p>
 <p>以上就是完整的执行流程的分析，到这里，相信你已经了解微任务和宏任务的执行时机是不同的了，微任务是在当前的任务快要执行结束之前执行的，宏任务是消息队列中的任务，主线程执行完一个宏任务之后，便会接着从消息队列中取出下一个宏任务并执行。</p>
 <h2 id="_3">能否在微任务中循环地触发新的微任务？</h2>
 <p>既然宏任务和微任务都是异步调用，只是执行的时机不同，那能不能在setTimeout解决栈溢出的问题时，把触发宏任务改成是触发微任务呢？</p>
@@ -5666,8 +5666,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

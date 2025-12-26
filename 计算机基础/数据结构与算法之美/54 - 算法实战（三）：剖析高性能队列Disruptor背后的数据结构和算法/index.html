@@ -7239,7 +7239,7 @@
 </ul>
 <p>因为第一个问题和第二个问题产生的原理是类似的。所以，我着重讲解第一个问题是如何产生的以及该如何解决。对于第二个问题，你可以类比我对第一个问题的解决思路自己来想一想。</p>
 <p>两个线程同时往队列中添加数据，也就相当于两个线程同时执行类Queue中的add()函数。我们假设队列的大小size是10，当前的tail指向下标7，head指向下标3，也就是说，队列中还有空闲空间。这个时候，线程1调用add()函数，往队列中添加一个值为12的数据；线程2调用add()函数，往队列中添加一个值为15的数据。在极端情况下，本来是往队列中添加了两个数据（12和15），最终可能只有一个数据添加成功，另一个数据会被覆盖。这是为什么呢？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4f/3d/4f88bec40128dbc8c1b700b4cf38b63d.jpg?wh=1142%2A647" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4f/3d/4f88bec40128dbc8c1b700b4cf38b63d.jpg?wh=1142%2A647" /></p>
 <p>为了方便你查看队列Queue中的add()函数，我把它从上面的代码中摘录出来，贴在这里。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>public boolean add(Long element) {
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>if ((tail + 1) % size == head) return false;
@@ -7249,7 +7249,7 @@
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>}
 </code></pre></div>
 <p>从这段代码中，我们可以看到，第3行给data[tail]赋值，然后第4行才给tail的值加一。赋值和tail加一两个操作，并非原子操作。这就会导致这样的情况发生：当线程1和线程2同时执行add()函数的时候，线程1先执行完了第3行语句，将data[7]（tail等于7）的值设置为12。在线程1还未执行到第4行语句之前，也就是还未将tail加一之前，线程2执行了第3行语句，又将data[7]的值设置为15，也就是说，那线程2插入的数据覆盖了线程1插入的数据。原本应该插入两个数据（12和15）的，现在只插入了一个数据（15）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/27/3a/27ee7d9c12590cfdf02a2f95996b713a.jpg?wh=1142%2A655" /><img alt="" src="https://static001.geekbang.org/resource/image/05/f7/05764e49514974aafaa97b70214a7af7.jpg?wh=1142%2A673" /></p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/27/3a/27ee7d9c12590cfdf02a2f95996b713a.jpg?wh=1142%2A655" /><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/05/f7/05764e49514974aafaa97b70214a7af7.jpg?wh=1142%2A673" />}{:referrerpolicy="no-referrer"</p>
 <p>那如何解决这种线程并发往队列中添加数据时，导致的数据覆盖、运行不正确问题呢？</p>
 <p>最简单的处理方法就是给这段代码加锁，同一时间只允许一个线程执行add()函数。这就相当于将这段代码的执行，由并行改成了串行，也就不存在我们刚刚说的问题了。</p>
 <p>不过，天下没有免费的午餐，加锁将并行改成串行，必然导致多个生产者同时生产数据的时候，执行效率的下降。当然，我们可以继续优化代码，用<a href="https://en.wikipedia.org/wiki/Compare-and-swap">CAS</a>（compare and swap，比较并交换）操作等减少加锁的粒度，但是，这不是我们这节的重点。我们直接看Disruptor的处理方法。</p>
@@ -7260,7 +7260,7 @@
 <p>对于消费者来说，处理的过程跟生产者是类似的。它先去申请一批连续可读的存储单元（这个申请的过程也是需要加锁的），当申请到这批存储单元之后，后续的读取操作就可以不用加锁了。</p>
 <p>不过，还有一个需要特别注意的地方，那就是，如果生产者A申请到了一组连续的存储单元，假设是下标为3到6的存储单元，生产者B紧跟着申请到了下标是7到9的存储单元，那在3到6没有完全写入数据之前，7到9的数据是无法读取的。这个也是Disruptor实现思路的一个弊端。</p>
 <p>文字描述不好理解，我画了一个图，给你展示一下这个操作过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a2/ba/a2c0d268070ed7cc11a5d22eb223f3ba.jpg?wh=1142%2A856" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a2/ba/a2c0d268070ed7cc11a5d22eb223f3ba.jpg?wh=1142%2A856" /></p>
 <p>实际上，Disruptor采用的是RingBuffer和AvailableBuffer这两个结构，来实现我刚刚讲的功能。不过，因为我们主要聚焦在数据结构和算法上，所以我对这两种结构做了简化，但是基本思想是一致的。如果你对Disruptor感兴趣，可以去阅读一下它的<a href="https://github.com/LMAX-Exchange/disruptor">源码</a>。</p>
 <h2 id="_1">总结引申</h2>
 <p>今天，我讲了如何实现一个高性能的并发队列。这里的“并发”两个字，实际上就是多线程安全的意思。</p>
@@ -7410,8 +7410,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

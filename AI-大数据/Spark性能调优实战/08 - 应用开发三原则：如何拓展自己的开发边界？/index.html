@@ -7176,11 +7176,11 @@
 <p>除了钨丝计划，我们最应该关注Spark 3.0版本发布的新特性——AQE。AQE（Adaptive Query Execution）全称“自适应查询执行”，它可以在Spark SQL优化的过程中动态地调整执行计划。</p>
 <p>我们知道，Spark SQL的优化过程可以大致分为语法分析、语义解析、逻辑计划和物理计划这几个环节。在3.0之前的版本中，Spark仅仅在编译时基于规则和策略遍历AST查询语法树，来优化逻辑计划，一旦基于最佳逻辑计划选定物理执行计划，Spark就会严格遵照物理计划的步骤去机械地执行计算。</p>
 <p><strong>而AQE可以让Spark在运行时的不同阶段，结合实时的运行时状态，周期性地动态调整前面的逻辑计划，然后根据再优化的逻辑计划，重新选定最优的物理计划，从而调整运行时后续阶段的执行方式。</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4c/17/4cdd21d991c290a12e34d5dbfbdf1f17.jpg?wh=3969%2A1131" title="Spark SQL端到端优化流程" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4c/17/4cdd21d991c290a12e34d5dbfbdf1f17.jpg?wh=3969%2A1131" title="Spark SQL端到端优化流程" /></p>
 <p>你可能会问：“听上去这么厉害，那AQE具体都有哪些改进呢？”AQE主要带来了3个方面的改进，分别是自动分区合并、数据倾斜和Join策略调整。我们一一来看。</p>
 <p><strong>首先，自动分区合并很好理解</strong>，我们拿Filter与Coalesce来举例。分布式数据集过滤之后，难免有些数据分片的内容所剩无几，甚至为空，所以为了避免多余的调度开销，我们经常会用Coalesce去做手工的分区合并。</p>
 <p>另外，在Shuffle的计算过程中，同样也存在分区合并的需求。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4a/a6/4a12bc05971799da422e942754c72fa6.jpg?wh=4989%2A1506" title="Spark支持AQE前后" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4a/a6/4a12bc05971799da422e942754c72fa6.jpg?wh=4989%2A1506" title="Spark支持AQE前后" /></p>
 <p>以上图为例，我们可以看到，数据表原本有2个分区，Shuffle之后在Reduce阶段产生5个数据分区。由于数据分布不均衡，其中3个分区的数据量很少。对CPU来说，这3个小分区产生的调度开销会是一笔不小的浪费。在Spark支持AQE以前，开发者对此无能为力。现在呢，AQE会自动检测过小的数据分区，并对它们自动合并，根本不需要我们操心了。</p>
 <p><strong>其次是数据倾斜（Data Skew），它在数据分析领域中很常见</strong>，如果处理不当，很容易导致OOM问题。</p>
 <p>比方说，我们要分析每一个微博用户的历史行为。那么，不论是发博量还是互动频次，普通用户与头部用户（明星、网红、大V、媒体）会相差好几个数量级。这个时候，按照用户ID进行分组分析就会产生数据倾斜的问题，而且，同一Executor中的执行任务基本上是平均分配可用内存的。因此，一边是平均的内存供给，一边是有着数量级之差的数据处理需求，数据倾斜严重的Task报出OOM错误也就不足为怪了。</p>
@@ -7189,7 +7189,7 @@
 <p>针对这种情况，AQE会根据运行时的统计数据，去动态地调整Join策略，把之前敲定的Sort Merge Join改为Broadcast Join，从而改善应用的执行性能。</p>
 <p>说了这么多，对于这些天然的优势，我们到底怎么才能利用好呢？首先，<strong>想要利用好Tungsten的优势，你只要抛弃RDD API，采用DataFrame或是Dataset API进行开发就可了</strong>，是不是很简单？</p>
 <p>不过，<strong>AQE功能默认是关闭的，如果我们想要充分利用自动分区合并、自动数据倾斜处理和Join策略调整，需要把相关的配置项打开</strong>，具体的操作如下表所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bb/75/bbc4f9f8a39990b2c85d9d9bc46e2e75.jpeg?wh=1369%2A419" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bb/75/bbc4f9f8a39990b2c85d9d9bc46e2e75.jpeg?wh=1369%2A419" /></p>
 <p>总的来说，通过钨丝计划和AQE，我们完全可以实现低投入、高产出，这其实就是坐享其成的核心原则。除此之外，类似的技巧还有用SQL functions或特征转换算子去取代UDF等等。我非常希望你能在开发过程中去主动探索、汇总这些可以拿来即用的技巧，如果有成果，也期待你在留言区分享。</p>
 <h2 id="_3">原则二：能省则省、能拖则拖</h2>
 <p>在很多数据处理场景中，为了快速实现业务需求，我往往会对数据清洗、过滤、提取、关联和聚合等多种操作排列组合来完成开发。这些排列组合的执行性能参差不齐、有好有坏，那我们该怎么找到性能更好的实现方式呢？</p>
@@ -7430,8 +7430,6 @@ filter应该是在优化范围内的,自动提升到最前边</p>2021-11-22</li>
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

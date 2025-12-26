@@ -14149,7 +14149,7 @@
 <h2 id="patch-code">patch code技术</h2>
 <p>我们知道，在Java语言中，类是按需加载的。也就是对于一个class文件，只有当hotspot第一次使用它的时候，它才会被加载进来。假如我们在即时编译A方法的时候要调用B方法，但这时B方法还没有被加载进来，该怎么办呢？</p>
 <p>虚拟机会采用一种叫做patch code的技术，在运行时再进行加载。简单地说，就是在生成call指令时候，它的目标地址填成一个虚拟机内部的用于解析符号的方法。在CPU执行这条call语句的时候，就会调用符号解析函数。此时虚拟机就会加载B方法所在的类，然后就能确定B方法的地址了，这时再把B方法的地址写回到call指令里。这个过程如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/78/4c/78e36fae2f8c8239bae9fe422b1dce4c.jpg?wh=2284x1570" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/78/4c/78e36fae2f8c8239bae9fe422b1dce4c.jpg?wh=2284x1570" /></p>
 <p>这个过程很像是在给原始的代码打补丁，所以人们就把这种方式称为<strong>patch code技术</strong>。这就像是在原来的代码安装了一个机关，当CPU执行到这个机关时，就会触发一次符号的重定位，然后这个机关就被替换掉了。下一次CPU再执行到这个call指令的时候，就可以正常地调用到B方法了。</p>
 <p>上节课，加载器在加载动态库时就把它的GOT中的所有符号都解析了，这种方法却把解析符号的过程又往后推到了执行代码时解析。</p>
 <p>在Hotspot里的patch code技术，会直接修改指令参数。不过，运行时修改指令总是一件很危险的事情。所以，动态库真正使用的运行时解析符号技术是延迟绑定技术，它的关键步骤和patch code很相似，但却比patch code的安全性更好一些，我们一起来看一下。</p>
@@ -14158,10 +14158,10 @@
 <p>对于我们当前的问题来说，<strong>将函数地址的重定位工作一直推迟到第一次访问的时候再进行，这就是延迟绑定(Lazy binding)的技术</strong>。这样的话，对于整个程序运行过程中没有访问到的全局函数，可以完全避免对这类符号的重定位工作，也就提高了程序的性能。</p>
 <p>patch code显然也是一种延迟绑定的技术，但是它要在运行时修改指令参数，这会带来风险。所以动态库的延迟绑定选择了继续使用GOT表来进行间接调用，然后patch的对象就不再是指令了，而是GOT中的一项。</p>
 <p>理想情况下，我们把GOT中的待解析符号的地方都填成动态符号解析的函数就可以了，当CPU执行到这个函数的时候，就会跳转进去解析符号，然后把GOT表的这一项填成符号的真正的地址。如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3b/e4/3b5b98531abd2b754e40d5af9cd32be4.jpg?wh=2284x1539" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3b/e4/3b5b98531abd2b754e40d5af9cd32be4.jpg?wh=2284x1539" /></p>
 <p>但是动态解析符号的函数_dl_runtime_resolve依赖两个参数，一个是当前动态库的ID，另一个是要解析的符号在GOT表中的序号。动态库的ID存储在GOT的0x8偏移的位置，而要解析的符号序号却不容易得到。</p>
 <p>为了解决传递参数的问题，动态链接又引入了过程链接表（Procedure Linkage Table， PLT)，将动态解析符号的过程做成了三级跳。如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b6/02/b675cc80d4e8c10af17249d4e6461f02.jpg?wh=2284x1648" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b6/02/b675cc80d4e8c10af17249d4e6461f02.jpg?wh=2284x1648" /></p>
 <p>在图中，我用序号①、②、③和它们旁边的箭头分别给你标注出了三级跳的路径。如果你仔细观察的话，你还会发现这张图与上一张图的主要变化就是引入了.plt段，在代码段里，main函数对B函数的调用转成了对"B@plt"的调用，"B@plt"函数只有三条指令。</p>
 <p>它的第一条指令jmp *(GOT[3])是一个间接跳转，跳转的目标是GOT表偏移为0x18的位置，正常情况下，这个位置应该放的是B函数的真实地址。但现在填入的是指向了B@plt + 0x6的位置，这是为了传递参数给_dl_runtime_resolve函数。B@plt+0x6的位置其实就是B@plt函数的第二条指令，它的作用是将函数参数入栈，然后执行第三条指令jmp .plt再准备第二个参数。</p>
 <p>我们再回到图中看看，在序号①箭头的位置，也就是第一级跳转，它的目的是把参数0入栈。由于GOT表的0x0，0x8，0x10的位置都被占用了，所以参数0代表的就是0x18位置，这就是B函数的真实地址应该存放的地方。</p>
@@ -14170,7 +14170,7 @@
 <p>上述过程由于传参的需要而变成了多级跳转，但如果抛开因为传参而产生的两级跳转，你会发现它的基本结构与patch code技术如出一辙。</p>
 <p>这样的跳转虽然麻烦，但有一个非常重要的优点，就是运行期间不会修改代码段的指令，所有的修改只涉及了GOT这个位于数据段的表里。我们在<a href="https://time.geekbang.org/column/article/431904">第3节课</a>就已经介绍过，.code和.plt会被加载到内存的代码段(code segment)，它的权限是可读可执行，但不可写；上节课也讲了.got会被加载进数据段，它的权限是可读可写。我们现在介绍的<strong>多级跳转的延迟绑定技术的整个重定位过程最终只会修改GOT的0x18这一个位置，其他位置都不必发生变化</strong>。</p>
 <p>当执行完了重定位过程以后，CPU再一次运行到main里的call指令时，就能通过一次跳转就调用到真正的B函数了，这时的GOT已经与上节课所讲的加载时重定位后的GOT一模一样了。如图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fb/11/fb2fb8ca742131711b040df30a452411.jpg?wh=2284x1742" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fb/11/fb2fb8ca742131711b040df30a452411.jpg?wh=2284x1742" /></p>
 <p>在这个图里，重定位完以后，只有红色字体的代码和数据是起作用的，.plt段里的其他代码就被“短路”掉了。这时，GOT表的结构就与上节课所讲的加载时重定位的情况完全一样了。<strong>只有用到的符号才会被重定位，这就是延迟绑定技术</strong>。未被用到的符号在加载时被重定位，这是一种浪费，而延迟绑定技术避免了这种浪费。为了加深理解，我结合一个具体例子向你展示延迟绑定是怎么实现的。</p>
 <h2 id="_2">延迟绑定技术的具体实现</h2>
 <p>下面我们还是根据上节课的例子来看一下延迟绑定技术的具体实现。</p>
@@ -14284,7 +14284,7 @@
 </ul>
 <p>最后，有的so文件还会有.init段，进行一些初始化函数的调用，例如so中全局变量的对象构造函数，或者用户自己生成在.init段的初始化函数等。这些都会由ld-linux.so在最后的阶段进行一次调用。当这些完成之后，ld-linux.so就会结束自己的使命，最终将程序的控制流转到可执行文件的入口函数中进行。</p>
 <p>整个Loader加载动态链接的可执行文件流程如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fb/ca/fb26425534d40bcec723f2716cb42eca.jpg?wh=2284x1280" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fb/ca/fb26425534d40bcec723f2716cb42eca.jpg?wh=2284x1280" /></p>
 <h2 id="_3">总结</h2>
 <p>我们通过三节课的学习，弄明白了“将符号转成地址”这个工作是由谁、在何时、如何完成的。</p>
 <p>编译器在把源代码翻译成汇编指令的过程中，由于不知道其他编译单元的符号的真实地址，在引用这些符号的时候只能使用占位符（通常是0）来代替。这些占位符由链接器填充。当链接器把所有的符号的位置都确定好以后，再把真实地址回填到占位符里，这个过程就是重定位。</p>
@@ -14296,7 +14296,7 @@
 <p>链接与加载还有很多细节，但我已经带你建立起了基本的知识框架。如果对链接和加载还有更浓厚的兴趣，你可以参考<a href="https://book.douban.com/subject/3652388/">《程序员的自我修养 》</a>，<a href="https://book.douban.com/subject/4083265/">《链接器和加载器 》</a>等书，以便了解更多的相关结构和算法。</p>
 <h2 id="_4">思考题</h2>
 <p>相信你已经完全理解了动态链接器的时机和原理了，那么请你思考一下：在生成一个动态库文件的时候，我们一定要加shared选项，但-fPIC选项是必然要加的吗？有没有不需要用这个选项的情况呢？如果没有，为什么？如果有的话，又是什么情况呢？欢迎你在留言区分享你的想法和收获，我在留言区等你。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9e/a2/9e53f01990e33e735ff21a751e23eaa2.jpg?wh=2284x1386" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9e/a2/9e53f01990e33e735ff21a751e23eaa2.jpg?wh=2284x1386" /></p>
 <p>好啦，这节课到这就结束啦。欢迎你把这节课分享给更多对计算机内存感兴趣的朋友。我是海纳，我们下节课再见！</p>
 <div><strong>精选留言（11）</strong></div>
 <ul>
@@ -14509,8 +14509,6 @@ libltdl.so.7 =&gt; &#47;opt&#47;mariadb34&#47;lib&#47;libltdl.so.7 (0x00007f605a
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

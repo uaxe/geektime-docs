@@ -6827,12 +6827,12 @@
 <p>那么，解密端是怎么知道解密是成功还是失败呢？到目前为止，在我们已经讨论过的密码学技术中，我们唯一能够利用的，就是数据补齐方案。我们先来看看，数据怎么补齐？</p>
 <h3 id="_2">数据怎么补齐？</h3>
 <p>简单来说，CBC模式的补齐数据，就是一个数据分组缺失的数据的长度。比如，对于AES来说，数据分组是16个字节。如果一段数据只有15个字节，补齐的数据就是一个1；如果有14个字节，补齐的数据就是两个2；以此类推，如果只有一个字节，补齐的数据就是十五个15 。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/95/fe/953c67a8a6fb6fc9aeddbcc6bf7074fe.png?wh=2284%2A2070" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/95/fe/953c67a8a6fb6fc9aeddbcc6bf7074fe.png?wh=2284%2A2070" /></p>
 <p>不过，这个数据补齐方案有明显的缺陷。</p>
 <p>当数据分组最后一个字节是1，解密端不太好判断这个字节到底是补齐数据，还是有效数据。所以，很多标准和协议使用最后一个数据分组的最后一个字节来标明补齐数据。</p>
 <p>如果一段数据只有15个字节，补齐的数据就只有这个标识字节，数值为0，表示没有额外的补齐数据；如果有14个字节，标识字节为1，表示还有一个字节的额外补齐数据，额外的补齐数据的数值也是1；如果有13个字节，标识字节为2，表示还有两个字节额外补齐数据，额外的补齐数据的数值也是2；以此类推。</p>
 <p>需要注意的是，如果一段数据有16个字节，也就是刚好一个数据分组大小，这时候，就需要一个全是补齐数据的数据分组，它的每一个字节都是15。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/82/bd/82198699be86df8f3b0c23fe3aa192bd.png?wh=2284%2A2070" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/82/bd/82198699be86df8f3b0c23fe3aa192bd.png?wh=2284%2A2070" /></p>
 <p>为了方便，下面的讨论中，我们都使用有标识字节的数据补齐方案，除非特别声明。</p>
 <h3 id="_3">补齐怎么校验？</h3>
 <p>那你会不会有疑问，我们如何在解密端，判断一个数据分组中的数据是不是补齐数据？</p>
@@ -6846,16 +6846,16 @@
 <li>加密和解密共享的密钥K。</li>
 </ul>
 <p>这一次的密文分组Ci和密钥K，通过解密函数的运算，可以产生一个中间结果Ti，也就是解密函数运算的中间结果Ti；然后，解密函数运算结果Ti和上一次的密文分组进行异或运算，获得明文分组Pi，Pi = Ci-1 ^ Ti。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4c/6b/4c1b630e4be11354cf37e3da500b516b.jpeg?wh=2284%2A1285" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4c/6b/4c1b630e4be11354cf37e3da500b516b.jpeg?wh=2284%2A1285" /></p>
 <p>接下来，我们利用数据补齐方案的攻击，通过修改、构造最后一个密文分组Cn的前一个密文分组Cn-1，也就是倒数第二个密文分组，然后让解密端解密构造后的密文数据，观察修改了密文数据的解密能不能成功。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/27/d6/27124b457a8a65f1eae06636974db6d6.jpeg?wh=1920%2A1080" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/27/d6/27124b457a8a65f1eae06636974db6d6.jpeg?wh=1920%2A1080" /></p>
 <p>那倒数第二个密文分组该怎么构造呢？首先，修改该密文分组的最后一个字节，该字节可以从零开始。毫无疑问，解密端并不能正确解密该密文分组，得到的明文分组也不是期望的明文数据。</p>
 <p>但是，正像我们前面讨论的，解密端并没有办法知道这一个密文分组解密失败。要判断解密是否成功，还需要判断最后一个明文分组的补齐数据是不是符合规范。</p>
 <p>如果我们修改倒数第二个密文分组的最后一个字节，那么解密后的最后一个明文分组应该只有最后一个字节受到影响。如果这个解密后的字节是零，其他的数据会被解读为有效数据，这样就会通过补齐数据的校验。如果这个解密后的字节是其他数值，补齐数据的校验通过的概率就很小。实际的攻击过程，这么一点小小的概率也可以优化过滤掉。</p>
 <p>如果解密后的这个字节不是零，那么，补齐数据的校验就会失败，解密端就会报错。观察解密端的行为，攻击者就能了解到，这个构造的字节没有通过解密过程。如果观察到失败，攻击者就会调节最后一个字节的数值，比如数值加一，然后再次让解密端尝试解密。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/85/69/85c1d2c0991b930147e5580849fbb069.png?wh=2284%2A1157" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/85/69/85c1d2c0991b930147e5580849fbb069.png?wh=2284%2A1157" /></p>
 <p>一个字节只有256种可能性，最多尝试255次，一定会有一次尝试，补齐数据是零。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/86/79/860a6ccfa7175c1f424acf27d3535b79.png?wh=2284%2A1127" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/86/79/860a6ccfa7175c1f424acf27d3535b79.png?wh=2284%2A1127" /></p>
 <p>当攻击者观察到解密成功时，他能够掌握哪些数据呢？他能够直接得到的数据包括：</p>
 <ul>
 <li>未修改密文分组的最后一个字节的数值（Cn-1[15]）；</li>
@@ -7057,8 +7057,6 @@ CBC存在“补齐预言攻击”  前提条件是解密端判断解密失败是
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

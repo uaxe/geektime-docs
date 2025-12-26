@@ -7871,12 +7871,12 @@
 </ul>
 <p>其实这个组合和我们之前学习的Bigtable非常类似。Zonemaster就好像Bigtable里的Master节点，负责分配Tablet；Spanserver就好像Tablet Server，负责提供数据和在线服务。而Location Proxy则是新出现的节点，它承担了原先Chubby和METADATA表的功能。</p>
 <p>只不过，相比原先的METADATA表是直接作为Bigtable里的一张表出现，Location Proxy则是把这个功能完全独立了出来。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8e/52/8ecdae8871793535c3a08dc1274f6352.jpg?wh=1920x709" title="其实分布式数据库的基本架构都是相似的，通过Master管理数据分区，通过Tablet Server提供分区数据的在线服务，然后数据在哪一个分区都不从Master查询而是独立剥离出来，避免Master成为系统性能瓶颈" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8e/52/8ecdae8871793535c3a08dc1274f6352.jpg?wh=1920x709" title="其实分布式数据库的基本架构都是相似的，通过Master管理数据分区，通过Tablet Server提供分区数据的在线服务，然后数据在哪一个分区都不从Master查询而是独立剥离出来，避免Master成为系统性能瓶颈" /></p>
 <p>一个Zone里，只会有一个Zonemaster，但是会有多个Location Proxy，但是又有成百上千个Spanserver。而每个Spanserver里，又和Bigtable里的Tablet Server一样，会负责管理100~1000个Tablet。</p>
 <p>而在很多个Zone之上，整个Spanner宇宙里，还会有两个服务器。</p>
 <p>一个叫做<strong>Universemaster</strong>，也就是这个宇宙的Master，它只是提供一系列的控制台信息，主要是Zone的各种状态信息。这些信息就像我们在MapReduce的论文里见过的<a href="https://time.geekbang.org/column/article/423598">JobTracker</a>那样，通过暴露各类信息，方便我们去监控和调试整个“宇宙”。</p>
 <p>还有一个服务器，叫做<strong>Placement Driver</strong>，它的作用就是调度数据，也就是把数据分配到不同的Zone里。这个分配策略，是使用数据库的应用程序就可以定义的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/22/6d/2291c22c9ca818deaf8629f2914f5c6d.jpg?wh=1920x1080" title="论文中的图1，也就是Spanner的Server的组织结构图" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/22/6d/2291c22c9ca818deaf8629f2914f5c6d.jpg?wh=1920x1080" title="论文中的图1，也就是Spanner的Server的组织结构图" /></p>
 <p>另外在Spanner的论文里，列出了它支持的一些控制的策略，包括：</p>
 <ul>
 <li><strong>明确指定哪些数据中心应该包括哪些数据</strong>。这个设置，是把数据在不同Zone内进行分布的权利，放到了应用开发人员的手里。</li>
@@ -7892,7 +7892,7 @@
 <p>首先是<strong>数据模型</strong>。Spanner的底层数据存储，是一个B树这样的数据结构，以及对应的预写日志（WAL）。Spanner没有像Bigtable那样，采用SSTable这样的LSM树。所以Spanner的数据模型，更像是一个<strong>关系型数据库</strong>，而不是一个KV数据库。</p>
 <p>在Bigtable里，我们看到每一个列的值，都有一个时间戳，在Megastore里我们也利用这个时间戳，来实现数据的多版本和MVCC下的隔离性。但是，作为一个数据库，其实我们的<strong>“版本”应该是在整条数据上</strong>，而不是某一列的数据上，我们的<strong>数据库事务，针对的也是整条数据记录</strong>。</p>
 <p>否则，我们在实践中就会遇到一些繁琐的操作，就是在更新数据的时候，需要先读出所有列的数据，再重新用一个新版本写回去。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9a/89/9aec4f65f1d79c349dea87759b1bdd89.jpg?wh=1920x975" title="Bigtable里，不同的Column的Value里的TimeStamp可能并不相同[br]那么“最新”版本的数据，到底是只包含T3这个时间戳？还是包含所有最后一个时间戳的Column的值呢？" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9a/89/9aec4f65f1d79c349dea87759b1bdd89.jpg?wh=1920x975" title="Bigtable里，不同的Column的Value里的TimeStamp可能并不相同[br]那么“最新”版本的数据，到底是只包含T3这个时间戳？还是包含所有最后一个时间戳的Column的值呢？" /></p>
 <p>所以，在Spanner的实现里，对应的时间戳也就是在整条数据上，也就是论文里列出的：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">(</span><span class="n">key</span><span class="p">:</span><span class="n">string</span><span class="p">,</span><span class="w"> </span><span class="n">timestamp</span><span class="p">:</span><span class="n">int64</span><span class="p">)</span><span class="w"> </span><span class="o">⇒</span><span class="w"> </span><span class="n">string</span>
 </code></pre></div>
@@ -7901,7 +7901,7 @@
 <p>然后，为了保障数据的同步复制，Spanserver自然也是采用了<strong>Paxos算法</strong>。这个Paxos算法，是作用在每一个Tablet上的。也就是在这个场景下，每一个Tablet相当于是Megastore里面的一个实体组。不过，它的Tablet里就不像实体组那样，只能有一条根实体的记录了。这个，会对Spanner的事务功能产生很大的影响，不过关于事务的部分，我们就要放到下一讲来讲了。</p>
 <p>Spanner的Paxos算法实现，也是采用基于Leader的算法。不过，这个Leader，并不是在每一轮事务的时候指定的。因为Spanner和Megastore不同，不是一个实体组就是一个迷你数据库。一个Paxos状态机，需要管理整个Tablet里的很多条记录。所以，<strong>这个Leader是类似于Chubby锁里面的“租约”的机制</strong>。</p>
 <p>一个租约是在0~10s之间，这段时间之内，Leader并不会改变。我们的数据写入，都是从Leader发起的，但是所有的其他副本，也都会拥有完整的数据，所以Spanserver读数据，可以从任意一个副本进行。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d0/e8/d0f6147b1acc60f2854ac735fe6000e8.jpg?wh=1920x1080" title="论文里的图2，Spanner的数据复制的架构，其中的数据库事务部分，我们会放到后面来单独讲解" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d0/e8/d0f6147b1acc60f2854ac735fe6000e8.jpg?wh=1920x1080" title="论文里的图2，Spanner的数据复制的架构，其中的数据库事务部分，我们会放到后面来单独讲解" /></p>
 <p>论文里写了，在数据写入的时候，Spanner其实会写入两份日志，一份是Paxos日志，一份是Tablet日志，当然这个会在后续改进。不过，这个其实凸显出了一点，那就是Spanner不像Megastore那样，是基于Bigtable这个间接层来实现事务日志和数据存储的，而是<strong>完全重新设计开发了一个支持同步复制的底层存储引擎</strong>。</p>
 <h3 id="spanner_1">Spanner的数据调度</h3>
 <p>一个Tablet和它的所有副本，在Spanner里组成了一个<strong>Paxos组</strong>（Paxos Group）。Spanner的一个重要的设计，是可以实现“数据调度”，也就是把数据记录，调度到不同的数据中心里。而这个调度，就是在不同的Paxos组之间进行的。</p>
@@ -7911,7 +7911,7 @@
 <p>之所以这样做，是因为虽然通常数据的访问有局部性，但是这个局部性不一定是空间局部性。也就是不一定所有连续的行键数据，都会频繁地被一起访问。</p>
 <p>而在Spanner这个设计下，我们可以把那些频繁共同访问的目录，调度到相同的Paxos组里。这样无论是读数据，还是写数据，都可以在一个Paxos组里完成，进而可以提升读写性能。<strong>我们可以根据实际数据被访问后的统计数据，来做动态的调度，而不是局限于在设计数据表结构的时候，必须要万无一失。</strong></p>
 <p>而整个数据在不同Paxos组之间的转移，则是通过一个<strong>movedir的后台任务</strong>。这个任务也不是一个事务，这是为了避免在转移数据的过程里，阻塞了正常的数据库事务读写。它的策略是先在后台转移数据，而当所有数据快要转移完的时候，再启动一个事务转移最后剩下的数据，来减少可能的阻塞时间。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d7/7d/d7dc2f7cf50ae532974347b6ccd2727d.jpg?wh=1920x1080" title="论文中的图3，数据在不同Paxos组之间的调度和迁移，是以“目录”作为单位的" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d7/7d/d7dc2f7cf50ae532974347b6ccd2727d.jpg?wh=1920x1080" title="论文中的图3，数据在不同Paxos组之间的调度和迁移，是以“目录”作为单位的" /></p>
 <p>不过，虽然Spanner定义目录是可以指定我们前面所说的，控制副本放在哪些Zone里的最小单元，但是实际上，当一个目录变得太大的时候，Spanner还会再进行<strong>分片存储</strong>。不同分片还会存储到不同的Paxos组里，也就是不同的Zone和服务器里。我们的movedir进程转移的也是分片而不是整个目录，所以在具体的实现上，其实Spanner会比这个抽象的模型更加复杂。</p>
 <h3 id="spanner_2">Spanner的数据模型</h3>
 <p>了解了Spanner的Spanserver的架构，以及对应的数据转移策略，我们最后再来看看Spanner的数据模型。其实Spanner的数据模型和Megastore的基本一致，因为Spanner设计的时候，Megastore的数据模型已经在Google内部得到普及了。</p>
@@ -7931,7 +7931,7 @@
 <a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="p">}</span><span class="w"> </span><span class="nc">PRIMARY</span><span class="w"> </span><span class="nc">KEY</span><span class="w"> </span><span class="p">(</span><span class="n">uid</span><span class="p">,</span><span class="w"> </span><span class="n">aid</span><span class="p">),</span>
 <a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="nc">INTERLEAVE</span><span class="w"> </span><span class="nc">IN</span><span class="w"> </span><span class="nc">PARENT</span><span class="w"> </span><span class="nc">Users</span><span class="w"> </span><span class="nc">ON</span><span class="w"> </span><span class="nc">DELETE</span><span class="w"> </span><span class="nc">CASCADE</span><span class="p">;</span>
 </code></pre></div>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/98/82/98ddd41d6fcaacea1e6caaa64e96ce82.jpg?wh=2000x916" title="来自论文中的图4[br]其实和Megastore里面我们看到的Schema定义很像，一对多的外键关联，是明确申明定义的[br]这样能够方便Spanner管理数据的布局，以及目录数据的调度" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/98/82/98ddd41d6fcaacea1e6caaa64e96ce82.jpg?wh=2000x916" title="来自论文中的图4[br]其实和Megastore里面我们看到的Schema定义很像，一对多的外键关联，是明确申明定义的[br]这样能够方便Spanner管理数据的布局，以及目录数据的调度" /></p>
 <p>而这个关系的声明，就使得Spanner可以直接根据这个信息，去对应地调度数据，从而让相同的父子行的数据，都会在一个目录里，来保障实际的访问性能。</p>
 <h2 id="_1">小结</h2>
 <p>好了，相信到这里，你对Spanner的整体设计已经有了一个清楚的理解。在这一讲的一开始，我们就看到了Megastore其实很难做到Spanner的设计目标，也就是一个“全球”的、上百数据中心、万亿级别的数据库。</p>
@@ -8084,8 +8084,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -14192,9 +14192,9 @@
 <p>前面我说过，不能盲目相信QPS结果，优化的时候要综合分析。为了让你理解这一点，我们结合一个例子来看看。</p>
 <p>我们常见的业务会请求多个依赖的服务处理数据，这些都是<strong>串行阻塞等待</strong>的。当一个服务请求过多其他服务时，接口的响应速度和QPS就会变得很差。</p>
 <p>这个过程，你可以结合后面的示意图看一下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a2/57/a288f35f99792609499f1a611eacab57.jpg?wh=2821x1818" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a2/57/a288f35f99792609499f1a611eacab57.jpg?wh=2821x1818" />
 为了提高性能，有些业务对依赖资源做了优化，通过<strong>并行请求</strong>依赖资源的方式提高接口响应速度。具体的实现请看下图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2d/a4/2d0fc3c24dfb3fb6f194721f54208ba4.jpg?wh=2821x1818" title="并行请求依赖资源" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2d/a4/2d0fc3c24dfb3fb6f194721f54208ba4.jpg?wh=2821x1818" title="并行请求依赖资源" /></p>
 <p>如上图，业务请求依赖接口的时候不再是串行阻塞等待处理，而是并行发起请求获取所有结果以后，并行处理业务逻辑，最终合并结果返回给客户端。这个设计会大大提高接口的响应速度，特别是依赖多个资源的服务。</p>
 <p>但是，这样优化的话有一个副作用，这会加大内网依赖服务的压力，导致内网的服务收到更多的瞬时并发请求。如果我们大规模使用这个技巧，流量大的时候会导致内网请求放大，比如外网是1WQPS，而内网流量放大后可能会有10W QPS，而内网压力过大，就会导致网站整体服务不稳定。</p>
 <p>所以，并行请求依赖技巧并不是万能的，我们需要注意依赖服务的承受能力，这个技巧更适合用在读多写少的系统里。对于很多复杂的内网服务，特别是<strong>事务一致性的服务</strong>，如果并发很高，这类服务反而会因为锁争抢超时，无法正常响应。</p>
@@ -14202,14 +14202,14 @@
 <h3 id="_3">临时缓存服务</h3>
 <p>临时缓存优化也是压测里需要特殊应对的一种情况，其实我们早在<a href="https://time.geekbang.org/column/article/596644">第二节课</a>就提到过。</p>
 <p>临时缓存通常会这样实现，示意图如下所示：
-<img alt="" src="https://static001.geekbang.org/resource/image/44/34/44572f33cdff2ec7aa9817b7507efc34.jpg?wh=2821x1818" title="请求依赖接口如果有缓存，则直接走缓存" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/44/34/44572f33cdff2ec7aa9817b7507efc34.jpg?wh=2821x1818" title="请求依赖接口如果有缓存，则直接走缓存" /></p>
 <p>结合上图，我们可以看到，接口请求依赖数据时会优先请求缓存，如果拿到缓存，那么就直接从缓存中获取数据，如果没有缓存直接从数据源获取，这样可以加快我们服务的响应速度。</p>
 <p>在通过临时缓存优化的服务做压测的时候，你会看到同参数的请求响应很快，甚至QPS也很高，但这不等同于服务的真实性能情况，系统不稳定的隐患仍然存在。为什么这么说呢？</p>
 <p>这是因为临时缓存的优化，针对的是会被频繁重复访问的接口，优化之后，接口的第一次请求还是很缓慢。如果某类服务原有接口依赖响应很慢，而且同参数的请求并不频繁，那这类服务的缓存就是形同虚设的。</p>
 <p>所以这种结构不适合用在低频率访问的业务场景，压测时我们也要注意这种接口平时在线上的表现。</p>
 <h3 id="_4">分片架构</h3>
 <p>接下来，我们再看看数据分片架构。下图是通过分片缓解压力的架构（我们在<a href="https://time.geekbang.org/column/article/609716">第18节课</a>的时候提到过）：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/03/08/03298d02faa7cd5d38cc513d137e7508.png?wh=1920x1142" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/03/08/03298d02faa7cd5d38cc513d137e7508.png?wh=1920x1142" /></p>
 <p>数据分片架构的服务，会根据一些标识id作为分片依据，<strong>期望</strong>将请求均衡地转发到对应分片，但是实际应用时，情况不一定和预期一致。</p>
 <p>我结合一个曾经踩过的坑和你分享经验。在线培训的业务里，当时选择了班级ID作为分片标识，10W人在线互动时，实际却只有一个分片对外服务，所有用户都请求到了一个分片上，其他分片没有太多流量。</p>
 <p>出现这种情况主要是两个原因：第一，我们的班级id很少，这是一个很小的数据范围，所以hash的时候如果算法不够分散，就会把数据放到同一个分片上；第二，因为hash算法有很多种，不同算法计算出的结果，分散程度也不同，因此有些特征的数据计算结果不会太分散，需要我们验证选择。</p>
@@ -14382,8 +14382,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

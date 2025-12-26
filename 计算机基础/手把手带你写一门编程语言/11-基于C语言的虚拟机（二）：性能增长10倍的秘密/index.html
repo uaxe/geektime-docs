@@ -6386,19 +6386,19 @@
 <a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>}OprandStack;
 </code></pre></div>
 <p>这样就导致我们一个栈桢的内存布局被切成了4小块：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/28/cd/28dab40e138aaeece61dd817e72c06cd.jpg?wh=1920x1253" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/28/cd/28dab40e138aaeece61dd817e72c06cd.jpg?wh=1920x1253" /></p>
 <p>很显然，这是一个可以优化的设计。其实，我们可以一次就申请出整个栈桢所需的内存，而不是分成4次。这样减少了malloc的调用次数，并且还会更好地避免内存的碎片化。好，现在我们就来做第一次的优化看看。</p>
 <h2 id="_3">第一次优化：把栈桢组合成一个整体</h2>
 <p>这个时候，我们重新编写一下为栈桢申请内存的程序。</p>
 <p>首先我们需要计算整个栈桢的整体大小。在下图中，我列出了每块内存大小的计算公式。加到一起后就是整个栈桢的大小了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0a/0d/0a8f0920c9a77f80d58d0b49d7ae4f0d.jpg?wh=1549x2248" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0a/0d/0a8f0920c9a77f80d58d0b49d7ae4f0d.jpg?wh=1549x2248" /></p>
 <p>在申请了一整块内存以后，我们就获得了一个指针，指向内存块的起始位置。然后，我们可以安排内存的布局，并计算出本地变量的数组、操作数栈，以及操作数栈中的数据区这三个指针的值。</p>
 <p>这样的话，你就可以在程序中使用这些指针来访问数据了，这跟单独为每个指针申请内存没啥区别。这就是C/C++语言的一些便利之处：<strong>你可以自己给每个指针赋值</strong>。当然，这种操作要小心一点，如果地址计算错误，会引发程序执行的问题。</p>
 <p>好了，这样做之后，我们成功地把内存申请和释放的次数降低到了原来的1/4。那么，还有没有可以进一步优化的地方呢？还是有的，我们来开始第二次优化。</p>
 <h2 id="arena">第二次优化：基于Arena机制来管理栈桢</h2>
 <p>在我们的虚拟机中，每一次函数调用，都要创建一次栈桢。这样的话，每一次函数调用都要做一次内存申请。</p>
 <p>fibonacci(n)函数的时间复杂度是指数级。随着n的增加，函数调用的次数会迅速增加。具体来说，fibonacci(n)函数的时间复杂度是下面这个公式：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/03/6d/03e8c0e2e40be4048ef7c3cdc4e1b06d.png?wh=528x114" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/03/6d/03e8c0e2e40be4048ef7c3cdc4e1b06d.png?wh=528x114" /></p>
 <p>比如，当n=30时，需要做832,040次函数调用，当n=40时，那就需要做1亿多次函数调用。如果按照我们现有的内存管理机制，就要做1亿多次内存申请和释放的动作。</p>
 <p>那有没有办法减少这个数值呢？当然有。</p>
 <p>我们面临的问题，其实像V8和JVM这些虚拟机都会遇到。并且，它们不仅仅需要降低由于栈桢导致的内存分配和释放的开销，这些虚拟机在运行时还会产生很多小对象，也可能像我们这个例子那样，产生上亿次分配内存的请求，从而导致大量的性能开销。</p>
@@ -6406,18 +6406,18 @@
 <p>说白了，就是把内存申请从零售改为批发。在所获得的一整块内存里，可以根据软件自己的特点，去合理的管理内存，并提高分配和回收的性能。</p>
 <p>并且，我们如果用Arena的方式来管理栈桢的申请，那可以非常简单。因为栈肯定是连续伸缩的，要申请一个新的栈桢，我们只需要在内存块上移动栈顶指针就行。</p>
 <p>具体的管理方案你可以看看下面这张图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/10/b6/100bd5e316b115865abcaf13073e3cb6.png?wh=1354x212" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/10/b6/100bd5e316b115865abcaf13073e3cb6.png?wh=1354x212" /></p>
 <p>当计算fib(5)的时候，虚拟机会逐级产生多个栈桢。每次划分出一个栈桢来以后，我们要多占一个位置，用于保存前一个栈桢的栈顶位置。这样，在弹出栈桢的时候，我们直接把栈顶指针指到前一个栈桢的栈顶就可以了。</p>
 <p>如果一个内存块不够怎么办？那就用多个内存块，一个块满了就去用下一个。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/11/35/1125c32544f4e6fe6142fc00b93a1135.jpg?wh=1920x875" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/11/35/1125c32544f4e6fe6142fc00b93a1135.jpg?wh=1920x875" /></p>
 <p>弹出栈桢的时候，则是一个逆向的过程，栈顶指针也会从一个块退回到前一个块。</p>
 <p>好了，用Arena来管理栈桢的原理就是这样。具体的实现细节，你可以去看看这节课的示例代码中与Arena有关的算法。另外，我还在playvm.h里设置了一个叫做USE_ARENA的预编译开关。你如果注释掉“#define USE_ARENA”语句，就会回到我们前一个用幼稚的方法申请内存的版本，这样你就能比较它们的性能差异了。</p>
 <p>现在又到了检验成果的时候了。我们新的内存管理机制到底能否带来性能上的改进呢？会带来多少改进呢？我们还是赶紧上手测试一下吧！</p>
 <h2 id="_4">再次做性能测试</h2>
 <p>我把测试结果放在了下面的表格中。你能发现，性能的提升是惊人的，<strong>基本上比之前版本的性能提升了10倍</strong>！</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/4f/92/4f25100647d23f2fb0d6b298b5763392.jpg?wh=1920x903" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4f/92/4f25100647d23f2fb0d6b298b5763392.jpg?wh=1920x903" /></p>
 <p>同样的，我也做了个图表，让性能比较数据更直观：代表新版虚拟机的线在最下方，性能最快；而原来的版本在最上方，性能最慢。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3f/06/3f209d5f9c3e5d28830c9d5a5458fd06.png?wh=1416x756" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3f/06/3f209d5f9c3e5d28830c9d5a5458fd06.png?wh=1416x756" /></p>
 <p>你看，这个测试结果证明，我们在内存管理方面做优化的思路是正确的。而基于C语言版的栈机也终于在性能上展露出优势，是TypeScript版栈机的4倍左右。</p>
 <h2 id="_5">课程小结</h2>
 <p>今天这节课，我们通过分析和提升基于C语言的解释器的性能，初步接触了内存管理方面的知识。栈是一种低成本的获取内存的方式，而从堆中申请内存的开销就要大一些。我们可以通过合并小的内存、采用Arena技术等方式，大幅度降低从操作系统申请内存的次数，从而提升系统的整体性能。</p>
@@ -6547,8 +6547,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

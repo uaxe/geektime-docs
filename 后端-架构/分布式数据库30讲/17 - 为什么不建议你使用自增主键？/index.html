@@ -14381,11 +14381,11 @@
 <p>但是，我接下来的分析可能会让你失望，因为除了最基本的唯一性，另外的两层期待都是无法充分满足的。</p>
 <h3 id="_3">无法连续递增</h3>
 <p>首先说连续递增。在多数情况下，自增主键确实表现为连续递增。但是当事务发生冲突时，主键就会跳跃，留下空洞。下面，我用一个例子简单介绍下MySQL的处理过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1a/21/1ae285029b67aa128fd34c5cc3caf721.jpg?wh=2700%2A622" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1a/21/1ae285029b67aa128fd34c5cc3caf721.jpg?wh=2700%2A622" /></p>
 <p>两个事务T1和T2都要在同一张表中插入记录，T1先执行，得到的主键是25，而T2后执行，得到是26。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7e/54/7e48552810fcc500aec4f4c253a18e54.jpg?wh=2700%2A605" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7e/54/7e48552810fcc500aec4f4c253a18e54.jpg?wh=2700%2A605" /></p>
 <p>但是，T1事务还要操作其他数据库表，结果不走运，出现了异常，T1必须回滚。T2事务则正常执行成功，完成了事务提交。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f8/6e/f8890f3f251cc74808f6fyy53a29526e.jpg?wh=2700%2A608" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f8/6e/f8890f3f251cc74808f6fyy53a29526e.jpg?wh=2700%2A608" /></p>
 <p>这样，在数据表中就缺少主键为25的记录，而当下一个事务T3再次申请主键时，得到的就是27，那么25就成了永远的空洞。</p>
 <p>为什么不支持连续递增呢？这是因为自增字段所依赖的计数器并不是和事务绑定的。如果要做到连续递增，就要保证计数器提供的每个主键都被使用。</p>
 <p>怎么确保每个主键都被使用呢？那就要等待使用主键的事务都提交成功。这意味着，必须前一个事务提交后，计数器才能为后一个事务提供新的主键，这个计数器就变成了一个表级锁。</p>
@@ -14394,7 +14394,7 @@
 <h3 id="_4">无法单调递增</h3>
 <p>对于单体数据库自身来说，自增主键确实是单调递增的。但使用自增主键也是有前提的，那就是主键生成的速度要能够满足应用系统的并发需求。而在高并发量场景下，每个事务都要去申请主键，数据库如果无法及时处理，自增主键就会成为瓶颈。那么，这时只用自增主键已经不能解决问题了，往往还要在应用系统上做些优化。</p>
 <p>比如，对于Oracle数据库，常见的优化方式就是由Sequence负责生成主键的高位，由应用服务器负责生成低位数字，拼接起来形成完整的主键。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f2/0c/f2b6cc531b0dbec7d19f191b6225b20c.jpg?wh=2700%2A1443" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f2/0c/f2b6cc531b0dbec7d19f191b6225b20c.jpg?wh=2700%2A1443" /></p>
 <p>图中展示这样的例子，数据库的Sequence 是一个5位的整型数字，范围从10001到99999。每个应用系统实例先拿到一个号，比如10001，应用系统在使用这5位为作为高位，自己再去拼接5位的低位，这样得到一个10位长度的主键。这样，每个节点访问一次Sequence就可以处理99999次请求，处理过程是基于应用系统内存中的数据计算主键，没有磁盘I/O开销，而相对的Sequence递增时是要记录日志的，所以方案改进后性能有大幅度提升。</p>
 <p>这个方案虽然使用了Sequence，但也只能保证全局唯一，数据表中最终保存的主键不再是单调递增的了。</p>
 <p>因为，几乎所有数据库中的自增字段或者自增序列都是要记录日志的，也就都会产生磁盘I/O，也就都会面临这个性能瓶颈的问题。所以，我们可以得出一个结论：在一个海量并发场景下，即使借助单体数据库的自增主键特性，也不能实现单调递增的主键。</p>
@@ -14404,7 +14404,7 @@
 <p>其次，使用单调递增的主键，也会给分布式数据库的写入带来问题。这个问题是在Range分片下发生的，我们通常将这个问题称为 “尾部热点”。</p>
 <h3 id="_6">尾部热点</h3>
 <p>我们先通过一组性能测试数据来看看尾部热点问题的现象，这些数据和图表来自<a href="https://www.cockroachlabs.com/blog/unpacking-competitive-benchmarks/">CockroachDB官网</a>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/53/d2/5324e7ee83485724b062d6e8e72bcdd2.png?wh=2854%2A1356" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/53/d2/5324e7ee83485724b062d6e8e72bcdd2.png?wh=2854%2A1356" /></p>
 <p>这本身是一个CockraochDB与YugabyteDB的对比测试。测试环境使用亚马逊跨机房的三节点集群，执行SQL insert操作时，YugabyteDB的TPS达到58,877，而CockroachDB的TPS是34,587。YugabyteDB集群三个节点上的CPU都得到了充分使用，而CockroachDB集群中负载主要集中在一个节点上，另外两个节点的CPU多数情况都处于空闲状态。</p>
 <p>为什么CockroachDB的节点负载这么不均衡呢？这是由于CockroachDB默认设置为Range分片，而测试程序的生成主键是单调递增的，所以新写入的数据往往集中在一个 Range 范围内，而Range又是数据调度的最小单位，只能存在于单节点，那么这时集群就退化成单机的写入性能，不能充分利用分布式读写的扩展优势了。当所有写操作都集中在集群的一个节点时，就出现了我们常说的数据访问热点（Hotspot）。</p>
 <p>图中也体现了CockroachDB改为Hash分片时的情况，因为数据被分散到多个Range，所以TPS一下提升到61,113，性能达到原来的1.77倍。</p>
@@ -14417,7 +14417,7 @@
 <h3 id="radom-id">内置Radom ID</h3>
 <p>TiDB默认是支持自增主键的，对未声明主键的表，会提供了一个隐式主键_tidb_rowid，因为这个主键大体上是单调递增的，所以也会出现我们前面说的“尾部热点”问题。</p>
 <p>TiDB也提供了UUID函数，而且在4.0版本中还提供了另一种解决方案AutoRandom。TiDB 模仿MySQL的 AutoIncrement，提供了AutoRandom关键字用于生成一个随机ID填充指定列。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4y/86/4yy3c805599ebb98ba418a4c63220986.jpg?wh=2700%2A351" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4y/86/4yy3c805599ebb98ba418a4c63220986.jpg?wh=2700%2A351" /></p>
 <p>这个随机ID是一个64位整型，分为三个部分。</p>
 <ul>
 <li>第一部分的符号位没有实际作用。</li>
@@ -14427,7 +14427,7 @@
 <p>AutoRandom可以保证表内主键唯一，用户也不需要关注分片情况。</p>
 <h3 id="snowflake">外置Snowflake</h3>
 <p>雪花算法（Snowflake）是Twitter公司分布式项目采用的ID生成算法。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5a/e2/5a0738f8520a5d21582e896yy3413de2.jpg?wh=2700%2A348" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5a/e2/5a0738f8520a5d21582e896yy3413de2.jpg?wh=2700%2A348" /></p>
 <p>这个算法生成的ID是一个64位的长整型，由四个部分构成：</p>
 <ul>
 <li>第一部分是1位的符号位，并没有实际用处，主要为了兼容长整型的格式。</li>
@@ -14444,7 +14444,7 @@
 <li>分布式数据库在产生自增主键和使用自增主键两方面都有问题。生成自增主键时，要做到绝对的单调递增，其复杂度等同于TSO全局时钟，而且存在性能上限。使用自增主键时，会导致写入数据集中在单个节点，出现“尾部热点”问题。</li>
 <li>由于自增主键的问题，有的分布式数据库，如CockroachDB更推荐使用随机主键的方式。随机主键的产生机制可以分为数据库内置和应用系统外置两种思路。内置的技术方案，我们介绍了CockraochDB的UUID和TiDB的RadomID。外置技术方案，我们介绍了Snowflake。</li>
 </ol>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6f/4f/6f4b43cfb79e1f1696c0fcb741d9ed4f.jpg?wh=2700%2A1435" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6f/4f/6f4b43cfb79e1f1696c0fcb741d9ed4f.jpg?wh=2700%2A1435" /></p>
 <h2 id="_9">思考题</h2>
 <p>课程的最后，我们来看看今天的思考题。我们说如果分布式数据库使用Range分片的情况下，单调递增的主键会造成写入压力集中在单个节点上，出现“尾部热点”问题。因此，很多产品都用随机主键替换自增主键，分散写入热点。我的问题就是，你觉得使用随机主键是不是一定能避免出现“热点”问题呢？</p>
 <p>欢迎你在评论区留言和我一起讨论，我会在答疑篇和你继续讨论这个问题。如果你身边的朋友也对分布式架构下如何设计主键这个话题感兴趣，你也可以把今天这一讲分享给他，我们一起讨论。</p>
@@ -14574,8 +14574,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

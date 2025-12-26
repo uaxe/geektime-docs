@@ -6614,14 +6614,14 @@
 <p>你好，我是张磊。今天我和你分享的主题是：解读 CRI 与 容器运行时。</p>
 <p>在上一篇文章中，我为你详细讲解了 kubelet 的工作原理和 CRI 的来龙去脉。在今天这篇文章中，我们就来进一步地、更深入地了解一下 CRI 的设计与工作原理。</p>
 <p>首先，我们先来简要回顾一下有了 CRI 之后，Kubernetes 的架构图，如下所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/70/38/7016633777ec41da74905bfb91ae7b38.png?wh=1940%2A1183" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/70/38/7016633777ec41da74905bfb91ae7b38.png?wh=1940%2A1183" />
 在上一篇文章中我也提到了，CRI 机制能够发挥作用的核心，就在于每一种容器项目现在都可以自己实现一个 CRI shim，自行对 CRI 请求进行处理。这样，Kubernetes 就有了一个统一的容器抽象层，使得下层容器运行时可以自由地对接进入 Kubernetes 当中。</p>
 <p>所以说，这里的 CRI shim，就是容器项目的维护者们自由发挥的“场地”了。而除了 dockershim之外，其他容器运行时的 CRI shim，都是需要额外部署在宿主机上的。</p>
 <p>举个例子。CNCF 里的 containerd 项目，就可以提供一个典型的 CRI shim 的能力，即：将Kubernetes 发出的 CRI 请求，转换成对 containerd 的调用，然后创建出 runC 容器。而 runC项目，才是负责执行我们前面讲解过的设置容器 Namespace、Cgroups和chroot 等基础操作的组件。所以，这几层的组合关系，可以用如下所示的示意图来描述。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/62/3d/62c591c4d832d44fed6f76f60be88e3d.png?wh=916%2A700" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/62/3d/62c591c4d832d44fed6f76f60be88e3d.png?wh=916%2A700" />
 <strong>而作为一个 CRI shim，containerd 对 CRI 的具体实现，又是怎样的呢？</strong></p>
 <p>我们先来看一下 CRI 这个接口的定义。下面这幅示意图，就展示了 CRI 里主要的待实现接口。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f7/16/f7e86505c09239b80ad05aecfb032e16.png?wh=980%2A576" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f7/16/f7e86505c09239b80ad05aecfb032e16.png?wh=980%2A576" />
 具体地说，<strong>我们可以把 CRI 分为两组：</strong></p>
 <ul>
 <li>第一组，是 RuntimeService。它提供的接口，主要是跟容器相关的操作。比如，创建和启动容器、删除容器、执行 exec 命令等等。</li>
@@ -6635,7 +6635,7 @@
 <p>不过，相信你也已经注意到了，CRI 里还是有一组叫作RunPodSandbox 的接口的。</p>
 <p>这个 PodSandbox，对应的并不是 Kubernetes 里的 Pod API 对象，而只是抽取了 Pod 里的一部分与容器运行时相关的字段，比如HostName、DnsConfig、CgroupParent 等。所以说，PodSandbox 这个接口描述的，其实是 Kubernetes 将 Pod 这个概念映射到容器运行时层面所需要的字段，或者说是一个Pod 对象子集。</p>
 <p>而作为具体的容器项目，你就需要自己决定如何使用这些字段来实现一个 Kubernetes 期望的 Pod模型。这里的原理，可以用如下所示的示意图来表示清楚。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d9/61/d9fb7404c5dc9e0b5c902f74df9d7a61.png?wh=1825%2A824" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d9/61/d9fb7404c5dc9e0b5c902f74df9d7a61.png?wh=1825%2A824" />
 比如，当我们执行 kubectl run 创建了一个名叫 foo 的、包括了 A、B 两个容器的 Pod 之后。这个Pod 的信息最后来到 kubelet，kubelet 就会按照图中所示的顺序来调用 CRI 接口。</p>
 <p>在具体的 CRI shim 中，这些接口的实现是可以完全不同的。比如，如果是 Docker 项目，dockershim 就会创建出一个名叫 foo 的 Infra容器（pause 容器），用来“hold”住整个 Pod 的 Network Namespace。</p>
 <p>而如果是基于虚拟化技术的容器，比如 Kata Containers 项目，它的 CRI 实现就会直接创建出一个轻量级虚拟机来充当 Pod。</p>
@@ -6647,7 +6647,7 @@
 <p>而如果是 Kata Containers 的话，CreateContainer和StartContainer接口的实现，就只会在前面创建的轻量级虚拟机里创建两个 A、B 容器对应的 Mount Namespace。所以，最后在宿主机上，只会有一个叫作 foo 的轻量级虚拟机在运行。关于像 Kata Containers 或者 gVisor 这种所谓的安全容器项目，我会在下一篇文章中为你详细介绍。</p>
 <p>除了上述对容器生命周期的实现之外，CRI shim 还有一个重要的工作，就是如何实现 exec、logs 等接口。这些接口跟前面的操作有一个很大的不同，就是这些gRPC 接口调用期间，kubelet 需要跟容器项目维护一个长连接来传输数据。这种 API，我们就称之为Streaming API。</p>
 <p>CRI shim 里对 Streaming API 的实现，依赖于一套独立的 Streaming Server 机制。这一部分原理，可以用如下所示的示意图来为你描述。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a8/ef/a8e7ff6a6b0c9591a0a4f2b8e9e9bdef.png?wh=1937%2A695" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a8/ef/a8e7ff6a6b0c9591a0a4f2b8e9e9bdef.png?wh=1937%2A695" />
 可以看到，当我们对一个容器执行 kubectl exec 命令的时候，这个请求首先交给 API Server，然后 API Server 就会调用 kubelet 的 Exec API。</p>
 <p>这时，kubelet就会调用 CRI 的 Exec 接口，而负责响应这个接口的，自然就是具体的 CRI shim。</p>
 <p>但在这一步，CRI shim 并不会直接去调用后端的容器项目（比如 Docker ）来进行处理，而只会返回一个 URL 给 kubelet。这个 URL，就是该 CRI shim 对应的 Streaming Server 的地址和端口。</p>
@@ -6795,8 +6795,6 @@ CRI可以分为两组，第一组是RuntimeService。它提供的接口主要是
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -6325,7 +6325,7 @@
 <p>你好，我是秦晓辉。</p>
 <p>这一讲，我们来聊聊监控系统的典型架构，看看监控系统由哪些模块组成，各个模块是如何相互协同的。业界监控系统数量较多，如果我们一上来就陷入某个具体的系统中，容易一叶障目，不见泰山。这里我把众多监控系统的架构做了一个统一的抽象和概括，后面你再看到任何一个监控系统，都能快速理解了。</p>
 <h2 id="_1">典型架构</h2>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9e/f5/9edcfef623ea9583134533c3b4c477f5.png?wh=1920x781" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9e/f5/9edcfef623ea9583134533c3b4c477f5.png?wh=1920x781" /></p>
 <p>我们先来看监控系统的典型架构图，从左往右看，采集器是负责采集监控数据的，采集到数据之后传输给服务端，通常是直接写入时序库。然后就是对时序库的数据进行分析和可视化，分析部分最典型的就是告警规则判断（复杂一些的会引入统计算法和机器学习的能力做预判），即图上的告警引擎，告警引擎产生告警事件之后交给告警发送模块做不同媒介的通知。可视化比较简单，就是图上的数据展示，通过各种图表来合理地渲染各类监控数据，便于用户查看比较、日常巡检。</p>
 <p>下面我们就来逐一分析一下每个模块的职能和设计。</p>
 <h2 id="_2">采集器</h2>
@@ -6355,14 +6355,14 @@
 <p>除了上面介绍的采集器，业内还有很多其他方案，比如 Datadog-Agent、Metricsbeat 等，这里我就不一一介绍了。实际上在公司内部落地的时候，倒也不是非黑即白，一定要选择某一个。很多时候，一个采集器可能搞不定所有业务需求，使用一款主力采集器，辅以多款其他采集器是大多数公司的选择。</p>
 <p>机器层面的监控，我推荐 Telegraf 和 Categraf，内置了监控脚本、进程/端口监控，CPU、内存之类的也都很完备；探针类的监控自由度就很高了，不同的中间件、数据库监控，习惯用哪个采集器就可以用哪个。</p>
 <p>针对上面我们介绍的这4种常见的采集器，我做了一个表格供你选型参考。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/5b/24/5b1f1aa6b8276c07bd0e2d9bcbbcae24.png?wh=1920x646" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5b/24/5b1f1aa6b8276c07bd0e2d9bcbbcae24.png?wh=1920x646" /></p>
 <p>采集器采集到数据之后，要推给服务端。通常有两种做法，一个是直接推给时序库，一个是先推给Kafka，再经由Kafka写到时序库。当然，一些复杂的情况，可能会在Kafka和时序库之间加一个流式计算引擎，比如Flink，做一些预聚合计算。但绝大部分公司都用不到，所以这里我们先不管复杂流式计算的问题，重点来看一下时序库。</p>
 <h2 id="_3">时序库</h2>
 <p>监控系统的架构中，最核心的就是时序库。老一些的监控系统直接复用关系型数据库，比如Zabbix直接使用MySQL存储时序数据，MySQL擅长处理事务场景，没有针对时序场景做优化，容量上有明显的瓶颈。Open-Falcon是用RRDtool攒了一个分布式存储组件Falcon-Graph，但是RRDTool本身的设计就有问题，散文件很多，对硬盘的IO要求太高，性能较差。Falcon-Graph是分布式的，可以通过堆机器来解决大规模的问题，但显然不是最优解。</p>
 <p>后来，各种专门解决时序存储问题的数据库横空出世，比较有代表性的有：OpenTSDB、InfluxDB、TDEngine、M3DB、VictoriaMetrics、TimescaleDB等。下面我们逐一介绍一下。</p>
 <h3 id="opentsdb">OpenTSDB</h3>
 <p>OpenTSDB出现得较早，2010年左右就有了，OpenTSDB的指标模型有别于老一代监控系统死板的模型设计，它非常灵活，给业界带来了非常好的引导。</p>
-<p>OpenTSDB是基于HBase封装的，后来持续发展，也有了基于Cassandra封装的版本。你可以看一下它的架构图。<img alt="图片" src="https://static001.geekbang.org/resource/image/77/ed/77fe2bd187b6163ba799444a37156eed.png?wh=1758x1194" title="图片来自官网" /></p>
+<p>OpenTSDB是基于HBase封装的，后来持续发展，也有了基于Cassandra封装的版本。你可以看一下它的架构图。<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/77/ed/77fe2bd187b6163ba799444a37156eed.png?wh=1758x1194" title="图片来自官网" /></p>
 <p>由于底层存储是基于HBase的，一般小公司都玩不转，在国内的受众相对较少，当下再选型时序数据库时，就已经很少有人会选择OpenTSDB了。</p>
 <h3 id="influxdb">InfluxDB</h3>
 <p>InfluxDB来自InfluxData，是一个创业公司做的项目，2019年D轮融资6000万美金，所以开发人员不担心养家糊口的问题，做的产品还是非常不错的。</p>
@@ -6370,7 +6370,7 @@
 <h3 id="tdengine">TDEngine</h3>
 <p>TDEngine姑且可以看做是国产版InfluxDB，GitHub的Star数上万，针对物联网设备的场景做了优化，性能很好，也可以和Grafana、Telegraf整合，对于偏设备监控的场景，TDEngine是个不错的选择。</p>
 <p>TDEngine的集群版是开源的，相比InfluxDB，TDEngine这点很有吸引力。TDEngine不止是做时序数据存储，还内置支持了流式计算，可以让用户少部署一些组件。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/13/db/13331964742c055805cd4b1d83547ddb.png?wh=1666x776" title="图片来自官网" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/13/db/13331964742c055805cd4b1d83547ddb.png?wh=1666x776" title="图片来自官网" /></p>
 <p>你可能比较关注TDEngine是否可以和Prometheus生态良好打通。通过TDEngine的官网可以得知，TDEngine是支持Prometheus的remote_read和remote_write接口的。不过不支持Prometheus的Query类接口，这点需要注意。</p>
 <p>注：Thanos、M3DB、VictoriaMetrics都直接兼容Prometheus的Query类接口，上层程序可以把这些时序库当做Prometheus来使用。</p>
 <p>TDEngine的创始人是陶建辉，有非常高的技术热情，在开源社区非常活跃，TDEngine也拿到了很高的融资，有粮草，未来可期。</p>
@@ -6378,7 +6378,7 @@
 <p>M3DB是来自Uber的时序数据库，M3声称在Uber抗住了66亿监控指标，这个量非常庞大。而且M3DB是全开源的，包括集群版，不过架构原理比较复杂，CPU和内存占用较高，在国内没有大规模推广起来。M3DB的架构代码中包含很多分布式系统设计的知识，是个可以拿来学习的好项目。</p>
 <h3 id="victoriametrics">VictoriaMetrics</h3>
 <p>VictoriaMetrics，简称VM，架构非常简单清晰，采用merge read方式，避免了数据迁移问题，搞一批云上虚拟机，挂上云硬盘，部署VM集群，使用单副本，是非常轻量可靠的集群方式。你可以看一下我给出的VM架构图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/85/3e/85yy905fa9f7b5d8c16f6019053cbf3e.png?wh=1340x882" title="图片来自网络" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/85/3e/85yy905fa9f7b5d8c16f6019053cbf3e.png?wh=1340x882" title="图片来自网络" /></p>
 <p>VM实现了Prometheus的Query类接口，即 <code>/api/v1/query</code>、<code>/api/v1/query_range</code>、<code>/api/v1/label/&lt;label-key&gt;/values</code> 相关的接口，是Prometheus一个非常好的Backend，甚至可以说是Prometheus的一个替代品。其实VM的初衷就是想要替换掉Prometheus的。</p>
 <h3 id="timescaledb"><strong>TimescaleDB</strong></h3>
 <p>TimescaleDB是 timescale.inc 开发的一款时序数据库，作为一个PostgreSQL的扩展提供服务。</p>
@@ -6404,7 +6404,7 @@
 <li>数据展示：用于渲染展示监控数据。最常见的图表就是折线图，可以清晰明了地看到数据变化趋势，有些人会把监控大盘配置得特别花哨，各种能用的图表类型都用一下，这一点我不敢苟同，我还是觉得实用性才是最核心的诉求。很多监控系统会内置看图功能，开源领域最成熟的就是Grafana，如果某个存储无法和Grafana对接，其流行性都会大打折扣。</li>
 </ul>
 <p>这里我也准备了一张脑图给你，便于你理解和记忆。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6f/55/6fc697bd0378f55d42043ef25982b155.jpg?wh=4294x3257" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6f/55/6fc697bd0378f55d42043ef25982b155.jpg?wh=4294x3257" /></p>
 <h2 id="_7">互动时刻</h2>
 <p>这一讲我们罗列了多款采集器和时序库，各有优缺点，监控领域开源产品非常多，你还知道其他解决方案吗？可以说一下产品名字、适用场景、优缺点，欢迎你留言参与讨论，也欢迎你把今天的内容分享给身边的朋友，邀他一起学习。我们下一讲再见！</p>
 <p>点击加入<a href="https://jinshuju.net/f/Ql3qlz">课程交流群</a></p>
@@ -6527,8 +6527,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

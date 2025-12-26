@@ -14301,18 +14301,18 @@
 <p>下面，我用一个转账的例子向你解释TCC处理流程。</p>
 <p>小明和小红都是番茄银行的客户，现在小明打算给小红转账2,000元，这件事在番茄银行存款系统中是如何实现的呢？</p>
 <p>我们先来看下系统的架构示意图：</p>
-<p><img alt="9.1" src="https://static001.geekbang.org/resource/image/2a/5c/2a34990e1c95645f3942cd7d358f4c5c.jpg?wh=2700%2A1724" /></p>
+<p><img alt="9.1" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2a/5c/2a34990e1c95645f3942cd7d358f4c5c.jpg?wh=2700%2A1724" /></p>
 <p>显然，番茄银行的存款系统是单元化架构的。也就是说，系统由多个单元构成，每个单元包含了一个存款系统的部署实例和对应的数据库，专门为某一个地区的用户服务。比如，单元A为北京用户服务，单元B为上海用户服务。</p>
 <p>单元化架构的好处是每个单元只包含了部分用户，这样运行负载比较小，而且一旦出现问题，也只影响到少部分客户，可以提升整个存款系统的可靠性。</p>
 <p>不过这种架构也有局限性。那就是虽然单元内的客户转账非常容易，但是跨单元的转账需要引入额外的处理机制，而TCC就是一种常见的选择。</p>
 <p>TCC的整个过程由两类角色参与，一类是事务管理器，只能有一个；另一类是事务参与者，也就是具体的业务服务，可以是多个，每个服务都要提供Try、Confirm和Cancel三个操作。</p>
 <p>下面是TCC的具体执行过程。</p>
 <p>小明的银行卡在北京的网点开户，而小红的银行卡是在上海出差时办理的，所以两人的账户分别在单元A和单元B上。现在小明的账户余额是4,900元，要给小红转账2,000元，一个正常流程是这样的。</p>
-<p><img alt="9.2" src="https://static001.geekbang.org/resource/image/61/cd/613371c67df3e1910a77785320586acd.jpg?wh=2700%2A1510" /></p>
+<p><img alt="9.2" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/61/cd/613371c67df3e1910a77785320586acd.jpg?wh=2700%2A1510" /></p>
 <p>第一阶段，事务管理器会发出Try 操作，要求进行资源的检查和预留。也就是说，单元A要检查小明账户余额并冻结其中的2,000元，而单元B要确保小红的账户合法，可以接收转账。在这个阶段，两者账户余额始终不会发生变化。</p>
 <p>第二阶段，因为参与者都已经做好准备，所以事务管理器会发出Confirm操作，执行真正的业务，完成2,000元的划转。</p>
 <p>但是很不幸，小红账户是无法接收转账的非法账户，处理过程就变成下面的样子。</p>
-<p><img alt="9.3" src="https://static001.geekbang.org/resource/image/01/f8/01fdc99cb9ba3233yyaa6a9cbee731f8.jpg?wh=2700%2A1514" /></p>
+<p><img alt="9.3" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/01/f8/01fdc99cb9ba3233yyaa6a9cbee731f8.jpg?wh=2700%2A1514" /></p>
 <p>第一阶段，事务管理器发出Try指令，单元B对小红账户的检查没有通过，回复No。而单元A检查小明账户余额正常，并冻结了2,000元，回复Yes。</p>
 <p>第二阶段，因为前面有参与者回复No，所以事务管理器向所有参与者发出Cancel指令，让已经成功执行Try操作的单元A执行Cancel操作，撤销在Try阶段的操作，也就是单元A解除2,000元的资金冻结。</p>
 <p>从上述流程可以发现，<strong>TCC仅是应用层的分布式事务框架</strong>，具体操作完全依赖于业务编码实现，可以做针对性的设计，但是这也意味着业务侵入会比较深。</p>
@@ -14325,15 +14325,15 @@
 <p>2PC具体是如何运行的呢？我们还是说回小明转账的例子。</p>
 <p>小明给小红转账没有成功，两人又到木瓜银行来尝试。</p>
 <p>木瓜银行的存款系统采用了分库分表方案，系统架构大致是这样的：</p>
-<p><img alt="9.4" src="https://static001.geekbang.org/resource/image/4f/24/4f417c89459f5f2f30bf7148ea747824.jpg?wh=2700%2A1377" /></p>
+<p><img alt="9.4" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4f/24/4f417c89459f5f2f30bf7148ea747824.jpg?wh=2700%2A1377" /></p>
 <p>在木瓜银行的存款系统中，所有客户的数据被分散存储在多个数据库实例中，这些数据库实例具有完全相同的表结构。业务逻辑部署在应用服务器上，通过数据库中间件访问底层的数据库实例。数据库中间件作为事务管理器，资源管理器就是指底层的数据库实例。</p>
 <p>假设，小明和小红的数据分别被保存在数据库D1和D2上。</p>
 <p>我们还是先讲正常的处理流程。</p>
-<p><img alt="9.5" src="https://static001.geekbang.org/resource/image/c1/1f/c1e92da6dbf1d6e92628383089a8ab1f.jpg?wh=2700%2A1518" /></p>
+<p><img alt="9.5" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c1/1f/c1e92da6dbf1d6e92628383089a8ab1f.jpg?wh=2700%2A1518" /></p>
 <p>第一阶段是准备阶段，事务管理器首先向所有参与者发送待执行的SQL，并询问是否做好提交事务的准备（Prepare）；参与者记录日志、分别锁定了小明和小红的账户，并做出应答，协调者接收到反馈Yes，准备阶段结束。</p>
 <p>第二阶段是提交阶段，如果所有数据库的反馈都是Yes，则事务管理器会发出提交（Commit）指令。这些数据库接受指令后，会进行本地操作，正式提交更新余额，给小明的账户扣减2,000元，给小红的账户增加2,000元，然后向协调者返回Yes，事务结束。</p>
 <p>那如果小明的账户出了问题，导致转账失败，处理过程会是怎样呢？</p>
-<p><img alt="9.6" src="https://static001.geekbang.org/resource/image/8c/c8/8c1cd6763c88b1fbf9be14402f3bfbc8.jpg?wh=2700%2A1494" /></p>
+<p><img alt="9.6" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8c/c8/8c1cd6763c88b1fbf9be14402f3bfbc8.jpg?wh=2700%2A1494" /></p>
 <p>第一阶段，事务管理器向所有数据库发送待执行的SQL，并询问是否做好提交事务的准备。</p>
 <p>由于小明之前在木瓜银行购买了基金定投产品，按照约定，每月银行会自动扣款购买基金，刚好这个自动扣款操作正在执行，先一步锁定了账户。数据库D1发现无法锁定小明的账户，只能向事务管理器返回失败。</p>
 <p>第二阶段，因为事务管理器发现数据库D1不具备执行事务的条件，只能向所有数据库发出“回滚”（Rollback）指令。所有数据库接收到指令后撤销第一阶段的操作，释放资源，并向协调者返回Yes，事务结束。小明和小红的账户余额均保持不变。</p>
@@ -14363,23 +14363,23 @@
 <p>Percolator模型同时涉及了隔离性和原子性的处理。今天，我们主要关注原子性的部分，在讲并发控制时，我再展开隔离性的部分。</p>
 <p>使用Percolator模型的前提是事务的参与者，即数据库，要<strong>支持多版本并发控制（MVCC）</strong>。不过你不用担心，现在主流的单体数据库和分布式数据库都是支持的MVCC。</p>
 <p>在转账事务开始前，小明和小红的账户分别存储在分片P1和P2上。如果你不了解分片的含义，可以回到<a href="https://time.geekbang.org/column/article/275696">第6讲</a>学习。当然，你也可以先用单体数据库来替换分片的概念，这并不会妨碍对流程的理解。</p>
-<p><img alt="9.7" src="https://static001.geekbang.org/resource/image/55/67/55141bef63a89718517cda63512af967.jpg?wh=2700%2A1256" /></p>
+<p><img alt="9.7" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/55/67/55141bef63a89718517cda63512af967.jpg?wh=2700%2A1256" /></p>
 <p>上图中的Ming代表小明，Hong代表小红。在分片的账户表中各有两条记录，第一行记录的指针（write）指向第二行记录，实际的账户余额存储在第二行记录的Bal. data字段中。</p>
 <p>Bal.data分为两个部分，冒号前面的是时间戳，代表记录的先后次序；后面的是真正的账户余额。我们可以看到，现在小明的账户上有4,900元，小红的账户上有300元。</p>
 <p>我们来看下Percolator的流程。</p>
-<p><img alt="9.8" src="https://static001.geekbang.org/resource/image/e6/25/e610bcb9d4fa5b53cf9e7f293b4da425.jpg?wh=2700%2A1441" /></p>
+<p><img alt="9.8" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e6/25/e610bcb9d4fa5b53cf9e7f293b4da425.jpg?wh=2700%2A1441" /></p>
 <p><strong>第一，准备阶段</strong>，事务管理器向分片发送Prepare请求，包含了具体的数据操作要求。</p>
 <p>分片接到请求后要做两件事，写日志和添加私有版本。关于私有版本，你可以简单理解为，在lock字段上写入了标识信息的记录就是私有版本，只有当前事务能够操作，通常其他事务不能读写这条记录。</p>
 <p>你可能注意到了，两个分片上的lock内容并不一样。</p>
 <p>主锁的选择是随机的，参与事务的记录都可能拥有主锁，但一个事务只能有一条记录拥有主锁，其他参与事务的记录在lock字段记录了指针信息“primary@Ming.bal”，指向主锁记录。</p>
 <p>准备阶段结束的时候，两个分片都增加了私有版本记录，余额正好是转账顺利执行后的数字。</p>
-<p><img alt="9.9" src="https://static001.geekbang.org/resource/image/f2/60/f2a39536e65c8e0f4c282a0e05274160.jpg?wh=2700%2A1522" /></p>
+<p><img alt="9.9" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f2/60/f2a39536e65c8e0f4c282a0e05274160.jpg?wh=2700%2A1522" /></p>
 <p><strong>第二，提交阶段</strong>，事务管理器只需要和拥有主锁的分片通讯，发送Commit指令，且不用附带其他信息。</p>
 <p>分片P1增加了一条新记录时间戳为8，指向时间戳为7的记录，后者在准备阶段写入的主锁也被抹去。这时候7、8两条记录不再是私有版本，所有事务都可以看到小明的余额变为2,700元，事务结束。</p>
 <p>你或许要问，为什么在提交阶段不用更新小红的记录？</p>
 <p>Percolator最有趣的设计就是这里，因为分片P2的最后一条记录，保存了指向主锁的指针。其他事务读取到Hong7这条记录时，会根据指针去查找Ming.bal，发现记录已经提交，所以小红的记录虽然是私有版本格式，但仍然可视为已经生效了。</p>
 <p>当然，这种通过指针查找的方式，会给读操作增加额外的工作。如果每个事务都照做，性能损耗就太大了。所以，还会有其他异步线程来更新小红的余额记录，最终变成下面的样子。</p>
-<p><img alt="9.10" src="https://static001.geekbang.org/resource/image/c8/d2/c8dc734cd33a8149eeb1ffb2f435e6d2.jpg?wh=2700%2A1516" /></p>
+<p><img alt="9.10" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c8/d2/c8dc734cd33a8149eeb1ffb2f435e6d2.jpg?wh=2700%2A1516" /></p>
 <p>现在，让我们对比2PC的问题，来看看Percolator模型有哪些改进。</p>
 <ol>
 <li><strong>数据不一致</strong></li>
@@ -14398,12 +14398,12 @@
 <p>那么，分布式数据库的另一大阵营，PGXC，又如何解决2PC的问题呢？</p>
 <p>GoldenDB展现了另外一种改良思路，称之为“一阶段提交”。</p>
 <p>GoldenDB遵循PGXC架构，包含了四种角色：协调节点、数据节点、全局事务器和管理节点，其中协调节点和数据节点均有多个。GoldenDB的数据节点由MySQL担任，后者是独立的单体数据库。</p>
-<p><img alt="9.11" src="https://static001.geekbang.org/resource/image/0f/70/0fa31de65b7c81yydda0d319ebe06070.jpg?wh=2700%2A1122" /></p>
+<p><img alt="9.11" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0f/70/0fa31de65b7c81yydda0d319ebe06070.jpg?wh=2700%2A1122" /></p>
 <p>虽然名字叫“一阶段提交”，但GoldenDB的流程依然可以分为两个阶段。</p>
-<p><img alt="9.12" src="https://static001.geekbang.org/resource/image/14/e2/142b33b069b60562f89acdb83c3346e2.jpg?wh=2700%2A641" /></p>
+<p><img alt="9.12" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/14/e2/142b33b069b60562f89acdb83c3346e2.jpg?wh=2700%2A641" /></p>
 <p>第一阶段，GoldenDB的协调节点接到事务后，在全局事务管理器（GTM）的全局事务列表中将事务标记成活跃的状态。这个标记过程是GoldenDB的主要改进点，实质是通过全局事务列表来申请资源，规避可能存在的事务竞争。</p>
 <p>这样的好处是避免了与所有参与者的通讯，也减少了很多无效的资源锁定动作。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f6/f3/f65854eceef3335edc3b8930879115f3.jpg?wh=2700%2A1202" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f6/f3/f65854eceef3335edc3b8930879115f3.jpg?wh=2700%2A1202" /></p>
 <p>第二阶段，协调节点把一个全局事务分拆成若干子事务，分配给对应的MySQL去执行。如果所有操作成功，协调者节点会将全局事务列表中的事务标记为结束，整个事务处理完成。如果失败，子事务在单机上自动回滚，而后反馈给协调者节点，后者向所有数据节点下发回滚指令。</p>
 <p><strong>由于GoldenDB属于商业软件，公开披露信息有限，我们也就不再深入细节了，你只要能够理解上面我讲的两个阶段就够了。</strong></p>
 <p>GoldenDB的“一阶段提交”，本质上是改变了资源的申请方式，更准确的说法是，并发控制手段从锁调度变为时间戳排序（Timestamp Ordering）。这样，在正常情况下协调节点与数据节点只通讯一次，降低了网络不确定性的影响，数据库的整体性能有明显提升。因为第一阶段不涉及数据节点的操作，也就弱化了数据一致性和单点故障的问题。</p>
@@ -14424,7 +14424,7 @@
 <p>可是，2PC注定就是延时较长、性能差吗？或者说分布式数据库中的分布式事务，延时一定很长吗？</p>
 <p>我想告诉你的是，其实不少优秀的分布式数据库产品已经大幅缩短了2PC的延时，无论是理论模型还是工程实践都已经过验证。</p>
 <p>那么，它们又有哪些精巧构思呢？我将在下一讲为你介绍这些黑科技。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0a/91/0a676d16295d91870a30caa1fccd4c91.jpg?wh=2700%2A2715" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0a/91/0a676d16295d91870a30caa1fccd4c91.jpg?wh=2700%2A2715" /></p>
 <h2 id="_3">思考题</h2>
 <p>最后，我给你留下一个思考题。今天内容主要围绕着2PC展开，而它的第一阶段“准备阶段”也被称为“投票阶段”，“投票”这个词是不是让你想到Paxos协议呢？</p>
 <p>那么，你觉得2PC和Paxos协议有没有关系，如果有又是什么关系呢？</p>
@@ -14574,8 +14574,6 @@ Raft里面基于Leader的复制是否就是一种2PC呢？有写请求时，Lead
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

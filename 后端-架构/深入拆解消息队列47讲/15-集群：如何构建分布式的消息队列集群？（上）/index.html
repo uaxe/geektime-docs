@@ -14830,7 +14830,7 @@
 <p>在此之前，我们先来了解一下什么是有状态服务和无状态服务，后面会用到。</p>
 <p>在日常开发中，我们经常听到有状态服务和无状态服务这两个词。二者之间最重要的一个区别在于：<strong>是否需要在本地存储持久化数据</strong>。需要在本地存储持久化数据的就是有状态服务，反之就是无状态服务。</p>
 <p>其实我这里想说明的是，有状态服务和无状态服务构建集群的思路是完全不一样的。HTTP Web 服务就是典型的无状态服务。在搭建HTTP Web 集群的时候，我们经常会使用 Nginx 或者在其他网关后面挂一批 HTTP 节点，此时后端的这批 HTTP 服务节点就是一套集群。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/19/05/199a3534be43198cc7819ddbf5d6f905.jpg?wh=10666x5114" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/19/05/199a3534be43198cc7819ddbf5d6f905.jpg?wh=10666x5114" /></p>
 <p>如上图所示，因为HTTP Web是无状态的服务，不同的节点不需要知道其他节点的存在。Nginx 认为后端所有的节点的功能是一样的，所以请求经过Nginx后，只需要根据一定转发策略，如轮询、加权轮询、按Key Hash等将请求转发给后端的Web 服务节点即可。然后在节点增减的时候，Nginx 会感知到节点的增减，执行转发或者不转发就行了。</p>
 <p>我们知道，消息队列是有状态服务。消息是和分片绑定，分片是和节点绑定。所以，当需要发送一个消息后，就需要发送到固定的节点，如果把消息发送到错误的节点，就会失败。所以，为了将消息发送到对的节点和从对的节点削峰数据，消息队列在消息的收发上，就有服务端转发和客户端寻址两种方案。</p>
 <p>所以，消息队列集群应该是按照有状态服务来设计的。接下来我们开始看看如何设计出一个集群化的消息队列服务。</p>
@@ -14838,7 +14838,7 @@
 <p>当前业界主流的分布式集群，一般都是基于主从（Master/Slave）思想来设计的。即通过一个组件来管理整个集群的相关工作，比如创建和删除主题、节点上下线等等。这个组件一般叫做Master（主节点）或Controller（控制器）。</p>
 <p>然后还需要有一个组件来完成集群元数据（比如节点信息、Topic信息等等）的存储，这个组件一般叫做元数据服务。当然还有一批数据流节点来完成数据的读写和存储工作，这个组件一般叫做 Broker 或者节点。</p>
 <p>所以一个消息队列集群的架构可能是下面图中的这个样子吗？带着这个疑问，我们正式开始设计我们的集群。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ee/de/ee8db4ceda999771fd0d89d0805626de.jpg?wh=10666x4801" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ee/de/ee8db4ceda999771fd0d89d0805626de.jpg?wh=10666x4801" /></p>
 <h3 id="_3">元数据存储</h3>
 <p>我们先来看一下集群中的元数据是如何存储的。</p>
 <p>消息队列集群元数据是指集群中Topic、分区、配置、节点、权限等信息。元数据必须保证可靠、高效地存储，不允许丢失。因为一旦元数据丢失，其实际的消息数据也会变得没有意义。</p>
@@ -14862,7 +14862,7 @@
 <h3 id="_5">节点探活</h3>
 <p>从实现角度来看，一般需要有一个角色来对集群内所有节点进行探活或者保活，这个角色一般是主节点（Master/Leader/Controller）或第三方组件。</p>
 <p>如下图所示，<strong>技术上一般分为主动上报和定时探测两种，这两种方式的主要区别在于心跳探活发起方的不同。</strong>从技术和实现上看，差别都不大，从稳定性来看，一般推荐主动上报。因为由中心组件主动发起探测，当节点较多时，中心组件可能会有性能瓶颈，所以目前业界主要的探活实现方式也是主动上报。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9c/f7/9c844b8yy4749e6d0260d3ddb1e923f7.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9c/f7/9c844b8yy4749e6d0260d3ddb1e923f7.jpg?wh=10666x6000" /></p>
 <p>从探测策略上看，基本都是基于ping-pong的方式来完成探活。心跳发起方一般会根据一定的时间间隔发起心跳探测。如果保活组件一段时间没有接收到心跳或者主动心跳探测失败，就会剔除这个节点。比如每3秒探测一次，连续3次探测失败就剔除节点。探测行为一般会设置较短的超时时间，以便尽快完成探测。</p>
 <p>以Kafka为例，它是基于 ZooKeeper 提供的临时节点和 Hook 机制来实现节点保活的。即节点加入集群时会创建 TCP 长连接并创建临时节点，当 TCP 连接断开时就会删除临时节点。临时节点的变更会触发后续的相关操作，比如将节点加入集群、将节点剔除集群等等。</p>
 <p>所以基于 ZooKeeper 实现节点发现和保活就很简单，只要通过SDK创建临时节点即可，只要TCP连接存活，临时节点就会存在。那么怎样确认连接存活呢？底层还是通过ping-pong 机制、客户端主动上报心跳的形式实现的。</p>
@@ -14871,16 +14871,16 @@
 <p>从技术上看，理论上只要完成了节点探活，即节点健康的情况下，这批节点就都是能被选为主节点的。当然，有的集群可以配置哪些节点可以被选举为主节点，哪些节点不能被选举主节点，但是这点不影响后续的选举流程。</p>
 <p>主节点的选择一般有相互选举和依赖第三方组件争抢注册两种方式。</p>
 <p><strong>相互选举</strong>是指所有节点之间相互投票，选出一个得票最多的节点成为Leader。投票的具体实现可以参考Raft算法，这里就不展开。目前业界Zookeeper、Elasticsearch、Kafka KRaft版本等都是用的这种方案。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6a/0f/6a4ed444061e250be6f42a1afe2a6c0f.jpg?wh=10666x2443" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6a/0f/6a4ed444061e250be6f42a1afe2a6c0f.jpg?wh=10666x2443" /></p>
 <p><strong>依赖第三方组件争抢注册</strong>是指通过引入一个集中式组件来辅助完成节点选举。比如可以在ZooKeeper、etcd上的某个位置写入数据，哪个节点先写入成功它就是Leader节点。当节点异常时，会触发其他节点争抢写入数据。以此类推，从而完成主节点的选举。</p>
 <p>在消息队列中，这个主节点一般称为 Controller（控制器），Controller 主要是用来完成集群管理相关的工作，集群的管理操作一般指创建和删除Topic、配置变更等等行为。</p>
 <p>所以抽象来看，一般情况下消息队列的集群架构如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c7/fc/c7d7e9f72e447d90yydb74632c2521fc.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c7/fc/c7d7e9f72e447d90yydb74632c2521fc.jpg?wh=10666x6000" /></p>
 <p>其中，Metadata Service负责元数据的存储，Controller负责读取、管理元数据信息，并通知集群中的Broker执行各种操作。此时从实际架构实现的角度来看，Broker 的元数据上报可以走路径1，通过 Controller 上报元数据到Metadata Service，也可以直连Metadata Service走路径2上报元数据。两条路径没有明显的优劣，一般根据实际的架构实现时的选型做考虑。</p>
 <p>当完成元数据存储、节点发现、节点探活、主节点选举后，消息队列的集群就创建完成了。接下来我们通过集群启动、创建Topic、Leader切换三个动作来分析一下集群的运行机制。先来看一下集群启动的流程。</p>
 <h2 id="_7">集群构建流程拆解</h2>
 <p>集群启动其实就是节点启动的过程，来看下图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5d/04/5dc9e912e11b6906cb21317963ddae04.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5d/04/5dc9e912e11b6906cb21317963ddae04.jpg?wh=10666x6000" /></p>
 <p>节点启动大致分为以下四步：</p>
 <ol>
 <li>节点启动时在某个组件（如图中的Controller 或 Metadata Service）上注册节点数据，该组件会保存该节点的元数据信息。</li>
@@ -14891,7 +14891,7 @@
 <p>从运行的角度看，完成这一步，集群就算已经构建完成了。接下来我们来看下创建 Topic 的流程是怎样运行的。</p>
 <h3 id="topic">创建Topic</h3>
 <p>下面是一张创建 Topic 流程各个组件的交互图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7e/5f/7ec388e27bbf896dc6316ba2b73d885f.jpg?wh=10666x6000" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7e/5f/7ec388e27bbf896dc6316ba2b73d885f.jpg?wh=10666x6000" />
 创建 Topic 大致分为以下四步：</p>
 <ol>
 <li>客户端指定分区和副本数量，调用Controller创建Topic。</li>
@@ -14906,7 +14906,7 @@
 <p>当新的 Broker 节点加入集群，这个节点就需要在 Controller上进行注册。此时如果节点宕机，因为新节点上没有分区或Topic数据，所以不需要进行 Leader 切换。</p>
 <p>而如果已有节点下线，因为节点上有分区的 Leader 存在，所以需要进行Leader切换，以便实现服务的高可用。</p>
 <p>因为集群会监听所有 Broker 的服务状态。当 Broker 挂掉时，Controller就会感知从而触发 Leader 切换操作。下面是一张 Leader 切换的流程图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fa/5c/fa010ccdcdd953f21a0208f91459765c.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fa/5c/fa010ccdcdd953f21a0208f91459765c.jpg?wh=10666x6000" /></p>
 <p>Leader 切换的流程可以分为以下四步：</p>
 <ol>
 <li>Controller会持续监听节点的存活状态，持续监控Broker节点是否可用。</li>
@@ -15078,8 +15078,6 @@ Q:先删除Topic分区节点，Metadata Service中其实还是有相应的分区
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

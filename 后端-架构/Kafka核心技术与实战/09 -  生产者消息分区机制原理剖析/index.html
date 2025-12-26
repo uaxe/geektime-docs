@@ -14488,7 +14488,7 @@
 <p>今天我就来和你说说Kafka生产者如何实现这个需求，我会以Java API为例进行分析，但实际上其他语言的实现逻辑也是类似的。</p>
 <h2 id="_1">为什么分区？</h2>
 <p>如果你对Kafka分区（Partition）的概念还不熟悉，可以先返回专栏<a href="https://time.geekbang.org/column/article/99318">第2期</a>回顾一下。专栏前面我说过Kafka有主题（Topic）的概念，它是承载真实数据的逻辑容器，而在主题之下还分为若干个分区，也就是说Kafka的消息组织方式实际上是三级结构：主题-分区-消息。主题下的每条消息只会保存在某一个分区中，而不会在多个分区中被保存多份。官网上的这张图非常清晰地展示了Kafka的三级结构，如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a9/51/a9fde3dd19a6ea5dc7e7e3d1f42ffa51.jpg?wh=4000%2A1911" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a9/51/a9fde3dd19a6ea5dc7e7e3d1f42ffa51.jpg?wh=4000%2A1911" /></p>
 <p>现在我抛出一个问题你可以先思考一下：你觉得为什么Kafka要做这样的设计？为什么使用分区的概念而不是直接使用多个主题呢？</p>
 <p>其实分区的作用就是提供负载均衡的能力，或者说对数据进行分区的主要原因，就是为了实现系统的高伸缩性（Scalability）。不同的分区能够被放置到不同节点的机器上，而数据的读写操作也都是针对分区这个粒度而进行的，这样每个节点的机器都能独立地执行各自分区的读写请求处理。并且，我们还可以通过添加新的节点机器来增加整体系统的吞吐量。</p>
 <p>实际上分区的概念以及分区数据库早在1980年就已经有大牛们在做了，比如那时候有个叫Teradata的数据库就引入了分区的概念。</p>
@@ -14502,12 +14502,12 @@
 <p>这里的<code>topic</code>、<code>key</code>、<code>keyBytes</code>、<code>value</code>和<code>valueBytes</code>都属于消息数据，<code>cluster</code>则是集群信息（比如当前Kafka集群共有多少主题、多少Broker等）。Kafka给你这么多信息，就是希望让你能够充分地利用这些信息对消息进行分区，计算出它要被发送到哪个分区中。只要你自己的实现类定义好了partition方法，同时设置<code>partitioner.class</code>参数为你自己实现类的Full Qualified Name，那么生产者程序就会按照你的代码逻辑对消息进行分区。虽说可以有无数种分区的可能，但比较常见的分区策略也就那么几种，下面我来详细介绍一下。</p>
 <p><strong>轮询策略</strong></p>
 <p>也称Round-robin策略，即顺序分配。比如一个主题下有3个分区，那么第一条消息被发送到分区0，第二条被发送到分区1，第三条被发送到分区2，以此类推。当生产第4条消息时又会重新开始，即将其分配到分区0，就像下面这张图展示的那样。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/be/e2/bed44c33d6707c0028cc3f14207ea6e2.jpg?wh=3441%2A959" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/be/e2/bed44c33d6707c0028cc3f14207ea6e2.jpg?wh=3441%2A959" /></p>
 <p>这就是所谓的轮询策略。轮询策略是Kafka Java生产者API默认提供的分区策略。如果你未指定<code>partitioner.class</code>参数，那么你的生产者程序会按照轮询的方式在主题的所有分区间均匀地“码放”消息。</p>
 <p><strong>轮询策略有非常优秀的负载均衡表现，它总是能保证消息最大限度地被平均分配到所有分区上，故默认情况下它是最合理的分区策略，也是我们最常用的分区策略之一。</strong></p>
 <p><strong>随机策略</strong></p>
 <p>也称Randomness策略。所谓随机就是我们随意地将消息放置到任意一个分区上，如下面这张图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/97/ff/97fd864312f804bf414001c2f9228aff.jpg?wh=3414%2A948" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/97/ff/97fd864312f804bf414001c2f9228aff.jpg?wh=3414%2A948" /></p>
 <p>如果要实现随机策略版的partition方法，很简单，只需要两行代码即可：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>List&lt;PartitionInfo&gt; partitions = cluster.partitionsForTopic(topic);
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>return ThreadLocalRandom.current().nextInt(partitions.size());
@@ -14517,7 +14517,7 @@
 <p><strong>按消息键保序策略</strong></p>
 <p>也称Key-ordering策略。有点尴尬的是，这个名词是我自己编的，Kafka官网上并无这样的提法。</p>
 <p>Kafka允许为每条消息定义消息键，简称为Key。这个Key的作用非常大，它可以是一个有着明确业务含义的字符串，比如客户代码、部门编号或是业务ID等；也可以用来表征消息元数据。特别是在Kafka不支持时间戳的年代，在一些场景中，工程师们都是直接将消息创建时间封装进Key里面的。一旦消息被定义了Key，那么你就可以保证同一个Key的所有消息都进入到相同的分区里面，由于每个分区下的消息处理都是有顺序的，故这个策略被称为按消息键保序策略，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cf/a8/cf7383078f4c7c022c1113c096d5d5a8.jpg?wh=3395%2A944" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cf/a8/cf7383078f4c7c022c1113c096d5d5a8.jpg?wh=3395%2A944" /></p>
 <p>实现这个策略的partition方法同样简单，只需要下面两行代码即可：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>List&lt;PartitionInfo&gt; partitions = cluster.partitionsForTopic(topic);
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>return Math.abs(key.hashCode()) % partitions.size();
@@ -14540,7 +14540,7 @@
 <p>我们可以从所有分区中找出那些Leader副本在南方的所有分区，然后随机挑选一个进行消息发送。</p>
 <h2 id="_3">小结</h2>
 <p>今天我们讨论了Kafka生产者消息分区的机制以及常见的几种分区策略。切记分区是实现负载均衡以及高吞吐量的关键，故在生产者这一端就要仔细盘算合适的分区策略，避免造成消息数据的“倾斜”，使得某些分区成为性能瓶颈，这样极易引发下游数据消费的性能下降。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fb/13/fb38053d6f7f880ab12fef7ee0d64813.jpg?wh=2069%2A2560" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fb/13/fb38053d6f7f880ab12fef7ee0d64813.jpg?wh=2069%2A2560" /></p>
 <h2 id="_4">开放讨论</h2>
 <p>在你的生产环境中使用最多的是哪种消息分区策略？实际在使用过程中遇到过哪些“坑”？</p>
 <p>欢迎写下你的思考和答案，我们一起讨论。如果你觉得有所收获，也欢迎把文章分享给你的朋友。</p>
@@ -14676,8 +14676,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

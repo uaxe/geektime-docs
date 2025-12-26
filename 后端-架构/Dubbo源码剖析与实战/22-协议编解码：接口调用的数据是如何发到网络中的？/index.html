@@ -14289,28 +14289,28 @@
 <p>想回答清楚今天的问题，我们从一个概念开始，帧格式。</p>
 <p>所谓的“帧格式”，就是指根据不同协议规定的数据传输的格式。举个常见的 TCP/IP 模型，分别有应用层、传输层、网络层、数据链路层，以及物理层，每一层都有着对应的数据帧格式。</p>
 <p>我们以数据封装的过程为例。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/4a/ef/4ab9241ef2acf486fdfd3b2a13e005ef.jpg?wh=1920x1290" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4a/ef/4ab9241ef2acf486fdfd3b2a13e005ef.jpg?wh=1920x1290" /></p>
 <p>比如，应用层的数据包+TCP头部就是传输层的帧格式，传输层的数据包+IP头部就是网络层的帧格式，网络层的数据包+MAC头部就是数据链路层的帧格式，最后，会把数据链路层的整个数据包，变成比特流，通过工作在物理层的网卡、网线或光纤发送出去。</p>
 <p>这是我们从 TCP/IP 模型层面认识帧格式，那对于<strong>这样的数据传输格式，在客户端向服务端发送数据的实际交互过程中，又是如何体现的呢？</strong></p>
 <p>我们看一个日常开发的交互案例。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6e/94/6e38ed12356ce27b725a2e961e8fdf94.jpg?wh=1920x818" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6e/94/6e38ed12356ce27b725a2e961e8fdf94.jpg?wh=1920x818" /></p>
 <p>client 把数据发往 server，这种交互形式估计你是再熟悉不过了。我们模拟一下数据的收发过程。</p>
 <h3 id="1">1. 固定长度</h3>
 <p>现在我们有 100 字节的数据，需要通过 client 发送出去，可是 client 的发送缓冲区太小了，缓冲区每次只能容纳 50 字节大小。所以，client 利用 socket 进行了 2 次 write 操作，才把 100 字节发送出去。</p>
 <p>但是对于收数据的 server 来说，什么时候才认为数据接收齐全了呢？</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9d/65/9d4cbe300010c2f727db794b75d7de65.jpg?wh=1920x819" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9d/65/9d4cbe300010c2f727db794b75d7de65.jpg?wh=1920x819" /></p>
 <p>server 其实是很疑惑的，接收 client 第一次发来的数据后，到底该不该收 client 第二次发来的数据呢？若是不收的话，会不会造成少收数据？若是收，到底收多少数据才算完整呢？</p>
 <p>为了解决种种疑惑，<strong>client 和 server 进行了双方的约定，按照固定长度直接进行收发。</strong></p>
 <p>在这个场景里约定 client 发起的一次短链接请求，server 收满 100 个字节就可以结束了。如果 client 发了 120 个字节，server 已经收下 100 个字节后，再继续收到 20 个字节时，发现 client 结束会话了，那么，server 会认为这20字节没有满 100 个字节，就干脆丢弃不要了。</p>
 <h3 id="2">2. 分隔符</h3>
 <p>看来长度的约定很重要，但是，这个长度到底该定义多少合适呢？</p>
 <p>若短了，会增加通信的次数，增加双方的通信压力；若长了，比如定义为 1000 个字节，但是大多数情况下数据都是 1000 ~ 1100 个长度，岂不是 client 每次都要多发 900 ~ 1000 个没有意义的内容给到 server，不然 server 就会抛弃掉 client 第二次发送的数据。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/79/f7/79e00b4e4b48aa422b59b801f9b922f7.jpg?wh=1920x841" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/79/f7/79e00b4e4b48aa422b59b801f9b922f7.jpg?wh=1920x841" /></p>
 <p>所以 client 又和 server 进行了约定，约定按照特殊字符切割。比如 client 给 server 发了一堆的数据，server 先一股脑全接收，当 server 碰到特殊字符时就切割开，然后继续接收新的一个数据包。</p>
 <p>这也不失为一种办法，总比数据被丢弃好得多。</p>
 <h3 id="3">3. 定长+变长</h3>
 <p>可是试行了一段时间后，client 还是觉得有问题，因为有些数据内容如果含有分隔符，也被切割了。如果能有一种特殊的前缀标识就好了，识别到这种标识，就读多少数据，貌似更可行。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e2/fd/e241209c04691dd7aec394ba90e34afd.jpg?wh=1920x684" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e2/fd/e241209c04691dd7aec394ba90e34afd.jpg?wh=1920x684" /></p>
 <p>于是 client 又和 server 进行了约定，约定数据格式由两部分组成，报文头、报文体。报文头是固定长度，里面有特殊的前缀标识、报文体的总长度；而报文体，长度是可变的，有多少数据就有多少长度。</p>
 <p>好，我们从固定长度，到分隔符，到定长+变长，梳理了三种 client 与 server 的约定传输数据方式，你也应该发现了，其实这就是<strong>约定数据如何传输的协议格式</strong>，约定是怎样的格式，那就按照怎样的格式进行收发处理。而这种约定数据包格式的方式，<strong>就是我们俗称的“数据帧格式”</strong>。</p>
 <p>那 Dubbo 框架把对象编解码后变成了什么样的帧格式呢？</p>
@@ -14319,7 +14319,7 @@
 <p>其实之前我们已经见过了，“<a href="https://time.geekbang.org/column/article/615369">源码框架</a>”中的 Serialize 模块属于哪个层次？“<a href="https://time.geekbang.org/column/article/621733">调用流程</a>”中将对象进行序列化的代码入口在哪里？</p>
 <p>没错，想必你也想到了，我们可以顺着 NettyCodecAdapter 这个类的 encode 方法看源码，应该就可以找到了。</p>
 <p>实践是检验真理的唯一标准，我们打个断点去 Debug 调试一下。启动 ZooKeeper 和提供方，然后 Debug 启动消费方，一会就来到了 encode 方法：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/74/42/74349480cb7da8c260b0fc5b845d2d42.jpg?wh=1920x533" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/74/42/74349480cb7da8c260b0fc5b845d2d42.jpg?wh=1920x533" /></p>
 <p>我们单步调试进去，先经过了 DubboCountCodec 类，然后经过了 ExchangeCodec 类，结果发现了一段惊喜的代码。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1">///////////////////////////////////////////////////</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1">// org.apache.dubbo.remoting.exchange.codec.ExchangeCodec#encode</span>
@@ -14439,7 +14439,7 @@
 </code></pre></div>
 <p>对这个 encodeRequest 方法仔细研读后，恍然大悟，原来 Dubbo 协议帧格式如此简单，正好就是我们协议约定中“定长 + 变长”的实现版本。</p>
 <p>光从代码上不好看出“定长 + 变长”的可视化效果，这里我也根据源码的编写逻辑，总结了下代码所表达的数据帧格式。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/28/fb/28b10a1005ab622c8865e6693a17f8fb.jpg?wh=1920x733" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/28/fb/28b10a1005ab622c8865e6693a17f8fb.jpg?wh=1920x733" /></p>
 <p>图中写的 0 ~ 7、8 ~ 15 这些数字表示的是一些 bit 位对应位置，也就是，各个方块占据了多少 bit，除以 8 得到的结果，就是占据了多少 byte（字节）。接下来，我们挨个认识一下每个小方块是什么含义：</p>
 <ul>
 <li>​magic high：魔术高位，占用 8 bit，也就是 1 byte。该值固定为 0xda，是一种标识符。</li>
@@ -14471,7 +14471,7 @@
 <p>今天，我们从已经学过的知识点中挑出一个从未深究的细节，一个接口调用时“所创建的请求对象”是如何编码发到网络中的？</p>
 <p>针对这个问题，我们梳理了帧格式的概念，借助 client 向 server 发送数据的简单模型案例，引出了 client 与 server 约定了三种类型的协议格式，分别是固定长度、分隔符、定长+变长。</p>
 <p>然后回忆所学的知识点，找到了 Dubbo 框架进行编码的入口，通过 Debug 模式步步深入，阅读 encodeRequest 方法后，挖掘出了把对象按照 Dubbo 协议进行编码的核心代码。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/14/fe/145dbc98e8d990f2a53a8e00296b92fe.png?wh=1250x391" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/14/fe/145dbc98e8d990f2a53a8e00296b92fe.png?wh=1250x391" /></p>
 <p>类似协议编解码的常见应用案例比如HTTP 协议、RESP 协议、WebSocket 协议等。</p>
 <h3 id="_4">思考题</h3>
 <p>留个作业给你，我们已经分析了 encodeRequest 方法，你尝试自己研究一下 encodeResponse 方法的逻辑，总结一下与 encodeRequest 的异同。</p>
@@ -14523,7 +14523,7 @@
 </code></pre></div>
 <p>代码其实非常简单，通过创建 ReferenceConfig 得到泛化引用对象，也就是泛化服务对象，然后调用泛化服务对象的 $invoke 方法，实现远程调用，并最终泛化调用的结果。</p>
 <p>有了消费方的泛化调用代码后，学过了“<a href="https://time.geekbang.org/column/article/621733">调用流程</a>”巧妙打断点的方式，想必你已经想到了，可以直接在 NettyClient 的 send 方法打个断点，然后启动提供方，Debug 启动消费方，静候断点的到来。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/00/eb/00fe1e290b0fe48fd0c60dbe1f77daeb.png?wh=1470x826" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/00/eb/00fe1e290b0fe48fd0c60dbe1f77daeb.png?wh=1470x826" /></p>
 <p>我们观察左侧的调用堆栈，很明显就找到了泛化实现类的过滤器，再细看其他环节的调用，可以发现，泛化调用和普通调用的区别就在于，泛化调用会经过一个泛化实现类过滤器（GenericImplFilter），其他环节的流程基本上没啥异样。</p>
 <h4 id="2_1">2.泛化调用内幕</h4>
 <p>既然要弄懂泛化调用的核心内幕逻辑，那就自然少不了去拜读一下源码的细节。</p>
@@ -14774,8 +14774,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

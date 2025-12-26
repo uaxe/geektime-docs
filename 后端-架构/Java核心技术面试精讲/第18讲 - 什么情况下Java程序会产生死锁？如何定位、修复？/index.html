@@ -14405,7 +14405,7 @@
 <h2 id="_1">典型回答</h2>
 <p>死锁是一种特定的程序状态，在实体之间，由于循环依赖导致彼此一直处于等待之中，没有任何个体可以继续前进。死锁不仅仅是在线程之间会发生，存在资源独占的进程之间同样也可能出现死锁。通常来说，我们大多是聚焦在多线程场景中的死锁，指两个或多个线程之间，由于互相持有对方需要的锁，而永久处于阻塞的状态。</p>
 <p>你可以利用下面的示例图理解基本的死锁问题：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ea/6c/ea88719ec112dead21334034c9ef8a6c.png?wh=551%2A356" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ea/6c/ea88719ec112dead21334034c9ef8a6c.png?wh=551%2A356" /></p>
 <p>定位死锁最常见的方式就是利用jstack等工具获取线程栈，然后定位互相之间的依赖关系，进而找到死锁。如果是比较明显的死锁，往往jstack等就能直接定位，类似JConsole甚至可以在图形界面进行有限的死锁检测。</p>
 <p>如果程序运行时发生了死锁，绝大多数情况下都是无法在线解决的，只能重启、修正程序本身问题。所以，代码开发阶段互相审查，或者利用工具进行预防性排查，往往也是很重要的。</p>
 <h2 id="_2">考点分析</h2>
@@ -14453,14 +14453,14 @@
 <a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>}
 </code></pre></div>
 <p>这个程序编译执行后，几乎每次都可以重现死锁，请看下面截取的输出。另外，这里有个比较有意思的地方，为什么我先调用Thread1的start，但是Thread2却先打印出来了呢？这就是因为线程调度依赖于（操作系统）调度器，虽然你可以通过优先级之类进行影响，但是具体情况是不确定的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/86/0e/869f3a3d7b759fbfb794f8c81047f30e.png?wh=328%2A57" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/86/0e/869f3a3d7b759fbfb794f8c81047f30e.png?wh=328%2A57" /></p>
 <p>下面来模拟问题定位，我就选取最常见的jstack，其他一些类似JConsole等图形化的工具，请自行查找。</p>
 <p>首先，可以使用jps或者系统的ps命令、任务管理器等工具，确定进程ID。</p>
 <p>其次，调用jstack获取线程栈：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>${JAVA_HOME}\bin\jstack your_pid
 </code></pre></div>
 <p>然后，分析得到的输出，具体片段如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1f/8b/1fcc1a521b801a5f7428d5229525a38b.png?wh=605%2A308" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1f/8b/1fcc1a521b801a5f7428d5229525a38b.png?wh=605%2A308" /></p>
 <p>最后，结合代码分析线程栈信息。上面这个输出非常明显，找到处于BLOCKED状态的线程，按照试图获取（waiting）的锁ID（请看我标记为相同颜色的数字）查找，很快就定位问题。 jstack本身也会把类似的简单死锁抽取出来，直接打印出来。</p>
 <p>在实际应用中，类死锁情况未必有如此清晰的输出，但是总体上可以理解为：</p>
 <p><strong>区分线程状态 -&gt; 查看等待目标 -&gt; 对比Monitor等持有状态</strong></p>
@@ -14513,7 +14513,7 @@
 </code></pre></div>
 <p>在close发生时， HttpClient-6-SelectorManager线程持有readLock/writeLock，试图获得closeLock；与此同时，另一个HttpClient-6-Worker-2线程，持有closeLock，试图获得readLock，这就不可避免地进入了死锁。</p>
 <p>这里比较难懂的地方在于，closeLock的持有状态（就是我标记为绿色的部分）<strong>并没有在线程栈中显示出来</strong>，请参考我在下图中标记的部分。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b7/24/b7961a84838b5429a8f59826b91ed724.png?wh=1457%2A686" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b7/24/b7961a84838b5429a8f59826b91ed724.png?wh=1457%2A686" />
 ﻿
 更加具体来说，请查看<a href="http://hg.openjdk.java.net/jdk/jdk/file/ce06058197a4/src/java.base/share/classes/sun/nio/ch/SocketChannelImpl.java">SocketChannelImpl</a>的663行，对比implCloseSelectableChannel()方法实现和<a href="http://hg.openjdk.java.net/jdk/jdk/file/ce06058197a4/src/java.base/share/classes/java/nio/channels/spi/AbstractInterruptibleChannel.java">AbstractInterruptibleChannel.close()</a>在109行的代码，这里就不展示代码了。</p>
 <p>所以，从程序设计的角度反思，如果我们赋予一段程序太多的职责，出现“既要…又要…”的情况时，可能就需要我们审视下设计思路或目的是否合理了。对于类库，因为其基础、共享的定位，比应用开发往往更加令人苦恼，需要仔细斟酌之间的平衡。</p>
@@ -14525,17 +14525,17 @@
 </ul>
 <!--THE END-->
 
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1e/59/1e23562b6ff34206b11c5ec07608fb59.png?wh=241%2A448" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1e/59/1e23562b6ff34206b11c5ec07608fb59.png?wh=241%2A448" /></p>
 <ul>
 <li>然后根据对象之间组合、调用的关系对比和组合，考虑可能调用时序。</li>
 </ul>
 <!--THE END-->
 
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ee/75/ee413b86e8775c63e7947955646db975.png?wh=444%2A604" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ee/75/ee413b86e8775c63e7947955646db975.png?wh=444%2A604" /></p>
 <ul>
 <li>按照可能时序合并，发现可能死锁的场景。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9b/e7/9bbad67e205e54e8f7ec8ad37872a9e7.png?wh=368%2A440" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9b/e7/9bbad67e205e54e8f7ec8ad37872a9e7.png?wh=368%2A440" />
 ﻿
 <strong>第三种方法</strong></p>
 <p>使用带超时的方法，为程序带来更多可控性。</p>
@@ -14694,8 +14694,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

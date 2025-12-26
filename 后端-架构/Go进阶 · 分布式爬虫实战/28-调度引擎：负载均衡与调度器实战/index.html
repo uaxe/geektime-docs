@@ -15161,18 +15161,18 @@
 <p>刚才，我们实战了 fan-in 和 fan-out 高并发模型，并深度使用了通道和select的机制。接下来让我们更进一步，看一下实现通道和select机制的原理，掌握这种高并发模型的底层图像。</p>
 <h2 id="_3">通道的底层原理</h2>
 <p>通道的实现并没有想象中复杂。它利用互斥锁实现了并发安全，只不过Go运行时为我们屏蔽了底层的细节。<strong>通道包括两种类型，一种是无缓冲的通道，另一种是带缓冲区的通道。</strong>通道的结构如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1d/2d/1d3df16f6b81e75537442a0a226de12d.jpg?wh=1920x1743" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1d/2d/1d3df16f6b81e75537442a0a226de12d.jpg?wh=1920x1743" /></p>
 <p>可以看到，通道中包含了数据的类型、大小、数量，堵塞协程队列，以及用于缓存区的诸多字段。</p>
 <p>我们先来看看无缓冲区的通道是怎么实现的。</p>
 <h3 id="_4">无缓冲区的通道</h3>
 <p>通道需要有多个协程分别完成读和写的功能，这样才能保证数据传输是顺畅的。对于无缓冲区的通道来说，如果有一个协程正在将数据写入通道，但是当前没有协程读取数据，那么写入协程将立即陷入到休眠状态。写入协程堵塞之前协程会被封装到sudog结构中，并存储到写入的堵塞队列sendq中，之后协程陷入休眠。</p>
 <p>之前我们介绍过，协程的堵塞是位于用户态的，协程切换时，运行时会保存当前协程的状态、并调用 <code>gopark</code> 函数切换到g0完成新一轮的调度。如果之后有协程读取数据，那么读取协程会立即读取sendq队列中第一个等待的协程，并将该协程对应的元素拷贝到读取协程中，同时调用 <code>goready</code> 唤醒写入协程，将写入协程放入到可运行队列中等待被调度器调度。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/95/df/951ea2060624460486cd7c19yy2c52df.jpg?wh=1920x1242" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/95/df/951ea2060624460486cd7c19yy2c52df.jpg?wh=1920x1242" /></p>
 <h3 id="_5">带缓冲区的通道</h3>
 <p>而对于带缓冲区的通道来说，假设缓存队列的数量为N，那么如果写入的数据量不大于N，写入协程就不会陷入到休眠状态，所有数据都会存储在缓冲队列中。</p>
 <p>缓冲队列可以在一定程度上削峰填谷，加快处理速度。但是如果写入速度始终大于读取数据，那么缓冲区迟早也有写满的时候，到时候仍然会陷入堵塞，只是延迟了问题的暴露并带来内存的浪费。因此缓冲区的容量不可以过大，我们可以根据实际情况给出一个经验值。例如上面的爬虫案例中，我们就可以给接收任务的requestCh通道加上缓存区，先将缓存区设置为500，这样就不会频繁堵塞住调度器了。</p>
 <p>对于有缓存的通道，存储在 buf 中的数据虽然是线性的数组，但是这些数组和序号recvx、recvq 模拟了一个环形队列。recvx 可以定位到 buf 是从哪个位置读取的通道中的元素，而 sendx 则能够找到写入时放入 buf 的位置，这样做主要是为了再次利用已经使用过的空间。从 recvx 到 sendx 的距离qcount就是通道队列中的元素数量。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/44/c9/44d5ac405f5997b198747c6b6acaacc9.jpg?wh=1920x1013" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/44/c9/44d5ac405f5997b198747c6b6acaacc9.jpg?wh=1920x1013" /></p>
 <h2 id="select">Select 机制的底层原理</h2>
 <p>在前面的实战案例中，我们还看到了大量channel与select结合使用的场景。</p>
 <p>受到通道特性的限制，如果单个通道被堵塞，协程就无法继续执行了。那有没有一种机制可以像网络中的多路复用一样，监听多个通道，使后续处理协程能够及时地运行？</p>
@@ -15398,8 +15398,6 @@ s.workerCh &lt;- r
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

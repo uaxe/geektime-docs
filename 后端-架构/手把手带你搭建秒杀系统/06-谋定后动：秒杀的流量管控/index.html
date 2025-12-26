@@ -13700,7 +13700,7 @@
 <p>通过对秒杀流量的隔离，我们已经能够把巨大瞬时流量的影响范围控制在隔离的秒杀环境里了。接下来，我们开始考虑隔离环境的高可用问题，通俗点说，普通商品交易流程保住了，现在就要看怎么把秒杀系统搞稳定，来应对流量冲击，让秒杀系统也不出问题。方法很多，有<strong>流量控制、削峰、限流、缓存热点处理、扩容、熔断</strong>等一系列措施。</p>
 <p>这些措施都是我们在第二模块要重点讲解的技术手段，内容比较多，而且会有一些交叉，我会用三节课来分享。</p>
 <p>这节课我们先来看流量控制。在库存有限的情况下，过多的用户参与实际上对电商平台的价值是边际递减的。举个例子，1万的茅台库存，100万用户进来秒杀和1000万用户进来秒杀，对电商平台而言，所带来的经济效益、社会影响不会有10倍的差距。相反，用户越多，一方面消耗机器资源越多；另一方面，越多的人抢不到商品，平台的客诉和舆情压力也就越大。当然如果为了满足用户，让所有用户都能参与，秒杀系统也可以通过堆机器扩容来实现，但是成本太高，ROI不划算，所以我们需要提前对流量进行管控。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/30/a3/300be2283197b07yyaa538e20f175aa3.jpg?wh=2209x1079" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/30/a3/300be2283197b07yyaa538e20f175aa3.jpg?wh=2209x1079" /></p>
 <p>如果你关注过电商平台的双11或618大促，你肯定能感受到“预约+秒杀”在大促时的主流营销玩法。上图是预约+秒杀营销模式的示意图，主要分为预约期和秒杀期。</p>
 <p>预约期内，开放用户预约，获取秒杀抢购资格；秒杀期内，具备抢购资格的用户真正开始秒杀。在预约期内，关键是<strong>锁定用户</strong>，这也是我们能够用来做流量管控的核心。在展开通过预约进行流量管控的细节之前，我们先看下如何来设计一个简单的预约系统。</p>
 <h2 id="_2">预约系统设计</h2>
@@ -13708,7 +13708,7 @@
 <p>先从角色看，参与的有运营方，提供商品，进行预约活动的计划安排；C端用户，进行预约和秒杀行为；以及支撑预约活动的交易链路系统。</p>
 <p>因此我们需要一个<strong>预约管理后台</strong>，进行活动的设置和关闭；需要一个<strong>预约worker系统</strong>，根据时间调用商品系统进行预约打标和去标，向预约过的用户发短信或消息提醒；还需要一个面向C端的<strong>预约核心微服务</strong>，提供给用户预约和取消预约能力，商详在展示时获取预约信息的能力，秒杀下单时检查预约资格的能力，以及获取用户的预约列表能力。</p>
 <p>这样预约的架构就出来了，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b3/90/b33b7faf17887dc8ac4c534bcf92d690.jpg?wh=1584x1430" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b3/90/b33b7faf17887dc8ac4c534bcf92d690.jpg?wh=1584x1430" /></p>
 <p>预约管理后台和预约worker的功能比较简单，这里就不展开介绍了。我们重点看下预约核心微服务系统的设计，包括接口、数据库和缓存。</p>
 <p>以下是核心微服务需要提供的<strong>Dubbo接口</strong>：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">package</span><span class="w"> </span><span class="nn">com.ecommerce.reservation.service</span><span class="p">;</span>
@@ -13754,19 +13754,19 @@
 <a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a><span class="p">)</span><span class="w"> </span><span class="n">ENGINE</span><span class="o">=</span><span class="n">InnoDB</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="n">CHARSET</span><span class="o">=</span><span class="n">utf8</span><span class="p">;</span>
 </code></pre></div>
 <p>以下是这两张核心数据库表的ER图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f1/6a/f1215e6a5dd4e9dd8cefc36a880de96a.jpg?wh=1202x558" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f1/6a/f1215e6a5dd4e9dd8cefc36a880de96a.jpg?wh=1202x558" /></p>
 <p>当数据量小的时候，我们用以上这两张表就能满足业务需求。但是在头部电商平台，每次大促时预约人数都是几千万量级的，因此为了更好的性能，我们需要对数据库分库分表。对t_reserve_user这个用户预约关系表来说，就需要按照user_name的哈希值进行分库和分表。另外，对于历史数据，也需要有个定时任务进行结转归档，以减轻数据库的压力。</p>
 <p>接下来我们再看下<strong>缓存设计</strong>。对高并发系统来说，要扛住大流量，我们知道肯定不能让流量击穿到数据库，所以需要设计缓存来抵挡。</p>
 <p>先看t_reserve_info这个对象，首先我们需要在Redis缓存里存储它，那么Redis key可以这样设计：reserve_info_{skuid}，value可以用JSON string存储，当然也可以采用其他序列化方式，取决于你自己。</p>
 <p>因为这个对象是sku维度的，在爆品的场景下，可能会有热点问题，针对热点问题的解决方案，可以设计Redis分片的一主多从来扛流量，也可以通过微服务层的本地缓存来解决。具体细节这里先留个悬念，我们在后面的热点缓存板块再来深入讨论。</p>
 <p>另外，用户和商品的预约关系，可以存储成Redis的hash表，key为reserve_user_{userName}，value就是用户的预约sku列表，field为skuid。用户的预约关系和预约信息表不同，它是用户维度的，不会存在热点问题，所以我们可以不用考虑本地缓存。</p>
 <p>假设skuid=10001的商品正常进行预约，用户szd预约了该商品，那么缓存内容大致如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2b/35/2b624d0070224a124fd8105ee569e635.jpg?wh=1496x1474" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2b/35/2b624d0070224a124fd8105ee569e635.jpg?wh=1496x1474" /></p>
 <h2 id="_3">预约系统优化</h2>
 <p>现在我们已经把预约系统设计出来了，接下来要做的就是优化它。</p>
 <p>传统的预约模式，预约期是固定的时间段，用户在这个阶段内都可以预约；但在秒杀场景下，为了能够准确把控流量，控制预约人数上限，我们需要拓展预约期的定义，除了时间维度外，还要加入预约人数上限的维度，一旦达到上限，预约期就即时结束。</p>
 <p>这实际上是给预约活动添加了一个自动熔断的功能，一旦活动太火爆，到达上限后系统自动关闭预约入口，提前进入等待秒杀状态。这样就可以准确把控人数，从而为秒杀期护航。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3d/a4/3d12611a9166fd13bb112038f916e8a4.jpg?wh=1202x1538" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3d/a4/3d12611a9166fd13bb112038f916e8a4.jpg?wh=1202x1538" /></p>
 <p>以上是预约熔断的流程图，白色部分流程是原有的用户预约过程，蓝色部分是添加了熔断机制的流程。技术方案还是比较简单的，这里更多的是给你思路上的启发，这也是我多次踩坑之后的经验总结。</p>
 <p>这里，你可以拓展想一想，我们现在已经能够通过预约熔断来把控秒杀资格的上限，那么随着用户对流程的熟悉，<strong>预约系统会怎么演变呢？</strong></p>
 <p>是的，你没有猜错，当用户都知道必须预约才能在秒杀阶段有参与资格时，用户就会在预约期疯狂地挤进来，那么此时的预约系统也具备秒杀系统的特点了。好在预约人数的把控不需要那么精确，我们只需要即时熔断就达到目的了。</p>
@@ -13938,8 +13938,6 @@ select user_name from t_reserve_user where sku_id=#{skuId} and user_name &gt; ${
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

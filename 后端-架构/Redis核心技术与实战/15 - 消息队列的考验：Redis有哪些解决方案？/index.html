@@ -14766,9 +14766,9 @@
 <p>我先介绍一下消息队列存取消息的过程。在分布式系统中，当两个组件要基于消息队列进行通信时，一个组件会把要处理的数据以消息的形式传递给消息队列，然后，这个组件就可以继续执行其他操作了；远端的另一个组件从消息队列中把消息读取出来，再在本地进行处理。</p>
 <p>为了方便你理解，我还是借助一个例子来解释一下。</p>
 <p>假设组件1需要对采集到的数据进行求和计算，并写入数据库，但是，消息到达的速度很快，组件1没有办法及时地既做采集，又做计算，并且写入数据库。所以，我们可以使用基于消息队列的通信，让组件1把数据x和y保存为JSON格式的消息，再发到消息队列，这样它就可以继续接收新的数据了。组件2则异步地从消息队列中把数据读取出来，在服务器2上进行求和计算后，再写入数据库。这个过程如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d7/bc/d79d46ec4aa22bf46fde3ae1a99fc2bc.jpg?wh=3000%2A1459" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d7/bc/d79d46ec4aa22bf46fde3ae1a99fc2bc.jpg?wh=3000%2A1459" /></p>
 <p>我们一般把消息队列中发送消息的组件称为生产者（例子中的组件1），把接收消息的组件称为消费者（例子中的组件2），下图展示了一个通用的消息队列的架构模型：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f4/62/f470bb957c1faff674c08b1fa65a3a62.jpg?wh=3000%2A857" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f4/62/f470bb957c1faff674c08b1fa65a3a62.jpg?wh=3000%2A857" /></p>
 <p>在使用消息队列时，消费者可以异步读取生产者消息，然后再进行处理。这样一来，即使生产者发送消息的速度远远超过了消费者处理消息的速度，生产者已经发送的消息也可以缓存在消息队列中，避免阻塞生产者，这是消息队列作为分布式组件通信的一大优势。</p>
 <p><strong>不过，消息队列在存取消息时，必须要满足三个需求，分别是消息保序、处理重复的消息和保证消息可靠性。</strong></p>
 <h3 id="_2">需求一：消息保序</h3>
@@ -14787,7 +14787,7 @@
 <p>List本身就是按先进先出的顺序对数据进行存取的，所以，如果使用List作为消息队列保存消息的话，就已经能满足消息保序的需求了。</p>
 <p>具体来说，生产者可以使用LPUSH命令把要发送的消息依次写入List，而消费者则可以使用RPOP命令，从List的另一端按照消息的写入顺序，依次读取消息并进行处理。</p>
 <p>如下图所示，生产者先用LPUSH写入了两条库存消息，分别是5和3，表示要把库存更新为5和3；消费者则用RPOP把两条消息依次读出，然后进行相应的处理。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b0/7c/b0959216cbce7ac383ce206b8884777c.jpg?wh=3000%2A2250" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b0/7c/b0959216cbce7ac383ce206b8884777c.jpg?wh=3000%2A2250" /></p>
 <p>不过，在消费者读取数据时，有一个潜在的性能风险点。</p>
 <p>在生产者往List中写入数据时，List并不会主动地通知消费者有新消息写入，如果消费者想要及时处理消息，就需要在程序中不停地调用RPOP命令（比如使用一个while(1)循环）。如果有新消息写入，RPOP命令就会返回结果，否则，RPOP命令返回空值，再继续循环。</p>
 <p>所以，即使没有新消息写入List，消费者也要不停地调用RPOP命令，这就会导致消费者程序的CPU一直消耗在执行RPOP命令上，带来不必要的性能损失。</p>
@@ -14804,7 +14804,7 @@
 <p>当消费者程序从List中读取一条消息后，List就不会再留存这条消息了。所以，如果消费者程序在处理消息的过程出现了故障或宕机，就会导致消息没有处理完成，那么，消费者程序再次启动后，就没法再次从List中读取消息了。</p>
 <p>为了留存消息，List类型提供了BRPOPLPUSH命令，这个命令的作用是让消费者程序从一个List中读取消息，同时，Redis会把这个消息再插入到另一个List（可以叫作备份List）留存。这样一来，如果消费者程序读了消息但没能正常处理，等它重启后，就可以从备份List中重新读取消息并进行处理了。</p>
 <p>我画了一张示意图，展示了使用BRPOPLPUSH命令留存消息，以及消费者再次读取消息的过程，你可以看下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/50/3d/5045395da08317b546aab7eb698d013d.jpg?wh=3000%2A2135" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/50/3d/5045395da08317b546aab7eb698d013d.jpg?wh=3000%2A2135" /></p>
 <p>生产者先用LPUSH把消息“5”“3”插入到消息队列mq中。消费者程序使用BRPOPLPUSH命令读取消息“5”，同时，消息“5”还会被Redis插入到mqback队列中。如果消费者程序处理消息“5”时宕机了，等它重启后，可以从mqback中再次读取消息“5”，继续处理。</p>
 <p>好了，到这里，你可以看到，基于List类型，我们可以满足分布式组件对消息队列的三大需求。但是，在用List做消息队列时，我们还可能遇到过一个问题：<strong>生产者消息发送很快，而消费者处理消息的速度比较慢，这就导致List中的消息越积越多，给Redis的内存带来很大压力</strong>。</p>
 <p>这个时候，我们希望启动多个消费者程序组成一个消费组，一起分担处理List中的消息。但是，List类型并不支持消费组的实现。那么，还有没有更合适的解决方案呢？这就要说到Redis从5.0版本开始提供的Streams数据类型了。</p>
@@ -14922,7 +14922,7 @@
 <h2 id="_5">小结</h2>
 <p>这节课，我们学习了分布式系统组件使用消息队列时的三大需求：消息保序、重复消息处理和消息可靠性保证，这三大需求可以进一步转换为对消息队列的三大要求：消息数据有序存取，消息数据具有全局唯一编号，以及消息数据在消费完成后被删除。</p>
 <p>我画了一张表格，汇总了用List和Streams实现消息队列的特点和区别。当然，在实践的过程中，你也可以根据新的积累，进一步补充和完善这张表。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b2/14/b2d6581e43f573da6218e790bb8c6814.jpg?wh=2922%2A943" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b2/14/b2d6581e43f573da6218e790bb8c6814.jpg?wh=2922%2A943" /></p>
 <p>其实，关于Redis是否适合做消息队列，业界一直是有争论的。很多人认为，要使用消息队列，就应该采用Kafka、RabbitMQ这些专门面向消息队列场景的软件，而Redis更加适合做缓存。</p>
 <p>根据这些年做Redis研发工作的经验，我的看法是：Redis是一个非常轻量级的键值数据库，部署一个Redis实例就是启动一个进程，部署Redis集群，也就是部署多个Redis实例。而Kafka、RabbitMQ部署时，涉及额外的组件，例如Kafka的运行就需要再部署ZooKeeper。相比Redis来说，Kafka和RabbitMQ一般被认为是重量级的消息队列。</p>
 <p>所以，关于是否用Redis做消息队列的问题，不能一概而论，我们需要考虑业务层面的数据体量，以及对性能、可靠性、可扩展性的需求。如果分布式系统中的组件消息通信量不大，那么，Redis只需要使用有限的内存空间就能满足消息存储的需求，而且，Redis的高性能特性能支持快速的消息读写，不失为消息队列的一个好的解决方案。</p>
@@ -15146,8 +15146,6 @@ Kafka 其实已经考虑去掉 ZK 了，而且适合高吞吐量的业务，不�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

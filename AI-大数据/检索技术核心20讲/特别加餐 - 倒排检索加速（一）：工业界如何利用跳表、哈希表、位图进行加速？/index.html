@@ -6931,14 +6931,14 @@
 <p>在<a href="https://time.geekbang.org/column/article/219268">第5讲</a>中我们讲过，倒排索引中的posting list一般是用链表来实现的。当两个posting list A和B需要合并求交集时，如果我们用归并法来合并的话，时间代价是O(m+n)。其中，m为posting list A的长度，n为posting list B的长度。</p>
 <p>那对于这个归并过程，工业界是如何优化的呢？接下来，我们就通过一个例子来看一下。</p>
 <p>假设posting list A中的元素为&lt;1,2,3,4,5,6,7,8……，1000&gt;，这1000个元素是按照从1到1000的顺序递增的。而posting list B中的元素，只有&lt;1,500,1000&gt;3个。那按照我们之前讲过的归并方法，它们的合并过程就是，在找到相同元素1以后，还需要再遍历498次链表，才能找到第二个相同元素500。
-<img alt="" src="https://static001.geekbang.org/resource/image/41/2c/41a18c5bf060dba4ff15fddc0646412c.jpg?wh=1920%2A667" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/41/2c/41a18c5bf060dba4ff15fddc0646412c.jpg?wh=1920%2A667" /></p>
 <p>链表遍历，时间代价高</p>
 <p>很显然，为了找到一个元素，遍历这么多次是很不划算的。那对于链表遍历，我们可以怎么优化呢？实际上，在许多工业界的实践中，比如搜索引擎，还有Lucene和Elasticsearch等应用中，都是使用跳表来实现posting list的。</p>
 <p>在上面这个例子中，我们可以将链表改为跳表。这样，在posting list A中，我们从第2个元素遍历到第500个元素，只需要log(498)次的量级，会比链表快得多。
-<img alt="" src="https://static001.geekbang.org/resource/image/0e/d5/0efedfaf5754dd2e7bfcce3c3e624cd5.jpg?wh=1920%2A679" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0e/d5/0efedfaf5754dd2e7bfcce3c3e624cd5.jpg?wh=1920%2A679" /></p>
 <p>跳表查找，检索加速</p>
 <p>这个时候你可能就会问了，我们只能用B中的每一个元素去A中二分查找吗？那在解答这个问题之前，我们先来看下图这个例子。
-<img alt="" src="https://static001.geekbang.org/resource/image/9b/3e/9b92ef9a864cb11ca29a1db3df68ef3e.jpg?wh=1483%2A474" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9b/3e/9b92ef9a864cb11ca29a1db3df68ef3e.jpg?wh=1483%2A474" /></p>
 <p>相互二分查找</p>
 <p>你会发现，在寻找500这个公共元素的过程中，我们是拿着链表B中的500作为key，在链表A中进行跳表二分查找的。但是，在查找1000这个公共元素的过程中，我们是拿着链表A中的元素1000，在链表B中进行跳表二分查找的。</p>
 <p>我们把这种方法定义为<strong>相互二分查找</strong>。那啥叫相互二分查找呢？</p>
@@ -6950,7 +6950,7 @@
 <p>说到高效查询，哈希表O(1)级别的查找能力令人印象深刻。那我们有没有能利用哈希表来加速的方法呢？别说，还真有。</p>
 <p>哈希表加速的思路其实很简单，就是当两个集合要求交集时，如果一个集合特别大，另一个集合相对比较小，那我们就可以用哈希表来存储大集合。这样，我们就可以拿着小集合中的每一个元素去哈希表中对比：如果查找为存在，那查找的元素就是公共元素；否则，就放弃。</p>
 <p>我们还是以前面说的posting list A和B为例，来进一步解释一下这个过程。由于Posting list A有1000个元素，而B中只有3个元素，因此，我们可以将posting list A中的元素提前存入哈希表。这样，我们利用B中的3个元素来查询的时候，每次查询代价都是O(1)。如果B有m个元素，那查询代价就是O(m)。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/25/e4/257cc516587a2772df3684254a1ab3e4.jpg?wh=1920%2A589" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/25/e4/257cc516587a2772df3684254a1ab3e4.jpg?wh=1920%2A589" /></p>
 <p>将posting list A中的元素提前存入哈希表</p>
 <p>但是，使用哈希表法加速倒排索引有一个前提，就是我们要在查询发生之前，就把posting list转为哈希表。这就需要我们提前分析好，哪些posting list经常会被拿来求交集，针对这一批posting list，我们将它们提前存入哈希表。这样，我们就能实现检索加速了。</p>
 <p>这里还有一点需要你注意，原始的posting list我们也要保留。这是为什么呢？</p>
@@ -6961,7 +6961,7 @@
 <p>首先，我们需要为每个key生成同样长度的位图，表示所有的对象空间。然后，如果一个元素出现在该posting list中，我们就将位图中该元素对应的位置置为1。这样就完成了posting list的位图改造。</p>
 <p>接下来，我们来看一下位图法的查询过程。</p>
 <p>如果要查找posting list A和B的公共元素，我们可以将A、B两个位图中对应的位置直接做and 位运算（复习一下and位运算：0 and 0 = 0； 0 and 1 = 0； 1 and 1 = 1）。由于位图的长度是固定的，因此两个位图的合并运算时间代价也是固定的。并且由于CPU执行位运算的效率非常快，因此，在位图总长度不是特别长的情况下，位图法的检索效率还是非常高的。
-<img alt="" src="https://static001.geekbang.org/resource/image/b1/2f/b18d701815e9347ab145d3794331c52f.jpg?wh=1563%2A739" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b1/2f/b18d701815e9347ab145d3794331c52f.jpg?wh=1563%2A739" /></p>
 <p>位运算</p>
 <p>和哈希表法一样，位图法也有自己的局限性。我总结了以下3点，你可以感受一下。</p>
 <ol>
@@ -6973,7 +6973,7 @@
 <h2 id="roaring-bitmap">升级版位图：Roaring Bitmap</h2>
 <p>下面我们来学习一下Roaring Bitmap的设计思想。</p>
 <p>首先，Roaring Bitmap将一个32位的整数分为两部分，一部分是高16位，另一部分是低16位。对于高16位，Roaring Bitmap将它存储到一个有序数组中，这个有序数组中的每一个值都是一个“桶”；而对于低16位，Roaring Bitmap则将它存储在一个2<sup>16的位图中，将相应位置置为1。这样，每个桶都会对应一个2</sup>16的位图。
-<img alt="" src="https://static001.geekbang.org/resource/image/7a/b8/7a98d3f464c1e233c2082c626067cdb8.jpeg?wh=1920%2A1080" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7a/b8/7a98d3f464c1e233c2082c626067cdb8.jpeg?wh=1920%2A1080" /></p>
 <p>Roaring Bitmap 存储过程</p>
 <p>接下来，如果我们要确认一个元素是否在Roaring Bitmap中存在，通过两次查找就能确认了。第一步是以高16位在有序数组中二分查找，看对应的桶是否存在。如果存在，第二步就是将桶中的位图取出，拿着低16位在位图中查找，判断相应位置是否为1。第一步查找由于是数组二分查找，因此时间代价是O（log n）；第二步是位图查找，因此时间代价是O(1)。</p>
 <p>所以你看，这种将<strong>有序数组和位图用倒排索引结合起来的设计思路，是</strong>能够保证高效检索的。那它到底是怎么节省存储空间的呢？</p>
@@ -6988,7 +6988,7 @@
 <p>第二种，随着数据插入，桶中的数据不断增多，当数组容器中的元素个数大于4096个时，就从数组容器转为<strong>位图容器</strong>；</p>
 <p>第三种，随着数据的删除，如果位图容器中的元素个数小于4096个，就退化回<strong>数组容器</strong>。</p>
 <p>这个过程是不是很熟悉？没错，这很像<a href="https://time.geekbang.org/column/article/215324">第3</a><a href="https://time.geekbang.org/column/article/215324">节</a>中的Hashmap的处理方法。
-<img alt="" src="https://static001.geekbang.org/resource/image/f8/ef/f8ce419c31151ff57f606fb6aafb63ef.jpg?wh=1509%2A744" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f8/ef/f8ce419c31151ff57f606fb6aafb63ef.jpg?wh=1509%2A744" /></p>
 <p>使用数组容器和位图容器并可以相互转换</p>
 <p>好了，前面我们说了这么多Roaring Bitmap的压缩位图空间的设计思路。下面，我们回到两个集合A和B快速求交集的例子中，一起来看一看Roaring Bitmap是怎么做的。假设，这里有Roaring Bitmap表示的两个集合A和B，那我们求它们交集的过程可以分为2步。</p>
 <p>第1步，比较高16位的所有桶，也就是对这两个有序数组求交集，所有相同的桶会被留下来。</p>
@@ -7178,8 +7178,6 @@ c. 随数据删除, 元素个数小于4096个, 则退化为数组容器
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

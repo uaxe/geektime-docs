@@ -14564,7 +14564,7 @@
 
 <p>你好，我是唐扬。</p>
 <p>前面几节课，我带你了解了缓存的原理、分类以及常用缓存的使用技巧。我们开始用缓存承担大部分的读压力，从而缓解数据库的查询压力，在提升性能的同时保证系统的稳定性。这时，你的电商系统整体的架构演变成下图的样子：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6c/05/6c860d61a578cde20591968cc2741a05.jpg?wh=1142%2A559" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6c/05/6c860d61a578cde20591968cc2741a05.jpg?wh=1142%2A559" /></p>
 <p>我们在Web层和数据库层之间增加了缓存层，请求会首先查询缓存，只有当缓存中没有需要的数据时才会查询数据库。</p>
 <p>在这里，你需要关注缓存命中率这个指标（缓存命中率=命中缓存的请求数/总请求数）。一般来说，在你的电商系统中，核心缓存的命中率需要维持在99%甚至是99.9%，哪怕下降1%，系统都会遭受毁灭性的打击。</p>
 <p>这绝不是危言耸听，我们来计算一下。假设系统的QPS是10000/s，每次调用会访问10次缓存或者数据库中的数据，那么当缓存命中率仅仅减少1%，数据库每秒就会增加10000 * 10 * 1% = 1000次请求。而一般来说我们单个MySQL节点的读请求量峰值就在1500/s左右，增加的这1000次请求很可能会给数据库造成极大的冲击。</p>
@@ -14590,13 +14590,13 @@
 <p><strong>一般来讲，分片算法常见的就是Hash分片算法和一致性Hash分片算法两种。</strong></p>
 <p>Hash分片的算法就是对缓存的Key做哈希计算，然后对总的缓存节点个数取余。你可以这么理解：</p>
 <p>比如说，我们部署了三个缓存节点组成一个缓存的集群，当有新的数据要写入时，我们先对这个缓存的Key做比如crc32等Hash算法生成Hash值，然后对Hash值模3，得出的结果就是要存入缓存节点的序号。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/72/55/720f7e4543d45fdc71056de280caff55.jpg?wh=1142%2A469" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/72/55/720f7e4543d45fdc71056de280caff55.jpg?wh=1142%2A469" /></p>
 <p>这个算法最大的优点就是简单易理解，缺点是当增加或者减少缓存节点时，缓存总的节点个数变化造成计算出来的节点发生变化，从而造成缓存失效不可用。<strong>所以我建议你，</strong>如果采用这种方法，最好建立在你对于这组缓存命中率下降不敏感，比如下面还有另外一层缓存来兜底的情况下。
 
 <strong>当然了，用一致性Hash算法可以很好地解决增加和删减节点时，命中率下降的问题。</strong>在这个算法中，我们将整个Hash值空间组织成一个虚拟的圆环，然后将缓存节点的IP地址或者主机名做Hash取值后，放置在这个圆环上。当我们需要确定某一个Key需要存取到哪个节点上的时候，先对这个Key做同样的Hash取值，确定在环上的位置，然后按照顺时针方向在环上“行走”，遇到的第一个缓存节点就是要访问的节点。比方说下面这张图里面，Key 1和Key 2会落入到Node 1中，Key 3、Key 4会落入到Node 2中，Key 5落入到Node 3中，Key 6落入到Node 4中。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f9/fe/f9ea0e201aa954cf46c5762835095efe.jpg?wh=1142%2A914" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f9/fe/f9ea0e201aa954cf46c5762835095efe.jpg?wh=1142%2A914" /></p>
 <p>这时如果在Node 1和Node 2之间增加一个Node 5，你可以看到原本命中Node 2的Key 3现在命中到Node 5，而其它的Key都没有变化；同样的道理，如果我们把Node 3从集群中移除，那么只会影响到Key 5 。所以你看，<strong>在增加和删除节点时，只有少量的Key会“漂移”到其它节点上，</strong>而大部分的Key命中的节点还是会保持不变，从而可以保证命中率不会大幅下降。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4c/91/4c13c4fd4278dc97d072afe09a1a1b91.jpg?wh=1142%2A807" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4c/91/4c13c4fd4278dc97d072afe09a1a1b91.jpg?wh=1142%2A807" /></p>
 <p>不过，事物总有两面性。虽然这个算法对命中率的影响比较小，但它还是存在问题：</p>
 <ul>
 <li>缓存节点在圆环上分布不平均，会造成部分缓存节点的压力较大；当某个节点故障时，这个节点所要承担的所有访问都会被顺移到另一个节点上，会对后面这个节点造成压力。</li>
@@ -14607,28 +14607,28 @@
 <p>它将一个缓存节点计算多个Hash值分散到圆环的不同位置，这样既实现了数据的平均，而且当某一个节点故障或者退出的时候，它原先承担的Key将以更加平均的方式分配到其他节点上，从而避免雪崩的发生。</p>
 <p><strong>其次，就是一致性Hash算法的脏数据问题。为什么会产生脏数据呢？</strong>比方说，在集群中有两个节点A和B，客户端初始写入一个Key为k，值为3的缓存数据到Cache A中。这时如果要更新k的值为4，但是缓存A恰好和客户端连接出现了问题，那这次写入请求会写入到Cache B中。接下来缓存A和客户端的连接恢复，当客户端要获取k的值时，就会获取到存在Cache A中的脏数据3，而不是Cache B中的4。</p>
 <p><strong>所以，在使用一致性Hash算法时一定要设置缓存的过期时间，</strong>这样当发生漂移时，之前存储的脏数据可能已经过期，就可以减少存在脏数据的几率。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4c/f8/4c10bb2e9b0f6cb9920d4b1c9418b2f8.jpg?wh=1142%2A591" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4c/f8/4c10bb2e9b0f6cb9920d4b1c9418b2f8.jpg?wh=1142%2A591" /></p>
 <p>很显然，数据分片最大的优势就是缓解缓存节点的存储和访问压力，但同时它也让缓存的使用更加复杂。在MultiGet（批量获取）场景下，单个节点的访问量并没有减少，同时节点数太多会造成缓存访问的SLA（即“服务等级协议”，SLA代表了网站服务可用性）得不到很好的保证，因为根据木桶原则，SLA取决于最慢、最坏的节点的情况，节点数过多也会增加出问题的概率，<strong>因此我推荐4到6个节点为佳。</strong></p>
 <p><strong>2.Memcached的主从机制</strong></p>
 <p>Redis本身支持主从的部署方式，但是Memcached并不支持，所以我们今天主要来了解一下Memcached的主从机制是如何在客户端实现的。</p>
 <p>在之前的项目中，我就遇到了单个主节点故障导致数据穿透的问题，这时我为每一组Master配置一组Slave，更新数据时主从同步更新。读取时，优先从Slave中读数据，如果读取不到数据就穿透到Master读取，并且将数据回种到Slave中以保持Slave数据的热度。</p>
 <p>主从机制最大的优点就是当某一个Slave宕机时，还会有Master作为兜底，不会有大量请求穿透到数据库的情况发生，提升了缓存系统的高可用性。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/54/60/5468eb8779396b38c3731839f3d8d960.jpg?wh=1142%2A588" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/54/60/5468eb8779396b38c3731839f3d8d960.jpg?wh=1142%2A588" /></p>
 <p><strong>3.多副本</strong></p>
 <p>其实，主从方式已经能够解决大部分场景的问题，但是对于极端流量的场景下，一组Slave通常来说并不能完全承担所有流量，Slave网卡带宽可能成为瓶颈。</p>
 <p>为了解决这个问题，我们考虑在Master/Slave之前增加一层副本层，整体架构是这样的：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/67/03/6779f9b6741b7767068df767218bcd03.jpg?wh=1142%2A537" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/67/03/6779f9b6741b7767068df767218bcd03.jpg?wh=1142%2A537" /></p>
 <p>在这个方案中，当客户端发起查询请求时，请求首先会先从多个副本组中选取一个副本组发起查询，如果查询失败，就继续查询Master/Slave，并且将查询的结果回种到所有副本组中，避免副本组中脏数据的存在。</p>
 <p>基于成本的考虑，每一个副本组容量比Master和Slave要小，因此它只存储了更加热的数据。在这套架构中，Master和Slave的请求量会大大减少，为了保证它们存储数据的热度，在实践中我们会把Master和Slave作为一组副本组使用。</p>
 <h2 id="_2">中间代理层方案</h2>
 <p>虽然客户端方案已经能解决大部分的问题，但是只能在单一语言系统之间复用。例如微博使用Java语言实现了这么一套逻辑，我使用PHP就难以复用，需要重新写一套，很麻烦。<strong>而中间代理层的方案就可以解决这个问题。</strong>你可以将客户端解决方案的经验移植到代理层中，通过通用的协议（如Redis协议）来实现在其他语言中的复用。</p>
 <p>如果你来自研缓存代理层，你就可以将客户端方案中的高可用逻辑封装在代理层代码里面，这样用户在使用你的代理层的时候就不需要关心缓存的高可用是如何做的，只需要依赖你的代理层就好了。</p>
 <p>除此以外，业界也有很多中间代理层方案，比如Facebook的<a href="https://github.com/facebook/mcrouter">Mcrouter</a>，Twitter的<a href="https://github.com/twitter/twemproxy">Twemproxy</a>，豌豆荚的<a href="https://github.com/CodisLabs/codis">Codis</a>。它们的原理基本上可以由一张图来概括：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c5/43/c517437faf418e7fa085b1850e3f7343.jpg?wh=1142%2A487" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c5/43/c517437faf418e7fa085b1850e3f7343.jpg?wh=1142%2A487" /></p>
 <p>看这张图你有什么发现吗？ 所有缓存的<strong>读写请求</strong>都是经过代理层完成的。代理层是无状态的，主要负责读写请求的路由功能，并且在其中内置了一些高可用的逻辑，不同的开源中间代理层方案中使用的高可用策略各有不同。比如在Twemproxy中，Proxy保证在某一个Redis节点挂掉之后会把它从集群中移除，后续的请求将由其他节点来完成；而Codis的实现略复杂，它提供了一个叫Codis Ha的工具来实现自动从节点提主节点，在3.2版本之后换做了Redis Sentinel方式，从而实现Redis节点的高可用。</p>
 <h2 id="_3">服务端方案</h2>
 <p>Redis在2.4版本中提出了Redis Sentinel模式来解决主从Redis部署时的高可用问题，它可以在主节点挂了以后自动将从节点提升为主节点，保证整体集群的可用性，整体的架构如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/94/e1/94ae214f840d2844b7b43751aab6d8e1.jpg?wh=1142%2A531" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/94/e1/94ae214f840d2844b7b43751aab6d8e1.jpg?wh=1142%2A531" /></p>
 <p>Redis Sentinel也是集群部署的，这样可以避免Sentinel节点挂掉造成无法自动故障恢复的问题，每一个Sentinel节点都是无状态的。在Sentinel中会配置Master的地址，Sentinel会时刻监控Master的状态，当发现Master在配置的时间间隔内无响应，就认为Master已经挂了，Sentinel会从从节点中选取一个提升为主节点，并且把所有其他的从节点作为新主的从节点。Sentinel集群内部在仲裁的时候，会根据配置的值来决定当有几个Sentinel节点认为主挂掉可以做主从切换的操作，也就是集群内部需要对缓存节点的状态达成一致才行。</p>
 <p>Redis Sentinel不属于代理层模式，因为对于缓存的写入和读取请求不会经过Sentinel节点。Sentinel节点在架构上和主从是平级的，是作为管理者存在的，<strong>所以可以认为是在服务端提供的一种高可用方案。</strong></p>
 <h2 id="_4">课程小结</h2>
@@ -14769,8 +14769,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

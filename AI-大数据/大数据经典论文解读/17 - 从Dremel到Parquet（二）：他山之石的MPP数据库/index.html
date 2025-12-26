@@ -7834,7 +7834,7 @@
 <h2 id="_1">瓶颈并不出现在硬件</h2>
 <p>Dremel采用的列存储，已经极大地减少了我们扫描数据的浪费。在论文里，Google给出了这样一组数据：在3000个节点上，查询一个87TB、一共有240亿条数据的数据集，查询的内容是一个简单的Word Count程序。如果采用MapReduce去读取行存储的数据，那么需要读取87TB的数据。而如果采用列存储的话，因为只需要读取一列数据，所以只扫描了0.5TB的数据，整个MapReduce程序执行的时间，也缩短了整整一个数量级。</p>
 <p>这也是为什么，在Dremel论文发表之后，开源社区很快跟进了这个支持嵌套的列存储的存储格式，也就催生了Parquet这个开源项目。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/75/14/75bf3c56d7fb4539e2af719f07274314.png?wh=1030x382" title="来自论文中的图10[br]同样的数据集，读取列存储比行存储快一个数量级，而使用Dremel比MapReduce快一个数量级" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/75/14/75bf3c56d7fb4539e2af719f07274314.png?wh=1030x382" title="来自论文中的图10[br]同样的数据集，读取列存储比行存储快一个数量级，而使用Dremel比MapReduce快一个数量级" /></p>
 <p>不过，如果你去看论文中的图10，你会发现，<strong>使用Dremel比传统的MapReduce读取列存储的数据还要再快一个数量级</strong>。那这又是怎么做到的呢？请你和我接着一起往下看。</p>
 <p>我们之前提过很多次，MapReduce虽然伸缩性非常好，非常适合进行大规模的数据批处理，但是它也有一些明显的缺陷，其中很重要的一个问题，就是每个任务都有相对比较大的额外开销（overhead）。</p>
 <p>所以即使有了Hive，可以让分析师不用写程序，可以直接写SQL，另外列存储也让我们需要扫描的数据大大减少了，但是MapReduce这个额外开销，始终还是会让我们的分析程序的运行时间在分钟级别。</p>
@@ -7858,7 +7858,7 @@
 <li>然后是一系列的<strong>中间服务器（intermediate servers），</strong>中间服务器可以有很多层。比如第一层有5个服务器，那么每个服务器可以往下再分发下一层的5个服务器，它是一个树状结构，这也是服务树的这个名字的由来。我们所有查询Dremel系统的原始SQL，每往下分发一层，就会重写（rewrite）一下，然后把结果在当前节点做聚合，再返回给上一层。</li>
 <li>最下面是一层<strong>叶子服务器（leaf servers）</strong>，叶子服务器是最终实际完成数据查询的节点，也算是我们实际存储数据的节点。</li>
 </ul>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9b/5e/9b425ff0d1f5f5cb47bf1ae18c86625e.jpg?wh=1920x1080" title="来自论文中的图7， Dremel的整体系统架构图" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9b/5e/9b425ff0d1f5f5cb47bf1ae18c86625e.jpg?wh=1920x1080" title="来自论文中的图7， Dremel的整体系统架构图" /></p>
 <p>光这样讲系统的架构实在还是太抽象，我们还是来看看论文里给到的SQL的例子：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">SELECT</span><span class="w"> </span><span class="n">A</span><span class="p">,</span><span class="w"> </span><span class="n">COUNT</span><span class="p">(</span><span class="n">B</span><span class="p">)</span><span class="w"> </span><span class="n">FROM</span><span class="w"> </span><span class="n">T</span><span class="w"> </span><span class="n">GROUP</span><span class="w"> </span><span class="n">BY</span><span class="w"> </span><span class="n">A</span>
 </code></pre></div>
@@ -7883,7 +7883,7 @@
 <h3 id="_2">树形分发的搜索引擎架构</h3>
 <p>而这个一层层服务树分发的机制，则是借鉴了搜索引擎的分布式检索机制。数据分区到不同的叶子节点上，就是相当于我们把不同的文档<strong>分片</strong>到不同的索引分片服务器上。</p>
 <p>每一个索引分片服务器，会完成自己分片数据上的检索工作，然后把结果返回给上一层的中间服务器。中间服务器也会在自己这一层，把检索结果再进行合并处理，再往上一层层返回，直到根服务器。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/38/98/38abeeba151b9e8473cb972599a9b898.jpg?wh=1920x1080" title="搜索引擎的分布式索引，也是采取类似的树状结构，每一个叶子节点本质都是某一个分区的数据[br]检索结果返回到中间层服务器进行归并，通常归并的方式是Top K" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/38/98/38abeeba151b9e8473cb972599a9b898.jpg?wh=1920x1080" title="搜索引擎的分布式索引，也是采取类似的树状结构，每一个叶子节点本质都是某一个分区的数据[br]检索结果返回到中间层服务器进行归并，通常归并的方式是Top K" /></p>
 <p>我们可以拿一个例子来看看，Dremel和搜索引擎的分布式索引有哪些相像之处。最合适的一个例子，就是求一个数据集中排序的Top K，也就是前K项的返回结果，它对应的SQL就是这样的：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">SELECT</span><span class="w"> </span><span class="n">A</span><span class="p">,</span><span class="w"> </span><span class="n">B</span><span class="p">,</span><span class="w"> </span><span class="n">C</span><span class="w"> </span><span class="n">FROM</span><span class="w"> </span><span class="n">T</span><span class="w"> </span><span class="n">ORDER</span><span class="w"> </span><span class="n">BY</span><span class="w"> </span><span class="n">D</span><span class="w"> </span><span class="n">LIMIT</span><span class="w"> </span><span class="n">K</span>
 </code></pre></div>
@@ -7900,7 +7900,7 @@
 <p><strong>这个架构中最核心的价值，在于可以通过中间服务器来进行“垂直”扩张。</strong>并且通过“垂直”扩张，可以在计算量基本不变的情况下，通过服务器的并行，来缩短整个SQL所花费的时间。也就是通过增加更多的服务器，<strong>让系统的吞吐量（Throughoutput）不变，延时（Latency）变小</strong>。这个“垂直”扩张，并不是所谓的对硬件升级进行Scale-Up，而是增加中间层服务器，增加归并聚合计算的并行度。</p>
 <p>因为实际扫描数据，是在最终的叶子节点进行的，所以这一层花费的时间和性能是固定的。如果我们没有中间服务器，而是所有的叶子节点数据都直接归并到根服务器，那么性能瓶颈就会在根服务器上。</p>
 <p>根服务器需要和3000个节点传输数据，并在根节点进行聚合。而这个聚合又在一个节点上，只能顺序进行，即使每一个叶子节点返回的数据，在根节点进行数据聚合只需要20毫秒，那么我们也需要1分钟才能完成3000个节点的数据聚合。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7e/1a/7e20ec6a1e1d292a99532aa6431b571a.jpg?wh=1920x1290" title="通过树形的中间层服务器的分发架构，我们增加了数据归并聚合的并行度，缩短了实际的SQL查询的响应时间" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7e/1a/7e20ec6a1e1d292a99532aa6431b571a.jpg?wh=1920x1290" title="通过树形的中间层服务器的分发架构，我们增加了数据归并聚合的并行度，缩短了实际的SQL查询的响应时间" /></p>
 <p>而如果我们在中间加入中间层的服务器，比如，我们有100个中间层的服务器，每个服务器下面聚合30个叶子服务器。那么中间层服务器就只需要600毫秒完成中间层的聚合，中间层的结果到根服务器也只需要2秒，我们可以在3秒内完成两层的聚合工作。</p>
 <p>当然，在实际的SQL执行过程中，我们还有叶子节点扫描数据，以及数据在叶子节点和中间层，还有中间层和根服务器之间的网络传输开销，实际花费的时间会比这个多一些。但是<strong>中间层，帮助我们把数据归并的工作并行化了。我们归并工作需要的CPU时间越多，这个并行化就更容易缩短整个查询的响应时间。</strong></p>
 <p>我们的叶子节点越多，叶子节点返回的数据记录越多，增加中间层就越划算。论文里的实验部分针对不同的SQL和不同层数的中间服务器做了各种实验，你可以去仔细看一看。</p>
@@ -7909,7 +7909,7 @@
 <p>Q2：SELECT country, SUM(item.amount) FROM T2 GROUP BY country
 Q3：SELECT domain, SUM(item.amount) FROM T2 WHERE domain CONTAINS ’.net’ GROUP BY domain</p>
 </blockquote>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e8/0b/e88b800ffb344b44dfc08d1e5d81140b.png?wh=970x390" title="来自论文中的图11[br]通过增加中间层，我们的SQL扫描的数据没有发生变化，但是整个任务的延时大大缩短了[br]这个对于返回的数据量越大，聚合工作越多的情况下越适用" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e8/0b/e88b800ffb344b44dfc08d1e5d81140b.png?wh=970x390" title="来自论文中的图11[br]通过增加中间层，我们的SQL扫描的数据没有发生变化，但是整个任务的延时大大缩短了[br]这个对于返回的数据量越大，聚合工作越多的情况下越适用" /></p>
 <p>其中，Q2是按照国家进行数据聚合，因为国家的数量很少，所以每一个叶子节点返回的数据量也很小。但是即使这样，在没有中间节点的情况下，因为根服务器要和3000个叶子服务器一一通信、聚合数据，花费的时间也要20秒。而我们只要加上一个中间层，所花费的时间立刻缩短到了3秒，但是要注意，这个时候即使我们再增加中间层，时间也无法缩短了。</p>
 <p>而里面的Q3，是按照域名进行数据聚合。我们知道互联网上的域名数量特别多，在这个SQL中，最终一共会有110万个域名。没有中间层的时候，执行时间需要超过一分钟。增加了100个节点的中间层之后，时间就缩短了一半以上，而当我们在中间层再加一层，把整个服务器的树形结构变成1:10:100:2900的时候，执行时间能够再缩短一半，到15秒之内。</p>
 <p>其实，这个树形垂直扩展的架构，也是搜索引擎能从无穷无尽的网页中，快速在几百毫秒之内给到你结果的核心所在。</p>
@@ -8063,8 +8063,6 @@ Q3：SELECT domain, SUM(item.amount) FROM T2 WHERE domain CONTAINS ’.net’ GR
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

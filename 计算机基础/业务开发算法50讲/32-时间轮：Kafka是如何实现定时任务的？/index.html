@@ -6375,7 +6375,7 @@
 <li>在插入元素时，既然是所谓的延时队列，我们会插入一个带执行时间的任务，底层会对这些任务进行排序，保证队列最前的任务是最快到期的；</li>
 <li>调用take接口后，会有一个线程检查头部元素，如果队列头的任务没有到期，我们就阻塞这个线程，直到任务到期，再唤醒这个线程；如果检查头部的时候任务已经到期，我们就会让这个消费进程真的从队列取出该元素，并执行。</li>
 </ul>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6a/b4/6a766e3178c1b3c9a47066d8aacea0b4.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6a/b4/6a766e3178c1b3c9a47066d8aacea0b4.jpg?wh=1920x1145" /></p>
 <p>为了提高效率，DelayedQueue底层还采用了一种leader-follower的线程模型，也非常常用，你可以理解成任务的执行会有多个线程进行，参考示意图，这样任务的具体执行和到期时间的检查就不会产生冲突，可以并行地进行。</p>
 <p>分析清楚了设计思路，那DelayedQueue底层是如何对任务做有序排列的，用的是什么数据结构呢？你可以先猜想一下。</p>
 <p>链表？数组？事实上，这里的有序排列并不会像你想的那样从头到尾维护一个线性的序列。我们之前也讲过，如果维护一个线性的序列，不管是链表还是数组，排序的时候都需要O(n*logn)的时间复杂度；而在这里<strong>我们所需要的其实只是判断整个队列中，最接近到期的那个任务的执行时间，是否已经被当前系统时间所超过。也就是说并不需要整个队列有序，只需要最值</strong>。</p>
@@ -6386,7 +6386,7 @@
 <p>底层基于跳表（<a href="https://time.geekbang.org/column/article/491979">上节课</a>讲过），Redis的有序集合性能非常不错，而且Redis本身是一个稳定、性能良好且能支持大量数据的KV存储引擎，用来实现延时队列自然比基于DelayedQueue的本地实现适用场景更大。</p>
 <p>借助ZSET来实现延时队列，本质思想和DelayedQueue是类似的，主要就是我们会用ZSET来维护按任务执行时间排列的数据结构。</p>
 <p>在使用ZSET做延时队列的时候，一般会用任务ID作为key，任务详情作为value，任务执行时间作为score，这样所有的待执行任务，在ZSET中，就会按任务执行时间score有序排列。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c8/8e/c879d96c657a503fa540756b396ff58e.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c8/8e/c879d96c657a503fa540756b396ff58e.jpg?wh=1920x1145" /></p>
 <p>在需要被调度的延时任务执行主体上，我们可以开启一个线程定时轮询 <code>ZRANGEBYSCORE KEY -inf +inf limit 0 1 WITHSCORES</code> 查询ZSET中最近可执行的任务：</p>
 <ul>
 <li>如果发现任务时间戳仍然大于当前时间戳，说明没有任务过期，什么都不执行；</li>
@@ -6426,7 +6426,7 @@
 <li>一个槽代表一个时间跨度，每个槽内队列中存储的任务就都是在这个跨度内应该被执行的任务。</li>
 </ul>
 <p>这样整个时间轮看起来就像一个时钟。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/09/15/09d1ebef599d5297bfbff31c51aa9215.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/09/15/09d1ebef599d5297bfbff31c51aa9215.jpg?wh=1920x1145" /></p>
 <p>我们还会有一个类似于秒针的指针，以槽位时间跨度为周期固定地转动，就像秒针一样，永远指向当前时间所应该对应的槽位，当然在这里精度不是秒，而是槽位的时间跨度。比如我们期待任务调度的精度是一分钟，在图中就可以让每个槽位代表的时间为60s，<strong>这样我们就可以很确定的在时间轮里表示600s也就是10分钟内的任务，每隔1分钟，就将当前的槽位指针+1，指向下一个槽位，并判断槽位中是否有任务需要执行</strong>。</p>
 <p>槽位编号更小的任务，自然就会得到更先的执行，从而就实现了在某个精度下定时任务或者延时任务的需求。</p>
 <p>这里的精度也可以调整，时间轮的整个时间周期除以刻度数量，就是我们最小的任务调度的精度，在不同的场景下，可以设计不同的时间轮刻度。比如以24小时、以秒，甚至毫秒为刻度都是可以的，当然精度越高，我们所需要的成本也就更高。</p>
@@ -6584,8 +6584,6 @@ Q5：ZSET只存储任务ID，不存储具体任务，即redis中并没有具体�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

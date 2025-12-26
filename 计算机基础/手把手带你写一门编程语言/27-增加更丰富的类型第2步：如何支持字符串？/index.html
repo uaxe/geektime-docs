@@ -6337,17 +6337,17 @@
 <p><strong>第二，我们看看string的内存布局。</strong></p>
 <p>如何在内存里表示一个字符串呢？</p>
 <p>我们站在巨人的肩膀上，看看C语言是怎么做的。在C语言中，字符串在内存里就相当于一个char的数组，这个数组以0结尾。所以，“Hello”在内存里大概是这样保存的，加起来一共是6个字节：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1c/39/1cc34a2ec21c28bc8bb2687b36764f39.png?wh=1194x254" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1c/39/1cc34a2ec21c28bc8bb2687b36764f39.png?wh=1194x254" /></p>
 <p>我们也可以借鉴C语言的做法，用一个数组来表示字符串。不过，C语言需要程序员自己去处理字符串使用的内存：要么通过声明一个数组，在栈里申请内存；要么在堆里申请一块内存，使用完毕以后再手工释放掉。</p>
 <p>而JavaScript是不需要程序员来手工管理内存的，而是采用了自动内存管理机制。自动内存管理机制管理的是一个个内存对象。当对象不再被使用以后，就可以被回收。</p>
 <p>那么我们的设计，也必须实现自动的内存管理，因为TypeScript并没有底层的内存管理能力。</p>
 <p>说到内存对象，我们还有一个设计目标，就是在语言内部，对各种类型的对象都有统一的管理机制，包括统一的内存管理机制、统一的运行时类型查询机制等等。这样，才能铺垫好TypeScript对象化的基础，并在后面实现更丰富的语言特性。所以，我们就需要对如何在内存里表示一个对象进行一下设计。</p>
 <p>这方面，我们又可以参考一下其他语言是怎么做的。比如，在Java等语言里，对象都有一些统一的内存布局设计。其典型特征，就是每个对象都有一个固定的对象头，对象头之后才是对象的实际数据。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ee/fd/ee3ae5eb88c69e046aa57aa95c8f93fd.png?wh=260x308" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ee/fd/ee3ae5eb88c69e046aa57aa95c8f93fd.png?wh=260x308" /></p>
 <p>对象头里面保存了一些信息，用来对这个对象进行管理。进行哪些管理呢？首先是自动内存管理。对象头里有一些标志位，是用于垃圾收集程序的。比如，通过算法来标记某个对象是否是垃圾。我们在后面会具体实现一个垃圾收集算法，那个时候就会用到这些标志位。</p>
 <p>标志位还有一个用途就是并发管理。你可以用一些特殊的指令，锁住一个对象，使得该对象在同一时间只可以被一个线程访问。在锁住对象的时候，也要在对象头做标识。此外，对象头里还有引用了类的定义，这样我们就可以在运行时知道这个对象属于哪个类，甚至通过反射等元编程机制去动态地调用对象的方法。</p>
 <p>我们可以参考一下Java对象头的设计。它包含类指针和标志位两个部分。类指针指向类定义的地址。标志位就是内部分割成多个部分，用来存放与锁、垃圾收集等标记，还会存放对象的哈希值。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/35/e7/35ca8dffeb3ce2e96d23bb5985b90de7.png?wh=1004x302" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/35/e7/35ca8dffeb3ce2e96d23bb5985b90de7.png?wh=1004x302" /></p>
 <p>当然，其他语言的对象，也都有类似的内存布局设计。我在<a href="https://time.geekbang.org/column/intro/100052801">《编译原理实战课》</a>中，对Java、Python和Julia等语言的对象内存布局都做了讨论，如果你感兴趣可以去看看。</p>
 <p>参考这些设计，我们也可以做出自己的设计。在PlayScript中，我们首先设计一个Object对象，里面有一个标志位的字段和一个指向对象的类定义的指针。我们后面再探讨它们的用途。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>//所有对象的对象头。目前的设计占用16个字节。
@@ -6371,7 +6371,7 @@
 <a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>}PlayString;
 </code></pre></div>
 <p>采用这个结构后，实际上PlayString的内存布局如下。对象头占16个字节，字符串长度占4个字节，其余的才是字符串数据，占用空间的大小是字符串的长度再加1个字节：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/76/5b/7665e4f02b90ef9ec93958a52799ae5b.png?wh=476x414" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/76/5b/7665e4f02b90ef9ec93958a52799ae5b.png?wh=476x414" /></p>
 <p>不过，在这里，我们还有一个技术细节需要做一下决策。</p>
 <p>C语言中是以0结尾的数组来表示一个字符串的。所以，在C语言中，我们每次为字符串申请内存的时候，都要多申请一个字节，用于存放字符串的结尾标志，也就是0。那么，在我们自己实现的语言里，是否需要也多申请一个字节的空间，也在字符串后面放一个0呢？</p>
 <p>本质上是不需要的。因为我们已经用了一个字段来表示字符串的长度。不过，像打印字符串这种功能，我们想直接使用C语言的标准函数来实现，所以还是决定采用C语言存储字符串的格式，尽管这可能会浪费一点存储空间。当然你也可以不使用这个设计，但在实现字符串输出等功能的时候，就需要去做额外的工作了。</p>
@@ -6412,7 +6412,7 @@
 <a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>}
 </code></pre></div>
 <p>这个例子编译后生成的汇编代码如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f7/d5/f742a8771731933b3e287037817934d5.png?wh=1500x1176" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f7/d5/f742a8771731933b3e287037817934d5.png?wh=1500x1176" /></p>
 <p>在这段代码里，你会看到一个单独的文本段，用来保存C语言格式的字符串。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>.section    __TEXT,__cstring,cstring_literals
 </code></pre></div>
@@ -6423,7 +6423,7 @@
 </code></pre></div>
 <p>到这里，我们就知道了。<strong>字符串字面量和上一节的浮点数字面量一样，都是保存在文本段的。在编译之后，它们就会进入到可执行文件中</strong>。</p>
 <p>知道了这个原理后，其实你就可以搞点黑客小技巧了。比如，你可以用工具修改二进制文件里的字符串常量，篡改程序里显示的信息。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/48/c0/483842c0aff5749fba5fbaa0976d8dc0.png?wh=1672x544" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/48/c0/483842c0aff5749fba5fbaa0976d8dc0.png?wh=1672x544" /></p>
 <p>同理，你还可以修改可执行程序中数据区里的一些数据。很多玩游戏的同学会使用这个手段，来修改自己的游戏参数，让自己的账号具备“超能力”。</p>
 <p>从这里你也可以看到，<strong>设计一门计算机语言的时候，其实你还要考虑程序的安全因素</strong>。从这个角度看，现代很多语言都采用托管的方式运行，而不是直接编译成在操作系统上运行的可执行程序，这在安全方面是有一些优势的。不过安全性就是另一个话题了，我们不多展开。从这里你能再次体会到，了解一些底层实现机制，能帮助你对很多技术问题的理解更深刻。</p>
 <p>回到原来的话题。现在，我们已经知道如何来存储字符串字面量了。<strong>那么如何在汇编代码里访问字符串呢？</strong></p>
@@ -6608,8 +6608,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

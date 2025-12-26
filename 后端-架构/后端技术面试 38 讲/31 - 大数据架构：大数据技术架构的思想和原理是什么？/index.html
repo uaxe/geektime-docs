@@ -14539,7 +14539,7 @@
 <p>事实上，MapReduce将同一个计算程序启动在分布式集群的多台服务器上，每个服务器上的程序进程都读取本服务器上要处理的数据块进行计算，因此，大量的数据就可以同时进行计算了。但是这样的话，每个数据块的数据都是独立的，如果这些数据块需要进行关联计算怎么办？</p>
 <p>MapReduce将计算过程分成两个部分，一个是map过程，每个服务器上会启动多个map进程，map优先读取本地数据进行计算，计算后输出一个&lt;key, value&gt;集合。另一个是reduce过程，MapReduce在每个服务器上都启动多个reduce进程，然后对所有map输出的&lt;key, value&gt;集合进行shuffle操作。所谓shuffle就是将相同的key发送到同一个reduce进程，在reduce中完成数据关联计算。</p>
 <p>我们以经典的WordCount，也就是统计所有数据中相同单词的词频数据为例，看看map和reduce的处理过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1b/5b/1b7b317b5863743112b3f45f7ae9025b.png?wh=1362%2A280" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1b/5b/1b7b317b5863743112b3f45f7ae9025b.png?wh=1362%2A280" /></p>
 <p>假设原始数据有两个数据块，MapReduce框架启动两个map进程进行处理，分别读入数据。map函数对输入数据进行分词处理，然后针对每个单词输出&lt;单词, 1&gt;这样的&lt;key, value&gt;结果。然后，MapReduce框架进行shuffle操作，相同的key发送给同一个reduce进程，reduce的输入就是&lt;key, value列表&gt;这样的结构，即相同key的value合并成一个value列表。</p>
 <p>在这个例子中，这个value列表就是很多个1组成的列表。reduce对这些1进行求和操作，就得到每个单词的词频结果了。具体的MapReduce程序如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>public class WordCount {
@@ -14576,7 +14576,7 @@
 <a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>}
 </code></pre></div>
 <p>上面讲述了map和reduce进程合作完成数据处理的过程，那么这些进程是如何在分布式的服务器集群上启动的呢？数据是如何流动，最终完成计算的呢？我们以MapReduce1为例看下这个过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/71/15/710e8315ab9723d7410a93bb5f871015.png?wh=1290%2A784" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/71/15/710e8315ab9723d7410a93bb5f871015.png?wh=1290%2A784" /></p>
 <p>MapReduce1主要有JobTracker和TaskTracker两种进程角色，JobTracker在MapReduce集群中只有一个，而TaskTracker则和DataNode一起，启动在集群的所有服务器上。</p>
 <p>MapReduce应用程序JobClient启动后，会向JobTracker提交作业，JobTracker根据作业中输入文件路径分析，需要在哪些服务器上启动map进程，然后就向这些服务器上的TaskTracker发送任务命令。</p>
 <p>TaskTracker收到任务后，启动一个TaskRunner进程下载任务对应的程序，然后反射加载程序中的map函数，读取任务中分配的数据块，进行map计算。map计算结束后，TaskTracker会对map输出进行shuffle操作，然后TaskRunner加载reduce函数进行后续计算。</p>
@@ -14588,14 +14588,14 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>SELECT pageid, age, count(1) FROM pv_users GROUP BY pageid, age;
 </code></pre></div>
 <p>这是一条常见的SQL统计分析语句，统计不同年龄的用户访问不同网页的兴趣偏好，具体数据输入和执行结果示例如下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/31/23/31746fc5876e5078dac36f0fa4779123.jpg?wh=1957%2A869" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/31/23/31746fc5876e5078dac36f0fa4779123.jpg?wh=1957%2A869" /></p>
 <p>我们看这个示例就会发现，这个计算场景和WordCount很像。事实上也确实如此，我们可以用MapReduce的计算过程完成这条SQL的处理。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3d/76/3d4978dff6074ee9b1b44fbab0d16976.jpg?wh=4028%2A1320" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3d/76/3d4978dff6074ee9b1b44fbab0d16976.jpg?wh=4028%2A1320" /></p>
 <p>map函数输出的key是表的行记录，value是1，reduce函数对相同的行记录，也就是相同的key的value集合进行求和计算，就得到最终的SQL输出结果了。</p>
 <p>那么Hive要做的就是将SQL翻译成MapReduce程序代码，实际上，Hive内置了很多Operator，每个Operator完成一个特定的计算过程，Hive将这些Operator构造成一个有向无环图DAG，然后根据这些Operator之间是否存在shuffle将其封装到map或者reduce函数，就可以提交给MapReduce执行了。Operator组成的DAG图示例如下，这是一个包含where查询条件的SQL，where查询条件对应一个FilterOperator。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cb/a6/cb1236ad035ca01cffbb9df47fa88fa6.jpg?wh=1744%2A1544" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cb/a6/cb1236ad035ca01cffbb9df47fa88fa6.jpg?wh=1744%2A1544" /></p>
 <p>Hive整体架构如下，Hive的表数据存储在HDFS。表的结构，比如表名、字段名、字段之间的分隔符等存储在Metastore。用户通过Client提交SQL到Driver，Driver请求Compiler将SQL编译成如上示例的DAG执行计划，然后交给Hadoop执行。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/40/7c/40e472fef9c766a79a13cd49aa57ee7c.jpg?wh=2037%2A1111" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/40/7c/40e472fef9c766a79a13cd49aa57ee7c.jpg?wh=2037%2A1111" /></p>
 <h2 id="spark">快速大数据计算Spark架构</h2>
 <p>MapReduce主要使用硬盘存储计算过程中的数据，这样虽然可靠性比较高，但是性能其实比较差。此外，MapReduce只能使用map和reduce函数进行编程，虽然能够完成各种大数据计算，但是编程比较复杂。而且，受map和reduce编程模型简单的影响，复杂的的计算必须组合多个MapReduce job才能完成，编程难度进一步增加。</p>
 <p>Spark在MapReduce基础上进行改进，主要使用内存进行中间计算数据存储，加快了计算执行时间，在某些情况下，性能可以提升上百倍。Spark的主要编程模型是RDD，弹性数据集。在RDD上定义了许多常见的大数据计算函数，利用这些函数，可以用极少的代码完成较为复杂的大数据计算。前面举例的WorkCount，如果用Spark编程，只需要三行代码：</p>
@@ -14608,12 +14608,12 @@
 <p>首先，从HDFS读取数据，构建出一个RDD textFile。然后，在这个RDD上执行三个操作：将输入数据的每一行文本用空格拆分成单词；将每个单词进行转换，word→(word, 1)，生成&lt;Key, Value&gt;的结构；相同的Key进行统计，统计方式是对Value求和。最后，将RDD counts写入到HDFS，完成结果输出。</p>
 <p>上面代码中flatMap、map、reduceByKey都是Spark的RDD转换函数，RDD转换函数的计算结果还是RDD，所以上面三个函数可以写在一行代码，最后得到的还是RDD。Spark会根据程序中的转换函数生成计算任务执行计划，这个执行计划就是一个DAG。Spark可以在一个作业中完成非常复杂的大数据计算。</p>
 <p>Spark DAG示例如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c8/08/c83f34a6b6e5c0c081e4ab48ce705a08.jpg?wh=2170%2A1570" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c8/08/c83f34a6b6e5c0c081e4ab48ce705a08.jpg?wh=2170%2A1570" /></p>
 <p>如上所示，A、C和E是从HDFS上加载的RDD，A经过groupBy分组统计转换函数后得到RDD B，C经过map转换函数后得到RDD D，D和E经过union合并转换函数后得到RDD F，B和F经过join连接转换函数后得到最终结果RDD G。</p>
 <h2 id="_1">大数据流计算架构</h2>
 <p>Spark虽然比MapReduce快很多，但是大多数场景下，计算耗时依然是分钟级别的，这种计算一般被称为大数据批处理计算。而在实际应用中，有些时候需要在毫秒级完成不断输入的海量数据的计算处理，比如实时对摄像头采集的数据进行监控分析，这就是所谓的大数据流计算。</p>
 <p>早期比较著名的流式大数据计算引擎是Storm，后来随着Spark的火爆，Spark上的流式计算引擎Spark Streaming也逐渐流行起来。Spark Streaming的架构原理是将实时流入的数据切分成小的一批一批的数据，然后将这些小的一批数据交给Spark执行。由于数据量比较小，Spark Streaming又常驻系统，不需要重新启动，因此可以毫秒级完成计算，看起来像是实时计算一样。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ba/b5/ba987158d27fc5bbad382c0111e3b2b5.jpg?wh=2416%2A537" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ba/b5/ba987158d27fc5bbad382c0111e3b2b5.jpg?wh=2416%2A537" /></p>
 <p>最近几年比较流行的大数据引擎Flink其架构原理其实和Spark Streaming很相似，随着数据源的不同，根据数据量和计算场景的要求，可以灵活适应流计算和批处理计算。</p>
 <h2 id="_2">小结</h2>
 <p>大数据技术可以说是分布式技术的一个分支，都是面临大量的计算压力，采用分布式服务器集群的方案解决问题。差别是大数据技术要处理的数据具有关联性，所以需要有个中心服务器进行管理，NameNode、JobTracker都是这样的中心服务器。</p>
@@ -14622,9 +14622,9 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>SELECT pv.pageid, u.age FROM page_view pv JOIN user u ON (pv.userid = u.userid);
 </code></pre></div>
 <p>page_view：</p>
-<p><img alt="9" src="https://static001.geekbang.org/resource/image/32/db/32f6e0431cfbad0bf055fa3e22fd4edb.png?wh=2390%2A502" /></p>
+<p><img alt="9" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/32/db/32f6e0431cfbad0bf055fa3e22fd4edb.png?wh=2390%2A502" /></p>
 <p>user：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/53/bc/53ef8d27c7a32e02e878230cf861b0bc.png?wh=2376%2A394" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/53/bc/53ef8d27c7a32e02e878230cf861b0bc.png?wh=2376%2A394" /></p>
 <div><strong>精选留言（10）</strong></div>
 <ul>
 <li><span>黄海峰</span> 👍（2） 💬（1）<p>shuffle把相同key发送给同一个reduce，那岂不是还是要传输大量数据？还是实际是把相同key放到相同hdfs文件reduce进程读取？</p>2020-02-03</li><br/><li><span>Winon</span> 👍（0） 💬（2）<p>老师说的集群有标准吗？譬如，由两台相同功能组成的服务器提供服务，算集群吗？</p>2020-07-28</li><br/><li><span>image</span> 👍（8） 💬（0）<p>Flink引擎是基于record，还是和spark streaming minibatch有较大区别的。</p>2020-03-21</li><br/><li><span>escray</span> 👍（6） 💬（0）<p>大数据技术首先要有大数据，其次要有大规模的数据计算要求。
@@ -14754,8 +14754,6 @@ hadoop 是把reduce完全放在shuffle之后，这样在shuffle的过程中，�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

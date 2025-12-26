@@ -14301,7 +14301,7 @@
 </code></pre></div>
 <p>这两个宏位于Include/object.h中。这段代码里最重要的地方在于ob_refcnt增一和减一的操作。这段代码与<a href="https://time.geekbang.org/column/article/465516">第19节课</a>所讲的引用计数法的伪代码十分相似，我就不重复分析了。</p>
 <p>使用了引用计数的地方，就会存在循环引用。例如下图中的四个对象，A是根对象，它与B之间有循环引用，那么它们都不是垃圾对象。C和D之间也有循环引用，但因为没有外界的引用指向它们了，所以它们就是垃圾对象，但是循环引用导致他们都不能释放。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/97/5f/97cc143f4d4216ba56ace93f1b8f7f5f.jpg?wh=2284x946" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/97/5f/97cc143f4d4216ba56ace93f1b8f7f5f.jpg?wh=2284x946" /></p>
 <p>Python为了解决这个问题，在虚拟机中引入了一个双向链表，把所有对象都放到这个链表里。Python的每个对象头上都有一个名为PyGC_Head的结构：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>/* GC information is stored BEFORE the object structure. */
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>typedef union _gc_head {
@@ -14315,11 +14315,11 @@
 </code></pre></div>
 <p>在这个结构里，gc_next和gc_prev的作用就是把对象关联到链表里。而gc_refs则是用于消除循环引用的。当链表中的对象达到一定数目时，Python的GC模块就会执行一次标记清除。具体来讲，一共有四步。</p>
 <p>第一步，<strong>将ob_refcnt的值复制到gc_refs中</strong>。对于上面的例子，它们的gc_refs的值就如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/52/49/524145acfebb39dc369c22fb3c36f649.jpg?wh=2284x896" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/52/49/524145acfebb39dc369c22fb3c36f649.jpg?wh=2284x896" /></p>
 <p>第二步是<strong>遍历整个链表，对每个对象，将它直接引用的对象的gc_refs的值减一</strong>。比如遍历到A对象时，只把B对象的gc_refs值减一；遍历到B对象时，再把它直接引用的A对象的gc_refs值减一。经过这一步骤后，四个对象的gc_refs的值如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7d/c9/7d29ee40420ff42a0c6a77455e2f0cc9.jpg?wh=2284x896" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7d/c9/7d29ee40420ff42a0c6a77455e2f0cc9.jpg?wh=2284x896" /></p>
 <p>第三步，<strong>将gc_refs值为0的对象，从对象链表中摘下来，放入一个名为“临时不可达”的链表中</strong>。之所以使用“临时”，是因为有循环引用的垃圾对象的gc_refs在此时一定为0，比如C和D。但gc_refs值为0的对象不一定是垃圾对象，比如B对象。此时，B、C和D对象就被放入临时不可达链表中了，示意图如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/38/69/3823754c6a23a3874f45547066fbd869.jpg?wh=2284x863" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/38/69/3823754c6a23a3874f45547066fbd869.jpg?wh=2284x863" /></p>
 <p>最后一步，<strong>以可达对象链表中的对象为根开始深度优先搜索</strong>，<strong>将所有访问到gc_refs为0的对象，再从临时不可达链表中移回可达链表中</strong>。最后留在临时不可达链表中的对象，就是真正的垃圾对象了。</p>
 <p>接下来就可以使用_Py_Dealloc逐个释放链表中的对象了，对于上面的例子，就是把B对象重新加回到可达对象链表中，然后将C和D分别释放。</p>
 <p>到这里，Python内存管理的核心知识我们就介绍完了，接下来，我们来看Go语言的例子。它的特点是分配算法复杂，但清除算法简单。</p>
@@ -14335,7 +14335,7 @@
 <h2 id="tcmalloc">TCMalloc的分配思想</h2>
 <p>在TCMalloc中，“TC”是Thread Cache的意思，其核心思想是：<strong>TCMalloc会给每个线程分配一个Thread-Local Cache，对于每个线程的分配请求，就可以从自己的Thread-Local Cache区间来进行分配。此时因为不会涉及多线程操作，所以并不需要进行加锁，从而减少了因为锁竞争而引起的性能损耗。</strong></p>
 <p>而当Thread-Local Cache空间不足的时候，才向下一级的内存管理器请求新的空间。TCMalloc引入了Thread cache、Central cache以及Page heap三个级别的管理器来管理内存，可以充分利用不同级别下的性能优势。这个时候你会发现，TCMalloc的多级管理机制非常类似计算机系统结构的内存多级缓存机制。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/45/a8/45883b243e08fb71fd6453f63d489da8.jpg?wh=2284x1310" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/45/a8/45883b243e08fb71fd6453f63d489da8.jpg?wh=2284x1310" /></p>
 <p>围绕着这个核心思想，我们具体看下Go的分配器是怎么实现的。在Go的内存管理机制中，有几个重要的数据结构需要关注，分别是<strong>mspan、heapArena、mcache、mcentral以及mheap</strong>。其中，mspan和heapArena维护了Go的虚拟内存布局，而mcache、mcentral以及mheap则构成了Go的三层内存管理器。</p>
 <h3 id="_2">虚拟内存布局</h3>
 <p>Go的内存管理基本单元是mspan，每个mspan中会维护着一块连续的虚拟内存空间，内存的起始地址由startAddr来记录。每个mspan存储的内存空间大小都是内存页的整数倍，由npages来保存。不过你需要注意的是，这里内存页并非是操作系统的物理页大小，Go的内存页大小设置的是8KB。mspan结构的部分定义如下：</p>
@@ -14350,7 +14350,7 @@
 <a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>...
 <a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>}
 </code></pre></div>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/32/eb/323bc82131d5ba1675a8bd9d9ef53ceb.jpg?wh=2284x1290" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/32/eb/323bc82131d5ba1675a8bd9d9ef53ceb.jpg?wh=2284x1290" /></p>
 <p>heapArena的结构相当于Go的一个内存块，在x86-64架构下的Linux系统上，一个heapArena维护的内存空间大小是64MB。该结构中存放了ArenaSize/PageSize 长度的mspan数组，heapArena结构的spans变量，用来精确管理每一个内存页。而整个arena内存空间的基址则存放在zeroedBase中。heapArena结构的部分定义如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>type heapArena struct {
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>...
@@ -14362,7 +14362,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>arenas [1 &lt;&lt; arenaL1Bits]*[1 &lt;&lt; arenaL2Bits]*heapArena
 </code></pre></div>
 <p>这里二维数组的大小在不同架构跟操作系统上有所不同，对于x86-64架构下的Linux系统，第一维数组长度是1，而第二维数组长度是4194304。这样每个heapArena管理的内存大小是64MB，由此可以算出Go的整个堆空间最多可以管理256TB的大小。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/61/d6/6100a108e58e380b6635c7bb705a70d6.jpg?wh=2284x1110" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/61/d6/6100a108e58e380b6635c7bb705a70d6.jpg?wh=2284x1110" /></p>
 <p>这里我们又会发现，Go通过heapArena来对虚拟内存进行管理的方式其实跟操作系统通过页表来管理物理内存是一样的。了解了Go的虚拟内存布局之后，我们再来看下Go的三级内存管理器。</p>
 <h3 id="_3">三级内存管理</h3>
 <p>在Go的三级内存管理器中，维护的对象都是小于32KB的小对象。对于这些小对象，Go又将其按照大小分成了67个类别，称为spanClass。每一个spanClass都用来存储固定大小的对象。这67个spanClass的信息在runtime.sizeclasses.go中可以看到详细的说明。我选取了一部分注释放在了下面，你可以看看。</p>
@@ -14377,7 +14377,7 @@
 <p>对于上面的注释，我以class 3为例做个介绍。class 3是说在spanClass为3的span结构中，存储的对象的大小是24字节，整个span的大小是8192字节，也就是一个内存页的大小，可以存放的对象数目最多是341。</p>
 <p>tail waste这里是8字节，这个8是通过8192 mod 24计算得到，意思是，当这个span填满了对象后，会有8字节大小的外部碎片。而max waste的计算方式则是$\left[ \left( 24-17 \right)\times341+8\right]\div8192$得到，意思是极端场景下，该span上分配的所有对象大小都是17字节，此时的内存浪费率为29.24%。</p>
 <p>以上67个存储小对象的spanClass级别，再加上class为0时用来管理大于32KB对象的spanClass，共总是68个spanClass。这些数据都是通过在runtime.mksizeclasses.go中计算得到的。我们从上边的注释可以看出，Go在分配的时候，是通过控制每个spanClass场景下的最大浪费率，来保障堆内存在GC时的碎片率的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a2/26/a2466f262yy6886a4813f99b587cee26.jpg?wh=2284x1338" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a2/26/a2466f262yy6886a4813f99b587cee26.jpg?wh=2284x1338" /></p>
 <p>另外，spanClass的ID中还会通过最后一位来存放noscan的属性。这个标志位是用来告诉Collector该span中是否需要扫描。如果当前span中并不存放任何堆上的指针，就意味着<strong>Collector不需要扫描这段span区间</strong>。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>func makeSpanClass(sizeclass uint8, noscan bool) spanClass {
 <a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>return spanClass(sizeclass&lt;&lt;1) | spanClass(bool2int(noscan))
@@ -14402,7 +14402,7 @@
 <a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>...
 <a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>}
 </code></pre></div>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/98/87/98a5961841b744615161dde97cbbf787.jpg?wh=2284x1279" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/98/87/98a5961841b744615161dde97cbbf787.jpg?wh=2284x1279" /></p>
 <p>当mcache中的内存不够需要扩容时，需要向mcentral请求，mcentral对应于TCMalloc中的Central cache结构。mcentral的主要结构如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>type mcentral struct {
 <a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>spanclass spanClass
@@ -14412,7 +14412,7 @@
 </code></pre></div>
 <p>可以看到，mcentral中也存有spanClass的ID标识符，这表示说每个mcentral维护着固定一种spanClass的mspan。spanClass下面是两个spanSet，它们是mcentral维护的mspan集合。partial里存放的是包含着空闲空间的mspan集合，full里存放的是不包含空闲空间的span集合。这里每种集合都存放两个元素，用来<strong>区分集合中mspan是否被清理过</strong>。</p>
 <p>mcentral不同于mcache，每次请求mcentral中的mspan时，都可能发生不同线程直接的竞争。因此，在使用mcentral时需要进行加锁访问，具体来讲，就是spanSet的结构中会有一个mutex的锁的字段。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4a/e0/4a1633500dba8f4923d3bbba9e6b97e0.jpg?wh=2284x1333" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4a/e0/4a1633500dba8f4923d3bbba9e6b97e0.jpg?wh=2284x1333" /></p>
 <p>我们最后看下mheap的结构。mheap在Go的运行时里边是只有一个实例的全局变量。上面我们讲到，维护Go的整个虚拟内存布局的heapArena的二维数组，就存放在mheap中。mheap结构对应于TCMalloc中的Page heap结构。mheap的主要结构如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>type mheap struct {
 <a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>lock  mutex
@@ -14428,7 +14428,7 @@
 </code></pre></div>
 <p>mheap中存放了$68\times2$个不同spanClass的mcentral数组，分别区分了scan队列以及noscan队列。</p>
 <p>到目前为止，我们就对Go的三级内存管理器有了一个整体的认识，下面这张图展示了这几个结构的关系。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e4/75/e4e35deaffa0504a8aa9cd7955eec375.jpg?wh=2284x1402" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e4/75/e4e35deaffa0504a8aa9cd7955eec375.jpg?wh=2284x1402" /></p>
 <p>学习了Go的三级内存管理机制，那么Go的对象分配逻辑也就很清晰了。</p>
 <h3 id="_4">对象分配机制</h3>
 <p>我们在这里需要注意的一点是：Go根据对象大小分成了三个级别，分别是微小对象、小对象和大对象。<strong>微小对象</strong>，也就是指大小在0 ~ 16字节的非指针类型对象；<strong>小对象</strong>，指的是大小在16 ~ 32KB的对象以及小于16字节的指针对象；<strong>大对象</strong>，也就是上文提到的spanClass为0的类型。</p>
@@ -14445,7 +14445,7 @@
 </code></pre></div>
 <p>微小对象会被放到spanClass为2的mspan中，由于每个对象最大是16字节，在分配时会尽量将多个小对象放到同一个内存块内（16字节），这样可以更进一步的降低这种微小对象带来的碎片化。</p>
 <p>我们在mcache中提到的三个字段：tiny、tinyoffset和tinyAllocs就是用来维护微小对象分配器的。tiny是指向当前在使用的16字节内存块的地址，tinyoffset则是指新分配微小对象需要的起始偏移，tinyAllocs则存放了目前这个mcache中共存放了多少微小对象。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4b/c3/4b04b0918e4963e1065f6913f73737c3.jpg?wh=2284x1387" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4b/c3/4b04b0918e4963e1065f6913f73737c3.jpg?wh=2284x1387" /></p>
 <p>对于小对象的分配，整体逻辑跟TCMalloc是保持一致的，就是依次向三级内存管理器请求内存，一旦内存请求成功则返回，这里我就不详细展开了。</p>
 <p>对于大对象的分配，Go并不会走上述的三次内存管理器，而是直接通过调用mcache.allocLarge来分配大内存。allocLarge会以内存页的倍数大小来通过mheap_.alloc申请对应大小内存，并构建起spanClass为0的mspan对象返回。</p>
 <p>好，接下来我们具体看下Go的内存回收器是怎么实现的。</p>
@@ -14480,7 +14480,7 @@
 <p>到这里，我们就把自动内存管理的核心内容全部介绍完了。</p>
 <h2 id="_7">思考题</h2>
 <p>如果你对Go语言比较熟悉的话，可以思考一下，Go语言中保留了值类型，有哪些优点和缺点呢？欢迎在留言区分享你的想法，我在留言区等你。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f6/cb/f6c74dc0fcf052f32d46d8c952f939cb.jpg?wh=2284x1386" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f6/cb/f6c74dc0fcf052f32d46d8c952f939cb.jpg?wh=2284x1386" /></p>
 <p>好啦，这节课到这就结束啦。欢迎你把这节课分享给更多对计算机内存感兴趣的朋友。我是海纳，我们下节课再见！</p>
 <div><strong>精选留言（6）</strong></div>
 <ul>
@@ -14598,8 +14598,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

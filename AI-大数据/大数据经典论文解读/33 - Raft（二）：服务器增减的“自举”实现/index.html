@@ -7604,7 +7604,7 @@
 <li>服务器B的配置后更新，在没有更新的时候，它觉得有2服务器的投票就是多数通过了；</li>
 <li>这样，我们就会遇到A和B都各自认为投票获得通过的情况，这个时候，我们在一个集群里就会有两个Leader，系统的共识就被破坏了。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/77/9c/77360c72a033a6a6c2b278309c47f69c.jpg?wh=2000x1542" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/77/9c/77360c72a033a6a6c2b278309c47f69c.jpg?wh=2000x1542" /></p>
 <p>要解决这个问题，Raft采用了一个加入“<strong>过渡共识</strong>（Joint Consensus）”的办法。这个办法是这样的，无论是服务器增加还是减少，我们的Raft其实有两组配置。第一组配置是变更之前的服务器配置，我们称之为$C_{old}$（也就是Old Configuration的意思），第二组配置是我们变更之后的服务器配置，我们称之为$C_{new}$（也就是New Configuration的意思）。</p>
 <p>要变更整个Raft集群的配置，我们会进行两阶段的变更，第一阶段是把我们的服务器配置，从$C_{old}$变更成$C_{old},C_{new}$，然后在第二阶段，再从$C_{old},C_{new}$变更成$C_{new}$。在整个集群处于$C_{old},C_{new}$这个过渡共识的过程中，整个Raft集群会做到以下几点：</p>
 <ul>
@@ -7623,7 +7623,7 @@
 <li>这个操作，只需要$C_{new}$里的服务器的半数通过，而不再需要$C_{old}$里的半数通过了。因为此时，我们已经不再需要$C_{old}$服务器里的日志信息了。</li>
 <li>于是，我们的集群就整个地切换到了$C_{new}$的配置之下了。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/93/a9/938128ebacf53b92afcd61b03e75eba9.jpg?wh=2000x1542" title="通过过渡阶段切换到底由哪些服务器投票的示意图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/93/a9/938128ebacf53b92afcd61b03e75eba9.jpg?wh=2000x1542" title="通过过渡阶段切换到底由哪些服务器投票的示意图" /></p>
 <p>不过，在这里，我们可能会遇到一种情况，那就是在进行从$C_{old},C_{new}$变成$C_{new}$的数据写入的时候，当时的Leader是$C_{old}$老配置里的服务器，而不是$C_{new}$里的服务器。<strong>一旦提交成功，我们的集群里就已经没有这个服务器的位置了。那该怎么办呢？</strong></p>
 <p>Raft的解决方案，是Leader在完成$C_{new}$的提交后，退回到Follower状态。这也意味着，从这个Leader写入数据到提交阶段，我们的Raft集群，被一个不在集群内的服务器管理。这个时候，我们在进行过半数的投票的时候，只要不要包括这个服务器就好了。这个额外的服务器并不会影响本身Raft算法的正确性。</p>
 <p>此外，在我们往集群里添加$C_{new}$里新增的服务器的时候，这些服务器里没有任何日志条目。那么，这些服务器一方面需要很长的时间来复制leader的日志，而且在这段时间里，它是不能提交新的日志的。这就意味着，如果我们加入多个节点，有可能会影响Raft的写入性能。可能有很多写入就是等待某一台新加入的服务器参与投票才能获得半数通过。所以Raft的做法，是会先把服务器加入集群参与复制，但是不给投票权，直到复制已经追上Leader的进度再把投票权给它。也就是这台服务器本身也有一个“过渡阶段”。</p>
@@ -7640,7 +7640,7 @@
 <li>其次，是对应的日志相关的元数据，也就是当前快照里面，对应最后一条日志的索引和任期信息。</li>
 </ul>
 <p>这样，通过这个快照，以及后续我们追加写入的日志，我们同样可以组合获得最新的状态机状态。这里我放了一张图，你可以对照着理解一下这个快照是怎么样的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/66/b0/669c56fed5cbc1d6cb7550b85e1569b0.jpg?wh=2000x1542" title="Log Compaction的逻辑" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/66/b0/669c56fed5cbc1d6cb7550b85e1569b0.jpg?wh=2000x1542" title="Log Compaction的逻辑" /></p>
 <p>这个创建快照、清理日志的方式，一般被称之为<strong>日志压实</strong>（Log Compaction）。有些地方，会把这个Compaction翻译成压缩，我觉得是不合理的。因为，这个动作实际上并不是对数据进行压缩（Compression），而是把对于数据库里同一个Key的多次更新的日志，压实之后只保留最后一条。</p>
 <p>在Raft里，日志压实这个动作，是在每个服务器上各自进行，而不是通过Leader进行然后复制到各个Follower。因为后者会占用太多的网络带宽，完全没有必要。</p>
 <p>不过，我们还是会遇到需要通过Leader进行整个快照同步的情况，那就是Follower的日志同步已经落后得太多的情况。比如，我们的某个Follower挂掉了比较长的一段时间，而Leader在这段时间内已经创建了快照，所以很多没有同步到这个Follower的日志，在Leader上已经删除了。或者，我们往集群里新加了一个新节点，这个节点没有任何日志，自然也是要去同步Leader上的快照，然后再去复制快照之后写入的日志。</p>
@@ -7780,8 +7780,6 @@ Cnew配置不是包含Cold的配置吗， 为什么会没有这个服务器的�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

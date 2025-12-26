@@ -7329,13 +7329,13 @@
 <p>如上表所示，我们创建了两个DataFrame，一个用于存储员工基本信息，我们称之为员工表；另一个存储员工薪水，我们称之为薪资表。</p>
 <p>数据准备好之后，我们有必要先弄清楚一些数据关联的基本概念。所谓数据关联，它指的是这样一个计算过程：给定关联条件（Join Conditions）将两张数据表以不同关联形式拼接在一起的过程。关联条件包含两层含义，一层是两张表中各自关联字段（Join Key）的选择，另一层是关联字段之间的逻辑关系。</p>
 <p>在<a href="https://time.geekbang.org/column/article/426789">上一讲</a>我们说到，Spark SQL同时支持DataFrame算子与SQL查询，因此咱们不妨结合刚刚准备好的数据，分别以这两者为例，来说明数据关联中的基本概念。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0c/9b/0c849767ac2bc45e97210bdcc3ecb89b.jpg?wh=1920x437" title="数据关联的基本概念" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0c/9b/0c849767ac2bc45e97210bdcc3ecb89b.jpg?wh=1920x437" title="数据关联的基本概念" /></p>
 <p>首先，约定俗成地，我们把主动参与Join的数据表，如上图中的salaries表，称作“左表”；而把被动参与关联的数据表，如employees表，称作是“右表”。</p>
 <p>然后，我们来关注图中蓝色的部分。可以看到，两张表都选择id列作为关联字段，而两者的逻辑关系是“相等”。这样的一个等式，就构成了我们刚刚说的关联条件。接下来，我们再来看图中绿色的部分，inner指代的就是内关联的关联形式。</p>
 <p>关联形式，是我们今天要学习的重点内容之一。接下来，我们还是一如既往地绕过SQL查询这种开发方式，以DataFrame算子这种开发模式为例，说一说Spark SQL都支持哪些关联形式，以及不同关联形式的效果是怎样的。</p>
 <h2 id="join-types">关联形式（Join Types）</h2>
 <p>在关联形式这方面，Spark SQL的支持比较全面，为了让你一上来就建立一个整体的认知，我把Spark SQL支持的Joint Types都整理到了如下的表格中，你不妨先粗略地过一遍。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/df/c0/df6217d9ac440b442934f1dfcc4192c0.jpg?wh=1555x1009" title="Spark SQL支持的关联形式" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/df/c0/df6217d9ac440b442934f1dfcc4192c0.jpg?wh=1555x1009" title="Spark SQL支持的关联形式" /></p>
 <p>结合已经准备好的数据，我们分别来说一说每一种关联形式的用法，以及它们各自的作用与效果。我们先从最简单、最基础、也是最常见的内关联说起。</p>
 <h3 id="inner-join">内关联（Inner Join）</h3>
 <p>对于登记在册的员工，如果我们想获得他们每个人的薪资情况，就可以使用内关联来实现，如下所示。</p>
@@ -7512,12 +7512,12 @@
 <p>对于参与关联的两张表，如salaries和employees，按照它们在代码中出现的顺序，我们约定俗成地把salaries称作“左表”，而把employees称作“右表”。在探讨关联机制的时候，我们又常常把左表称作是“驱动表”，而把右表称为“基表”。</p>
 <p>一般来说，<strong>驱动表的体量往往较大，在实现关联的过程中，驱动表是主动扫描数据的那一方。而基表相对来说体量较小，它是被动参与数据扫描的那一方</strong>。</p>
 <p>在NLJ的实现机制下，算法会使用外、内两个嵌套的for循环，来依次扫描驱动表与基表中的数据记录。在扫描的同时，还会判定关联条件是否成立，如内关联例子中的salaries(“id”) === employees(“id”)。如果关联条件成立，就把两张表的记录拼接在一起，然后对外进行输出。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f4/f7/f469513e8d90d4df1b4e6f9b482517f7.jpg?wh=1920x784" title="Nested Loop Join实现原理" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f4/f7/f469513e8d90d4df1b4e6f9b482517f7.jpg?wh=1920x784" title="Nested Loop Join实现原理" /></p>
 <p>在实现的过程中，外层的 for 循环负责遍历驱动表的每一条数据，如图中的步骤 1 所示。对于驱动表中的每一条数据记录，内层的 for 循环会逐条扫描基表的所有记录，依次判断记录的id字段值是否满足关联条件，如步骤 2 所示。</p>
 <p>不难发现，假设驱动表有 M 行数据，而基表有 N 行数据，那么 NLJ 算法的计算复杂度是 O(M * N)。尽管NLJ的实现方式简单、直观、易懂，但它的执行效率显然很差。</p>
 <h3 id="smjsort-merge-join">SMJ：Sort Merge Join</h3>
 <p>鉴于NLJ低效的计算效率，SMJ应运而生。Sort Merge Join，顾名思义，SMJ的实现思路是先排序、再归并。给定参与关联的两张表，SMJ先把他们各自排序，然后再使用独立的游标，对排好序的两张表做归并关联。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/66/c5/66f7c7395e30747861296c8f69a387c5.jpg?wh=1920x1179" title="Sort Merge Join实现原理" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/66/c5/66f7c7395e30747861296c8f69a387c5.jpg?wh=1920x1179" title="Sort Merge Join实现原理" /></p>
 <p>具体计算过程是这样的：起初，驱动表与基表的游标都会先锚定在各自的第一条记录上，然后通过对比游标所在记录的id字段值，来决定下一步的走向。对比结果以及后续操作主要分为 3 种情况：</p>
 <ul>
 <li>满足关联条件，两边的id值相等，那么此时把两边的数据记录拼接并输出，然后把驱动表的游标滑动到下一条记录；</li>
@@ -7529,16 +7529,16 @@
 <p>因此，SMJ的计算过程我们可以用“先苦后甜”来形容。苦，指的是要先花费时间给两张表做排序，而甜，指的则是有序表的归并关联能够享受到线性的计算复杂度。</p>
 <h3 id="hjhash-join">HJ：Hash Join</h3>
 <p>考虑到SMJ对于排序的苛刻要求，后来又有人推出了HJ算法。HJ的设计初衷是以空间换时间，力图将基表扫描的计算复杂度降低至O(1)。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6a/d1/6a835cd4ab02063f283802a2b98647d1.jpg?wh=1920x648" title="Hash Join实现原理" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6a/d1/6a835cd4ab02063f283802a2b98647d1.jpg?wh=1920x648" title="Hash Join实现原理" /></p>
 <p>具体来说，HJ的计算分为两个阶段，分别是Build阶段和Probe阶段。在Build阶段，在基表之上，算法使用既定的哈希函数构建哈希表，如上图的步骤 1 所示。哈希表中的Key是id字段应用（Apply）哈希函数之后的哈希值，而哈希表的 Value 同时包含了原始的Join Key（id字段）和Payload。</p>
 <p>在Probe阶段，算法依次遍历驱动表的每一条数据记录。首先使用同样的哈希函数，以动态的方式计算Join Key的哈希值。然后，算法再用哈希值去查询刚刚在Build阶段创建好的哈希表。如果查询失败，则说明该条记录与基表中的数据不存在关联关系；相反，如果查询成功，则继续对比两边的Join Key。如果Join Key一致，就把两边的记录进行拼接并输出，从而完成数据关联。</p>
 <p>好啦，到此为止，对于Join的3种实现机制，我们暂时说到这里。对于它们各自的实现原理，想必你已经有了充分的把握。至于这3种机制都适合哪些计算场景，以及Spark SQL如何利用这些机制在分布式环境下做数据关联，我们留到<a href="https://time.geekbang.org/column/article/428259">下一讲</a>再去展开。</p>
 <h2 id="_2">重点回顾</h2>
 <p>今天这一讲，我们重点介绍了数据关联中的关联形式（Join Types）与实现机制（Join Mechanisms）。掌握了不同的关联形式，我们才能游刃有余地满足不断变化的业务需求。而熟悉并理解不同实现机制的工作原理，则有利于培养我们以性能为导向的开发习惯。</p>
 <p>Spark SQL支持的关联形式多种多样，为了方便你查找，我把它们的含义与效果统一整理到了如下的表格中。在日后的开发工作中，当你需要区分并确认不同的关联形式时，只要回顾这张表格，就能迅速得到结论。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/77/97/77bbf470479a54a11c45a77697560797.jpg?wh=1920x888" title="Spark SQL支持的关联形式" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/77/97/77bbf470479a54a11c45a77697560797.jpg?wh=1920x888" title="Spark SQL支持的关联形式" /></p>
 <p>在此之后，我们又介绍了Join的3种实现机制，它们分别是Nested Loop Join、Sort Merge Join和Hash Join。这3种实现机制的工作原理，我也整理成了表格，方便你随时查看。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3c/10/3c036d0bbf371542e2fe07bd0882fd10.jpg?wh=1920x618" title="不同Join实现机制的工作原理" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3c/10/3c036d0bbf371542e2fe07bd0882fd10.jpg?wh=1920x618" title="不同Join实现机制的工作原理" /></p>
 <h2 id="_3">每课一练</h2>
 <p>对于Join的3种实现机制，也即Nested Loop Join、Sort Merge Join和Hash Join，结合其实现原理，你能猜一猜，它们可能的适用场景都有哪些吗？或者换句话说，在什么样的情况下，更适合使用哪种实现机制来进行数据关联？</p>
 <p>欢迎你在留言区跟我交流互动，也推荐你把这一讲分享给身边的同事、朋友。</p>
@@ -7697,8 +7697,6 @@ jointDF6.show()</p>2021-10-23</li><br/><li><span>LJK</span> 👍（0） 💬（3
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -6364,15 +6364,15 @@
 <p>话不多说，开整！</p>
 <h2 id="_1">场景运行数据</h2>
 <p>对于生成订单接口，我们第一次试执行性能场景的结果如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/dc/6a/dcbed4b3bc53be11f7d18280b8f1d16a.png?wh=1830%2A831" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dc/6a/dcbed4b3bc53be11f7d18280b8f1d16a.png?wh=1830%2A831" /></p>
 <p>从场景执行的结果来看。40个压力线程只跑出来50多的TPS，响应时间也蹭蹭蹭地跑了近700ms。这显然是一个非常慢的接口了。</p>
 <p>从这样的接口来看，我们选择这个项目算是选择对了，因为到处都是性能问题。</p>
 <p>下面我们就来一步步分析一下。</p>
 <h2 id="_2">架构图</h2>
 <p>前面我们做过多次描述，画架构图是为了知道分析的路径。所以按照惯例，我们仍然把架构图列在这里。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/89/5f/8973byyed69dec259cb6f7d4bf3f4b5f.png?wh=1215%2A731" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/89/5f/8973byyed69dec259cb6f7d4bf3f4b5f.png?wh=1215%2A731" /></p>
 <p>由于这个接口比较复杂，架构图看起来有点乱，我又整了一个简化版本：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c9/aa/c95c8daab26ca52fb2df688986a1c0aa.png?wh=894%2A736" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c9/aa/c95c8daab26ca52fb2df688986a1c0aa.png?wh=894%2A736" /></p>
 <p>Order服务是这个接口的核心，因此，你可以看到我把Order相关的服务都筛选了出来，这样我们就能很清楚地知道它连接了哪些东西。</p>
 <p>下面我们来拆分响应时间。</p>
 <h2 id="_3">拆分响应时间</h2>
@@ -6380,27 +6380,27 @@
 <ul>
 <li>Gateway ：</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b7/5c/b7f6b87b608cc0fc9b8f6e05baf90c5c.png?wh=330%2A183" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b7/5c/b7f6b87b608cc0fc9b8f6e05baf90c5c.png?wh=330%2A183" /></p>
 <p>从上图我们就可以看到Gateway上的时间在700ms左右，这与前面的场景数据是可以对上的。</p>
 <p>我说明一下，这张小图的采样间隔是分钟，因此，你可能会发现这个曲线和压力工具给出的TPS曲线，在一些细节上对应不起来。不过这没关系，我们更应该关注整体的趋势。</p>
 <ul>
 <li>Order：</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c9/01/c9aaa22298a00d7b68a6d89f7cef7501.png?wh=324%2A161" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c9/01/c9aaa22298a00d7b68a6d89f7cef7501.png?wh=324%2A161" /></p>
 <p>我们前面提到，Order是生产订单信息这个接口的重点，并且它的业务逻辑也非常复杂，因此，我们要多关注这个服务。</p>
 <p>从数据上来看，Order的是时间消耗在350毫秒左右，占到整个响应时间的一半。这是我们着重要分析的，而Gateway的转发能力也是要考虑的问题点，只是Gateway上没有逻辑，只做转发，如果是因为数据量大而导致的Gateway转发慢，那我们解决了Order的问题之后，Gateway的问题也就会被解决。所以，我们先分析Order的问题。</p>
 <p>所以，我们现在就来分析一下。</p>
 <h2 id="_4">第一阶段</h2>
 <h3 id="_5">全局监控分析</h3>
 <p>我们先看全局监控：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/58/e8/584fc960c184d9c4bba12fae9b6c58e8.png?wh=1826%2A457" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/58/e8/584fc960c184d9c4bba12fae9b6c58e8.png?wh=1826%2A457" /></p>
 <p>一眼扫过去，啥也没有。既没有明显的CPU资源消耗，也没有明显的网络资源、IO资源瓶颈。</p>
 <p><strong>遇到这种情况，我们一定要留意整个链路上有限制的点</strong>。什么是有限制的点？比如说，各种池（连接池、等）、栈中的锁、数据库连接、还有数据库的锁之类。其实，总结下来就是一个关键词：<strong>阻塞</strong>。</p>
 <p>我们只要分析出阻塞的点，就能把链路扩宽，进而把资源都用起来。</p>
 <p>当然，也有可能在你分析了一圈之后，发现没有任何有阻塞的点，可是资源就是用不上去。这种情况只有一种可能，那就是你分析得还不够细致。因为可能存在阻塞的地方实在太多了，我们只能一步步拆解。</p>
 <h3 id="_6">定向监控分析</h3>
 <p>正所谓“心中常备决策树，让你分析不迷路”。到了定向监控分析这里，按照<a href="https://time.geekbang.org/column/article/356789">第4讲</a>中强调的性能分析决策树，我们先来分析Order服务：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3e/84/3e2cd8928022bccf83fe69a71f004784.jpg?wh=2000%2A1706" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3e/84/3e2cd8928022bccf83fe69a71f004784.jpg?wh=2000%2A1706" /></p>
 <p>在我分析Order的线程栈信息时，发现在Order的栈中，有大量这样的内容：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>&quot;http-nio-8086-exec-421&quot; Id=138560 WAITING on java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject@a268a48
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>at sun.misc.Unsafe.park(Native Method)
@@ -6439,7 +6439,7 @@
 </code></pre></div>
 <p>你可以看到，我在这里并没有把JDBC池一次性修改得太大，主要是因为我不想为了维护连接池而产生过多的CPU消耗。我也建议你在增加资源池的时候，先一点点增加，看看有没有效果，等有了效果后再接着增加。</p>
 <p>修改JDBC池后，我们再来看一下压力场景的执行数据：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a8/bb/a8e672d9f5f829509a68216ed0146ebb.png?wh=1829%2A834" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a8/bb/a8e672d9f5f829509a68216ed0146ebb.png?wh=1829%2A834" /></p>
 <p>从数据上看，TPS有上升的趋势，并且一度达到了150以上。可是紧接着，TPS就掉下来了，这个时候的响应时间倒是没有明显增加。而且你看，TPS不仅掉下来了，而且还断断续续的，极为不稳定。</p>
 <p>此外，我们还可以发现，在后续的压力中不仅有错误信息产生，响应时间也在上升。与此同时，我查看了全局监控的资源，并没有发现太大的资源消耗。既然有错误产生，没二话，我们只能整它！</p>
 <h2 id="_7">第二阶段</h2>
@@ -6587,16 +6587,16 @@
 <p>这是一个典型的语句没过滤的问题。像这样的开发项目，也最多就是做个Demo用。要是在真实的线上项目中，早就不知道伤害了多少人。</p>
 <p>我们在这里直接修改代码加上limit，不让它一次性查询出所有的数据。</p>
 <p>然后，我们看一下优化效果：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/42/5c/42d0c383e03acf38b31e4fc7879c2f5c.png?wh=1830%2A829" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/42/5c/42d0c383e03acf38b31e4fc7879c2f5c.png?wh=1830%2A829" /></p>
 <p>你看，没有出现TPS断裂的情况了，优化效果还是有的，说明那条SQL语句不会再查出太多数据把内存给占满了。</p>
 <p>不过，TPS值并没有增加多少，所以我们必须做第三阶段的分析。</p>
 <h2 id="_10">第三阶段</h2>
 <p>这次我们不从全局监控数据来看了，有了前面的经验，我们直接来做定向监控分析。</p>
 <h3 id="_11">定向监控分析</h3>
 <p>因为我们在前面改了SQL，所以在执行SQL之后，我们要去查一下innodb_trx表，看看还有没有慢的SQL。 结果，看到了如下SQL：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cb/73/cb7cd20de10b8d55b3c94f47c2576273.png?wh=1889%2A222" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cb/73/cb7cd20de10b8d55b3c94f47c2576273.png?wh=1889%2A222" /></p>
 <p>把这个SQL拿出来，看看它的执行计划：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/67/54/67785136ea6b3748d5ab7c148445ff54.png?wh=1016%2A63" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/67/54/67785136ea6b3748d5ab7c148445ff54.png?wh=1016%2A63" /></p>
 <p>又是一个典型的全表扫描，并且是由一个update使用的。看到这里，你是不是有种想把开发拉出去祭旗的冲动？</p>
 <p>由于生成订单信息是一个复杂的接口，我们不急着收拾这个SQL，先把slow log全都拿出来分析一遍。</p>
 <p>请你注意，有时候项目执行的场景多了，数据相互之间的影响就会很大，容易导致我们分析的方向不准确。所以，我们最好把slow log都清一遍。反正我通常都会这么干，因为我不想看到乱七八糟的数据。</p>
@@ -6633,7 +6633,7 @@
 </ol>
 <p>在这里，我先把这个批量业务给分离开，并且也不去调用它。但是，在真实的业务逻辑中，你可不能这么干。我之所以这么做，是为了看后续性能优化的效果和方向。</p>
 <p>做了上述修改之后，TPS如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/20/3d/20e420c49edcd201cc68c0698e7ddf3d.png?wh=1836%2A836" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/20/3d/20e420c49edcd201cc68c0698e7ddf3d.png?wh=1836%2A836" /></p>
 <p>从效果上来看，TPS能达到300左右了，响应时间看起来也稳定了。我们终于可以进入正常的性能分析阶段了，哈哈。</p>
 <p>不过，到这里，我们的工作并没有结束，从上图来看，TPS在300左右，根据我们的整体系统资源来考虑，这个TPS还是偏低的，所以这个接口显然还有优化的空间。所以，在下节课中，我们接着来唠。</p>
 <h2 id="_12">总结</h2>
@@ -6775,8 +6775,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -6466,27 +6466,27 @@
 <p>我们本节课正式开始讲解 <strong>RAG 检索流程</strong>。当前主流的 RAG 检索方式主要采用<strong>向量检索（Vector Search）</strong>，通过语义相似度来匹配文本切块。这种方法在我们之前的课程中已经深入探讨过了。然而，向量检索并非万能，它在某些场景下无法替代传统关键词检索的优势。</p>
 <p>例如，当你需要精准搜索某个订单 ID、品牌名称或地址，或者搜索特定人物或物品的名字（如伊隆·马斯克、iPhone 15）时，向量检索的准确性往往不如关键词检索。此外，当用户输入的问题非常简短，仅包含几个单词时，比如搜索缩写词或短语（如 RAG、LLM），语义匹配的效果也可能不尽理想。</p>
 <p>这些正是传统关键词检索的优势所在。关键词检索（Keyword Search）在几个场景中表现尤为出色：<strong>精确匹配</strong>，如产品名称、姓名、产品编号；<strong>少量字符的匹配</strong>，用户习惯于输入几个关键词，而少量字符进行向量检索时效果可能较差；以及<strong>低频词汇的匹配</strong>，低频词汇往往承载了关键意义，如在“你想跟我去喝咖啡吗？”这句话中，“喝”“咖啡”比“你”“吗”更具重要性。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/57/15/57337062d6bf564a0116412f889c4615.jpg?wh=2000x916" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/57/15/57337062d6bf564a0116412f889c4615.jpg?wh=2000x916" /></p>
 <p>在上述案例中，虽然依靠关键词检索可以精确找到与“订单 12345”匹配的特定信息，但它无法提供与订单相关的更广泛上下文。另一方面，语义匹配虽然能够识别“订单”和“配送”等相关概念，但在处理具体的订单 ID 时，往往容易出错。</p>
 <p><strong>混合检索（Hybrid Search）</strong>通过结合关键词检索和语义匹配的优势，可以首先利用关键词检索精确定位到“订单 12345”的信息，然后通过语义匹配扩展与该订单相关的其他上下文或客户操作的信息，例如“12开头的订单、包装破损严重”等。这样不仅能够获取精确的订单详情，还能获得与之相关的额外有用信息。</p>
 <p>在 RAG 检索场景中，首要目标是<strong>确保最相关的结果能够出现在候选列表</strong>中。向量检索和关键词检索各有其独特优势，混合检索通过结合这多种检索技术，弥补了各自的不足，提供了一种更加全面的搜索方案。</p>
 <p>仅具备混合检索的能力还不足以满足需求，检索到的结果还需要经过优化排序。<strong>重排序（Reranking）</strong>的目的是将混合检索的结果进行整合，并将与用户问题语义最契合的结果排在前列。在上述案例中，由于缺乏有效的排序，我们期望的结果位于第一和第四位，尽管依然可以被检索到，但理想情况下，如果检索方式更为精确，该结果应该被优先排序在前两位。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f0/e0/f07619c5f03bdf04649d97f8c0f18be0.jpg?wh=1920x770" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f0/e0/f07619c5f03bdf04649d97f8c0f18be0.jpg?wh=1920x770" /></p>
 <p>在这个案例中，我们通过重排序技术成功找到了与问题语义最契合的结果。系统评分显示，“订单 12345 于 2023 年 8 月 15 日在上海，客户不满意。”与“该12开头的订单客户不满意的地方在于包装破损严重。”这两个文档块的相关性分别为 0.9 和 0.8，排序为第一和第二位。</p>
 <p><strong>重排序技术</strong>在检索系统中扮演着至关重要的角色。即使检索算法已经能够捕捉到所有相关的结果，重排序过程依然不可或缺。它确保<strong>最符合用户意图和查询语义的结果优先展示</strong>，从而提升用户的搜索体验和结果的准确性。通过重排序，检索系统不仅能找到相关信息，还能智能地将最重要的信息呈现在用户面前。</p>
 <p>本节课将深入讲解 RAG 检索流程中的<strong>混合检索（多路召回）与重排序技术</strong>。相关实战代码已发布在 Gitee 托管项目中，代码文件为 <strong>rag_app_lesson6.py</strong> 。</p>
 <h2 id="_1">为什么需要混合检索？</h2>
 <p>古人云：“兼听则明，偏信则暗。”意思是，只有听取各方面的意见，才能正确认识事物；而只相信单一的观点，必然会导致片面的错误。在 RAG 检索中，这一原则同样适用。通过同时从多个信息源获取信息，我们的检索结果将更加全面和准确。</p>
 <p>2023年，Microsoft Azure AI 发布了《Azure 认知搜索：通过混合检索和排序能力超越向量搜索》一文。这篇文章对在 LLM RAG 应用中引入混合检索和重排序技术进行了全面的实验数据评估，并量化了这些技术组合在提升文档召回率和准确性方面的显著效果。实验结果表明，在多个数据集和多种检索任务中，<strong>混合检索与重排序的组合均取得了最佳表现</strong>。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/5d/95/5d35930185bfc17ccb08ae12ea5caf95.jpg?wh=1920x1387" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5d/95/5d35930185bfc17ccb08ae12ea5caf95.jpg?wh=1920x1387" /></p>
 <p>下图展示了在不同数量的文档块召回情况下，各种检索方式的效果对比。结果表明，混合检索结合重排序的方法显著提升了检索的有效性和准确性，远超单独依赖向量检索或关键词检索的传统方法。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3f/0e/3f84a18efd8a802fbd25e66ea3e7640e.jpg?wh=1920x1070" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3f/0e/3f84a18efd8a802fbd25e66ea3e7640e.jpg?wh=1920x1070" /></p>
 <h2 id="_2">混合检索（多路召回）</h2>
 <p><strong>混合检索</strong>，又称<strong>融合检索/多路召回</strong>，是指在检索过程中同时采用多种检索方式，并将各类检索结果进行融合，从而得到最终的检索结果。混合检索的优势在于能够充分利用不同检索方式的优点，弥补各自的不足，从而提升检索的准确性和效率。下图展示了混合检索的流程：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6e/8d/6ef5fcc2e456d53c277dc3c728d6cd8d.jpg?wh=1920x676" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6e/8d/6ef5fcc2e456d53c277dc3c728d6cd8d.jpg?wh=1920x676" /></p>
 <p>混合检索实际上并没有严格限定必须包含哪几种检索方式。这节课我们以<strong>向量检索</strong>和<strong>关键词检索</strong>的组合为例，但实际上可以包含多种检索方式的组合。如果我们将其他搜索算法结合在一起，也同样可以称为“混合检索”。例如，可以将知识图谱技术用于检索实体关系，并与向量检索技术相结合。</p>
 <p>更多的 RAG 检索方式还包括多重提问检索、上下文压缩检索、集成检索、多向量检索、自查询检索等，每种检索方式说明如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7e/34/7eddf214ee696b2e1f5977d72a4db134.jpg?wh=1920x884" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7e/34/7eddf214ee696b2e1f5977d72a4db134.jpg?wh=1920x884" /></p>
 <p>上述方法均包含在 LangChain 的检索器模块 langchain_community.retrievers 中，具体详情可以查看 <a href="https://python.langchain.com/v0.2/api_reference/community/retrievers.html">LangChain 检索器站点</a>。</p>
 <p>混合检索后，我们需要对多个检索方式的检索结果进行综合排名。这节课后半段会详细讲解重排序技术，但在此之前，我们可以使用一种更简单的方法来排序，称为<strong>递归折减融合（Reciprocal Rank Fusion, RRF）排序</strong>。RRF 是一种把来自不同检索方法的排名结果结合起来的技巧。它的基本思想是，如果一个文档在不同的检索结果中都排得比较靠前，那么它在综合排名中就应该得到更高的位置。</p>
 <p>相比于复杂的重排序技术，RRF 的操作更加简单，不需要对每种检索结果进行复杂的调整或计算。它通过直接考虑文档在不同方法中的排名，快速生成一个合理的综合排名。这种方法非常适合那些需要快速融合多个检索结果的场景，短时间内得到一个有参考价值的排序。</p>
@@ -6592,7 +6592,7 @@
 <h2 id="reranking-model">重排序模型 Reranking Model</h2>
 <p>RAG流程有两个概念，粗排和精排。粗排检索效率较快，但是召回的内容并不一定强相关。而精排效率较低，因此适合在粗排的基础上进行进一步优化。精排的代表就是重排序（Reranking）。</p>
 <p><strong>重排序模型（Reranking Model）</strong>查询与每个文档块计算对应的相关性分数，并根据这些分数对文档进行重新排序，确保文档按照从最相关到最不相关的顺序排列，并返回前top-k个结果。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e0/e0/e0b3ebbcb7f3ecd581d2ed9a0eabd9e0.jpg?wh=1920x1170" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e0/e0/e0b3ebbcb7f3ecd581d2ed9a0eabd9e0.jpg?wh=1920x1170" /></p>
 <p>与嵌入模型不同，重排序模型将用户的查询（Query）和文档块作为输入，直接输出相似度评分，而非生成嵌入向量。目前，市面上可用的重排序模型并不多，商用的有Cohere，开源的有BGE、Sentence、Mixedbread、T5-Reranker等，甚至可以使用指令（Prompt）让大模型（GPT、Claude、通义千问、文心一言等）进行重排，大模型指令参考如下：</p>
 <p>以下是与查询 {问题} 相关的文档块：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>[1] {文档块1}
@@ -6788,8 +6788,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

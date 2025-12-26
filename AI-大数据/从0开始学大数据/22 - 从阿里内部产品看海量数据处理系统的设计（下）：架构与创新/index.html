@@ -7406,12 +7406,12 @@
 
 <p>上一期，Doris提出了目前阿里巴巴海量KV存储方面的问题，给出了Doris的业务价值、设计目标和技术指标。但是Doris项目组还必须证明自己有已经经过论证的架构技术方案，可以实现前面设定的目标，立项后可以迅速启动执行，不需要再去摸索尝试，风险可以把控。</p>
 <p>因此，PPT后面的内容主要就是阐述Doris的架构方案和创新设计。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/eb/5b/eb949889c4fe1823ced433ea59123a5b.png?wh=1244%2A798" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/eb/5b/eb949889c4fe1823ced433ea59123a5b.png?wh=1244%2A798" /></p>
 <p>Doris是一种支持Key、Value数据结构的分布式存储系统，核心要解决的问题是分布式路由、分布式集群伸缩、分布式数据冗余与失效转移。所以Doris把分布式存储系统很重要的一块，也就是数据存储部分转移出去，使用第三方软件完成，当时选择Berkeley DB作为Doris的底层存储Store，Doris自己专注于分布式技术实现。</p>
 <p>Doris的主要访问模型是，应用程序KV Client启动后，连接控制中心Administration，从控制中心获得整个Doris集群的服务器部署信息及路由算法，Client使用Key作为参数进行路由计算，计算得到集群中某些服务器作为当前Key、Value数据存储的服务器节点；然后KV Client使用自定义的通信协议将数据和命令传输给服务器上的Data Server组件，DataServer再调用本地的Berkeley DB将数据存储到本地磁盘。</p>
 <p>Doris的核心技术就是这个架构模型上创新性地实现了自己独特的<strong>分区路由算法、失效转移策略、集群伸缩设计方案</strong>。并在项目开发过程中，将这个三个技术创新申请了技术专利。下面我们重点看下这三个技术创新。</p>
 <h2 id="_1">分区路由算法</h2>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/01/d6/019cd0d87daf9d356bd7326cd2a928d6.png?wh=1058%2A778" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/01/d6/019cd0d87daf9d356bd7326cd2a928d6.png?wh=1058%2A778" /></p>
 <p>Doris采用一种基于虚拟节点的分区路由算法，Key使用余数Hash算法计算得到虚拟节点下标。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>虚拟节点下标 = hash(md5(key)) mod 虚拟节点个数
 </code></pre></div>
@@ -7419,26 +7419,26 @@
 <p>路由算法在初始化的时候就预先设立一个较大的数字，比如100000，当存储服务器集群需要伸缩的时候，要增加一个服务器，虚拟节点和下标计算算法不变，仅仅调整虚拟节点和物理服务器节点的映射关系就可以了，如PPT中图2所示。</p>
 <p>这种基于虚拟节点的分区路由算法相对于传统的一致性Hash路由算法，可以获得更好的数据负载均衡，即数据在各个服务器上的存储分布更加均衡。在集群伸缩、增加服务器的时候可以做到更少迁移数据。在实践中，这种算法的一个更大优势是，如果将物理存储的文件系统和虚拟节点关联，即一个虚拟节点对应一个物理存储文件，那么当集群扩容，进行数据迁移的时候，就可以以文件为单位进行数据拷贝，这样迁移速度和运维成本都非常低。</p>
 <p>这个基于虚拟节点的分区路由算法的关键难点是，如何计算虚拟节点与物理节点的映射关系，特别是在增加服务器的时候，如何重新计算这个映射关系，使新的映射关系依然处于负载均衡的状态，也就是每个物理节点映射的虚拟节点个数差不太多相同。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0a/b8/0a9dde28106a7b279048d755390638b8.png?wh=1054%2A782" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0a/b8/0a9dde28106a7b279048d755390638b8.png?wh=1054%2A782" /></p>
 <p>项目组抽象了一个数学公式完成映射关系的计算，你可以看上面PPT示例。</p>
 <h2 id="_2">失效转移策略</h2>
 <p>在前面在技术指标上，曾经承诺Doris的可用性为99.997%，保证数据可用性的策略主要是数据存储冗余备份和数据访问失效转移。</p>
 <p>我们先看下Doris如何实现冗余备份。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cd/5e/cd2bd7fc384155e29a2b0dad4c92575e.png?wh=1058%2A788" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cd/5e/cd2bd7fc384155e29a2b0dad4c92575e.png?wh=1058%2A788" /></p>
 <p>Doris将存储服务器集群分成多个group（默认情况下为2个group），数据写操作的时候，根据分区路由算法，在每个group里计算一个服务器地址，异步并发同时向多个group的服务器上写入数据，以此保证数据有多个备份。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/eb/fc/eba8dc671ec1a750fae74221a0782cfc.png?wh=1052%2A688" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/eb/fc/eba8dc671ec1a750fae74221a0782cfc.png?wh=1052%2A688" /></p>
 <p>当KV Client访问某台服务器失败的时候，Doris会启动失效转移策略。具体来说，Doris将失效分为三种情况：瞬时失效、临时失效、永久失效，不同情况采用不同的失效转移策略。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/05/0d/0584b85e62b7917fce2f11f587ea8e0d.png?wh=1054%2A738" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/05/0d/0584b85e62b7917fce2f11f587ea8e0d.png?wh=1054%2A738" /></p>
 <p>当第一次不能访问服务器的时候，Doris认为这是瞬时失效，会进行访问重试，如果三次重试后仍然失败，就会把失败信息提交给控制中心。控制中心检测该服务器心跳是否正常，并进行尝试访问，如果访问失败，就将该服务器标记为临时失效，并通知所有KV Client应用程序。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8f/e8/8fb946ae9879bfbfdf403a8b686605e8.png?wh=1052%2A774" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8f/e8/8fb946ae9879bfbfdf403a8b686605e8.png?wh=1052%2A774" /></p>
 <p>KV Client应用程序收到服务器失效通知的时候，启动临时失效策略，将原本需要写入到失效节点（图中的物理节点2）的数据写入临时日志节点（图中的物理节点X），而读操作则只访问正常的物理节点1。</p>
 <p>当临时失效节点2恢复正常运行，系统会将失效期间写入临时日志节点X的数据合并恢复到物理节点2，这段时间物理节点2只提供写服务，不提供读服务。当所有数据恢复完毕，集群访问恢复正常。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/39/87/390216499d8a68f9f9f607bd18fc8987.png?wh=1058%2A692" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/39/87/390216499d8a68f9f9f607bd18fc8987.png?wh=1058%2A692" /></p>
 <p>而对于永久失效的节点，需要添加新的服务器以代替下线的服务器，基本策略就是将另一个group正常使用的服务器数据拷贝到新添加的服务器上即可。</p>
 <p>需要说明的是，上述三种失效转移过程，除了服务器永久失效后，需要工程师手动添加服务器，并到控制中心添加新服务器配置、激活启用外，其他情况不需要任何人工干预，全部自动化完成。</p>
 <h2 id="_3">集群伸缩设计</h2>
 <p>分布式系统的一个重要设计目标是集群弹性可伸缩，如果当前的服务器数目不能满足业务的负载压力要求，那么就添加更多的服务器去增强处理能力。对于分布式数据存储服务器的伸缩性扩容而言，必然伴随着数据的迁移，就是将原先服务器中的部分数据迁移到新的服务器上。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/dd/fe/ddaf1e4c4e13be3bb1085f2dda9ecefe.png?wh=1074%2A796" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dd/fe/ddaf1e4c4e13be3bb1085f2dda9ecefe.png?wh=1074%2A796" /></p>
 <p>具体过程为：</p>
 <p>1.向集群中一个分组group添加新的物理服务器，部署并启动Doris服务器进程。</p>
 <p>2.将这个group的所有服务器设置为临时失效。</p>
@@ -7587,8 +7587,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

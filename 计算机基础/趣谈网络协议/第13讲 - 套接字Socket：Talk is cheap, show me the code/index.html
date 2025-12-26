@@ -6415,17 +6415,17 @@
 <p>这是一个经常考的知识点，就是监听的Socket和真正用来传数据的Socket是两个，一个叫作<strong>监听Socket</strong>，一个叫作<strong>已连接Socket</strong>。</p>
 <p>连接建立成功之后，双方开始通过read和write函数来读写数据，就像往一个文件流里面写东西一样。</p>
 <p>这个图就是基于TCP协议的Socket程序函数调用过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/87/ea/87c8ae36ae1b42653565008fc47aceea.jpg?wh=1626%2A2172" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/87/ea/87c8ae36ae1b42653565008fc47aceea.jpg?wh=1626%2A2172" /></p>
 <p>说TCP的Socket就是一个文件流，是非常准确的。因为，Socket在Linux中就是以文件的形式存在的。除此之外，还存在文件描述符。写入和读出，也是通过文件描述符。</p>
 <p>在内核中，Socket是一个文件，那对应就有文件描述符。每一个进程都有一个数据结构task_struct，里面指向一个文件描述符数组，来列出这个进程打开的所有文件的文件描述符。文件描述符是一个整数，是这个数组的下标。</p>
 <p>这个数组中的内容是一个指针，指向内核中所有打开的文件的列表。既然是一个文件，就会有一个inode，只不过Socket对应的inode不像真正的文件系统一样，保存在硬盘上的，而是在内存中的。在这个inode中，指向了Socket在内核中的Socket结构。</p>
 <p>在这个结构里面，主要的是两个队列，一个是<strong>发送队列</strong>，一个是<strong>接收队列</strong>。在这两个队列里面保存的是一个缓存sk_buff。这个缓存里面能够看到完整的包的结构。看到这个，是不是能和前面讲过的收发包的场景联系起来了？</p>
 <p>整个数据结构我也画了一张图。
-<img alt="" src="https://static001.geekbang.org/resource/image/60/13/604f4cb37576990b3f836cb5d7527b13.jpg?wh=3646%2A2998" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/60/13/604f4cb37576990b3f836cb5d7527b13.jpg?wh=3646%2A2998" /></p>
 <h2 id="udpsocket">基于UDP协议的Socket程序函数调用过程</h2>
 <p>对于UDP来讲，过程有些不一样。UDP是没有连接的，所以不需要三次握手，也就不需要调用listen和connect，但是，UDP的交互仍然需要IP和端口号，因而也需要bind。UDP是没有维护连接状态的，因而不需要每对连接建立一组Socket，而是只要有一个Socket，就能够和多个客户端通信。也正是因为没有连接状态，每次通信的时候，都调用sendto和recvfrom，都可以传入IP地址和端口。</p>
 <p>这个图的内容就是基于UDP协议的Socket程序函数调用过程。
-<img alt="" src="https://static001.geekbang.org/resource/image/6b/31/6bbe12c264f5e76a81523eb8787f3931.jpg?wh=1245%2A1261" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6b/31/6bbe12c264f5e76a81523eb8787f3931.jpg?wh=1245%2A1261" /></p>
 <h2 id="_1">服务器如何接更多的项目？</h2>
 <p>会了这几个基本的Socket函数之后，你就可以轻松地写一个网络交互的程序了。就像上面的过程一样，在建立连接后，进行一个while循环。客户端发了收，服务端收了发。</p>
 <p>当然这只是万里长征的第一步，因为如果使用这种方法，基本上只能一对一沟通。如果你是一个服务器，同时只能服务一个客户，肯定是不行的。这就相当于老板成立一个公司，只有自己一个人，自己亲自上来服务客户，只能干完了一家再干下一家，这样赚不来多少钱。</p>
@@ -6441,14 +6441,14 @@
 <p>这里有一个问题是，如何创建子公司，并如何将项目移交给子公司呢？</p>
 <p>在Linux下，创建子进程使用fork函数。通过名字可以看出，这是在父进程的基础上完全拷贝一个子进程。在Linux内核中，会复制文件描述符的列表，也会复制内存空间，还会复制一条记录当前执行到了哪一行程序的进程。显然，复制的时候在调用fork，复制完毕之后，父进程和子进程都会记录当前刚刚执行完fork。这两个进程刚复制完的时候，几乎一模一样，只是根据fork的返回值来区分到底是父进程，还是子进程。如果返回值是0，则是子进程；如果返回值是其他的整数，就是父进程。</p>
 <p>进程复制过程我画在这里。
-<img alt="" src="https://static001.geekbang.org/resource/image/18/d0/18070c00ff5d0082yy1fbc32b84e73d0.jpg?wh=4842%2A3559" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/18/d0/18070c00ff5d0082yy1fbc32b84e73d0.jpg?wh=4842%2A3559" /></p>
 <p>因为复制了文件描述符列表，而文件描述符都是指向整个内核统一的打开文件列表的，因而父进程刚才因为accept创建的已连接Socket也是一个文件描述符，同样也会被子进程获得。</p>
 <p>接下来，子进程就可以通过这个已连接Socket和客户端进行互通了，当通信完毕之后，就可以退出进程，那父进程如何知道子进程干完了项目，要退出呢？还记得fork返回的时候，如果是整数就是父进程吗？这个整数就是子进程的ID，父进程可以通过这个ID查看子进程是否完成项目，是否需要退出。</p>
 <h3 id="_3">方式二：将项目转包给独立的项目组（多线程方式）</h3>
 <p>上面这种方式你应该也能发现问题，如果每次接一个项目，都申请一个新公司，然后干完了，就注销掉这个公司，实在是太麻烦了。毕竟一个新公司要有新公司的资产，有新的办公家具，每次都买了再卖，不划算。</p>
 <p>于是你应该想到了，我们可以使用<strong>线程</strong>。相比于进程来讲，这样要轻量级的多。如果创建进程相当于成立新公司，购买新办公家具，而创建线程，就相当于在同一个公司成立项目组。一个项目做完了，那这个项目组就可以解散，组成另外的项目组，办公家具可以共用。</p>
 <p>在Linux下，通过pthread_create创建一个线程，也是调用do_fork。不同的是，虽然新的线程在task列表会新创建一项，但是很多资源，例如文件描述符列表、进程空间，还是共享的，只不过多了一个引用而已。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a3/64/a36537201678e08ac83e5410562d5f64.jpg?wh=4628%2A3401" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a3/64/a36537201678e08ac83e5410562d5f64.jpg?wh=4628%2A3401" /></p>
 <p>新的线程也可以通过已连接Socket处理请求，从而达到并发处理的目的。</p>
 <p>上面基于进程或者线程模型的，其实还是有问题的。新到来一个TCP连接，就需要分配一个进程或者线程。一台机器无法创建很多进程或者线程。有个<strong>C10K</strong>，它的意思是一台机器要维护1万个连接，就要创建1万个进程或者线程，那么操作系统是无法承受的。如果维持1亿用户在线需要10万台服务器，成本也太高了。</p>
 <p>其实C10K问题就是，你接项目接的太多了，如果每个项目都成立单独的项目组，就要招聘10万人，你肯定养不起，那怎么办呢？</p>
@@ -6459,7 +6459,7 @@
 <p>上面select函数还是有问题的，因为每次Socket所在的文件描述符集合中有Socket发生变化的时候，都需要通过轮询的方式，也就是需要将全部项目都过一遍的方式来查看进度，这大大影响了一个项目组能够支撑的最大的项目数量。因而使用select，能够同时盯的项目数量由FD_SETSIZE限制。</p>
 <p>如果改成事件通知的方式，情况就会好很多，项目组不需要通过轮询挨个盯着这些项目，而是当项目进度发生变化的时候，主动通知项目组，然后项目组再根据项目进展情况做相应的操作。</p>
 <p>能完成这件事情的函数叫epoll，它在内核中的实现不是通过轮询的方式，而是通过注册callback函数的方式，当某个文件描述符发送变化的时候，就会主动通知。
-<img alt="" src="https://static001.geekbang.org/resource/image/d6/b1/d6efc5c5ee8e48dae0323de380dcf6b1.jpg?wh=4410%2A2335" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d6/b1/d6efc5c5ee8e48dae0323de380dcf6b1.jpg?wh=4410%2A2335" /></p>
 <p>如图所示，假设进程打开了Socket m, n, x等多个文件描述符，现在需要通过epoll来监听是否这些Socket都有事件发生。其中epoll_create创建一个epoll对象，也是一个文件，也对应一个文件描述符，同样也对应着打开文件列表中的一项。在这项里面有一个红黑树，在红黑树里，要保存这个epoll要监听的所有Socket。</p>
 <p>当epoll_ctl添加一个Socket的时候，其实是加入这个红黑树，同时红黑树里面的节点指向一个结构，将这个结构挂在被监听的Socket的事件列表中。当一个Socket来了一个事件的时候，可以从这个列表中得到epoll对象，并调用call back通知它。</p>
 <p>这种通知方式使得监听的Socket数据增加的时候，效率不会大幅度降低，能够同时监听的Socket的数目也非常的多了。上限就为系统定义的、进程打开的最大文件描述符个数。因而，<strong>epoll被称为解决C10K问题的利器</strong>。</p>
@@ -6592,8 +6592,6 @@ epoll 由文件描述符数量限制
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

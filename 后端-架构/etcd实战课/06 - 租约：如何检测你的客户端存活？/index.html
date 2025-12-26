@@ -14056,7 +14056,7 @@
 <p>在这个案例中，我们期望的效果是，在节点异常时，表示节点健康的key能被从etcd集群中自动删除。</p>
 <h2 id="lease_1">Lease整体架构</h2>
 <p>在和你详细解读Lease特性如何解决上面的问题之前，我们先了解下Lease模块的整体架构，下图是我给你画的Lease模块简要架构图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ac/7c/ac70641fa3d41c2dac31dbb551394b7c.png?wh=2464%2A1552" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ac/7c/ac70641fa3d41c2dac31dbb551394b7c.png?wh=2464%2A1552" /></p>
 <p>etcd在启动的时候，创建Lessor模块的时候，它会启动两个常驻goroutine，如上图所示，一个是RevokeExpiredLease任务，定时检查是否有过期Lease，发起撤销过期的Lease操作。一个是CheckpointScheduledLease，定时触发更新Lease的剩余到期时间的操作。</p>
 <p>Lessor模块提供了Grant、Revoke、LeaseTimeToLive、LeaseKeepAlive API给client使用，各接口作用如下:</p>
 <ul>
@@ -14099,7 +14099,7 @@
 <a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>}
 </code></pre></div>
 <p>以上流程原理如下图所示，它描述了用户的key是如何与指定Lease关联的。当你通过put等命令新增一个指定了"--lease"的key时，MVCC模块它会通过Lessor模块的Attach方法，将key关联到Lease的key内存集合ItemSet中。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/aa/ee/aaf8bf5c3841a641f8c51fcc34ac67ee.png?wh=2024%2A1450" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/aa/ee/aaf8bf5c3841a641f8c51fcc34ac67ee.png?wh=2024%2A1450" /></p>
 <p>一个Lease关联的key集合是保存在内存中的，那么etcd重启时，是如何知道每个Lease上关联了哪些key呢?</p>
 <p>答案是etcd的MVCC模块在持久化存储key-value的时候，保存到boltdb的value是个结构体（mvccpb.KeyValue）， 它不仅包含你的key-value数据，还包含了关联的LeaseID等信息。因此当etcd重启时，可根据此信息，重建关联各个Lease的key集合列表。</p>
 <h2 id="lease_2">如何优化Lease续期性能</h2>
@@ -14116,7 +14116,7 @@
 <h2 id="lease_3">如何高效淘汰过期Lease</h2>
 <p>在了解完节点正常情况下的Lease续期特性后，我们再看看节点异常时，未正常续期后，etcd又是如何淘汰过期Lease、删除节点健康指标key的。</p>
 <p>淘汰过期Lease的工作由Lessor模块的一个异步goroutine负责。如下面架构图虚线框所示，它会定时从最小堆中取出已过期的Lease，执行删除Lease和其关联的key列表数据的RevokeExpiredLease任务。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b0/6b/b09e9d30157876b031ed206391698c6b.png?wh=2552%2A1550" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b0/6b/b09e9d30157876b031ed206391698c6b.png?wh=2552%2A1550" /></p>
 <p>从图中你可以看到，目前etcd是基于最小堆来管理Lease，实现快速淘汰过期的Lease。</p>
 <p>etcd早期的时候，淘汰Lease非常暴力。etcd会直接遍历所有Lease，逐个检查Lease是否过期，过期则从Lease关联的key集合中，取出key列表，删除它们，时间复杂度是O(N)。</p>
 <p>然而这种方案随着Lease数增大，毫无疑问它的性能会变得越来越差。我们能否按过期时间排序呢？这样每次只需轮询、检查排在前面的Lease过期时间，一旦轮询到未过期的Lease， 则可结束本轮检查。</p>
@@ -14133,7 +14133,7 @@
 <p>当你的集群发生Leader切换后，新的Leader基于Lease map信息，按Lease过期时间构建一个最小堆时，etcd早期版本为了优化性能，并未持久化存储Lease剩余TTL信息，因此重建的时候就会自动给所有Lease自动续期了。</p>
 <p>然而若较频繁出现Leader切换，切换时间小于Lease的TTL，这会导致Lease永远无法删除，大量key堆积，db大小超过配额等异常。</p>
 <p>为了解决这个问题，etcd引入了检查点机制，也就是下面架构图中黑色虚线框所示的CheckPointScheduledLeases的任务。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/70/59/70ece2fa3bc400edd8d3b09f752ea759.png?wh=2580%2A1560" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/70/59/70ece2fa3bc400edd8d3b09f752ea759.png?wh=2580%2A1560" /></p>
 <p>一方面，etcd启动的时候，Leader节点后台会运行此异步任务，定期批量地将Lease剩余的TTL基于Raft Log同步给Follower节点，Follower节点收到CheckPoint请求后，更新内存数据结构LeaseMap的剩余TTL信息。</p>
 <p>另一方面，当Leader节点收到KeepAlive请求的时候，它也会通过checkpoint机制把此Lease的剩余TTL重置，并同步给Follower节点，尽量确保续期后集群各个节点的Lease 剩余TTL一致性。</p>
 <p>最后你要注意的是，此特性对性能有一定影响，目前仍然是试验特性。你可以通过experimental-enable-lease-checkpoint参数开启。</p>
@@ -14280,8 +14280,6 @@ etcd的集群，一个节点的系统盘性能差时，etcd的lease为什么会�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

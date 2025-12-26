@@ -7835,13 +7835,13 @@
 <p>那么，能不能跳着只读我们需要的字段呢？当然也是不行的，因为<strong>对于硬盘来说，顺序读远远要优于随机读</strong>，这个问题我们在GFS、MapReduce以及Bigtable里都已经反复强调过了。如果每个字段都要根据索引或者偏移量进行随机数据访问，那性能恐怕还不如直接把所有数据都顺序读入呢。</p>
 <p>所以，一个新的想法就进入了工程师的脑海中。对于有很多列，并且后续要进行大量分析的数据，<strong>我们能不能不要一行一行存储数据，而是一列一列存储数据？</strong>这样，当分析程序只需要几列数据的时候，就顺序地读取连续的、存放在一起的那几列数据就好了。</p>
 <p>最极端的情况下，我们可以把每一列的数据都单独存储成一个文件，这样，当我们需要分析哪些字段，就只需要读取哪些文件就可以了。我们可以在内存里，把分析程序用到的各个列的数据重新组装成一行行的记录，然后来进行分析就好了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/fc/ea/fc21b7dcdc08de482544f6767a89c5ea.jpg?wh=1920x1080" title="列存储的方式下，所有列的数据连续存储，可以放在一个文件里，也可以每列一个单独文件" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fc/ea/fc21b7dcdc08de482544f6767a89c5ea.jpg?wh=1920x1080" title="列存储的方式下，所有列的数据连续存储，可以放在一个文件里，也可以每列一个单独文件" /></p>
 <p>不过，这样存储之后，数据写入就变得有些麻烦了。原先我们只需要顺序追加写入数据，而现在我们需要向很多个文件去追加写入数据，那有没有什么好办法呢？</p>
 <p>其实办法也并不复杂，我们在Bigtable里面已经用过一次了。我们还是可以用类似于<strong>WAL+MemTable+SSTable组合的解决方案</strong>。对于追加写入的数据，我们可以先写WAL日志，然后再把数据更新到内存中，接着再从内存里面，定期导出按列存储的文件到硬盘上。</p>
 <p>这样，我们所有的数据写入，也一样都是顺序写入的。我们并不需要追加一行数据，就跑去在上百个列存储文件后面追加记录，那样的话我们一样会面临海量的随机写请求。如果你对这个方法已经有些记不清了，你可以回头去看看课程的<a href="https://time.geekbang.org/column/article/425351">第10讲</a>。</p>
 <p>当然，在Hadoop这样的大数据环境中，甚至这样的追加写入操作都不需要。我们可以直接通过一个MapReduce程序，把原来的按行存储的数据做一个格式转换就好了，在这个MapReduce的过程中，数据的读写都是顺序的，我们的分析程序也只需要读取这个数据转换的结果就好了。</p>
 <p>事实上，在一个分布式的环境里，我们的数据其实并不能称之为100%的列存储。因为我们在分析数据的时候，可能需要多个列的组合筛选条件。比如，我们可能同时需要采用用户所在的州和小时作为筛选条件。如果这两列的数据在不同的服务器上，那么我们就需要通过网络传输这些数据。我们在<a href="https://time.geekbang.org/column/article/422468">GFS的论文</a>里也看到了，网络往往是大数据系统的第一瓶颈。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/61/77/6142731921d93a659111d5eedfa48f77.jpg?wh=1920x1080" title="分布式环境下需要行列混合存储" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/61/77/6142731921d93a659111d5eedfa48f77.jpg?wh=1920x1080" title="分布式环境下需要行列混合存储" /></p>
 <p>所以，更合理的解决方案是<strong>行列混合存储</strong>。因为，我们需要把一批行相同的数据，放在同一个服务器上。</p>
 <p>而这个解决方案我们之前也已经用过了，那就是像Bigtable一样<strong>对数据进行分区</strong>。只要行键在同一区间的列存储的数据，存储在相同服务器的硬盘上，我们也就不需要通过网络传输，来把基于列存储的数据，组装成一行行的数据了。而这种存储方式，正好和我们前面通过MapReduce进行数据格式转换对上了。我们可以让所有的Map函数都读取分配给它的数据，然后转换成列存储，存储到自己所在的节点的硬盘上。这整个过程中，完全不需要网络传输。</p>
 <h2 id="_2">解决嵌套结构问题</h2>
@@ -7901,7 +7901,7 @@
 <p>我们再往下看，其中的Name group和Name group里的Language也是一样的，都被申明为了repeated，也就是一个网页可以有多个Name，每个Name里又会有多个Language。<strong>也就是我们可以在List里面，再套一层List。</strong></p>
 <p>这样一来，问题一下子就变得麻烦了。原先我们的列存储，每个列有多少行数据是固定的。我们要组装数据也很容易，只要每个列的第1条数据和另一个列的第1条数据，合并在一起就好了。</p>
 <p>但是在现在这个，一行数据的一个列，可能有多条数据。如果我们把每个字段的数据都按列存储，那么不同列的数据行数就不一样多了。比如，我把论文里图2的r1和r2两条数据，都按列存放下来，那么你能看得出来，Links.Backward的第三个值到底应该是在哪条记录里吗？</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/43/80/43a122a3b649744b9d6d12aaf9299980.jpg?wh=1920x1080" title="简单地直接把每个字段按照顺序在一列里面存储下来，我们无法区分repeated的字段具体属于哪一条记录" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/43/80/43a122a3b649744b9d6d12aaf9299980.jpg?wh=1920x1080" title="简单地直接把每个字段按照顺序在一列里面存储下来，我们无法区分repeated的字段具体属于哪一条记录" /></p>
 <p>你可能会想，那我记录一下每行数据里，有多少个值不就好了？不过问题可没有那么简单，因为这里存在List套List的情况，甚至还可以有List套List再套List的情况。</p>
 <p>所以即使我们知道，前面的示意图里，Name.Language.Code的连续三个值都属于记录r1，但是我们没法儿知道，它是属于里面的Name这个List里的第一个Name，还是第二个Name。其他多层嵌套的字段也有类似的问题。而且更进一步的，Dremel支持Optional的字段，也就是说，Name下面可能有Language字段，也可能没有。</p>
 <p>这样，我们就没有办法把已经转化成列存储的数据，简单地重新组装回原始对象了。</p>
@@ -7910,7 +7910,7 @@
 <li>第一个字段叫做<strong>Repetition Level</strong>，用来告诉我们，当前这个值相对于上一次出现，是由第几层嵌套结构引起的。</li>
 <li>第二个字段叫做<strong>Definition Level</strong>，用来告诉我们，当一个字段是Optional，也就是可选的时候，它现在没有填充值，是因为多层嵌套的哪一层的字段为空。</li>
 </ul>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/50/83/5000d6eba7618b0e9095654807ccef83.jpg?wh=1920x1080" title="来自论文中的图3，r代表存储的Repetition Level，d代表存储的Definition Level" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/50/83/5000d6eba7618b0e9095654807ccef83.jpg?wh=1920x1080" title="来自论文中的图3，r代表存储的Repetition Level，d代表存储的Definition Level" /></p>
 <h3 id="repetition-level">Repetition Level</h3>
 <p>我们先来看看Repetition Level是怎么一回事。为了方便理解，我们下面把每个字段的Reptition level的值，简称为r。</p>
 <p>以Name.Language.Code这个字段为例，这个嵌套结构有三层，第1层是Name，第2层是Language，第3层则是Code。其中，只有Name和Language是repeated，也就是会重复出现的，第三层Code只是一个简单的值。</p>
@@ -7940,7 +7940,7 @@
 <li>存放的第四个值<code>'en-gb'</code>的r=1，则是说明重复在第1层，也就是又需要一个新的Name</li>
 <li>存放的第五个值null的r=0，则是说明这个值不来自于之前重复的列表，也就是一条新的Document记录，其实也就是进入论文图2里面的r2这条记录了。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e7/7b/e773c5d530304461d5e122333c3f687b.jpg?wh=2000x1980" title="我们一层层来看Repetition Level，就很容易理解这个Repetition Level意味着什么了" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e7/7b/e773c5d530304461d5e122333c3f687b.jpg?wh=2000x1980" title="我们一层层来看Repetition Level，就很容易理解这个Repetition Level意味着什么了" /></p>
 <p><strong>这个Repetition其实指向的就是Protobuf中的repeated的关键字。</strong>我们通过这个Repetition Level，就能够区分清楚，这个值存储的是哪一层的repeated的值。</p>
 <h3 id="definition-level">Definition Level</h3>
 <p>那么到这里，你可能会觉得：这样看来问题就解决了呀，我们为什么还需要一个Definition Level呢？</p>
@@ -7950,7 +7950,7 @@
 <p>而这个Definition Level，是要告诉我们，<strong>对于取值为NULL的对象，具体到哪一层Optional的对象的值变成了NULL</strong>。知道了这个信息，我们通过列数据反向组装成行对象的时候，就能够100%还原了，不会出现不知道哪一层结构应该设置为空的情况。</p>
 <p>在下面的讲解中，我们把这个Definition Level就记录为d，我们还是来看看Name.Language.Code这个字段。</p>
 <p>可以看到，在Protobuf的定义中，对于Code字段来说，Name字段本身是必然需要的。只有1层Language字段是可要可不要的。那么，当Code字段为Null的时候，只有一种可能性，也就是第1层的Language是空，这个时候，d=1。<strong>因为只要Code出现，Name字段本身必然出现。</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/05/31/059daf48d7d46fab344e082d0856ac31.jpg?wh=2000x1980" title="Definition Level，看的是到第几层嵌套的Optional字段为NULL" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/05/31/059daf48d7d46fab344e082d0856ac31.jpg?wh=2000x1980" title="Definition Level，看的是到第几层嵌套的Optional字段为NULL" /></p>
 <p>在前面的数据示例里，我们把这个Definition Level，记录为了d。可以看到，只要取值不是Null的情况，这个d其实就是当前字段作为Optional字段，定义的层数加1。</p>
 <p>如果你去看Name.Language.Country这个列的数据，可以更清楚地做一个对比。</p>
 <p>首先和前面一样，Name字段本身不能为NULL。而Language、Country字段都是Optional的，那么Country没有值，可能是因为第1层的Language就已经是Null了，也可能是因为第2层的Country字段本身是NULL。</p>
@@ -8090,8 +8090,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -14657,7 +14657,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>wrk -c10 -t10 -d 100s http://localhost:45678/cacheinvalid/city
 </code></pre></div>
 <p>启动程序30秒后缓存过期，回源的数据库QPS最高达到了700多：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/91/6b/918a91e34725e475cdee746d5ba8aa6b.png?wh=2114%2A186" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/91/6b/918a91e34725e475cdee746d5ba8aa6b.png?wh=2114%2A186" /></p>
 <p>解决缓存Key同时大规模失效需要回源，导致数据库压力激增问题的方式有两种。</p>
 <p>方案一，差异化缓存过期时间，不要让大量的Key在同一时间过期。比如，在初始化缓存的时候，设置缓存的过期时间是30秒+10秒以内的随机延迟（扰动值）。这样，这些Key不会集中在30秒这个时刻过期，而是会分散在30~40秒之间过期：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>@PostConstruct
@@ -14672,7 +14672,7 @@
 <a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>}
 </code></pre></div>
 <p>修改后，缓存过期时的回源不会集中在同一秒，数据库的QPS从700多降到了最高100左右：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6f/35/6f4a666cf48c4d1373aead40afb57a35.png?wh=2124%2A644" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6f/35/6f4a666cf48c4d1373aead40afb57a35.png?wh=2124%2A644" /></p>
 <p>方案二，让缓存不主动过期。初始化缓存数据的时候设置缓存永不过期，然后启动一个后台线程30秒一次定时把所有数据更新到缓存，而且通过适当的休眠，控制从数据库更新数据的频率，降低数据库压力：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>@PostConstruct
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>public void rightInit2() throws InterruptedException {
@@ -14703,7 +14703,7 @@
 <a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a>}
 </code></pre></div>
 <p>这样修改后，虽然缓存整体更新的耗时在21秒左右，但数据库的压力会比较稳定：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5c/5a/5cb8bb1764998b57b63029bd5f69465a.png?wh=2292%2A1198" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5c/5a/5cb8bb1764998b57b63029bd5f69465a.png?wh=2292%2A1198" /></p>
 <p>关于这两种解决方案，<strong>我们需要特别注意以下三点</strong>：</p>
 <ul>
 <li>方案一和方案二是截然不同的两种缓存方式，如果无法全量缓存所有数据，那么只能使用方案一；</li>
@@ -14739,7 +14739,7 @@
 <a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>}
 </code></pre></div>
 <p>可以看到，每隔5秒数据库都有20左右的QPS：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/09/99/096f2bb47939f9ca0e4bc865eb4da399.png?wh=2056%2A638" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/09/99/096f2bb47939f9ca0e4bc865eb4da399.png?wh=2056%2A638" /></p>
 <p>如果回源操作特别昂贵，那么这种并发就不能忽略不计。这时，我们可以考虑使用锁机制来限制回源的并发。比如如下代码示例，使用Redisson来获取一个基于Redis的分布式锁，在查询数据库之前先尝试获取锁：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>@Autowired
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>private RedissonClient redissonClient;
@@ -14768,7 +14768,7 @@
 <a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a>}
 </code></pre></div>
 <p>这样，可以把回源到数据库的并发限制在1：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/63/28/63ccde3fdf058b48431fc7c554fed828.png?wh=2018%2A700" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/63/28/63ccde3fdf058b48431fc7c554fed828.png?wh=2018%2A700" /></p>
 <p>在真实的业务场景下，<strong>不一定</strong>要这么严格地使用双重检查分布式锁进行全局的并发限制，因为这样虽然可以把数据库回源并发降到最低，但也限制了缓存失效时的并发。可以考虑的方式是：</p>
 <ul>
 <li>方案一，使用进程内的锁进行限制，这样每一个节点都可以以一个并发回源数据库；</li>
@@ -14798,7 +14798,7 @@
 <a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>}
 </code></pre></div>
 <p>压测后数据库的QPS达到了几千：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/dc/d2/dc2ee3259dd21d55a845dc4a8b9146d2.png?wh=2060%2A190" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dc/d2/dc2ee3259dd21d55a845dc4a8b9146d2.png?wh=2060%2A190" /></p>
 <p>如果这种漏洞被恶意利用的话，就会对数据库造成很大的性能压力。<strong>这就是缓存穿透</strong>。</p>
 <p>这里需要注意，缓存穿透和缓存击穿的区别：</p>
 <ul>
@@ -14829,7 +14829,7 @@
 <p>布隆过滤器是一种概率型数据库结构，由一个很长的二进制向量和一系列随机映射函数组成。它的原理是，当一个元素被加入集合时，通过k个散列函数将这个元素映射成一个m位bit数组中的k个点，并置为1。</p>
 <p>检索时，我们只要看看这些点是不是都是1就（大概）知道集合中有没有它了。如果这些点有任何一个0，则被检元素一定不在；如果都是1，则被检元素很可能在。</p>
 <p>原理如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c5/1f/c58cb0c65c37f4c1bf3aceba1c00d71f.png?wh=1966%2A1024" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c5/1f/c58cb0c65c37f4c1bf3aceba1c00d71f.png?wh=1966%2A1024" /></p>
 <p>布隆过滤器不保存原始值，空间效率很高，平均每一个元素占用2.4字节就可以达到万分之一的误判率。这里的误判率是指，过滤器判断值存在而实际并不存在的概率。我们可以设置布隆过滤器使用更大的存储空间，来得到更小的误判率。</p>
 <p>你可以把所有可能的值保存在布隆过滤器中，从缓存读取数据前先过滤一次：</p>
 <ul>
@@ -15034,8 +15034,6 @@ key分为2种类型：
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

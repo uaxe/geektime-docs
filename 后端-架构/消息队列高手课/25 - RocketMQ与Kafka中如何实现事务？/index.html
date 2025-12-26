@@ -14735,16 +14735,16 @@
 <p>而Kafka中的事务，它解决的问题是，确保在一个事务中发送的多条消息，要么都成功，要么都失败。注意，这里面的多条消息不一定要在同一个主题和分区中，可以是发往多个主题和分区的消息。当然，你可以在Kafka的事务执行过程中，加入本地事务，来实现和RocketMQ中事务类似的效果，但是Kafka是没有事务反查机制的。</p>
 <p>Kafka的这种事务机制，单独来使用的场景不多。更多的情况下被用来配合Kafka的幂等机制来实现Kafka 的Exactly Once语义。我在之前的课程中也强调过，这里面的Exactly Once，和我们通常理解的消息队列的服务水平中的Exactly Once是不一样的。</p>
 <p>我们通常理解消息队列的服务水平中的Exactly Once，它指的是，消息从生产者发送到Broker，然后消费者再从Broker拉取消息，然后进行消费。这个过程中，确保每一条消息恰好传输一次，不重不丢。我们之前说过，包括Kafka在内的几个常见的开源消息队列，都只能做到At Least Once，也就是至少一次，保证消息不丢，但有可能会重复。做不到Exactly Once。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ac/40/ac330e3e22b0114f5642491889510940.png?wh=354%2A91" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ac/40/ac330e3e22b0114f5642491889510940.png?wh=354%2A91" /></p>
 <p>那Kafka中的Exactly Once又是解决的什么问题呢？它解决的是，在流计算中，用Kafka作为数据源，并且将计算结果保存到Kafka这种场景下，数据从Kafka的某个主题中消费，在计算集群中计算，再把计算结果保存在Kafka的其他主题中。这样的过程中，保证每条消息都被恰好计算一次，确保计算结果正确。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/15/ff/15f8776de71b79cc232d8b60c3c24bff.png?wh=435%2A82" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/15/ff/15f8776de71b79cc232d8b60c3c24bff.png?wh=435%2A82" /></p>
 <p>举个例子，比如，我们把所有订单消息保存在一个Kafka的主题Order中，在Flink集群中运行一个计算任务，统计每分钟的订单收入，然后把结果保存在另一个Kafka的主题Income里面。要保证计算结果准确，就要确保，无论是Kafka集群还是Flink集群中任何节点发生故障，每条消息都只能被计算一次，不能重复计算，否则计算结果就错了。这里面有一个很重要的限制条件，就是数据必须来自Kafka并且计算结果都必须保存到Kafka中，才可以享受到Kafka的Excactly Once机制。</p>
 <p>可以看到，Kafka的Exactly Once机制，是为了解决在“读数据-计算-保存结果”这样的计算过程中数据不重不丢，而不是我们通常理解的使用消息队列进行消息生产消费过程中的Exactly Once。</p>
 <h2 id="kafka">Kafka的事务是如何实现的？</h2>
 <p>那Kafka的事务又是怎么实现的呢？它的实现原理和RocketMQ的事务是差不多的，都是基于两阶段提交来实现的，但是实现的过程更加复杂。</p>
 <p>首先说一下，参与Kafka事务的几个角色，或者说是模块。为了解决分布式事务问题，Kafka引入了事务协调者这个角色，负责在服务端协调整个事务。这个协调者并不是一个独立的进程，而是Broker进程的一部分，协调者和分区一样通过选举来保证自身的可用性。</p>
 <p>和RocketMQ类似，Kafka集群中也有一个特殊的用于记录事务日志的主题，这个事务日志主题的实现和普通的主题是一样的，里面记录的数据就是类似于“开启事务”“提交事务”这样的事务日志。日志主题同样也包含了很多的分区。在Kafka集群中，可以存在多个协调者，每个协调者负责管理和使用事务日志中的几个分区。这样设计，其实就是为了能并行执行多个事务，提升性能。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c8/f4/c8c286a5e32ee324c8a32ba967d1f2f4.png?wh=1024%2A693" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c8/f4/c8c286a5e32ee324c8a32ba967d1f2f4.png?wh=1024%2A693" />
 （图片来源：<a href="https://www.confluent.io/blog/transactions-apache-kafka/">Kafka官方</a>）</p>
 <p>下面说一下Kafka事务的实现流程。</p>
 <p>首先，当我们开启事务的时候，生产者会给协调者发一个请求来开启事务，协调者在事务日志中记录下事务ID。</p>
@@ -14752,7 +14752,7 @@
 <p>消息发送完成后，生产者给协调者发送提交或回滚事务的请求，由协调者来开始两阶段提交，完成事务。第一阶段，协调者把事务的状态设置为“预提交”，并写入事务日志。到这里，实际上事务已经成功了，无论接下来发生什么情况，事务最终都会被提交。</p>
 <p>之后便开始第二阶段，协调者在事务相关的所有分区中，都会写一条“事务结束”的特殊消息，当Kafka的消费者，也就是客户端，读到这个事务结束的特殊消息之后，它就可以把之前暂时过滤的那些未提交的事务消息，放行给业务代码进行消费了。最后，协调者记录最后一条事务日志，标识这个事务已经结束了。</p>
 <p>我把整个事务的实现流程，绘制成一个简单的时序图放在这里，便于你理解。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/27/fe/27742f00f70ead8c7194ef1aab503efe.png?wh=654%2A570" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/27/fe/27742f00f70ead8c7194ef1aab503efe.png?wh=654%2A570" /></p>
 <p>总结一下Kafka这个两阶段的流程，准备阶段，生产者发消息给协调者开启事务，然后消息发送到每个分区上。提交阶段，生产者发消息给协调者提交事务，协调者给每个分区发一条“事务结束”的消息，完成分布式事务提交。</p>
 <h2 id="_1">小结</h2>
 <p>这节课我分别讲解了Kafka和RocketMQ是如何来实现事务的。你可以看到，它们在实现事务过程中的一些共同的地方，它们都是基于两阶段提交来实现的事务，都利用了特殊的主题中的队列和分区来记录事务日志。</p>
@@ -14876,8 +14876,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

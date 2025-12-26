@@ -14929,9 +14929,9 @@
 <h3 id="_3">消息数据存储结构</h3>
 <p>我们知道，消息队列的底层是分段存储，也知道底层存储结构有每个分区单独一个存储“文件”和每个节点上所有分区的数据都存储在同一个“文件”这两个方案。因为从消息查询的角度来看，两种方案的技术实现基本一致，所以接下来我们就基于方案一来分析一下消息查询的实现。</p>
 <p>下面是基于方案一实现的分区维度的底层分段数据结构图。可以看到，一个分区由多个数据段组成，比如 Offset 从 1~10000 的数据段，Offset 从 10000~30000 的数据段。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ef/d6/ef641dcd8f5798366c903b8f711819d6.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ef/d6/ef641dcd8f5798366c903b8f711819d6.jpg?wh=10666x6000" /></p>
 <p>每个数据段里面的数据由多个数据组成，每个数据又由消息位点和消息组成。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b1/a0/b1f143b6d0647bdf652c7d7e2de956a0.jpg?wh=10666x3027" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b1/a0/b1f143b6d0647bdf652c7d7e2de956a0.jpg?wh=10666x3027" /></p>
 <p>那怎么在这个数据结构上进行数据查询呢？从技术上来看，核心是<strong>数据索引的构建</strong>。所以接下来我们就来看一下为什么需要索引？以及如何构建索引？</p>
 <h3 id="_4">关于索引的一些知识点</h3>
 <p><strong>问题1：为什么一定要构建索引呢？</strong></p>
@@ -14941,7 +14941,7 @@
 <p>所以构建索引的核心就是选择合理的数据结构存储索引数据。从业界来看，MySQL用的是“B+树”来构建索引，Elasticsearch使用的是“倒排索引”，从而支持高性能、复杂的查询。消息队列查询的核心也是设计合理的数据结构来构建索引，以满足对应的查询需求。</p>
 <p>不过索引是需要持久化存储的，我们应该怎么持久化存储索引呢？</p>
 <p>索引的持久化存储肯定是存储在文件上的，而消息数据底层是分段存储的。所以如下图所示，从技术上看，在索引的构建上有<strong>所有段文件构建一个索引</strong>和<strong>每个数据段构建索引</strong>两个思路。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/04/f1/04a21496e72544706bc914561fff0ff1.jpg?wh=10666x4896" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/04/f1/04a21496e72544706bc914561fff0ff1.jpg?wh=10666x4896" /></p>
 <p>技术实现上，这两种方案都会用到，根据不同的场景来选择合适的方案即可。至于如何选择，我们在后面会细讲。</p>
 <p>接下来我们来看一下内核是如何支持查询的。</p>
 <h2 id="_5">内核支持简单查询</h2>
@@ -14962,7 +14962,7 @@
 <p>当然不是。我们需要先分析当前我们的底层存储和数据的特征，然后结合需求来实际分析如何实现。</p>
 <p>我们知道消息队列底层是<strong>顺序存储的模型，所以Offset是顺序递增的。</strong>简单理解，数据已经是一个天然顺序了，基于一个天然顺序的数据来做检索就非常简单，直接引入二分查找就可以。</p>
 <p>所以我们索引文件的数据结构实现就很简单。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/49/b9/493be332f26c3a2d205393d8f3f13eb9.jpg?wh=10666x2756" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/49/b9/493be332f26c3a2d205393d8f3f13eb9.jpg?wh=10666x2756" /></p>
 <p>如上图所示，我们可以用顺序链表来存储索引数据。每个链表节点存储消息位点（Offset）和消息所在的文件的位置（Position）两个元素。基于顺序链表，如果要搜索某个Offset的数据，直接使用二分查找（折半查找）即可，查找的时间复杂度为O(logn)，顺序链表的插入的时间复杂度为O(1)。</p>
 <p>因为要持久化存储，所以文件中索引数据的格式可以用下面的格式进行存储。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>offset: 1 position: 10
@@ -14973,7 +14973,7 @@
 </code></pre></div>
 <p>在上面的示例中，不知道你是否注意到了Offset和Position是单向递增的，但都不是连续的，这是为什么呢？</p>
 <p>你可以试想一下，假设我们有10亿条数据，按照上面的设计应该也有10亿个索引节点。以此类推，如果数据更大，索引数据会占用大量的存储空间，所以我们在顺序链表的基础上，可以引入<strong>跳跃表</strong>来节省空间。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d7/03/d72982d04afb1e998e22ebe2338bed03.jpg?wh=10666x3341" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d7/03/d72982d04afb1e998e22ebe2338bed03.jpg?wh=10666x3341" /></p>
 <p>如上图所示，引入跳跃表的主要思路是按照一定的间隔跳跃着保留中间元素。当检索数据时，通过二分算法找到离目标最近的前一个跳跃表元素。如果恰好是需要寻找的元素，就直接返回，否则就往后遍历数据找到数据。</p>
 <p>举个例子说明，比如我们要找到上图中的元素22，流程就是：</p>
 <ol>
@@ -14997,10 +14997,10 @@
 </ol>
 <p>消息队列内核一般只支持第一种场景。因为从技术上看，构建高性能的范围查询是一个复杂的话题，涉及到的知识点非常多。从消息队列内核的角度看，从技术上也能实现，但是代码复杂度会提高很多，要增加大量内核开发维护成本。所以目前消息队列内核支持第二种场景的比较少。</p>
 <p>如下图所示，从技术上看，消息队列实现根据时间查询的思路是：先根据时间戳找到对应的Offet，然后再根据Offset查询到对应的数据。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/16/4e/16186b5f1d7ee8f63d37bd580498214e.jpg?wh=10666x2745" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/16/4e/16186b5f1d7ee8f63d37bd580498214e.jpg?wh=10666x2745" /></p>
 <p>所以技术上的核心思路是：<strong>构建时间戳和Offset对应的索引。</strong></p>
 <p>因为消息数据是根据时间戳递增存储的，所以时间戳和Offset索引也是基于顺序链表构建的。链表节点由毫秒时间戳和消息位点组成。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/94/bd/94cc3b7a8bbf6b66b6c34fe361b0f5bd.jpg?wh=10666x2638" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/94/bd/94cc3b7a8bbf6b66b6c34fe361b0f5bd.jpg?wh=10666x2638" /></p>
 <p>同样的因为需要持久化存储，所以底层索引文件内容格式可以如下所示：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>timestamp: 1691236897071 offset: 744267032
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>timestamp: 1691236898193 offset: 744267036
@@ -15031,7 +15031,7 @@
 <li>查询的时候根据消息ID反解析出消息ID对应的时间戳，因为SnowFlake算法中有一部分数据是时间戳。</li>
 <li>结合这个时间戳去搜索消息。</li>
 </ol>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c6/ed/c679dcdff8ac2bb0db76615a073c8ded.jpg?wh=10666x2654" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c6/ed/c679dcdff8ac2bb0db76615a073c8ded.jpg?wh=10666x2654" /></p>
 <p>这个方案的好处是，几乎不需要开发工作量，流程简单通用。缺点是可能会误判，即消息明明存在，但是却搜索不出来。因为消息ID在客户端生成，SnowFlake算法的时间戳也是客户端的时间，所以在一些异常或延时消息的场景中，数据写入Topic或分区的时间和客户端发送出来的时间相差很大，从而导致根据SnowFlake解析出的客户端时间无法查询到消息。</p>
 <p>复杂方案则是是<strong>基于哈希表、B+树、红黑树等数据结构来构建消息ID和Offset的索引</strong>，同时保证在索引元素添加和获取的时候的时间复杂度较低，从而满足查询需求。因为根据消息ID查询消息的需求是很固定的，所以我会建议你使用哈希表来构建索引，因为哈希索引结构能够实现高效的消息查询。</p>
 <p>业界主流消息队列RocketMQ就是基于哈希表来构建消息ID和Offset的索引的。我们简单来看一下底层的实现原理，大概分为以下4点：</p>
@@ -15048,7 +15048,7 @@
 <h3 id="_8">第三方引擎支持查询</h3>
 <p>第三方引擎支持查询是指引入第三方查询引擎，将Kafka的数据导入到下游引擎，依赖引擎的能力来实现复杂的数据查询，比如Kafka + Hive、Kafka + Elasticsearch、Kafka + Trino（以前的Presto SQL）。</p>
 <p>如下图所示，上面这几个方案的思路都是一样的。核心思路都是先将数据清洗处理变成结构化的数据，然后导入到下游的查询引擎中，然后依赖搜索引擎的复杂检索能力来提供检索服务。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9e/ac/9e581fdb6794e3318ce2d4cc113bbaac.jpg?wh=10666x3836" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9e/ac/9e581fdb6794e3318ce2d4cc113bbaac.jpg?wh=10666x3836" /></p>
 <p>这几个方案的主要区别在于使用方式、支持的查询能力、资源部署的成本不一样。比如搜索引擎是否能够自主从Kafka拉取数据，还是需要依赖一个独立的组件导入数据，但是从结果上来看都是基本可以满足复杂查询需求的。</p>
 <p>从具体落地使用上来看，上面这三种方案业界用得都比较多。从选择上来看，一般业务都是根据自己当前所拥有的资源来决定使用哪一个。比如我当前已经有一套Elasticsearch了，我就选择Kafka + Elasticsearch，举一反三。这么选择也是因为这几个方案之间的差别不是特别大。</p>
 <p>不过这个方案有一个前提是，需要Kakfa里面的数据都是规范的格式化的数据，或者需要经过数据清洗格式化后才能导入到下游的引擎中。</p>
@@ -15056,7 +15056,7 @@
 <p>接下来看看什么是工具化简单查询。</p>
 <h3 id="_9">工具化简单查询</h3>
 <p>工具化简单查询是指我们自定义编码去消费数据，然后在代码里面加过滤条件，从而实现查询。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2f/3d/2fa545059805eb1040990c7a3c05123d.jpg?wh=10666x3438" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2f/3d/2fa545059805eb1040990c7a3c05123d.jpg?wh=10666x3438" /></p>
 <p>这个方案直观看上去，存在性能低、时间复杂度高、不灵活等严重缺点，但在实际场景中它是非常实用的。</p>
 <p>例如，我们在出问题的时候，偶尔需要根据消息内容或者消息Key模糊查询数据是否在集群中。这个需求非常常见，但是使用频率低。</p>
 <p>从技术上看，标准方案是把数据清洗后导入到下游引擎，然后查询。这个方案的缺点就是成本太高、太复杂，因为使用频率太低，就有一种杀鸡用牛刀的感觉，综合讲 ROI 太低了。所以面对这种场景，我们就可以使用这种思路。</p>
@@ -15191,8 +15191,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

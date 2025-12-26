@@ -14942,12 +14942,12 @@
 <p>SimpleKV所缺少的有：丰富的数据类型、支持数据压缩、过期机制、数据淘汰策略、主从复制、集群化、高可用集群等，另外，还可以增加统计模块、通知模块、调试模块、元数据查询等辅助功能。</p>
 </blockquote>
 <p>我也给个答案总结。还记得我在<a href="https://time.geekbang.org/column/article/268247">开篇词</a>讲过的“两大维度”“三大主线”吗？这里我们也可以借助这个框架进行分析，如下表所示。此外，在表格最后，我还从键值数据库开发和运维的辅助工具上，对SimpleKV和Redis做了对比。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/67/36/67e77bea2568a4f0997c1853d9c60036.jpg?wh=2944%2A2045" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/67/36/67e77bea2568a4f0997c1853d9c60036.jpg?wh=2944%2A2045" /></p>
 <h3 id="2"><a href="https://time.geekbang.org/column/article/268253">第2讲</a></h3>
 <p><strong>问题：整数数组和压缩列表作为底层数据结构的优势是什么？</strong></p>
 <p>整数数组和压缩列表的设计，充分体现了Redis“又快又省”特点中的“省”，也就是节省内存空间。整数数组和压缩列表都是在内存中分配一块地址连续的空间，然后把集合中的元素一个接一个地放在这块空间内，非常紧凑。因为元素是挨个连续放置的，我们不用再通过额外的指针把元素串接起来，这就避免了额外指针带来的空间开销。</p>
 <p>我画一张图，展示下这两个结构的内存布局。整数数组和压缩列表中的entry都是实际的集合元素，它们一个挨一个保存，非常节省内存空间。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2c/2a/2c57cc1c548a0733bd1bf09f397f342a.jpg?wh=2680%2A883" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2c/2a/2c57cc1c548a0733bd1bf09f397f342a.jpg?wh=2680%2A883" /></p>
 <p>Redis之所以采用不同的数据结构，其实是在性能和内存使用效率之间进行的平衡。</p>
 <h3 id="3"><a href="https://time.geekbang.org/column/article/270474">第3讲</a></h3>
 <p><strong>问题：Redis基本IO模型中还有哪些潜在的性能瓶颈？</strong></p>
@@ -15033,20 +15033,20 @@
 </ul>
 <p>然后，我们再看下Redis使用的线程。从4.0版本开始，Redis也开始使用pthread_create创建线程，这些线程在创建后，一般会自行执行一些任务，例如执行异步删除任务。相对于完成主要工作的主线程来说，我们一般可以称这些线程为后台线程。关于Redis后台线程的具体执行机制，我会在第16讲具体介绍。</p>
 <p>为了帮助你更好地理解，我画了一张图，展示了它们的区别。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c2/51/c2c5bd3a66921b1b0cc1d377dfabd451.jpg?wh=2210%2A1322" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c2/51/c2c5bd3a66921b1b0cc1d377dfabd451.jpg?wh=2210%2A1322" /></p>
 <h3 id="3_1">问题3：写时复制的底层实现机制</h3>
 <p>Redis在使用RDB方式进行持久化时，会用到写时复制机制。我在第5节课讲写时复制的时候，着重介绍了写时复制的效果：bgsave子进程相当于复制了原始数据，而主线程仍然可以修改原来的数据。</p>
 <p>今天，我再具体讲一讲写时复制的底层实现机制。</p>
 <p>对Redis来说，主线程fork出bgsave子进程后，bgsave子进程实际是复制了主线程的页表。这些页表中，就保存了在执行bgsave命令时，主线程的所有数据块在内存中的物理地址。这样一来，bgsave子进程生成RDB时，就可以根据页表读取这些数据，再写入磁盘中。如果此时，主线程接收到了新写或修改操作，那么，主线程会使用写时复制机制。具体来说，写时复制就是指，主线程在有写操作时，才会把这个新写或修改后的数据写入到一个新的物理地址中，并修改自己的页表映射。</p>
 <p>我来借助下图中的例子，具体展示一下写时复制的底层机制。</p>
 <p>bgsave子进程复制主线程的页表以后，假如主线程需要修改虚页7里的数据，那么，主线程就需要新分配一个物理页（假设是物理页53），然后把修改后的虚页7里的数据写到物理页53上，而虚页7里原来的数据仍然保存在物理页33上。这个时候，虚页7到物理页33的映射关系，仍然保留在bgsave子进程中。所以，bgsave子进程可以无误地把虚页7的原始数据写入RDB文件。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cc/eb/cc98dc9f65a1079f3638158aacf81aeb.jpg?wh=2725%2A2005" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cc/eb/cc98dc9f65a1079f3638158aacf81aeb.jpg?wh=2725%2A2005" /></p>
 <h3 id="4replication-bufferrepl_backlog_buffer">问题4：replication buffer和repl_backlog_buffer的区别</h3>
 <p>在进行主从复制时，Redis会使用replication buffer和repl_backlog_buffer，有些同学可能不太清楚它们的区别，我再解释下。</p>
 <p>总的来说，replication buffer是主从库在进行全量复制时，主库上用于和从库连接的客户端的buffer，而repl_backlog_buffer是为了支持从库增量复制，主库上用于持续保存写操作的一块专用buffer。</p>
 <p>Redis主从库在进行复制时，当主库要把全量复制期间的写操作命令发给从库时，主库会先创建一个客户端，用来连接从库，然后通过这个客户端，把写操作命令发给从库。在内存中，主库上的客户端就会对应一个buffer，这个buffer就被称为replication buffer。Redis通过client_buffer配置项来控制这个buffer的大小。主库会给每个从库建立一个客户端，所以replication buffer不是共享的，而是每个从库都有一个对应的客户端。</p>
 <p>repl_backlog_buffer是一块专用buffer，在Redis服务器启动后，开始一直接收写操作命令，这是所有从库共享的。主库和从库会各自记录自己的复制进度，所以，不同的从库在进行恢复时，会把自己的复制进度（slave_repl_offset）发给主库，主库就可以和它独立同步。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7a/a8/7a1795yy4f6dc064f0d34ef1231203a8.jpg?wh=2109%2A1620" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7a/a8/7a1795yy4f6dc064f0d34ef1231203a8.jpg?wh=2109%2A1620" /></p>
 <p>好了，这节课就到这里。非常感谢你的仔细思考和提问，每个问题都很精彩，在看留言的过程中，我自己也受益匪浅。另外，我希望我们可以组建起一个Redis学习团，在接下来的课程中，欢迎你继续在留言区畅所欲言，我们一起进步，希望每个人都能成为Redis达人！</p>
 <div><strong>精选留言（15）</strong></div>
 <ul>
@@ -15168,8 +15168,6 @@ RDB的生成和AOF重写都是fork出来子进程来进行的，而且都是对�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

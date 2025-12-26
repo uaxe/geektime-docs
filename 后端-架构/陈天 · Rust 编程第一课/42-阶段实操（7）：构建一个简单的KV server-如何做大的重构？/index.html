@@ -15165,18 +15165,18 @@
 <a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="c1">// A/B 都收到 &quot;good game&quot;</span>
 </code></pre></div>
 <p>带着这个需求，我们重新审视目前的架构：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/82/2c/82da823b4eb16935fdeyy727e3b3262c.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/82/2c/82da823b4eb16935fdeyy727e3b3262c.jpg?wh=1920x1145" /></p>
 <p>要支持 Pub/Sub，现有架构有两个很大的问题。</p>
 <p><strong>首先，CommandService 是一个同步的处理</strong>，来一个命令，立刻就能计算出一个值返回。但现在来一个 SUBSCRIBE 命令，它期待的不是一个值，而是未来可能产生的若干个值。我们讲过 Stream 代表未来可能产生的一系列值，所以这里需要返回一个异步的 Stream。</p>
 <p>因此，我们要么需要牺牲 CommandService 这个 trait 来适应新的需求，要么构建一个新的、和 CommandService trait 并列的 trait，来处理和 Pub/Sub 有关的命令。</p>
 <p>其次，<strong>如果直接在 TCP/TLS 之上构建 Pub/Sub 的支持，我们需要在 Request 和 Response 之间建立“流”的概念</strong>，为什么呢？</p>
 <p>之前我们的协议运行模式是同步的，一来一回：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7b/68/7byy9cdb2c3651e4cd77bdda89a52968.jpg?wh=1920x998" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7b/68/7byy9cdb2c3651e4cd77bdda89a52968.jpg?wh=1920x998" /></p>
 <p>但是，如果继续采用这样的方式，就会有应用层的 <a href="https://en.wikipedia.org/wiki/Head-of-line_blocking">head of line blocking</a>（队头阻塞）问题，一个 SUBSCRIBE 命令，因为其返回结果不知道什么时候才结束，会阻塞后续的所有命令。所以，我们需要在一个连接里，划分出很多彼此独立的“流”，让它们的收发不受影响：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/67/db/67659457626d12eba6e26b37ayy08edb.jpg?wh=1920x998" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/67/db/67659457626d12eba6e26b37ayy08edb.jpg?wh=1920x998" /></p>
 <p>这种流式处理的典型协议是使用了多路复用（multiplex）的 HTTP/2。所以，一种方案是我们可以把 KV server 构建在使用 HTTP/2 的 gRPC 上。不过，HTTP 是个太过庞杂的协议，对于 KV server 这种性能非常重要的服务来说，不必要的额外开销太多，所以它不太适合。</p>
 <p>另一种方式是使用 <a href="https://github.com/hashicorp/yamux/blob/master/spec.md">Yamux</a> 协议，之前介绍过，它是一个简单的、和 HTTP/2 内部多路复用机制非常类似的协议。如果使用它，整个协议的交互看上去是这个样子的：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/31/67/31f3efcd510ff6a3yy0caf32dbfd8667.jpg?wh=1920x998" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/31/67/31f3efcd510ff6a3yy0caf32dbfd8667.jpg?wh=1920x998" /></p>
 <p>Yamux 适合不希望引入 HTTP 的繁文缛节（大量的头信息），在 TCP 层做多路复用的场景，今天就用它来支持我们所要实现的 Pub/Sub。</p>
 <h2 id="yamux">使用 yamux 做多路复用</h2>
 <p>Rust 下有 <a href="https://github.com/libp2p/rust-yamux">rust-yamux</a> 这个库，来支持 yamux。除此之外，我们还需要 tokio-util，它提供了 tokio 下的 trait 和 futures 下的 trait 的兼容能力。在 Cargo.toml 中引入它们：</p>
@@ -15337,7 +15337,7 @@
 <p>当 SUBSCRIBE 时，我们获取一个订阅 ID，插入到 Topic Table，然后再创建一个 MPSC channel，把 channel 的发送端和订阅 ID 存入 subscription table。</p>
 <p>这样，当有人 PUBLISH 时，可以从 Topic table 中找到对应的订阅 ID 的列表，然后循环从 subscription table 中找到对应的 Sender，往里面写入数据。此时，channel 的 Receiver 端会得到数据，这个数据会被 yamux stream poll 到，然后发给客户端。</p>
 <p>整个流程如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7c/30/7ce3046af823dbbdaa7b47d12d04ce30.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7c/30/7ce3046af823dbbdaa7b47d12d04ce30.jpg?wh=1920x1145" /></p>
 <p>有了这个基本设计，我们可以着手接口和数据结构的构建了：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="sd">/// 下一个 subscription id</span>
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">static</span><span class="w"> </span><span class="n">NEXT_ID</span><span class="p">:</span><span class="w"> </span><span class="nc">AtomicU32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">AtomicU32</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
@@ -15980,8 +15980,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

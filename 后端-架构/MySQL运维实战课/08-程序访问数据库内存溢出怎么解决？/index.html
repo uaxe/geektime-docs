@@ -14914,27 +14914,27 @@
 <p>我们使用MAT（Memory Analyzer Tool）来分析Java的Heapdump文件。首先需要获取Java程序的Heapdump，我们可以使用jmap等工具来生成Heapdump，具体的方法这里就不展开了。获取到Dump文件后，使用MAT打开。如果生成的Dump文件比较大，打开可能需要比较多的时间。</p>
 <h3 id="_2">总览页</h3>
 <p>打开Dump文件后，从总览页面可以看到内存消耗最高的那些对象。在我们这个Dump文件中，内存占用最高的是JDBC42ResultSet，从名字我们猜测这应该是从数据库取回的结果集。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/fe/36/fe4156114f5b6f2379f09acb02330b36.png?wh=1108x768" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fe/36/fe4156114f5b6f2379f09acb02330b36.png?wh=1108x768" /></p>
 <h3 id="dominator-tree">Dominator Tree</h3>
 <p>进入Dominator Tree模块，查看内存占用最高的对象。这里我们主要关注的是Retained Heap这一列，也就是对象本身加上该对象引用的其他对象占用的内存总和。我们的Dump文件中，主要是JDBC42ResultSet和Thread对象，总共占用了超过90%的内存。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/eb/17/eb49c6309060715ac7d94dd070a7f617.png?wh=1676x572" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/eb/17/eb49c6309060715ac7d94dd070a7f617.png?wh=1676x572" /></p>
 <h3 id="_3">对象属性</h3>
 <p>展开对象，我们发现JDBC42ResultSet内存使用这么高的原因是里面有一个elementData数组，这个数组里有80多万个对象，我们猜测这些对象对应数据库返回的记录。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9b/d2/9b773e239557624566e5ac3304023ed2.png?wh=1676x602" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9b/d2/9b773e239557624566e5ac3304023ed2.png?wh=1676x602" /></p>
 <h3 id="_4">查看对象引用</h3>
 <p>接下来我们希望能找到这是哪个SQL查询得到的数据。点击鼠标右键，打开“List objects”下的“with outgoing references”菜单页。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a8/4d/a892ee029b2d591ccb241899707f3f4d.png?wh=1678x574" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a8/4d/a892ee029b2d591ccb241899707f3f4d.png?wh=1678x574" /></p>
 <p>进入list_objects菜单页，我们发现在owningStatement属性中，可以找到原始的SQL语句文本。从physicalConnection属性中，我们还能看到数据库连接的相关属性。到这里我们就已经定位到了具体的SQL语句。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/34/84/342b98604ea1119b20e5a4615e140884.png?wh=1600x850" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/34/84/342b98604ea1119b20e5a4615e140884.png?wh=1600x850" /></p>
 <h3 id="_5">分析调用栈</h3>
 <p>Thread对象也占用了比较多的内存，展开后可以看到其中也有一个长度为20多万的elementData数组，elementData里面存的是业务的对象，跟数据库中的记录相对应。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/36/65/3655f074a5e708963d871c08c2672b65.png?wh=1652x412" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/36/65/3655f074a5e708963d871c08c2672b65.png?wh=1652x412" /></p>
 <p>为了分析这些对象是哪个SQL查询得到的，我们需要分析线程的调用栈，打开“Java Basics”下的“Thread Overview and Stacks”菜单。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/63/a8/63628d44a6bfc29e1d355c6057b00da8.png?wh=1750x748" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/63/a8/63628d44a6bfc29e1d355c6057b00da8.png?wh=1750x748" /></p>
 <p>在thread_overview菜单页中，我们可以看到线程的调用栈。内存主要由handleResultSet的局部变量占用，而SQL语句可能是在SimpleExecutor.doQuery方法中发起的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b9/c9/b9e0991c30208ff834e5507865bae8c9.png?wh=1666x650" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b9/c9/b9e0991c30208ff834e5507865bae8c9.png?wh=1666x650" /></p>
 <p>点开doQuery，我们找到了代码中执行的SQL语句。点开statement还可以看到传给SQL的具体参数。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c3/cd/c39dfbc64436e36cc93df346a82e97cd.png?wh=1698x726" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c3/cd/c39dfbc64436e36cc93df346a82e97cd.png?wh=1698x726" /></p>
 <p>我们演示了从Heapdump文件中定位SQL语句的一些方法。一条SQL的执行结果，在程序中可能会存储两次，一次以JDBCResultSet的方式存储，一次以应用程序对象的方式存储。找到SQL语句后，就可以从业务的角度进行分析，SQL语句是否合理、是否可以优化。</p>
 <p>接下来我们来回答这一讲开头提出的那个问题：为什么从代码逻辑上看，每次只处理了一行记录，但是程序却占用了大量内存，就好像将所有返回的记录都缓存到了内存中？</p>
 <p>为此我们先来分析一个普通的SELECT语句完整的执行流程。</p>
@@ -14942,7 +14942,7 @@
 <p>我们以最简单的一条SQL为例，来说明SQL的执行步骤。我们假定src_tab使用InnoDB存储引擎。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">select</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nx">from</span><span class="w"> </span><span class="nx">src_tab</span><span class="p">;</span>
 </code></pre></div>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1a/77/1a856f01500ff56c5cd75d93baebyy77.png?wh=1920x754" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1a/77/1a856f01500ff56c5cd75d93baebyy77.png?wh=1920x754" /></p>
 <p>SELECT语句的完整执行流程大致上可以分为下面这几个步骤：</p>
 <ol>
 <li>客户端提交SQL语句。客户端驱动程序将SQL语句打包，发送给服务器。</li>
@@ -14957,28 +14957,28 @@
 <p>这里需要注意的是，SQL开始执行后，SQL引擎会持续从存储引擎中获取数据，每读取到一行记录，就把记录通过网络发送给客户端，直到所有的数据都查询完成。所有数据都发送完成后，服务端还要发送一个结束标记，告诉客户端这个SQL的所有结果都已经发送了。</p>
 <h3 id="mysql">MySQL客户端服务端交互协议</h3>
 <p>MySQL客户端和服务端之间的交互遵循一定的协议，协议的基本格式如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b6/d7/b68682f2fff463f5a041d120b38c98d7.png?wh=1920x463" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b6/d7/b68682f2fff463f5a041d120b38c98d7.png?wh=1920x463" /></p>
 <p>length为3个字节，标识包的长度，一个包最大长度为16M。超过16M的部分需要拆成多个包，seq是包的序号，payload是具体的协议数据。对于一个SELECT查询语句，客户端发送的请求包格式大致上就是下面图片中展示的这样。其中command是命令的类型，目前MySQL中总共定义了几十种类型，对于查询语句，command是COM_QUERY。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/4c/b0/4c205d45ae2f946f38766e6c48e683b0.png?wh=1920x505" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4c/b0/4c205d45ae2f946f38766e6c48e683b0.png?wh=1920x505" /></p>
 <p>服务端返回的包大致可以分为三种类型。</p>
 <ul>
 <li>结果集</li>
 </ul>
 <p>结果集数据包由元数据、行记录、结束标记这几部分组成。元数据实际上是一个字段列表，告诉你返回的数据由哪几个字段组成。行记录从数据库中查询得到，结果集中可能包含0行或多行记录，每行记录由多个字段组成。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/67/d4/67b21df1d7320d6d5186078995df86d4.png?wh=2698x568" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/67/d4/67b21df1d7320d6d5186078995df86d4.png?wh=2698x568" /></p>
 <ul>
 <li>OK_Packet</li>
 </ul>
 <p>OK_Packet标志着一个语句的结束，包里面也包含了一些额外的信息，比如SQL影响了多少行数据，SQL执行是否有Warning。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/2f/e2/2f502d9bf4cc92b5e14bc4cc3b21aee2.png?wh=1920x441" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2f/e2/2f502d9bf4cc92b5e14bc4cc3b21aee2.png?wh=1920x441" /></p>
 <ul>
 <li>Err_Packet</li>
 </ul>
 <p>如果SQL执行过程中出错了，服务端会返回一个Err_Packet，包括错误编号和错误消息。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/34/1c/34a115365e5535e56c6a337b732f151c.png?wh=1920x481" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/34/1c/34a115365e5535e56c6a337b732f151c.png?wh=1920x481" /></p>
 <h3 id="sql">SQL引擎的核心逻辑</h3>
 <p>MySQL优化器生成的执行计划，交给SQL引擎执行。SQL引擎的核心是一个大的循环，根据执行计划中的步骤，从表或索引中获取数据。在最简单的情况下，查询只涉及一个表，SQL引擎调用存储引擎接口，如果正常地获取到了记录，就把记录打包，发送给客户端，然后再继续调用存储引擎接口，获取下一行记录。处理完所有记录后，发送OK_Packet，告诉客户端所有数据都已经发送完成。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1d/d7/1df7a3cfd2c0be7e2dc43dd04e78f3d7.png?wh=1920x1224" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1d/d7/1df7a3cfd2c0be7e2dc43dd04e78f3d7.png?wh=1920x1224" /></p>
 <h3 id="_6">存储引擎接口</h3>
 <p>SQL引擎调用存储引擎接口时，每次调用最多只获取一行记录，SQL引擎会提供一段临时内存用来存放这一行记录。存储引擎获取到记录后，进行必要的格式转换后，将记录写到SQL引擎提供的临时内存中。</p>
 <h3 id="_7">客户端获取数据</h3>
@@ -15009,7 +15009,7 @@
 <p>如果我们使用tcpdump对MySQL进行抓包分析，会发现执行cur.execute()这一行代码后，服务端向客户端发送了一些数据后就停止发送了，这个时候客户端的TCP接收窗口为0。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nx">tcpdump</span><span class="w"> </span><span class="o">-</span><span class="nx">i</span><span class="w"> </span><span class="kt">any</span><span class="w">  </span><span class="nx">port</span><span class="w"> </span><span class="mi">3306</span><span class="w"> </span><span class="o">-</span><span class="nx">t</span><span class="w"> </span><span class="o">-</span><span class="nx">nnnn</span>
 </code></pre></div>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/fa/47/fa221e0184157ff091b34e0fcffb7b47.png?wh=1920x563" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fa/47/fa221e0184157ff091b34e0fcffb7b47.png?wh=1920x563" /></p>
 <p>如果客户端在net_write_timeout设置的时间内都没有读取数据，服务端的网络写操作会超时，这个时候客户端如果再次获取数据，会发现连接已经被断开了。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="o">&gt;&gt;</span><span class="p">&gt;</span><span class="w"> </span><span class="nx">time</span><span class="p">.</span><span class="nx">sleep</span><span class="p">(</span><span class="mi">60</span><span class="p">)</span>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="o">&gt;&gt;</span><span class="p">&gt;</span><span class="w"> </span><span class="nx">row</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nx">cur</span><span class="p">.</span><span class="nx">fetchone</span><span class="p">()</span>
@@ -15194,8 +15194,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

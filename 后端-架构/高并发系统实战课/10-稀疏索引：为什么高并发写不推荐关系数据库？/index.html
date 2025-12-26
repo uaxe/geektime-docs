@@ -14090,7 +14090,7 @@
 <p>MySQL为了达到这个效果，几乎所有<strong>查询</strong>都是通过索引去<strong>缩小扫描数据的范围</strong>，然后再回到表中对范围内数据进行<strong>遍历加工、过滤</strong>，最终拿到我们的业务需要的数据。</p>
 <p>事实上，<strong>并不是MySQL不能存储更多的数据，而限制我们的多数是数据查询效率问题</strong>。</p>
 <p>那么MySQL限制查询效率的地方有哪些？请看下图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/2e/ef/2e42b71c21bf6f958ef1a7884a62e0ef.jpg?wh=1920x1068" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2e/ef/2e42b71c21bf6f958ef1a7884a62e0ef.jpg?wh=1920x1068" /></p>
 <p>众所周知，MySQL的InnoDB数据库的索引是B+Tree，<strong>B+Tree的特点在于只有在最底层才会存储真正的数据ID，通过这个ID就可以提取到数据的具体内容</strong>，同时B+Tree索引最底层的数据是按索引字段顺序进行存储的。</p>
 <p>通过<strong>这种设计方式，我们只需进行1～3次IO（树深度决定了IO次数）就能找到所查范围内排序好的数据</strong>，而树形的索引最影响查询效率的是<strong>树的深度以及数据量</strong>（数据越独特，筛选的数据范围就越少）。</p>
 <p>数据量我么很好理解，只要我们的索引字段足够独特，筛选出来的数据量就是可控的。</p>
@@ -14098,7 +14098,7 @@
 <p>我们从这个Page就可以推导出：索引第一层放1280条，树第二层大概能放2万条，树第三层大概能放2400万条，三层的深度B+Tree按主键查找数据每次查询需要 <strong>3次IO</strong>（一层索引在内存，IO两次索引，最后一次是拿数据）。</p>
 <p>不过这个2000万并不是绝对的，如果我们的每行数据是0.5KB，那么大概在4000万以后才会出现第四层深度。而对于辅助索引，一页Page能存放1170个索引节点（主键bigint8字节+数据指针6字节），三层深度的辅助索引大概能记录10亿条索引记录。</p>
 <p>可以看到，我们的数据存储数量超过三层时，每次数据操作<strong>需要更多的IO操作</strong>来进行查询，这样做的后果就是查询数据返回的速度变慢。所以，很多互联网系统为了保持服务的高效，会定期整理数据。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e7/04/e70f82ff4ba17865f2a2ac2ba7d82004.jpg?wh=1920x1605" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e7/04/e70f82ff4ba17865f2a2ac2ba7d82004.jpg?wh=1920x1605" /></p>
 <p>通过上面的讲解，相信你已经对整个查询有画面感了：当我们查询时，通过1～3次IO查找辅助索引，从而找到一批数据主键ID。然后，通过MySQL的MMR算法将这些ID做排序，再回表去<strong>聚簇索引</strong>按取值范围提取在子叶上的业务数据，将这些数据边取边算或一起取出再进行聚合排序后，之后再返回结果。</p>
 <p>可以看到，我们常用的数据库之所以快，核心在于索引用得好。由于加工数据光用索引是无法完成的，我们还需要找到具体的数据进行再次加工，才能得到我们业务所需的数据，这也是为什么<strong>我们的字段数据长度和数据量会直接影响我们对外服务的响应速度</strong>。</p>
 <p>同时请你注意，我们一个表不能增加过多的索引，因为索引太多会影响到表插入的性能。并且我们的查询要遵循左前缀原则来逐步缩小查找的数据范围，而不能利用多个CPU并行去查询索引数据。这些大大限制了我们对大数据的处理能力。</p>
@@ -14107,25 +14107,25 @@
 <p>我们先来分析索引的不同。OLTP常用的是B+Tree，我们知道，B+tree索引是一个整体的树，当我们的数据量大时会影响索引树的深度，如果深度过高就会严重影响其工作效率。对于大量数据，OLAP服务会用什么类型的索引呢？</p>
 <h2 id="lsm-tree">稀疏索引LSM Tree与存储</h2>
 <p>这里重点介绍一下LSM索引。我第一次见到LSM Tree还是从RocksDB（以及LevelDB）上看到的，RocksDB之所以能够得到快速推广并受到欢迎，主要是因为它利用了<strong>磁盘顺序写性能超绝</strong>的特性，并以较小的性能查询代价提供了写多读少的KV数据存储查询服务，这和关系数据库的存储有很大的不同。</p>
-<p>为了更好理解，我们详细讲讲Rocksdb稀疏索引是如何实现的，如下图所示：<img alt="图片" src="https://static001.geekbang.org/resource/image/fa/11/fa96b7540736ff7c8ce739fb710e3e11.jpg?wh=1920x2122" /></p>
+<p>为了更好理解，我们详细讲讲Rocksdb稀疏索引是如何实现的，如下图所示：<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fa/11/fa96b7540736ff7c8ce739fb710e3e11.jpg?wh=1920x2122" /></p>
 <p>我们前面讲过，B+Tree是一个大树，它是一个聚合的完整整体，任何数据的增删改都是在这个整体内进行操作，这就导致了大量的随机读写IO。</p>
 <p>RocksDB LSM则不同，它是由一棵棵小树组成，当我们新数据写入时会在内存中暂存，这样能够获得非常大的写并发处理能力。而当内存中数据积累到一定程度后，会将内存中数据和索引做<strong>顺序写</strong>，落地形成一个数据块。</p>
 <p>这个数据块内保存着一棵小树和具体的数据，新生成的数据块会保存在Level 0 层（最大有几层可配置），Level 0 层会有多个类似的数据块文件。结构如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/2c/d0/2cd33aeac61a17b5d0773289d932eed0.jpg?wh=1920x653" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2c/d0/2cd33aeac61a17b5d0773289d932eed0.jpg?wh=1920x653" /></p>
 <p>每一层的数据块和数据量超过一定程度时，RocksDB合并不同Level的数据，将多个数据块内的数据和索引合并在一起，并推送到Level的下一层。通过这个方式，每一层的数据块个数和数据量就能保持一定的数量，合并后的数据会更紧密、更容易被找到。</p>
 <p>这样的设计，可以让一个Key存在于多个Level或者数据块中，但是最新的常用的数据肯定是在Level最顶部或内存（0～4层，0为顶部）中最新的数据块内。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/bf/39/bf07c18e36e13d0c59211fd9b16e0539.jpg?wh=1920x702" title="bloomfilter 能辅助确认数据的**绝对没有**" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bf/39/bf07c18e36e13d0c59211fd9b16e0539.jpg?wh=1920x702" title="bloomfilter 能辅助确认数据的**绝对没有**" /></p>
 <p>而当我们查询一个key的时候，RocksDB会先查内存。如果没找到，会从Level 0层到下层，每层按生成最新到最老的顺序去查询每层的数据块。同时为了减少IO次数，每个数据块都会有一个BloomFIlter辅助索引，来辅助确认这个数据块中是否<strong>可能有</strong>对应的Key；如果当前数据块没有，那么可以快速去找下一个数据块，直到找到为止。当然，最惨的情况是遍历所有数据块。</p>
 <p>可以看到，这个方式虽然放弃了整体索引的一致性，却换来了更高效的写性能。在读取时通过<strong>遍历所有子树来</strong>查找，减少了写入时对树的合并代价。</p>
 <p>LSM这种方式的数据存储在OLAP数据库中很常用，因为OLAP多数属于<strong>写多读少</strong>，而当我们使用OLAP对外提供数据服务的时候，多数会通过缓存来帮助数据库承受更大的读取压力。</p>
 <h2 id="_1">列存储数据库</h2>
 <p>说到这里，不得不提OLAP数据库和OLTP数据之间的另一个区别。我们常用的关系型数据库，属于行式存储数据库Row-based，表数据结构是什么样，它就会按表结构的字段顺序进行存储；而大数据挖掘使用的数据库普遍使用列式存储（Column-based），原因在于我们用关系数据库保存的多数是实体属性和实体关系，很多查询每一列都是不可或缺的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d8/97/d82f0d03ef589671cc8b716yya303597.jpg?wh=1920x512" />
-<img alt="图片" src="https://static001.geekbang.org/resource/image/83/3b/83a629e1667d0defb1cd5c467e2f993b.jpg?wh=1920x921" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d8/97/d82f0d03ef589671cc8b716yya303597.jpg?wh=1920x512" />
+<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/83/3b/83a629e1667d0defb1cd5c467e2f993b.jpg?wh=1920x921" /></p>
 <p>但是，实时数据分析则相反，很多情况下常用一行表示一个用户或主要实体（聚合根），而列保存这个用户或主要实体是否买过某物、使用过什么App、去过哪里、开什么车、点过什么食品、哪里人等等。</p>
 <p>这样组织出来的数据，做数据挖掘、分析对比很方便，不过也会导致一个表有成百上千个字段，如果用行存储的数据引擎，我们对数据的筛选是一行行进行读取的，会浪费大量的IO读取。</p>
 <p>而列存储引擎可以指定用什么字段读取所需字段的数据，并且这个方式能够充分利用到磁盘顺序读写的性能，大大提高这种列筛选式的查询，并且列方式更好进行数据压缩，在实时计算领域做数据统计分析的时候，表现会更好。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ed/a4/edb943c38d8bbb0e0c37dca9f8da58a4.jpg?wh=4463x2086" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ed/a4/edb943c38d8bbb0e0c37dca9f8da58a4.jpg?wh=4463x2086" /></p>
 <p>到了这里相信你已经发现，使用场景不同，数据底层的实现也需要不同的方式才能换来更好的性能和性价比。随着行业变得更加成熟，这些需求和特点会不断挖掘、总结、合并到我们的底层服务当中，逐渐降低我们的工作难度和工作量。</p>
 <h2 id="htap">HTAP</h2>
 <p>通过前面的讲解，我么可以看到OLAP和OLTP数据库各有特点，并且有不同的发展方向，事实上它们对外提供的数据查询服务都是期望实时快速的，而不同在于如何存储和查找索引。</p>
@@ -14260,8 +14260,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

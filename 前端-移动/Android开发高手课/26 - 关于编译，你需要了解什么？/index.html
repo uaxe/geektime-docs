@@ -6392,7 +6392,7 @@
 <p>但今天我们的重点不是底层的编译原理，而是希望一起讨论Android编译需要解决的问题是什么，目前又遇到了哪些挑战，以及国内外大厂又给出了什么样的解决方案。</p>
 <p><strong>1. Android编译的基础知识</strong></p>
 <p>无论是微信的编译优化，还是Tinker项目，都涉及比较多的编译相关知识，因此我在Android编译方面研究颇多，经验也比较丰富。Android的编译构建流程主要包括代码、资源以及Native Library三部分，整个流程可以参考官方文档的<a href="https://developer.android.com/studio/build/?hl=zh-cn">构建流程图</a>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7e/87/7e66559bb42ce21a538ab34f596c1f87.png?wh=950%2A1068" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7e/87/7e66559bb42ce21a538ab34f596c1f87.png?wh=950%2A1068" /></p>
 <p><a href="https://docs.gradle.org/current/userguide/userguide.html">Gradle</a>是Android官方的编译工具，它也是GitHub上的一个<a href="https://github.com/gradle/gradle">开源项目</a>。从Gradle的<a href="https://gradle.org/releases/">更新日志</a>可以看到，当前这个项目还更新得非常频繁，基本上每一两个月都会有新的版本。对于Gradle，我感觉最痛苦的还是Gradle Plugin的编写，主要是因为Gradle在这方面没有完善的文档，因此一般都只能靠看源码或者<a href="https://fucknmb.com/2017/07/05/%E5%8F%88%E6%8E%8C%E6%8F%A1%E4%BA%86%E4%B8%80%E9%A1%B9%E6%96%B0%E6%8A%80%E8%83%BD-%E6%96%AD%E7%82%B9%E8%B0%83%E8%AF%95Gradle%E6%8F%92%E4%BB%B6/">断点调试</a>的方法。</p>
 <p>但是编译实在太重要了，每个公司的情况又各不相同，必须强行造一套自己的“轮子”。已经开源的项目有Facebook的<a href="https://github.com/facebook/buck">Buck</a>以及Google的<a href="https://github.com/bazelbuild/bazel">Bazel</a>。</p>
 <p>为什么要自己“造轮子”呢？主要有下面几个原因：</p>
@@ -6401,20 +6401,20 @@
 <li><strong>代码组织管理架构</strong>。Facebook和Google的代码管理有一个非常特别的地方，就是整个公司的所有项目都放到同一个仓库里面。因此整个仓库非常庞大，所以他们也不会使用Git。目前Google使用的是<a href="http://www.ruanyifeng.com/blog/2016/07/google-monolithic-source-repository.html">Piper</a>，Facebook是基于<a href="https://www.mercurial-scm.org/">HG</a>修改的，也是一种基于分布式的文件系统。</li>
 <li><strong>极致的性能追求</strong>。Buck和Bazel的性能的确比Gradle更好，内部包含它们的各种编译优化。但是它们或多或少都有一些定制的味道，例如对Maven、JCenter这样的外部依赖支持的也不是太好。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fa/90/fa5da989a8047e935ec15803235ecd90.png?wh=1070%2A356" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fa/90/fa5da989a8047e935ec15803235ecd90.png?wh=1070%2A356" /></p>
 <p>“程序员最痛恨写文档，还有别人不写文档”，所以它们的文档也是比较少的，如果想做二次定制开发会感到很痛苦。如果你想把编译工具切换到Buck和Bazel，需要下很大的决心，而且还需要考虑和其他上下游项目的协作。当然即使我们不去直接使用，它们内部的优化思路也非常值得我们学习和参考。</p>
 <p>Gradle、Buck、Bazel都是以更快的编译速度、更强大的代码优化为目标，我们下面一起来看看它们做了哪些努力。</p>
 <p><strong>2. 编译速度</strong></p>
 <p>回想一下我们的Android开发生涯，在编译这件事情上面究竟浪费了多少时间和生命。正如前面我所说，编译速度对团队效率非常重要。</p>
 <p>关于编译速度，我们最关心的可能还是编译Debug包的速度，尤其是<strong>增量编译</strong>（incremental build）的速度，希望可以做到更加快速的调试。正如下图所示，我们每次代码验证都要经过编译和安装两个步骤。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/04/56/04a94858fd23dc6d1ccce64f400c2656.png?wh=1678%2A660" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/04/56/04a94858fd23dc6d1ccce64f400c2656.png?wh=1678%2A660" /></p>
 <ul>
 <li><strong>编译时间</strong>。把Java或者Kotlin代码编译为“.class“文件，然后通过dx编译为Dex文件。对于增量编译，我们希望编译尽可能少的代码和资源，最理想情况是只编译变化的部分。但是由于代码之间的依赖，大部分情况这并不可行。这个时候我们只能退而求其次，希望编译更少的模块。<a href="https://developer.android.com/studio/build/dependencies">Android Plugin 3.0</a>使用Implementation代替Compile，正是为了优化依赖关系。</li>
 <li><strong>安装时间</strong>。我们要先经过签名校验，校验成功后会有一大堆的文件拷贝工作，例如APK文件、Library文件、Dex文件等。之后我们还需要编译Odex文件，这个过程特别是在Android 5.0和6.0会非常耗时。对于增量编译，最好的优化是直接应用新的代码，无需重新安装新的APK。</li>
 </ul>
 <p>对于增量编译，我先来讲讲Gradle的官方方案<a href="https://developer.android.com/studio/run/?hl=zh-cn">Instant Run</a>。在Android Plugin 2.3之前，它使用的Multidex实现。在Android Plugin 2.3之后，它使用Android 5.0新增的Split APK机制。</p>
 <p>如下图所示，资源和Manifest都放在Base APK中， 在Base APK中代码只有Instant Run框架，应用的本身的代码都在Split APK中。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/11/a5/118f836da894cdc9ff16675293e44aa5.png?wh=1920%2A719" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/11/a5/118f836da894cdc9ff16675293e44aa5.png?wh=1920%2A719" /></p>
 <p>Instant Run有三种模式，如果是热交换和温交换，我们都无需重新安装新的Split APK，它们的区别在于是否重启Activity。对于冷交换，我们需要通过<code>adb install-multiple -r -t</code>重新安装改变的Split APK，应用也需要重启。</p>
 <p>虽然无论哪一种模式，我们都不需要重新安装Base APK。这让Instant Run看起来是不是很不错，但是在大型项目里面，它的性能依然非常糟糕，主要原因是：</p>
 <ul>
@@ -6437,7 +6437,7 @@
 <p>事实上，它们的方案在大部分情况比Instant Run更快，那是因为牺牲了正确性。也就是说它们为了追求更快的速度，直接忽略了Annotation和常量改变可能带来错误的编译产物。Instant Run作为官方方案，它优先保证的是100%的正确性。</p>
 <p><strong>当然Google的人也发现了Instant Run的种种问题，在Android Studio 3.5之后，对于Android 8.0以后的设备将会使用新的方案“<a href="https://androidstudio.googleblog.com/2019/01/android-studio-35-canary-1-available.html">Apply Changes</a>”代替Instant Run。目前我还没找到关于这套方案更多的资料，不过我认为应该是抛弃了Split APK机制</strong>。</p>
 <p>一直以来，我心目中都有一套理想的编译方案，这套方案安装的Base APK依然只是一个壳APK，真正的业务代码放到Assets的ClassesN.dex中。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f0/e4/f02eeaf46a8a4c5a7f82544ca208ebe4.png?wh=1920%2A927" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f0/e4/f02eeaf46a8a4c5a7f82544ca208ebe4.png?wh=1920%2A927" /></p>
 <ul>
 <li><strong>无需安装</strong>。依然使用类似Tinker热修复的方法，每次只把修改以及依赖的类插入到pathclassloader的最前方就可以，不熟悉的同学可以参考<a href="https://mp.weixin.qq.com/s/-NmkSwZu83HAmzKPawdTqQ">《微信Android热补丁实践演进之路》</a>中的Qzone方案。</li>
 <li><strong>Oatmeal</strong>。为了解决首次运行时Assets中ClassesN.dex的Odex耗时问题，我们可以使用“安装包优化“中讲过的ReDex中的黑科技：Oatmeal。它可以在100毫秒以内生成一个完全解释执行的Odex文件。</li>
@@ -6453,26 +6453,26 @@
 </ul>
 <p>当然最近几个Android Studio版本，Google也做了大量的其他优化，例如使用<a href="https://developer.android.com/studio/command-line/aapt2">AAPT2</a>替代了AAPT来编译Android资源。AAPT2实现了资源的增量编译，它将资源的编译拆分成Compile和Link两个步骤。前者资源文件以二进制形式编译Flat格式，后者合并所有的文件再打包。</p>
 <p>除了AAPT2，Google还引入了d8和R8，下面分别是Google提供的一些测试数据。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ed/16/ed5dd1797ea15e58c4bbe5a52008bd16.png?wh=1920%2A916" />
-<img alt="" src="https://static001.geekbang.org/resource/image/cd/2a/cd479426df64c979cda4fe35578c9f2a.png?wh=1920%2A636" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ed/16/ed5dd1797ea15e58c4bbe5a52008bd16.png?wh=1920%2A916" />
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cd/2a/cd479426df64c979cda4fe35578c9f2a.png?wh=1920%2A636" /></p>
 <p>那什么是d8和R8呢？除了编译速度的优化，它们还有哪些其他的作用？</p>
 <p><strong>3. 代码优化</strong></p>
 <p>对于Debug包编译，我们更关心速度。但是对于Release包来说，代码的优化更加重要，因为我们会更加在意应用的性能。</p>
 <p>下面我就分别讲讲ProGuard、d8、R8和ReDex这四种我们可能会用到的代码优化工具。</p>
 <p><strong>ProGuard</strong></p>
 <p>在微信Release包12分钟的编译过程里，单独ProGuard就需要花费8分钟。尽管ProGuard真的很慢，但是基本每个项目都会使用到它。加入了ProGuard之后，应用的构建过程流程如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b4/f3/b4bddb5e8cf4666b3f38f046998f33f3.png?wh=1276%2A228" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b4/f3/b4bddb5e8cf4666b3f38f046998f33f3.png?wh=1276%2A228" /></p>
 <p>ProGuard主要有混淆、裁剪、优化这三大功能，它的整个处理流程是：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/03/e4/031014e00f8568c5eac9256782005ee4.png?wh=1278%2A342" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/03/e4/031014e00f8568c5eac9256782005ee4.png?wh=1278%2A342" /></p>
 <p>其中优化包括内联、修饰符、合并类和方法等30多种，具体介绍与使用方法你可以参考<a href="https://www.guardsquare.com/en/products/proguard/manual/usage/optimizations">官方文档</a>。</p>
 <p><strong>d8</strong></p>
 <p>Android Studio 3.0推出了<a href="https://developer.android.com/studio/command-line/d8">d8</a>，并在3.1正式成为默认工具。它的作用是将“.class”文件编译为Dex文件，取代之前的dx工具。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/06/c3/0692ef05be5dac0803819274f6c6b3c3.png?wh=1284%2A230" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/06/c3/0692ef05be5dac0803819274f6c6b3c3.png?wh=1284%2A230" /></p>
 <p>d8除了更快的编译速度之外，还有一个优化是减少生成的Dex大小。根据Google的测试结果，大约会有3%～5%的优化。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a4/ee/a410c50d547c49c37640632c81ec2dee.png?wh=1358%2A842" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a4/ee/a410c50d547c49c37640632c81ec2dee.png?wh=1358%2A842" /></p>
 <p><strong>R8</strong></p>
 <p>R8在Android Studio 3.1中引入，它的志向更加高远，它的目标是取代ProGuard和d8。我们可以直接使用R8把“.class”文件变成Dex。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9d/ac/9de1ce2e0d821dabcdabf82844601eac.png?wh=1272%2A226" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9d/ac/9de1ce2e0d821dabcdabf82844601eac.png?wh=1272%2A226" /></p>
 <p>同时，R8还支持ProGuard中混淆、裁剪、优化这三大功能。由于目前R8依然处于实验阶段，网上的介绍资料并不多，你可以参考下面这些资料：</p>
 <ul>
 <li>ProGuard和R8对比：<a href="https://www.guardsquare.com/en/blog/proguard-and-r8">ProGuard and R8: a comparison of optimizers</a>。</li>
@@ -6498,7 +6498,7 @@
 </ul>
 <h2 id="_2">持续交付</h2>
 <p>Gradle、Buck、Bazel它们代表的都是狭义上的编译，我认为广义的编译应该包括打包构建、Code Review、代码工程管理、代码扫描等流程，也就是业界最近经常提起的持续集成。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/02/a9/020fc61a0096102fa1b05be2f30b02a9.png?wh=1920%2A804" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/02/a9/020fc61a0096102fa1b05be2f30b02a9.png?wh=1920%2A804" /></p>
 <p>目前最常用的持续集成工具有Jenkins、GitLab CI、Travis CI等，GitHub也有提供自己的持续集成服务。每个大公司都有自己的持续集成方案，例如腾讯的RDM、阿里的摩天轮、大众点评的<a href="https://tech.meituan.com/2018/07/12/mci.html">MCI</a>等。</p>
 <p>下面我来简单讲一下我对持续集成的一些经验和看法：</p>
 <ul>
@@ -6635,8 +6635,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

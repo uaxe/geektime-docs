@@ -14616,7 +14616,7 @@
 <p>从执行计划中，我们可以发现使用到了索引，那为什么DBA还要求将create_time这一列加入到组合索引中呢？这个问题我们在<a href="https://time.geekbang.org/column/article/113440">第33讲</a>中提到过，相信你也已经知道答案了。通过故事我们可以发现索引知识在平时开发时的重要性，然而它又很容易被我们忽略，所以今天我们就来详细聊一聊索引。</p>
 <h2 id="mysql">MySQL索引存储结构</h2>
 <p>索引是优化数据库查询最重要的方式之一，它是在MySQL的存储引擎层中实现的，所以每一种存储引擎对应的索引不一定相同。我们可以通过下面这张表格，看看不同的存储引擎分别支持哪种索引类型：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f6/1b/f6dc2c083b30377628b3699322f6611b.jpg?wh=1334%2A342" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f6/1b/f6dc2c083b30377628b3699322f6611b.jpg?wh=1334%2A342" /></p>
 <p>B+Tree索引和Hash索引是我们比较常用的两个索引数据存储结构，B+Tree索引是通过B+树实现的，是有序排列存储，所以在排序和范围查找方面都比较有优势。如果你对B+Tree索引不够了解，可以通过该<a href="https://zhuanlan.zhihu.com/p/27700617">链接</a>了解下它的数据结构原理。</p>
 <p>Hash索引相对简单些，只有Memory存储引擎支持Hash索引。Hash索引适合key-value键值对查询，无论表数据多大，查询数据的复杂度都是O(1)，且直接通过Hash索引查询的性能比其它索引都要优越。</p>
 <p>在创建表时，无论使用InnoDB还是MyISAM存储引擎，默认都会创建一个主键索引，而创建的主键索引默认使用的是B+Tree索引。不过虽然这两个存储引擎都支持B+Tree索引，但它们在具体的数据存储结构方面却有所不同。</p>
@@ -14631,11 +14631,11 @@
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>) CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;
 </code></pre></div>
 <p>然后新增了以下几行数据，如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/52/c8/524d7510e8c3ec264f274798d72b99c8.jpg?wh=1166%2A406" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/52/c8/524d7510e8c3ec264f274798d72b99c8.jpg?wh=1166%2A406" /></p>
 <p>如果我们使用的是MyISAM存储引擎，由于MyISAM使用的是辅助索引，索引中每一个叶子节点仅仅记录的是每行数据的物理地址，即行指针，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ea/43/eacb96b876a4db6f3f020bd1efd39243.jpg?wh=2352%2A962" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ea/43/eacb96b876a4db6f3f020bd1efd39243.jpg?wh=2352%2A962" /></p>
 <p>如果我们使用的是InnoDB存储引擎，由于InnoDB使用的是聚簇索引，聚簇索引中的叶子节点则记录了主键值、事务id、用于事务和MVCC的回流指针以及所有的剩余列，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9a/42/9a98b5abb7ff82530b02c6aeb15b6242.jpg?wh=2326%2A1012" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9a/42/9a98b5abb7ff82530b02c6aeb15b6242.jpg?wh=2326%2A1012" /></p>
 <p>基于上面的图示，如果我们需要根据商品编码查询商品，我们就需要将商品编码serial_no列作为一个索引列。此时创建的索引是一个辅助索引，与MyISAM存储引擎的主键索引的存储方式是一致的，但叶子节点存储的就不是行指针了，而是主键值，并以此来作为指向行的指针。这样的好处就是当行发生移动或者数据分裂时，不用再维护索引的变更。</p>
 <p>如果我们使用主键索引查询商品，则会按照B+树的索引找到对应的叶子节点，直接获取到行数据：</p>
 <blockquote>
@@ -14648,7 +14648,7 @@
 <p>从辅助索引中查询得到记录，而不需要通过聚簇索引查询获得，MySQL中将其称为覆盖索引。使用覆盖索引的好处很明显，我们不需要查询出包含整行记录的所有信息，因此可以减少大量的I/O操作。</p>
 <p>通常在InnoDB中，除了查询部分字段可以使用覆盖索引来优化查询性能之外，统计数量也会用到。例如，在<a href="https://time.geekbang.org/column/article/113440">第32讲</a>我们讲 SELECT COUNT(*)时，如果不存在辅助索引，此时会通过查询聚簇索引来统计行数，如果此时正好存在一个辅助索引，则会通过查询辅助索引来统计行数，减少I/O操作。</p>
 <p>通过EXPLAIN，我们可以看到 InnoDB 存储引擎使用了idx_order索引列来统计行数，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c6/6f/c689b2fd284c19fd2049b1f73091226f.jpg?wh=2588%2A370" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c6/6f/c689b2fd284c19fd2049b1f73091226f.jpg?wh=2588%2A370" /></p>
 <h2 id="2">2.自增字段作主键优化查询</h2>
 <p>上面我们讲了 InnoDB 创建主键索引默认为聚簇索引，数据被存放在了B+树的叶子节点上。也就是说，同一个叶子节点内的各个数据是按主键顺序存放的，因此，每当有一条新的数据插入时，数据库会根据主键将其插入到对应的叶子节点中。</p>
 <p>如果我们使用自增主键，那么每次插入的新数据就会按顺序添加到当前索引节点的位置，不需要移动已有的数据，当页面写满，就会自动开辟一个新页面。因为不需要重新移动数据，因此这种插入数据的方法效率非常高。</p>
@@ -14662,14 +14662,14 @@
 <h2 id="4">4.防止索引失效</h2>
 <p>当我们习惯建立索引来实现查询SQL的性能优化后，是不是就万事大吉了呢？当然不是，有时候我们看似使用到了索引，但实际上并没有被优化器选择使用。</p>
 <p>对于Hash索引实现的列，如果使用到范围查询，那么该索引将无法被优化器使用到。也就是说Memory引擎实现的Hash索引只有在“=”的查询条件下，索引才会生效。我们将order表设置为Memory存储引擎，分析查询条件为id&lt;10的SQL，可以发现没有使用到索引。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8e/d0/8eaac54829f3c99337e481d833a93dd0.jpg?wh=1986%2A310" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8e/d0/8eaac54829f3c99337e481d833a93dd0.jpg?wh=1986%2A310" /></p>
 <p>如果是以%开头的LIKE查询将无法利用节点查询数据：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0b/bb/0b20dbd8274be269779989b3df546dbb.jpg?wh=1932%2A376" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0b/bb/0b20dbd8274be269779989b3df546dbb.jpg?wh=1932%2A376" /></p>
 <p>当我们在使用复合索引时，需要使用索引中的最左边的列进行查询，才能使用到复合索引。例如我们在order表中建立一个复合索引idx_user_order_status(<code>order_no</code>, <code>status</code>, <code>user_id</code>)，如果我们使用order_no、order_no+status、order_no+status+user_id以及order_no+user_id组合查询，则能利用到索引；而如果我们用status、status+user_id查询，将无法使用到索引，这也是我们经常听过的最左匹配原则。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4c/f0/4cebb097ea9a1d2db2c3cfc98bf611f0.jpg?wh=2122%2A302" /></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/18/65/18b7427c6d7e65821284fe90ec461565.jpg?wh=2202%2A302" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4c/f0/4cebb097ea9a1d2db2c3cfc98bf611f0.jpg?wh=2122%2A302" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/18/65/18b7427c6d7e65821284fe90ec461565.jpg?wh=2202%2A302" /></p>
 <p>如果查询条件中使用or，且or的前后条件中有一个列没有索引，那么涉及的索引都不会被使用到。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2b/35/2b8f194d32bf2387264d50258c1f2235.jpg?wh=2236%2A308" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2b/35/2b8f194d32bf2387264d50258c1f2235.jpg?wh=2236%2A308" /></p>
 <p>所以，你懂了吗？作为一名开发人员，如果没有熟悉MySQL，特别是MySQL索引的基础知识，很多时候都将被DBA批评到怀疑人生。</p>
 <h2 id="_1">总结</h2>
 <p>在大多数情况下，我们习惯使用默认的 InnoDB 作为表存储引擎。在使用InnoDB作为存储引擎时，创建的索引默认为B+树数据结构，如果是主键索引，则属于聚簇索引，非主键索引则属于辅助索引。基于主键查询可以直接获取到行信息，而基于辅助索引作为查询条件，则需要进行回表，然后再通过主键索引获取到数据。</p>
@@ -14681,7 +14681,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>select * from order_detail where order_id between 5000 and 10000；
 </code></pre></div>
 <p>期待在留言区看到你的答案。也欢迎你点击“请朋友读”，把今天的内容分享给身边的朋友，邀请他一起讨论。</p>
-<p><img alt="unpreview" src="https://static001.geekbang.org/resource/image/bb/67/bbe343640d6b708832c4133ec53ed967.jpg?wh=1110%2A659" /></p>
+<p><img alt="unpreview" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bb/67/bbe343640d6b708832c4133ec53ed967.jpg?wh=1110%2A659" /></p>
 <div><strong>精选留言（15）</strong></div>
 <ul>
 <li><span>QQ怪</span> 👍（79） 💬（6）<p>回答老师问题：
@@ -14806,8 +14806,6 @@ force index </p>2019-09-16</li><br/><li><span>考休</span> 👍（6） 💬（2
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

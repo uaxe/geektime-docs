@@ -14625,7 +14625,7 @@
 <p>而且考虑复用性，这里只是写了一个控制器，那如果有多个控制器呢，我们难道要为每个控制器都写上这么一段超时代码吗？那就非常冗余了。</p>
 <p>所以，能不能设计一个机制，<strong>将这些非业务逻辑代码抽象出来，封装好，提供接口给控制器使用</strong>。这个机制的实现，就是我们今天要讲的中间件。</p>
 <p>怎么实现这个中间件呢？我们再观察一下刚才的代码找找思路。</p>
-<p>代码的组织顺序很清晰，先预处理请求，再处理业务逻辑，最后处理返回值，你发现没有这种顺序，其实很符合设计模式中的装饰器模式。装饰器模式，顾名思义，就是在核心处理模块的外层增加一个又一个的装饰，类似洋葱。<img alt="" src="https://static001.geekbang.org/resource/image/f9/2c/f94ccc78af2ca491afe1591e674e3f2c.jpg?wh=1920x912" /></p>
+<p>代码的组织顺序很清晰，先预处理请求，再处理业务逻辑，最后处理返回值，你发现没有这种顺序，其实很符合设计模式中的装饰器模式。装饰器模式，顾名思义，就是在核心处理模块的外层增加一个又一个的装饰，类似洋葱。<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f9/2c/f94ccc78af2ca491afe1591e674e3f2c.jpg?wh=1920x912" /></p>
 <p>现在，抽象出中间件的思路是不是就很清晰了，把核心业务逻辑先封装起来，然后一层一层添加装饰，最终让所有请求正序一层层通过装饰器，进入核心处理模块，再反序退出装饰器。原理就是这么简单，不难理解，我们接着看该如何实现。</p>
 <h2 id="_1">使用函数嵌套方式实现中间件</h2>
 <p>装饰器模式是一层一层的，所以具体实现其实也不难想到，就是使用函数嵌套。</p>
@@ -14690,7 +14690,7 @@
 <p>所以，我们要对刚才实现的简单中间件代码做一些改进。怎么做呢？</p>
 <h2 id="pipeline">使用 pipeline 思想改造中间件</h2>
 <p>一层层嵌套不好用，如果我们将每个核心控制器所需要的中间件，使用一个数组链接（Chain）起来，形成一条流水线（Pipeline），就能完美解决这两个问题了。</p>
-<p>请求流的流向如下图所示：<img alt="" src="https://static001.geekbang.org/resource/image/e1/2a/e1aa5937627e46c8b2b21e45426f342a.jpg?wh=1920x915" /></p>
+<p>请求流的流向如下图所示：<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e1/2a/e1aa5937627e46c8b2b21e45426f342a.jpg?wh=1920x915" /></p>
 <p>这个Pipeline模型和前面的洋葱模型不一样的点在于，<strong>Middleware不再以下一层的ControllerHandler为参数了，它只需要返回有自身中间件逻辑的ControllerHandler</strong>。</p>
 <p>也就是在框架文件夹中的timeout.go中，我们将Middleware的形式从刚才的：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kd">func</span><span class="w"> </span><span class="nx">TimeoutHandler</span><span class="p">(</span><span class="nx">fun</span><span class="w"> </span><span class="nx">ControllerHandler</span><span class="p">,</span><span class="w"> </span><span class="nx">d</span><span class="w"> </span><span class="nx">time</span><span class="p">.</span><span class="nx">Duration</span><span class="p">)</span><span class="w"> </span><span class="nx">ControllerHandler</span><span class="w"> </span><span class="p">{</span>
@@ -14710,7 +14710,7 @@
 <a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="p">}</span>
 </code></pre></div>
 <p>但是在中间件注册的回调函数中，如何调用下一个ControllerHandler呢？在回调函数中，只有framework.Context 这个数据结构作为参数。</p>
-<p>所以就需要我们在Context这个数据结构中想一些办法了。回顾下目前有的数据结构：Core、Context、Tree、Node、Group。<img alt="" src="https://static001.geekbang.org/resource/image/8e/7b/8ef582e74e9c5ca1c0f54e7c1d75a67b.jpg?wh=1920x1277" /></p>
+<p>所以就需要我们在Context这个数据结构中想一些办法了。回顾下目前有的数据结构：Core、Context、Tree、Node、Group。<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8e/7b/8ef582e74e9c5ca1c0f54e7c1d75a67b.jpg?wh=1920x1277" /></p>
 <p>它们基本上都是以 Core 为中心，在 Core 中设置路由 router，实现了 Tree 结构，在 Tree 结构中包含路由节点 node；在注册路由的时候，将对应的业务核心处理逻辑 handler ，放在 node 结构的 handler 属性中。</p>
 <p>而 Core 中的 ServeHttp 方法会创建 Context 数据结构，然后ServeHttp方法再根据 Request-URI 查找指定 node，并且将 Context 结构和 node 中的控制器 ControllerHandler 结合起来执行具体的业务逻辑。</p>
 <p>结构都梳理清楚了，怎么改造成流水线呢？</p>
@@ -14719,7 +14719,7 @@
 <p>对应到代码上，我们先搞清楚使用链路的方式，再看如何注册和构造链路。</p>
 <h3 id="_2">如何使用控制器链路</h3>
 <p>首先，我们研究下如何使用这个控制器链路，即图中右边部分的改造。
-<img alt="" src="https://static001.geekbang.org/resource/image/49/c8/49c2d50b26d48e338c3acd2e1374f4c8.jpg?wh=1920x1277" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/49/c8/49c2d50b26d48e338c3acd2e1374f4c8.jpg?wh=1920x1277" /></p>
 <p>第一步，我们需要修改路由节点node。</p>
 <p>在node节点中将原先的Handler，替换为控制器链路Handlers。这样在寻找路由节点的时候，就能找到对应的控制器链路了。修改框架文件夹中存放trie树的trie.go文件：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1">// 代表节点</span>
@@ -14758,7 +14758,7 @@
 <ul>
 <li>第一个是在此次请求处理的入口处，即Core的ServeHttp；</li>
 <li>第二个是在每个中间件的逻辑代码中，用于调用下个中间件。
-<img alt="" src="https://static001.geekbang.org/resource/image/73/3c/73a80752cf6d94b90febd2e23e80bc3c.jpg?wh=1920x915" /></li>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/73/3c/73a80752cf6d94b90febd2e23e80bc3c.jpg?wh=1920x915" /></li>
 </ul>
 <p>这里要注意，index下标表示当前调用Next要执行的控制器序列，它的<strong>初始值应该为-1，每次调用都会自增1</strong>，这样才能保证第一次调用的时候index为0，定位到控制器链条的下标为0的控制器，即第一个控制器。</p>
 <p>在框架文件夹context.go的初始化Context函数中，代码如下：</p>
@@ -14817,7 +14817,7 @@
 <a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a><span class="p">}</span>
 </code></pre></div>
 <h3 id="_3">如何注册控制器链路</h3>
-<p>如何使用控制器链路，我们就讲完了，再看控制器链路如何注册，就是之前UML图的左边部分。<img alt="" src="https://static001.geekbang.org/resource/image/3c/b5/3c2012fcfcabcfc0159e4ecec2fdb8b5.jpg?wh=1920x1277" /></p>
+<p>如何使用控制器链路，我们就讲完了，再看控制器链路如何注册，就是之前UML图的左边部分。<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3c/b5/3c2012fcfcabcfc0159e4ecec2fdb8b5.jpg?wh=1920x1277" /></p>
 <p>很明显，现有的函数没有包含注册中间件逻辑，所以我们需要为Group和Core两个结构增加注册中间件入口，要设计两个地方：</p>
 <ul>
 <li>Core和Group单独设计一个Use函数，为其数据结构负责的路由批量设置中间件</li>
@@ -14921,7 +14921,7 @@
 <a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="p">}</span>
 </code></pre></div>
 <p>到这里，我们使用 pipeline 思想对中间件的改造就完成了, 最终的UML类图如下：
-<img alt="" src="https://static001.geekbang.org/resource/image/7f/ab/7f26e60d79ec987dba10a1b5045aa2ab.jpg?wh=1920x1277" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7f/ab/7f26e60d79ec987dba10a1b5045aa2ab.jpg?wh=1920x1277" /></p>
 <p>让我们简要回顾下改造过程。</p>
 <p>第一步使用控制器链路，我们<strong>改造了node和Context两个数据结构</strong>。为node增加了handlers，存放这个路由注册的所有中间件；Context也增加了handlers，在Core.ServeHttp的函数中，创建Context结构，寻找到请求对应的路由节点，然后把路由节点的handlers数组，复制到Context中的handlers。</p>
 <p>为了实现真正的链路调用，需要在框架的<strong>两个地方调用Context.Next() 方法</strong>，一个是启动业务逻辑的地方，一个是每个中间件的调用。</p>
@@ -14930,7 +14930,7 @@
 <p>我们现在已经将中间件机制搭建并运行起来了， 但是具体需要实现哪些中间件呢？这要根据不同需求进行不同的研发，是个长期话题。</p>
 <p>这里我们演示一个最基本的中间件：Recovery。</p>
 <p>中间件那么多，比如超时中间件、统计中间件、日志中间件，为什么我说Recovery是最基本的呢？给出我的想法之前，你可以先思考这个问题：在编写业务核心逻辑的时候，如果出现了一个panic，而且在业务核心逻辑函数中未捕获处理，会发生什么？</p>
-<p>我们还是基于第一节课讲的net/http的主流程逻辑来思考，关键结论有一点是，<strong>每个HTTP连接都会开启一个Goroutine为其服务</strong>，所以很明显， net/http 的进程模型是单进程、多协程。<img alt="" src="https://static001.geekbang.org/resource/image/0f/ee/0fa86b64b6d1b1e96560420243ec6aee.jpg?wh=1920x1133" /></p>
+<p>我们还是基于第一节课讲的net/http的主流程逻辑来思考，关键结论有一点是，<strong>每个HTTP连接都会开启一个Goroutine为其服务</strong>，所以很明显， net/http 的进程模型是单进程、多协程。<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0f/ee/0fa86b64b6d1b1e96560420243ec6aee.jpg?wh=1920x1133" /></p>
 <p>在Golang的这种模型中，每个协程是独立且平等的，即使是创建子协程的父协程，在Goroutine 中也无法管理子协程。所以，<strong>每个协程需要自己保证不会外抛panic</strong>，一旦外抛panic了，整个进程就认为出现异常，会终止进程。</p>
 <p>这一点搞清楚了，再看Recovery为什么必备就很简单。在net/http处理业务逻辑的协程中，要捕获在自己这个协程中抛出的panic，就必须自己实现 Recovery 机制。</p>
 <p>而Recovery中间件就是用来为每个协程增加Recovery机制的。我们在框架的middleware文件夹中增加recovery.go存放这个中间件：</p>
@@ -14955,7 +14955,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="nx">core</span><span class="p">.</span><span class="nx">Use</span><span class="p">(</span><span class="nx">middleware</span><span class="p">.</span><span class="nx">Recovery</span><span class="p">())</span>
 </code></pre></div>
 <p>今天所有代码的目录结构截图，我也贴在这里供你对比检查，代码放在GitHub上的 <a href="https://github.com/gohade/coredemo/tree/geekbang/04/framework">04分支</a>里。
-<img alt="" src="https://static001.geekbang.org/resource/image/b8/yy/b8a053e4650ec9560754383d0f3974yy.png?wh=784x1274" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b8/yy/b8a053e4650ec9560754383d0f3974yy.png?wh=784x1274" /></p>
 <h2 id="_4">小结</h2>
 <p>今天我们最终为自己的框架增加了中间件机制。中间件机制的本质就是装饰器模型，对核心的逻辑函数进行装饰、封装，所以一开始我们就使用函数嵌套的方式实现了中间件机制。</p>
 <p>但是实现之后，我们发现函数嵌套的弊端：一是不优雅，二是无法批量设置中间件。所以我们<strong>引入了pipeline的思想，将所有中间件做成一个链条，通过这个链条的调用，来实现中间件机制</strong>。</p>
@@ -15097,8 +15097,6 @@ copy(allHandlers, append(c.middlewares, handlers...))</p>2022-12-04</li><br/><li
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

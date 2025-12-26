@@ -14661,9 +14661,9 @@
 <h3 id="_2">可重定位目标文件的基本结构</h3>
 <p>回顾我在 <a href="https://time.geekbang.org/column/article/487944">25 讲</a> 中“ELF 文件类型”这一小节里介绍的内容，你能够知道，Linux 平台上的 .o 目标文件实际上是一种被称为“可重定位文件”的 ELF 文件类型。因此，它的内部也同样遵循着与 ELF 二进制可执行文件类似的布局方式。只是相较于后者，它不包含有与动态视图相关的多种 Segment 与 Program 头部。因此，各种不同类型的 Section 便成为了用于描述它所有特征的基本组成结构。</p>
 <p>这里，我将目标文件中的几个与静态链接过程密切相关的 Section 整理在了表格中，你可以先对它们的基本功能有一个大致印象。我会在接下来的内容中，带你仔细观察它们是如何在链接过程中发挥重要作用的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9f/cc/9fe80e68cfe78beb4b6efc5cfa9af4cc.jpg?wh=1920x1069" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9f/cc/9fe80e68cfe78beb4b6efc5cfa9af4cc.jpg?wh=1920x1069" /></p>
 <p>每一个可重定位目标文件内都存在有一个符号表，它包含了该文件对应源码内使用到的所有全局变量和函数信息。而通过使用名为 “nm” 的命令，我们可以查看这些文件中的符号表。这里，通过对 main.o 与 sum.o 这两个目标文件使用该命令，你会得到如下图所示的输出结果：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/63/d3/639d95be36f2d19ffa01b20875db16d3.png?wh=1604x298" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/63/d3/639d95be36f2d19ffa01b20875db16d3.png?wh=1604x298" /></p>
 <p>可以看到，不带有任何参数的 nm 命令会打印出有关符号的三部分信息（对应于图片中的三列）：</p>
 <ul>
 <li>第一列的数字值为符号在对应 Section 中的偏移位置；</li>
@@ -14688,17 +14688,17 @@
 <p>重定位的一个主要目的在于，将之前各个独立编译单元（目标文件）内，所有对外部符号的引用地址进行修正。比如在我们之前的例子中，main.o 文件内便存在有两个外部符号引用 sharedArr 与 sum。编译器在编译该文件时，由于尚不清楚这些符号定义的真实所在位置，因此会使用默认值（比如 0）来作为它们在机器代码中的地址占位符。</p>
 <p>当然，除了对引用地址的修正外，可以看到，同样是在 main.o 文件内，array 变量的具体值实际上也依赖于外部符号 sharedArr 的确切所在地址。而且，已初始化的全局变量，其初始值被存放在了 .data 中，因此，这个位于该 Section 中的 array 变量的初始值，也需要被一同修改。</p>
 <p>到这里，我们能够得知，链接器的另一个重要作用便是在组合各个目标文件的同时，对我们上面提到的这些值进行修正。而这一过程的正确执行，便依赖于我在前面介绍的两个特殊 Section，即 .rela.data 与 .rela.text。通过为 readelf 命令添加 “-r” 参数，我们可以查看 main.o 文件内，这两个 Section 的内容，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b4/f8/b4bcf85eae4edff6eb97c260c15545f8.png?wh=1626x464" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b4/f8/b4bcf85eae4edff6eb97c260c15545f8.png?wh=1626x464" /></p>
 <p>这两个特殊的 Section 通常也被称为“重定位表”，在它们的内部，以一行行表项的形式分别保存着链接器在重定位时需要在 .text 与 .data 中修改的具体位置和方式。这里每个表项中第一列的 Offset 属性，表明该重定向目标在对应 Section 中的偏移；Type 属性表明了重定位类型，即链接器在处理该重定位表项时，需要使用的特定方式；Sym.Value 属性为当前重定位符号的值；最后的 “Sym. Name + Addend” 属性为符号的名称，外加在计算该符号地址时需要被修正的量。</p>
 <p>通过使用 objdump 命令，我们可以在 main.o 文件内找到上述重定向目标在各个 Section 中的位置，具体如下图所示（这里，我用红色的框将这些位置标注了出来）：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b3/17/b3ac03dd8382ce12a7f3e5605745aa17.png?wh=1690x1110" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b3/17/b3ac03dd8382ce12a7f3e5605745aa17.png?wh=1690x1110" /></p>
 <p>总的来看，上面我提到的重定位类型，在 X86-64 体系下可以被分为 6 种，如下表所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8e/bd/8eed9bba0e0977ab5b212c011e5784bd.jpg?wh=1920x842" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8e/bd/8eed9bba0e0977ab5b212c011e5784bd.jpg?wh=1920x842" /></p>
 <p>在本例中，我们需要特别关注的是其中的 R_X86_64_PC32、R_X86_64_PLT32 与 R_X86_64_64。表格中的最后一列指明了链接器在更正地址时需要遵循的计算方式。这里，S 表示符号的实际地址；A 表示重定位条目中符号对应的 Addend（在 i386 中，由于 ELF32 的特殊要求，这个值被直接存放在被修改的内存位置上）；P 表示被修改的具体位置；L 表示在 PLT 中该符号的入口地址（PLT 通常用于实现函数的间接调用，我会在第 29 讲中介绍与它相关的内容）。</p>
 <p>接下来，我们以 .rela.text 中的第一个重定位条目为例，来看看链接器在处理重定位时的具体流程。根据标注的类型 R_X86_64_PC32，我们能够知道更正值的具体计算方式为 “S + A - P”。其中，S 表示符号 array 在输出文件中的实际地址，这里我们可以通过 nm 命令来查看：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1b/93/1be3a781276fa45d2f06dfb9a948ea93.png?wh=1340x100" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1b/93/1be3a781276fa45d2f06dfb9a948ea93.png?wh=1340x100" /></p>
 <p>可以看到，这个地址为十六进制值 0x601020。紧接着，A 表示符号 array 在重定位条目中的 Addend，即 -4。最后，P 表示当前重定向条目在输入文件中的修改位置。同样地，使用 objdump 命令，我们可以得到这个值。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/79/8c/79f7a99821bfc6c35e8ce64ae7c8218c.png?wh=1920x525" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/79/8c/79f7a99821bfc6c35e8ce64ae7c8218c.png?wh=1920x525" /></p>
 <p>上图中的红框标注了该行机器指令的起始位置，在此基础之上，再向“右侧”移动 3 个字节，我们便可得到重定向的修改位置，即 0x400541。最后，按照公式 “S + A - P” 进行计算，即 数学公式: $0x601020 - 0x4 - 0x400541$，链接器便可得到最终的修改值 0x200adb。通过与上图中使用绿色框标注的内容进行比对，我们可以验证这个结果。这里需要注意的是，图中的“左侧”为低地址位（LSB），因此其字节顺序与我们的结果相反。</p>
 <p>通过类似的方式，链接器可以完成对所有重定位条目的处理过程。而在此之后，输出的可执行文件中，所有符号也都有了正确的初始值和引用地址。随后，程序便可以被操作系统加载进内存，正常运行。</p>
 <h2 id="_5">总结</h2>
@@ -14847,8 +14847,6 @@ gcc -c main.c -o main.o     # 生成目标文件 main.o；
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

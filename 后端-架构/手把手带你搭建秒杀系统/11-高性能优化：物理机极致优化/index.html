@@ -13832,7 +13832,7 @@
 <p>以上Redis的绑核操作可以通过taskset来完成，而Nginx的绑核则可以通过Nginx的配置来直接绑定。那么接下来我们就一起看下Nginx配置方面的优化点。</p>
 <h2 id="nginx"><strong>Nginx配置优化</strong></h2>
 <p>前面在介绍Nginx的时候，我有给你展示过这张Nginx配置的模块结构图，每个模块都可以做相应的配置。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/af/e8/af0a2cd9ab08af631c5ab95ae91141e8.png?wh=1726x1656" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/af/e8/af0a2cd9ab08af631c5ab95ae91141e8.png?wh=1726x1656" /></p>
 <p>下面我们就按照顺序，依次介绍下各模块中重要配置的优化方式，并在最后附上一个最终建议优化配置。</p>
 <h3 id="_3">全局模块配置</h3>
 <p>首先是全局模块配置 worker_processes，即用来处理网络请求的工作进程数。这个配置参数的设置非常关键，它直接会影响到整个Nginx服务的吞吐量，设置小了，发挥不了服务器的硬件水平，设置过大，还会起到反效果。</p>
@@ -13841,7 +13841,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>worker_cpu_affinity   0001 0010 0100 1000;
 </code></pre></div>
 <p>针对语法的说明可参考下图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/25/d7/25yy8caa109ebfc1f9b21d8af7164ed7.jpg?wh=1566x726" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/25/d7/25yy8caa109ebfc1f9b21d8af7164ed7.jpg?wh=1566x726" /></p>
 <p>通过合理地设置工作进程，并将工作进程与CPU一一绑定，可以有效利用机器资源，提高服务的吐吞量与整体响应性能。</p>
 <p>那说到吞吐量呢，还得介绍一个关键的配置参数，即工作进程可以打开的最大文件描述符数量，其配置指令为worker_rlimit_nofile。</p>
 <p><strong>worker_rlimit_nofile：</strong>我们都知道网络通信的底层是通过socket来建立连接的，而每一个socket又会打开一个文件描述符，所以文件描述符的数量设置会影响服务器处理网络连接的上限。如果设置过小，那么超过文件描述符数量的连接都会被直接返回。而该配置又和单个工作进程可以建立的最大连接数量息息相关，所以我们和下面的worker_ connections一起说下。</p>
@@ -13856,7 +13856,7 @@
 <p><strong>sendfile：这个是操作系统用来优化文件传输提供的一个函数。</strong></p>
 <p>正常的文件传输，读时需要将数据文件从硬盘拷到内核空间，再从内核空间拷贝到用户空间，写时再依次拷贝出，同时也伴随着上下文的切换。</p>
 <p>而sendfile的做法是省略掉了内核空间和用户空间的拷贝以及上下文切换操作，这也叫做零拷贝，节省资源的同时提高了效率，具体如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fa/48/fafd20fe607cbab6e021cecc9e865b48.jpg?wh=1956x672" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fa/48/fafd20fe607cbab6e021cecc9e865b48.jpg?wh=1956x672" /></p>
 <p>因为秒杀有文件传输的场景，所以建议打开这个配置（通过upstream的文件传输，是不受该配置影响的）。打开该配置后，就可以继续使用另一个指令tcp_nopush了。</p>
 <p><strong>tcp_nopush：该配置只有在打开sendfile配置的情况下才能生效。</strong></p>
 <p>简单来说，该配置是关于TCP传输的配置。如果打开了nopush，那么在Nginx响应客户端请求时，会优化响应数据包的发送模式，即将多个较小的数据包合并发送，就像响应头和响应体。这样做的好处是可以减少网络拥堵，优化网络传输，当然也会牺牲稍许实时性的体验。</p>
@@ -13865,11 +13865,11 @@
 <p>其做法和上面的tcp_nopush相反，追求数据包的实时传输，对于秒杀这种网络负载较高的场景，一般不推荐打开，并且该配置只在长连接条件下才能生效，而秒杀结算页的HTTP请求一般都使用短连接（这里以及下文提到的长、短连接，都是指TCP层面的）。那在Nginx上也可以通过指令来配置客户端的连接处理方式，即keepalive_timeout。</p>
 <p><strong>keepalive_timeout：一般HTTP请求是要使用长连接还是短连接，需要客户端和服务端都支持。</strong></p>
 <p>客户端在使用HTTP1.1之后的协议版本，默认都是长连接，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ea/d9/ea7bc78ffbd0293d9f60babbd63515d9.jpg?wh=879x477" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ea/d9/ea7bc78ffbd0293d9f60babbd63515d9.jpg?wh=879x477" /></p>
 <p>协议版本是HTTP2.0的话，如果没有特殊配置，请求头里会有keep-alive的设置。但我们可以在Nginx通过配置空闲连接的存活时间为0，来关闭长连接，使其变成短连接。效果如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a2/cc/a2514a8292e2d42b06f6d25668b3b3cc.png?wh=764x696" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a2/cc/a2514a8292e2d42b06f6d25668b3b3cc.png?wh=764x696" /></p>
 <p>我们知道Nginx要连接的不仅有客户端，还有下游的Web服务。那针对上游客户端以及下游服务端，采用的连接方式会有什么不同呢？我们看下这张图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/78/ff/78c7683c0c937d35934fd1d6abbb47ff.jpg?wh=1508x818" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/78/ff/78c7683c0c937d35934fd1d6abbb47ff.jpg?wh=1508x818" /></p>
 <p>Nginx之所以针对客户端采用短连接，是因为客户端数量太多了，且交互不频繁。如果都用长连接，那么很快服务端连接将会被占完。</p>
 <p>但对于下游，Nginx相对就成了客户端了，其数量只有几台到几十台之间不等，且与后端Tomcat交互是十分频繁的，如果不停地创建连接，将会造成非常大的性能损耗，所以最好采用长连接的方式。长连接配置的方式，就放到最后的汇总配置里了。</p>
 <p><strong>最后再说几个与下游Web服务相关的超时配置。</strong></p>
@@ -14082,8 +14082,6 @@ sendfile on; tcp_nodelay on保证即使有未确认的ack数据包仍然可以�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

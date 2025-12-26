@@ -14421,7 +14421,7 @@
 <p>在第9篇文章“<a href="https://time.geekbang.org/column/article/148187">分布式体系结构之集中式结构：一人在上，万人在下</a>”中，我给你留了一个思考题：<strong>在集中式架构中，Master 如何判断 Slave 是否存活呢</strong>？</p>
 <p>首先，我先和你说说Slave故障的两类情况：一种是Slave进程退出，另一种是Slave所在服务器宕机或重启了。你可能会说，这两种情况的判断方法，难道还不一致吗？别着急，且听我慢慢道来。</p>
 <p>如下图所示，假设Master节点与3个Slave节点相连。请注意，我在图中，Master与Slave之间画了两条线，实线旁写的是TCP长连接，虚线旁写的是心跳。因为Master与Slave之间的监控关系是固定的，因此我用了两种机制协同来判断Slave是否存活。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a0/a1/a04e5d8e89239be68a1ed239b66d6ea1.png?wh=554%2A369" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a0/a1/a04e5d8e89239be68a1ed239b66d6ea1.png?wh=554%2A369" /></p>
 <p>其中，<strong>TCP长连接就是针对Slave进程退出，但是Slave所在服务器未故障的情况。</strong>这种方式是借助TCP长连接的工作原理进行判断的。TCP长连接中，TCP会对对端的Socket进行检测，当发现对端Socket不可用时，比如不能发出探测包或探测包未收到响应，会返回-1的状态，表示连接断开。所以，这种方式可以快速检测到Slave进程的退出。</p>
 <p>对于Slave所在服务器故障的情况，由于服务器宕机或重启，那么系统环境等均不工作了，这种情况TCP长连接也无法进行探测了，也就是说TCP长连接方法在这种场景下无法判断节点是否故障。</p>
 <p>对于这种场景，现有的软件架构中，基本都采用了<strong>心跳方式</strong>。其核心策略是，Master按照周期性（比如每隔1s）的方式给Slave发送心跳包，正常情况下Slave收到Master发送的心跳包后，会立即回复一个心跳包，告知Master自己还活着。当某个Slave（比如Slave1）所在服务器故障后，由于Slave无法接收到Master的心跳包，也就无法回复了。</p>
@@ -14447,7 +14447,7 @@
 <li>当某个节点发现自己监控的节点心跳超时时（比如Node 2发现Node1心跳超时），则标记该节点不可达（Node2标记Node1不可达），并将该信息通过Gossip协议传播给集群中的其他节点。</li>
 <li>如果某个节点被标记为不可达之后（比如Node1不可达），若不将该节点踢出集群，那么Node2和Node3仍然会给Node1发送心跳，若后面Node2又发现Node1心跳可达时，则重新将Node1更新为可达状态，然后同步给集群中其他节点。</li>
 </ol>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/03/51/031e8d6c6efceff4d9c299d583e6a151.png?wh=518%2A475" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/03/51/031e8d6c6efceff4d9c299d583e6a151.png?wh=518%2A475" /></p>
 <p>这里的<strong>判断心跳超时机制，可采用集中式方法中的连续k次心跳超时的方法进行判断，也可以通过历史心跳信息进行预测</strong>。具体的预测方法，我将在第31篇文章“分布式高可用之故障恢复：知错能改，善莫大焉”中做进一步讲解。</p>
 <h3 id="2">追加2: 一个集群为什么会存在双主的场景呢？</h3>
 <p>上面，我提到判断节点存活的方法主要是通过心跳的方式。如果是因为网络连接断开，那么节点之间就会被误判为对方故障了。在主备场景下，通常会出现双主的情况。这也就是第4篇文章“<a href="https://time.geekbang.org/column/article/143329">分布式选举：国不可一日无君</a>”的课后思考题答案了。</p>
@@ -14464,7 +14464,7 @@
 <p>接下来，我们再看一下<strong>实时计算。</strong>实时计算其实是和离线计算相对应的，离线计算对时延要求不敏感，相反，实时计算对时延的要求比较敏感。这种模式需要短时间执行完成并输出结果，比如秒级、分钟级，也就是说强调时效，通常用于秒杀、抢购等场景。实时计算由于时延要求低，因此计算量通常不大、数据量也不会太多，所计算的数据往往是K、M级别的。</p>
 <p>最后，我们在看看<strong>流式计算。</strong>我在第16篇文章“<a href="https://time.geekbang.org/column/article/156937">分布式计算模式之Stream: 一门背锅的艺术</a>”中，与你讲述了流式计算。流计算强调的是实时性，数据一旦产生就会被立即处理，当一条数据被处理完成后，会立刻通过网络传输到下一个节点，由下一个节点继续处理。这种模式通常用于商业场景中每天的报表统计、持续多天的促销活动效果分析等。</p>
 <p>为了便于你理解与记忆，我将这四种计算模式的特点，汇总为了一张表格，如下所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ea/6d/ea93ecf04130f6546924554f1664696d.jpg?wh=3276%2A1133" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ea/6d/ea93ecf04130f6546924554f1664696d.jpg?wh=3276%2A1133" /></p>
 <p>通过对这四种计算模式的讲解，相信你已经发现了，离线计算和批量计算对任务执行的时延不是特别敏感，而实时计算和流式计算对任务执行的时延敏感。但，离线计算和实时计算是从计算时延的维度进行分类的，而批量计算和流式计算是从计算方式的维度进行分类的，因此我们<strong>不能将离线计算和批量计算直接等同，也不能将实时计算和流式计算直接等同</strong>。</p>
 <h2 id="_3">总结</h2>
 <p>我把前面21篇文章中，大家针对思考题的讨论和困惑，筛选出了分布式系统架构中如何判断节点是否存活，以及四种分布式计算模式的异同，做了进一步展开，梳理成了今天的这篇答疑文章。</p>
@@ -14596,8 +14596,6 @@ slave进程如果还活着但是死锁卡住了，其实长连接是探测不到
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

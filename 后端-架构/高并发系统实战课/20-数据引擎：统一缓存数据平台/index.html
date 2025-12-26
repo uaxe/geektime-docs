@@ -14144,12 +14144,12 @@
 <h2 id="_2">实体数据主动缓存</h2>
 <p>之前我们在<a href="https://time.geekbang.org/column/article/596644">第二节课</a>讲过<strong>实体数据</strong>最容易做缓存，实体数据的缓存key可以设计为<strong>前缀+主键ID这种形式</strong> 。通过这个设计，我们只要拥有实体的ID，就可以直接在缓存中获取到实体的数据了。</p>
 <p>为了降低重复的工作量，我们对这个方式做个提炼，单独将这个流程做成中间件，具体实现如下图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/09/02/095a50102cc42a37fa8543dd020b5d02.jpg?wh=1920x1626" title="通过canal 监控 实现 简单的主动推送数据缓存" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/09/02/095a50102cc42a37fa8543dd020b5d02.jpg?wh=1920x1626" title="通过canal 监控 实现 简单的主动推送数据缓存" /></p>
 <p>结合上图，我们分析一下这个中间件的工作原理。我们通过canal来监控MySQL数据库的binlog日志，当有数据变更时，消息监听端会收到变更通知。</p>
 <p>因为变更消息包含变更的表名和所有变更数据的所有主键ID，所以这时我们可以通过主键ID，回到数据库主库查询出最新的实体数据，再根据需要来加工这个数据，并将其推送数据到缓存当中。</p>
 <p>而从过往经验来看，很多刚变动的数据有很大概率会被马上读取。所以，这个实现会有较好的缓存命中率。同时，当我们的数据被缓存后会根据配置设置一个TTL，缓存在一段时间没有被读取的话，就会被LRU策略淘汰掉，这样还能节省缓存空间。</p>
 <p>如果你仔细思考一下，就会发现这个设计还是有缺陷：如果业务系统无法从缓存中拿到所需数据，还是要回数据库查找数据，并且再次将数据放到缓存当中。这和我们设计初衷不一致。为此，我们还需要配套一个缓存查询服务，请看下图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c1/cb/c10415ec4034cc12yyab50b3c6e174cb.jpg?wh=2900x2456" title="缓存查询及数据缓存服务" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c1/cb/c10415ec4034cc12yyab50b3c6e174cb.jpg?wh=2900x2456" title="缓存查询及数据缓存服务" /></p>
 <p>如上图所示，当我们查找缓存时如果没找到数据，中间件就会通过Key识别出待查数据属于数据库的哪个表和处理脚本，再按配置执行脚本查询数据库做数据加工，然后中间件将获取的数据回填到缓存当中，最后再返回结果。</p>
 <p>为了提高查询效率，建议查询服务使用类似Redis的纯文本长链接协议，同时还需要支持批量获取功能，比如Redis的mget实现。如果我们的数据支撑架构很复杂，并且一次查询的数据量很大，还可以做成批量并发处理来提高系统吞吐性能。</p>
 <p>落地缓存服务还有一些实操的技巧，我们一起看看。</p>
@@ -14162,7 +14162,7 @@
 <p>上面我们设计的缓存中间件已经能够应付大部分<strong>临时缓存</strong>所需的场景。但如果碰到大并发查询的场景，缓存出现缺失或过期的情况，就会给数据库造成很大压力，为此还需要继续改进这个服务。</p>
 <p>改进方式就是统计查询次数，判断被查询的key是否是热点缓存。举个例子，比如通过时间块异步统计5分钟内缓存key被访问的次数，单位时间内超过设定次数（根据业务实现设定）就是热点缓存。</p>
 <p>具体的热点缓存统计和续约流程如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ea/e8/eabcdf7b249a4714993dafc7231b68e8.jpg?wh=2821x1818" title="热点缓存及续约" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ea/e8/eabcdf7b249a4714993dafc7231b68e8.jpg?wh=2821x1818" title="热点缓存及续约" /></p>
 <p>对照流程图可以看到，热点统计服务获取了被认定是热点的key之后，会按统计次数大小做区分。如果是<strong>很高频率</strong>访问的key会被定期从脚本推送到L1缓存中（L1缓存可以部署在每台业务服务器上，或每几台业务服务器共用一个L1缓存）。</p>
 <p>当业务查询数据时，业务的查询SDK驱动会通过热点key配置，检测当前key是否为热点key，如果是会去L1缓存获取，如果不是热点缓存会去集群缓存获取数据。</p>
 <p>而<strong>相对频率较高</strong>的key热点缓存服务，只会定期通知查询服务刷新对应的key，或做TTL刷新续期的操作。</p>
@@ -14184,14 +14184,14 @@
 <h2 id="_4">多数据引擎平台</h2>
 <p>一个理想状态的多数据引擎平台是十分庞大的，需要投入很多人力建设，它能够给我们提供强大的数据查询及分析能力，并且接入简单方便，能够大大促进我们的业务开发效率。</p>
 <p>为了让你有个整体认知，这里我特意画了一张多数据引擎平台的架构图，帮助你理解数据引擎和缓存以及数据更新之间的关系，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/43/42/438612baefa2cbaf2be76b1715b75f42.jpg?wh=2067x2030" title="多数据引擎平台架构图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/43/42/438612baefa2cbaf2be76b1715b75f42.jpg?wh=2067x2030" title="多数据引擎平台架构图" /></p>
 <p>可以看到，这时基础数据服务已经做成了一个平台。MySQL数据更新时，会通过我们订阅的变更消息，根据数据加工过滤进程，将数据推送到不同的引擎当中，对外提供数据统计、大数据KV、内存缓存、全文检索以及MySQL异构数据查询的服务。</p>
 <p>具体业务需要用到核心业务基础数据时，需要在该平台申请数据访问授权。如果还有特殊需要，可以向平台提交数据加工lua脚本。高流量的业务甚至可以申请独立部署一套数据支撑平台。</p>
 <h2 id="_5">总结</h2>
 <p>这节课我们一起学习了统一缓存数据平台的实现方案，有了这个中间件，研发效率会大大提高。在使用数据支撑组件之前，是<strong>业务自己实现的缓存以及多数据源的同步</strong>，需要我们业务重复写大量关于缓存刷新的逻辑，如下图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/52/b1/521f3920d2430b1b2957590c97cbf5b1.jpg?wh=2337x1818" title="自实现多数据引擎同步及多级缓存" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/52/b1/521f3920d2430b1b2957590c97cbf5b1.jpg?wh=2337x1818" title="自实现多数据引擎同步及多级缓存" /></p>
 <p>而使用数据缓存平台后，我们省去了很多人工实现的工作量，研发同学只需要在平台里做好配置，就能坐享中间件提供的强大多级缓存功能、多种数据引擎提供的数据查询服务，如下图所示：
-<img alt="" src="https://static001.geekbang.org/resource/image/d5/27/d59888a65ca981ae9c748b84cf325e27.jpg?wh=2067x1818" title="通过数据缓存平台对外服务" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d5/27/d59888a65ca981ae9c748b84cf325e27.jpg?wh=2067x1818" title="通过数据缓存平台对外服务" /></p>
 <p>我们回顾下中间件的工作原理。首先我们通过Canal订阅MySQL数据库的binlog，获取数据的变更消息。然后，缓存平台根据订阅变更信息实现触发式的缓存更新。另外，结合客户端SDK及缓存查询服务实现热点数据的识别，即可实现多级缓存服务。</p>
 <p>可以说,数据是我们系统的心脏，如数据引擎能力足够强大，能做的事情会变得更多。数据支撑平台最大的特点在于，将我们的数据和各种数据引擎结合起来，从而实现更强大的数据服务能力。</p>
 <p>大公司的核心系统通常会用多引擎组合的方式，共同提供数据支撑数据服务，甚至有些服务的服务端只需做配置就可以得到这些功能，这样业务实现更轻量，能给业务创造更广阔的增值空间。</p>
@@ -14317,8 +14317,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

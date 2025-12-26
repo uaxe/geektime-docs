@@ -14086,7 +14086,7 @@
 <h2 id="elasticsearch">Elasticsearch架构</h2>
 <p>那么ELK是如何运作的？它为什么能够承接如此大的日志量？</p>
 <p>我们先分析分析ELK的架构长什么样，事实上，它和OLAP及OLTP的实现区别很大，我们一起来看看。Elasticsearch架构如下图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0d/cc/0d954e660d80ae00854f29955c6168cc.jpg?wh=1920x1357" title="整体的数据流向图" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0d/cc/0d954e660d80ae00854f29955c6168cc.jpg?wh=1920x1357" title="整体的数据流向图" /></p>
 <p>我们对照架构图，梳理一下整体的数据流向，可以看到，我们项目产生的日志，会通过Filebeat或Rsyslog收集将日志推送到Kafka内。然后由LogStash消费Kafka内的日志、对日志进行整理，并推送到Elasticsearch集群内。</p>
 <p>接着，日志会被分词，然后计算出在文档的权重后放入索引中供查询检索，Elasticsearch会将这些信息推送到不同的分片。<strong>每个分片都会有多个副本，数据写入时，只有大部分副本写入成功了，主分片才会对索引进行落地（需要你回忆下分布式写一致知识）</strong>。</p>
 <p>Elasticsearch集群中服务分多个角色，我带你简单了解一下：</p>
@@ -14101,14 +14101,14 @@
 <p>要知道最近这几年<strong>大部分云厂商提供的日志服务都是基于ELK实现的，Elasticsearch已经上市，可见其市场价值。</strong></p>
 <h2 id="elasticsearch_1">Elasticsearch的写存储机制</h2>
 <p>下图是Elasticsearch的索引存储具体的结构，看起来很庞大，但是别担心，我们只需要关注分片及索引部分即可：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a7/97/a70527bd3901d776edaeaa01c89df897.jpg?wh=1920x1603" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a7/97/a70527bd3901d776edaeaa01c89df897.jpg?wh=1920x1603" /></p>
 <p>我们再持续深挖一下，Elasticsearch是如何实现分布式全文检索服务的写存储的。其底层全文检索使用的是Lucene引擎，事实上这个引擎是单机嵌入式的，并不支持分布式，分布式功能是基础分片来实现的。</p>
 <p>为了提高写效率，常见分布式系统都会先将数据先写在缓存，当数据积累到一定程度后，再将缓存中的数据顺序刷入磁盘。Lucene也使用了类似的机制，将写入的数据保存在Index Buffer中，周期性地将这些数据落盘到segment文件。</p>
 <p>再来说说存储方面，Lucene为了让数据能够更快被查到，基本一秒会生成一个segment文件，这会导致文件很多、索引很分散。而检索时需要对多个segment进行遍历，如果segment数量过多会影响查询效率，为此，Lucene会定期在后台对多个segment进行合并。</p>
 <p>更多索引细节，我稍后再给你介绍，可以看到Elasticsearch是一个IO频繁的服务，将新数据放在SSD上能够提高其工作效率。</p>
 <p>但是SSD很昂贵，为此Elasticsearch实现了冷热数据分离。我们可以将热数据保存在高性能SSD，冷数据放在大容量磁盘中。</p>
 <p>同时官方推荐我们按天建立索引，当我们的存储数据量达到一定程度时，Elasticsearch会把一些不经常读取的索引挪到冷数据区，以此提高数据存储的性价比。而且我建议你创建索引时按天创建索引，这样查询时。我们可以通过时间范围来降低扫描数据量。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f0/0b/f0yyb81d94c46a1882cacef5ce313c0b.jpg?wh=1920x1134" title="ES索引组成" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f0/0b/f0yyb81d94c46a1882cacef5ce313c0b.jpg?wh=1920x1134" title="ES索引组成" /></p>
 <p>另外，Elasticsearch服务为了保证读写性能可扩容，Elasticsearch对数据做了分片，分片的路由规则默认是通过日志DocId做hash来保证数据分布均衡，常见分布式系统都是<strong>通过分片来实现读写性能的线性提升</strong>。</p>
 <p>你可以这样理解：单个节点达到性能上限，就需要增加Data服务器节点及副本数来降低写压力。但是，副本加到一定程度，由于写强一致性问题反而会让写性能下降。具体加多少更好呢？这需要你用生产日志实测，才能确定具体数值。</p>
 <h2 id="elasticsearch_2">Elasticsearch的两次查询</h2>
@@ -14116,7 +14116,7 @@
 <p>所以,为了均衡各个数据节点的性能压力，Elasticsearch每次查询都是请求<strong>所有</strong>索引所在的Data节点，查询请求时协调节点会在相同数据分片多个副本中，随机选出一个节点发送查询请求，从而实现负载均衡。</p>
 <p>而收到请求的副本会根据关键词权重对结果先进行一次排序，当协调节点拿到所有副本返回的文档ID列表后，会再次对结果汇总排序，最后才会用 <strong>DocId去各个副本Fetch具体的文档数据将结果返回</strong>。</p>
 <p>可以说，Elasticsearch通过这个方式实现了所有分片的大数据集的全文检索，但这种方式也同时加大了Elasticsearch对数据查询请求的耗时。下图是协调节点和副本的通讯过程：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0e/68/0e1c40f567d902e6yy14ecd7e02a1068.jpg?wh=1920x1138" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0e/68/0e1c40f567d902e6yy14ecd7e02a1068.jpg?wh=1920x1138" /></p>
 <p>除了耗时，这个方式还有很多缺点，比如查询QPS低；网络吞吐性能不高；协助节点需要每次查询结果做分页；分页后，如果我们想查询靠后的页面，要等每个节点先搜索和排序好该页之前的所有数据，才能响应，而且翻页跨度越大，查询就越慢……</p>
 <p>为此，ES限制默认返回的结果最多1w条，这个限制也提醒了我们不能将Elasticsearch的服务当作数据库去用。</p>
 <p>还有一点实践的注意事项，这种实现方式也导致了小概率个别日志由于权重太低查不到的问题。为此，ES提供了search_type=dfs_query_then_fetch参数来应对特殊情况，但是这种方式损耗系统资源严重，非必要不建议开启。</p>
@@ -14124,12 +14124,12 @@
 <h2 id="elasticsearch_3">Elasticsearch的倒排索引</h2>
 <p>我们再谈谈Elasticsearch的全文检索的倒排索引。</p>
 <p>Elasticsearch支持多种查询方式不仅仅是全文检索，如数值类使用的是BKD Tree，Elasticsearch的全文检索查询是通过Lucene实现的，索引的实现原理和OLAP的LSM及OLTP的B+Tree完全不同，它使用的是倒排索引（Inverted Index）。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a4/42/a47c53ea69740a30b6e7c04545a48842.jpg?wh=1920x1440" title="正排索引及倒排索引" /></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7b/77/7b06f6c58bd676dde6429190e58d9b77.jpg?wh=1920x720" title="查询时多个分词的合并交集" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a4/42/a47c53ea69740a30b6e7c04545a48842.jpg?wh=1920x1440" title="正排索引及倒排索引" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7b/77/7b06f6c58bd676dde6429190e58d9b77.jpg?wh=1920x720" title="查询时多个分词的合并交集" /></p>
 <p>一般来说，倒排索引常在搜索引擎内做全文检索使用，其不同于关系数据库中的B+Tree和B-Tree 。B+Tree和B-Tree 索引是从树根往下按左前缀方式来递减缩小查询范围，而倒排索引的过程可以大致分四个步骤：<strong>分词、取出相关DocId、计算权重并重新排序、展示高相关度的记录</strong>。</p>
 <p>首先，对用户输入的内容做分词，找出关键词；然后，通过多个关键词对应的倒排索引，取出所有相关的DocId；接下来，将多个关键词设计索引ID做交集后，再根据关键词在每个文档的出现次数及频率，以此计算出每条结果的权重，进而给列表排序，并实现基于查询匹配度的评分；然后就可以根据匹配评分来降序排序，列出相关度高的记录。</p>
 <p>下面，我们简单看一下Lucene具体实现。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0d/16/0d643686d0511e7fca7593e624a68616.jpg?wh=1920x1440" title="ES的倒排索引原理" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0d/16/0d643686d0511e7fca7593e624a68616.jpg?wh=1920x1440" title="ES的倒排索引原理" /></p>
 <p>如上图，Elasticsearch集群的索引保存在Lucene的segment文件中，segment文件格式相关信息你可以参考 <a href="https://lucene.apache.org/core/3_0_3/fileformats.html#Segments%20File">segment格式</a>，其中包括行存、列存、倒排索引。</p>
 <p>为了节省空间和提高查询效率，Lucene对关键字倒排索引做了大量优化，segment主要保存了三种索引：</p>
 <ul>
@@ -14269,8 +14269,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

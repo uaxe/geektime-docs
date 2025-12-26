@@ -14523,7 +14523,7 @@
 <li>若在给定的时间范围内，本节点没有收到其他节点回复的Alive消息，则认为自己成为主节点，并向其他节点发送Victory消息，宣誓自己成为主节点；若接收到来自比自己ID大的节点的Alive消息，则等待其他节点发送Victory消息；</li>
 <li>若本节点收到比自己ID小的节点发送的Election消息，则回复一个Alive消息，告知其他节点，我比你大，重新选举。</li>
 </ol>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/91/54/91385c487255ba0179d8e9538ed8f154.png?wh=696%2A447" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/91/54/91385c487255ba0179d8e9538ed8f154.png?wh=696%2A447" /></p>
 <p>目前已经有很多开源软件采用了Bully算法进行选主，比如MongoDB的副本集故障转移功能。MongoDB的分布式选举中，采用节点的最后操作时间戳来表示ID，时间戳最新的节点其ID最大，也就是说时间戳最新的、活着的节点是主节点。</p>
 <p><strong>小结一下</strong>。Bully算法的选择特别霸道和简单，谁活着且谁的ID最大谁就是主节点，其他节点必须无条件服从。这种算法的优点是，选举速度快、算法复杂度低、简单易实现。</p>
 <p>但这种算法的缺点在于，需要每个节点有全局的节点信息，因此额外信息存储较多；其次，任意一个比当前主节点ID大的新节点或节点故障后恢复加入集群的时候，都可能会触发重新选举，成为新的主节点，如果该节点频繁退出、加入集群，就会导致频繁切主。</p>
@@ -14544,7 +14544,7 @@
 <li>当Leader节点的任期到了，即发现其他服务器开始下一轮选主周期时，Leader节点的状态由Leader降级为Follower，进入新一轮选主。</li>
 </ol>
 <p>节点的状态迁移如下所示（图中的term指的是选举周期）：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fc/b8/fc0f00a3b7c9290bc91cb4d8721dc6b8.png?wh=571%2A378" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fc/b8/fc0f00a3b7c9290bc91cb4d8721dc6b8.png?wh=571%2A378" /></p>
 <p>请注意，<strong>每一轮选举，每个节点只能投一次票。</strong>这种选举就类似人大代表选举，正常情况下每个人大代表都有一定的任期，任期到后会触发重新选举，且投票者只能将自己手里唯一的票投给其中一个候选者。对应到Raft算法中，选主是周期进行的，包括选主和任值两个时间段，选主阶段对应投票阶段，任值阶段对应节点成为主之后的任期。但也有例外的时候，如果主节点故障，会立马发起选举，重新选出一个主节点。</p>
 <p>Google开源的Kubernetes，擅长容器管理与调度，为了保证可靠性，通常会部署3个节点用于数据备份。这3个节点中，有一个会被选为主，其他节点作为备。Kubernetes的选主采用的是开源的etcd组件。而，etcd的集群管理器etcds，是一个高可用、强一致性的服务发现存储仓库，就是采用了Raft算法来实现选主和一致性的。</p>
 <p><strong>小结一下。</strong>Raft算法具有选举速度快、算法复杂度低、易于实现的优点；缺点是，它要求系统内每个节点都可以相互通信，且需要获得过半的投票数才能选主成功，因此通信量大。该算法选举稳定性比Bully算法好，这是因为当有新节点加入或节点故障恢复后，会触发选主，但不一定会真正切主，除非新节点或故障后恢复的节点获得投票数过半，才会导致切主。</p>
@@ -14567,15 +14567,15 @@
 <p>ZAB选举算法的核心是“少数服从多数，ID大的节点优先成为主”，因此选举过程中通过(vote_id, vote_zxID)来表明投票给哪个节点，其中vote_id表示被投票节点的ID，vote_zxID表示被投票节点的服务器zxID。<strong>ZAB算法选主的原则是：server_zxID最大者成为Leader；若server_zxID相同，则server_id最大者成为Leader。</strong></p>
 <p>接下来，我以3个Server的集群为例，此处每个Server代表一个节点，与你介绍ZAB选主的过程。</p>
 <p>第一步：当系统刚启动时，3个服务器当前投票均为第一轮投票，即epoch=1，且zxID均为0。此时每个服务器都推选自己，并将选票信息&lt;epoch, vote_id, vote_zxID&gt;广播出去。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2f/29/2fddb05e71c14c7af437e9a5d558dc29.png?wh=582%2A418" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2f/29/2fddb05e71c14c7af437e9a5d558dc29.png?wh=582%2A418" /></p>
 <p>第二步：根据判断规则，由于3个Server的epoch、zxID都相同，因此比较server_id，较大者即为推选对象，因此Server 1和Server 2将vote_id改为3，更新自己的投票箱并重新广播自己的投票。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/25/57/25a37bb2edb2894dc7f4ea6fe2cce757.png?wh=571%2A395" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/25/57/25a37bb2edb2894dc7f4ea6fe2cce757.png?wh=571%2A395" /></p>
 <p>第三步：此时系统内所有服务器都推选了Server 3，因此Server 3当选Leader，处于Leading状态，向其他服务器发送心跳包并维护连接；Server1和Server2处于Following状态。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ee/c8/ee3612f641c037021595e383eb5336c8.png?wh=522%2A345" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ee/c8/ee3612f641c037021595e383eb5336c8.png?wh=522%2A345" /></p>
 <p><strong>小结一下</strong>。ZAB算法性能高，对系统无特殊要求，采用广播方式发送信息，若节点中有n个节点，每个节点同时广播，则集群中信息量为n*(n-1)个消息，容易出现广播风暴；且除了投票，还增加了对比节点ID和数据ID，这就意味着还需要知道所有节点的ID和数据ID，所以选举时间相对较长。但该算法选举稳定性比较好，当有新节点加入或节点故障恢复后，会触发选主，但不一定会真正切主，除非新节点或故障后恢复的节点数据ID和节点ID最大，且获得投票数过半，才会导致切主。</p>
 <h3 id="_3">三种选举算法的对比分析</h3>
 <p>好了，我已经带你理解了分布式选举的3种经典算法，即Bully算法、Raft算法和ZAB算法。那么接下来，我就从消息传递内容、选举机制和选举过程的维度，对这3种算法进行一个对比分析，以帮助你理解记忆。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e4/7e/e411f24b0b03991ad761134dfc3dff7e.jpg?wh=3400%2A2142" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e4/7e/e411f24b0b03991ad761134dfc3dff7e.jpg?wh=3400%2A2142" /></p>
 <h2 id="_4">知识扩展：为什么“多数派”选主算法通常采用奇数节点，而不是偶数节点呢？</h2>
 <p>多数派选主算法的核心是少数服从多数，获得投票多的节点胜出。想象一下，如果现在采用偶数节点集群，当两个节点均获得一半投票时，到底应该选谁为主呢？</p>
 <p>答案是，在这种情况下，无法选出主，必须重新投票选举。但即使重新投票选举，两个节点拥有相同投票数的概率也会很大。因此，多数派选主算法通常采用奇数节点。</p>
@@ -14583,7 +14583,7 @@
 <h2 id="_5">总结</h2>
 <p>今天，我首先与你讲述了什么是分布式选举，以及为什么需要分布式选举。然后，我和你介绍了实现分布式选举的3种方法，即：Bully算法、Raft算法，以及ZooKeeper中的ZAB算法，并通过实例与你展示了各类方法的选举流程。</p>
 <p>我将今天的主要内容总结为了如下所示的思维导图，来帮助你加深理解与记忆。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/04/bd/04dfd1e4b8a1558fcbfa1bb8a9b077bd.png?wh=833%2A873" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/04/bd/04dfd1e4b8a1558fcbfa1bb8a9b077bd.png?wh=833%2A873" /></p>
 <h2 id="_6">思考题</h2>
 <ol>
 <li>分布式选举和一致性的关系是什么？</li>
@@ -14737,8 +14737,6 @@ http:&#47;&#47;thesecretlivesofdata.com&#47;raft&#47;#election</p>2019-09-30</li
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

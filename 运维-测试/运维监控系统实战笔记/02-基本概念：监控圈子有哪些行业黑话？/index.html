@@ -6366,7 +6366,7 @@
 <a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>mysql,schema=foo,host=db2 bytes_received=340899533915,bytes_sent=5506469130707 1287333321000000000
 </code></pre></div>
 <p>注意，时间戳的单位是纳秒。这种写法设计很精巧，标签重复度低，field越多的情况下它的优势越明显，网络传输的时候可以节省更多带宽。当然了，OpenTSDB的格式或者Prometheus的格式如果做了数据压缩，节省带宽的效果也是不错的，因为字符的压缩效果一般比较明显。现如今机房内部通信动辄万兆网卡，这个流量的大小区别倒也不用太关注。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ee/22/ee5a62f16cb36b57cf560c1b00e41822.png?wh=1920x581" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ee/22/ee5a62f16cb36b57cf560c1b00e41822.png?wh=1920x581" /></p>
 <p>监控指标的概念非常重要，可以说监控系统中的一切都是围绕监控指标来的，所以我们用了大量篇幅来解释监控指标，还讲解了几种不同指标的描述方式。除了这些描述方式之外，监控指标还分为各种不同的类型，下面我们一起来看一下。</p>
 <h2 id="_4">指标类型</h2>
 <p>有些监控系统是不区分指标类型的，有些会做区分。90年代左右社区就出现了一款作品 <a href="https://oss.oetiker.ch/rrdtool/">RRDtool</a>，它是一个环形数据库，也是一个绘图引擎，很多监控工具都是使用 RRDtool 来存储或绘制监控趋势图的，比如 Cacti、MRTG、Zabbix 等等。RRDtool 还提出了数据类型的概念，支持GAUGE、COUNTER、DERIVE、DCOUNTER、DDERIVE、ABSOLUTE 等多种数据类型。</p>
@@ -6379,7 +6379,7 @@
 <p>直方图类型，用于<strong>描述数据分布</strong>，最典型的应用场景就是监控延迟数据，计算90分位、99分位的值。所谓的分位值，就是把一批数据从小到大排序，然后取X%位置的数据，90分位就是指样本数据第90%位置的值。</p>
 <p>有些服务访问量很高，每秒几百万次，如果要把所有请求的延迟数据全部拿到，排序之后再计算分位值，这个代价就太高了。使用 Histogram 类型，可以用较小的代价计算一个大概值。当然，不是特别准确，但是在监控场景足够用了，监控毕竟只是一个采样的系统，对数据准确性要求没有那么高。</p>
 <p>Histogram的做法是根据数据的value范围，规划多个桶（bucket），把样本数据点放入不同的桶来统计。比如我们有个服务 service1，它的接口延迟最小的通常在一两百毫秒，最大的通常在1秒，如果超过3秒，大概率就是系统不正常了。此时我们可以规划4个桶，假设有1000个请求，我们来看下各个桶和对应的样本统计值。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f0/28/f0a3eca509ac8bebcdb07685c4ba3d28.png?wh=1978x730" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f0/28/f0a3eca509ac8bebcdb07685c4ba3d28.png?wh=1978x730" /></p>
 <ul>
 <li>延迟小于200毫秒的，有600个请求落到了这个区间。</li>
 <li>延迟小于1秒的，有850个请求落到了这个区间，其中大于200毫秒的有250个请求。</li>
@@ -6389,7 +6389,7 @@
 <p>现在我们来计算90分位值，也就是第900个请求，说明这个值落到了第3个桶，延迟小于3秒的桶，于是我们可以得出结论，90分位的延迟大小是1~3秒之间。</p>
 <p>虽然知道了区间范围，但是我们还无法得出具体的值。为了计算出具体的值，Prometheus有个假设，它认为各个桶里的样本数据是均匀分布的，即第三个桶的这150个请求，延迟最小的请求恰好延迟了1秒，延迟最大的恰好延迟了3秒，总量的第900个请求，是这个桶里的第50个请求，最终90分位的延迟数据计算方法是：</p>
 <p>$$（3-1）\times（50\div150）+1=1.67 秒$$</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0b/0f/0bb6b97835f11ae512517eb2040df30f.png?wh=1930x1020" title="第三个桶" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0b/0f/0bb6b97835f11ae512517eb2040df30f.png?wh=1930x1020" title="第三个桶" /></p>
 <p>这就是 histogram_quantile 的计算方法。histogram_quantile 是 Prometheus 的一个函数，这里为了说明 Histogram 类型，提前给你讲一下这个函数的计算逻辑。</p>
 <p>虽然Histogram这种做法相比于把所有请求延迟数据都存储起来再计算延迟，性能有了巨大的提升，但是要同时计算成千上万个接口的分位值延迟数据，还是非常耗费资源的，甚至会造成服务端OOM。于是就有了 Summary 类型。</p>
 <h3 id="summary">Summary</h3>
@@ -6422,7 +6422,7 @@
 <li><strong>告警收敛和告警闭环：</strong>告警事件层面的话题是所有监控系统都需要处理的。当然也可以作为一个专门的产品和多种监控系统对接，专注处理告警事件，希望国内能有超越 Bigpanda、Pagerduty 的产品出现。</li>
 </ul>
 <p>最后我把这节课的重点总结成了一张脑图，你可以多看几遍，加深记忆。你也可以自己试着总结一下这节课的重点，画一画图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b2/f9/b2a5d68462fa2yy22615720ee10fe2f9.jpg?wh=1861x1781" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b2/f9/b2a5d68462fa2yy22615720ee10fe2f9.jpg?wh=1861x1781" /></p>
 <h2 id="_10">互动时刻</h2>
 <p>这一讲我们聊了很多监控方向的黑话，现在我们来互动一下，你能否用一句话或者一个词，来证明你是圈内人士，让我们一起看看有多少同道中人。也欢迎你把今天的内容分享给你身边的朋友，邀他一起学习。我们下一讲再见！</p>
 <p>点击加入<a href="https://jinshuju.net/f/Ql3qlz">课程交流群</a></p>
@@ -6554,8 +6554,6 @@ go_gc_duration_seconds_count 585060</p>2023-02-02</li><br/><li><span>kobe</span>
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

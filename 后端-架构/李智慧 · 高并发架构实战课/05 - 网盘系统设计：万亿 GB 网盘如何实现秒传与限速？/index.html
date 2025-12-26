@@ -14060,7 +14060,7 @@
 <p>DBox的核心功能是提供文件上传和下载服务。基于核心功能，DBox需要在服务器端保存这些文件，并在下载和上传过程中实现断点续传。也就是说，如果上传或下载过程被中断了，恢复之后，还能从中断的地方重新上传或者下载，而不是从头再来。</p>
 <p>DBox还需要实现文件共享的需求。使用DBox的不同用户之间可以共享文件，一个用户上传的文件共享给其他用户后，其他用户也可以下载这个文件。</p>
 <p>此外，网盘是一个存储和网络密集型的应用，用户文件占据大量<strong>硬盘资源</strong>，上传、下载需要占用大量网络带宽，并因此产生较高的运营成本。所以用户体验需要向付费用户倾斜，DBox需要对上传和下载进行<strong>流速控制</strong>，保证付费用户得到更多的网络资源。DBox用例图如下。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c8/07/c817188e7a3436b1a0b545d7972e4707.jpg?wh=1920x1037" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c8/07/c817188e7a3436b1a0b545d7972e4707.jpg?wh=1920x1037" /></p>
 <h4 id="_2">负载指标估算</h4>
 <p>DBox的设计目标是支持10亿用户注册使用，免费用户最大可拥有1TB存储空间。预计日活用户占总用户的20%，即2亿用户。每个活跃用户平均每天上传、下载4个文件。</p>
 <p>DBox的<strong>存储量</strong>、<strong>吞吐量</strong>、<strong>带宽负载</strong>估算如下。</p>
@@ -14095,24 +14095,24 @@
 <h2 id="_4">概要设计</h2>
 <p>网盘设计的关键是<strong>元数据与文件内容的分离存储与管理</strong>。所谓文件元数据就是文件所有者、文件属性、访问控制这些文件的基础信息，事实上，传统文件系统也是元数据与文件内容分离管理的，比如Linux的文件元数据记录在文件控制块FCB中，Windows的文件元数据记录在文件分配表FAB中，Hadoop分布式文件系统HDFS的元数据记录在NameNode中。</p>
 <p>而DBox是将元信息存储在数据库中，文件内容则使用另外专门的存储体系。但是由于DBox是一个互联网应用，出于安全和访问管理的目的，并不适合由客户端直接访问存储元数据的数据库和存储文件内容的存储集群，而是通过API服务器集群和数据块服务器集群分别进行访问管理。整体架构如下图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/05/06/0562910aaa2f53517b431ed40d42fe06.jpg?wh=1920x1005" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/05/06/0562910aaa2f53517b431ed40d42fe06.jpg?wh=1920x1005" /></p>
 <p>对于大文件，DBox不会上传、存储一整个的文件，而是将这个文件进行切分，变成一个个单独的Block，再将它们分别上传并存储起来。</p>
 <p>这样做的核心原因是，DBox采用对象存储作为最终的文件存储方案，而对象存储不适合存储大文件，需要进行切分。而大文件进行切分还带来其他的好处：可以<strong>以Block为单位进行上传和下载，提高文件传输速度</strong>；客户端或者网络故障导致文件传输失败，也只需要重新传输失败的Block就可以，进而实现<strong>断点续传</strong>功能。</p>
 <p>Block服务器就是负责Block上传和管理的。客户端应用程序根据API服务器的返回指令，将文件切分成一些Block，然后将这些Block分别发送给Block服务器，Block服务器再调用对象存储服务器集群，将Block存储在对象存储服务器中（DBox选择Ceph作为对象存储）。</p>
 <p>用户上传文件的时序图如下。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/da/3f/da219984e7d006ed2e535b86bdfb943f.jpg?wh=1920x1123" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/da/3f/da219984e7d006ed2e535b86bdfb943f.jpg?wh=1920x1123" /></p>
 <p>用户上传文件时，客户端应用程序收集文件元数据，包括文件名、文件内容MD5、文件大小等等，并根据文件大小计算Block的数量（DBox设定每个block大小4MB），以及每个Block的MD5值。</p>
 <p>然后客户端应用程序将全部元数据（包括所有Block的MD5值列表）发送给API服务器。API服务器收到文件元数据后，为每个Block分配全局唯一的BlockID（BlockID为严格递增的64位正整数，总可记录数据大小$\small 2^{64}\times4MB=180亿PB$，足以满足DBox的应用场景）。</p>
 <p>下一步，API服务器将文件元数据与BlockID记录在数据库中，并将BlockID列表和应用程序可以连接的Block服务器列表返回客户端。客户端连接Block服务器请求上传Block，Block服务器连接API服务器进行权限和文件元数据验证。验证通过后，客户端上传Block数据，Block服务器再次验证Block数据的MD5值，确认数据完整后，将BlockID和Block数据保存到对象存储集群Ceph中。</p>
 <p>类似的，用户下载文件的时序图如下。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1c/71/1c658bdd073f5bde99f2310cd222ae71.jpg?wh=1920x1178" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1c/71/1c658bdd073f5bde99f2310cd222ae71.jpg?wh=1920x1178" /></p>
 <p>客户端程序访问API服务器，请求下载文件。然后API服务器会查找数据库，获得文件的元数据信息，再将元数据信息中的文件BlockID列表及可以访问的Block服务器列表返回给客户端。</p>
 <p>下一步，客户端访问Block服务器，请求下载Block。Block服务器验证用户权限后，从Ceph中读取Block数据，返回给客户端，客户端再将返回的Block组装为文件。</p>
 <h2 id="_5">详细设计</h2>
 <p>为解决网盘的三个重要问题：元数据如何管理？网络资源如何向付费用户倾斜？如何做到不重复上传？DBox详细设计将关注元数据库、上传下载限速、秒传的设计实现。</p>
 <h4 id="_6">元数据库设计</h4>
 <p>元数据库表结构设计如下。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/54/9b/54ef5431490310a01ab0d05a5c22d79b.jpg?wh=1920x953" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/54/9b/54ef5431490310a01ab0d05a5c22d79b.jpg?wh=1920x953" /></p>
 <p>从图中可以看出，元数据库表结构中主要包括三个表，分别是User用户表、File文件表和Block数据块表，表的用途和包含的主要字段如下：</p>
 <ol>
 <li>User用户表记录用户基本信息：用户名、创建时间、用户类型（免费、VIP）、用户已用空间、电话号码、头像等等。</li>
@@ -14133,7 +14133,7 @@
 <p>但是，计算MD5可能会发生Hash冲突，也就是不同文件算出来的MD5值是相同的，这样会导致DBox误判，将本不相同的文件关联到一个物理文件上。不但会使上传者丢失自己的文件，还会被黑客利用：上传一个和目标文件MD5相同的文件，然后就可以下载目标文件了。</p>
 <p>所以，DBox需要通过更多信息判断文件是否相同：<strong>只有文件长度、文件开头256KB的MD5值、文件的MD5值，三个值都相同，才会认为文件相同</strong>。当文件长度小于256KB，则直接上传文件，不启用秒传功能。</p>
 <p>为此，我们需要将上面的元数据库表结构进行一些改动，将原来的File表拆分成物理文件表Physics_File和逻辑文件表Logic_File。其中，Logic_File记录用户文件的元数据，并和物理文件表Physics_File建立多对1关联关系，而Block表关联的则是Physics_File表，如下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/09/0f/09595890fbf51218a7866d26e97e400f.jpg?wh=2000x1288" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/09/0f/09595890fbf51218a7866d26e97e400f.jpg?wh=2000x1288" /></p>
 <p>Physics_File中字段md5和256kmd5字段分别记录了文件MD5和文件头256KB的MD5数据，而size记录了文件长度，只有这三个字段都相同才会启用秒传。</p>
 <h2 id="_9">小结</h2>
 <p>我们在需求分析中讨论过，DBox需要支持大数据量存储、高并发访问、高可用服务、高可靠存储等非功能需求。事实上，对于网盘应用而言，元数据API服务其实和一般的高并发互联网系统网关没有太大差别。真正有挑战的是海量文件的高可用存储，而这一挑战，在DBox中，被委托给了分布式对象存储Ceph来完成。而Ceph本身设计就是支持大数据量存储、高并发访问、高可用服务、高可靠存储的。</p>
@@ -14275,8 +14275,6 @@ Q4：如何在用户下载前确认这个文件已经上传完毕了，否则拒
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

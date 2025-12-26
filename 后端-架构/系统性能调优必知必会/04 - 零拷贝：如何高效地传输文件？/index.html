@@ -14537,7 +14537,7 @@
 <h2 id="_1">你会如何实现文件传输？</h2>
 <p>服务器提供文件传输功能，需要将磁盘上的文件读取出来，通过网络协议发送到客户端。如果需要你自己编码实现这个文件传输功能，你会怎么实现呢？</p>
 <p>通常，你会选择最直接的方法：从网络请求中找出文件在磁盘中的路径后，如果这个文件比较大，假设有320MB，可以在内存中分配32KB的缓冲区，再把文件分成一万份，每份只有32KB，这样，从文件的起始位置读入32KB到缓冲区，再通过网络API把这32KB发送到客户端。接着重复一万次，直到把完整的文件都发送完毕。如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/65/ee/6593f66902b337ec666551fe2c6f5bee.jpg?wh=3509%2A1970" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/65/ee/6593f66902b337ec666551fe2c6f5bee.jpg?wh=3509%2A1970" /></p>
 <p>不过这个方案性能并不好，主要有两个原因。</p>
 <p>首先，它至少<strong>经历了4万次用户态与内核态的上下文切换。</strong>因为每处理32KB的消息，就需要一次read调用和一次write调用，每次系统调用都得先从用户态切换到内核态，等内核完成任务后，再从内核态切换回用户态。可见，每处理32KB，就有4次上下文切换，重复1万次后就有4万次切换。</p>
 <p>上下文切换的成本并不小，虽然一次切换仅消耗几十纳秒到几微秒，但高并发服务会放大这类时间的消耗。</p>
@@ -14550,9 +14550,9 @@
 <p>其次，我们应该考虑如何减少内存拷贝次数。</p>
 <p>每周期中的4次内存拷贝，其中与物理设备相关的2次拷贝是必不可少的，包括：把磁盘内容拷贝到内存，以及把内存拷贝到网卡。但另外2次与用户缓冲区相关的拷贝动作都不是必需的，因为在把磁盘文件发到网络的场景中，<strong>用户缓冲区没有必须存在的理由</strong>。</p>
 <p>如果内核在读取文件后，直接把PageCache中的内容拷贝到Socket缓冲区，待到网卡发送完毕后，再通知进程，这样就只有2次上下文切换，和3次内存拷贝。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bf/a1/bf80b6f858d5cb49f600a28f853e89a1.jpg?wh=3517%2A1995" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bf/a1/bf80b6f858d5cb49f600a28f853e89a1.jpg?wh=3517%2A1995" /></p>
 <p>如果网卡支持SG-DMA（The Scatter-Gather Direct Memory Access）技术，还可以再去除Socket缓冲区的拷贝，这样一共只有2次内存拷贝。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0a/77/0afb2003d8aebaee763d22dda691ca77.jpg?wh=3514%2A1959" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0a/77/0afb2003d8aebaee763d22dda691ca77.jpg?wh=3514%2A1959" /></p>
 <p><strong>实际上，这就是零拷贝技术。</strong></p>
 <p>它是操作系统提供的新函数，同时接收文件描述符和TCP socket作为输入参数，这样执行时就可以完全在内核态完成内存拷贝，既减少了内存拷贝次数，也降低了上下文切换次数。</p>
 <p>而且，零拷贝取消了用户缓冲区后，不只降低了用户内存的消耗，还通过最大化利用socket缓冲区中的内存，间接地再一次减少了系统调用的次数，从而带来了大幅减少上下文切换次数的机会！</p>
@@ -14574,9 +14574,9 @@
 <h2 id="io-io">异步IO + 直接IO</h2>
 <p>高并发场景处理大文件时，应当使用异步IO和直接IO来替换零拷贝技术。</p>
 <p>仍然回到本讲开头的例子，当调用read方法读取文件时，实际上read方法会在磁盘寻址过程中阻塞等待，导致进程无法并发地处理其他任务，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9e/4e/9ef6fcb7da58a007f8f4e3e67442df4e.jpg?wh=3933%2A2550" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9e/4e/9ef6fcb7da58a007f8f4e3e67442df4e.jpg?wh=3933%2A2550" /></p>
 <p>异步IO（异步IO既可以处理网络IO，也可以处理磁盘IO，这里我们只关注磁盘IO）可以解决阻塞问题。它把读操作分为两部分，前半部分向内核发起读请求，但<strong>不等待数据就位就立刻返回</strong>，此时进程可以并发地处理其他任务。当内核将磁盘中的数据拷贝到进程缓冲区后，进程将接收到内核的通知，再去处理数据，这是异步IO的后半部分。如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/15/f3/15d33cf599d11b3188253912b21e4ef3.jpg?wh=4040%2A2172" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/15/f3/15d33cf599d11b3188253912b21e4ef3.jpg?wh=4040%2A2172" /></p>
 <p>从图中可以看到，异步IO并没有拷贝到PageCache中，这其实是异步IO实现上的缺陷。经过PageCache的IO我们称为缓存IO，它与虚拟内存系统耦合太紧，导致异步IO从诞生起到现在都不支持缓存IO。</p>
 <p>绕过PageCache的IO是个新物种，我们把它称为直接IO。对于磁盘，异步IO只支持直接IO。</p>
 <p>直接IO的应用场景并不多，主要有两种：第一，应用程序已经实现了磁盘文件的缓存，不需要PageCache再次缓存，引发额外的性能消耗。比如MySQL等数据库就使用直接IO；第二，高并发下传输大文件，我们上文提到过，大文件难以命中PageCache缓存，又带来额外的内存拷贝，同时还挤占了小文件使用PageCache时需要的内存，因此，这时应该使用直接IO。</p>
@@ -14716,8 +14716,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

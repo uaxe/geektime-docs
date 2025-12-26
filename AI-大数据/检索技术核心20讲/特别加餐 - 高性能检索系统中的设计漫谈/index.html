@@ -6933,7 +6933,7 @@
 <li>节约存储空间，我们不需要在posting list中重复记录唐诗的内容。</li>
 <li>减少检索过程中的复制代价。在倒排索引的检索过程中，我们需要将posting list中的元素进行多次比较和复制等操作。如果每个元素都存了复杂的数据，而不是简单的ID，那复制代价我们也不能忽略。</li>
 <li>保持索引的简单有效，让我们可以使用更多的优化手段加速检索过程。在<a href="https://time.geekbang.org/column/article/221292">加餐1</a>中我们讲过，如果posting list中都存着简单ID的话，我们可以将posting list转为位图来存储和检索，以及还可以使用Roaring Bitmap来提高检索效率。
-<img alt="" src="https://static001.geekbang.org/resource/image/d1/9c/d1cfadb61b0160b95c63d443cd5fb29c.jpg?wh=1920%2A1080" title="索引与数据分离的设计示意图" /></li>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d1/9c/d1cfadb61b0160b95c63d443cd5fb29c.jpg?wh=1920%2A1080" title="索引与数据分离的设计示意图" /></li>
 </ol>
 <p>总结来说就是，索引与数据分离的设计理念可以让索引保持简洁和高效，来帮助我们聚焦在索引的优化技术上。因此，保持索引的简洁高效是我们需要重点关注的。</p>
 <p>当然，我相信你刚开始设计一个新系统的时候，可以很容易做到这一点。但也正因为它非常基础，恰恰就成了我们工作中最容易忽视的地方。</p>
@@ -6943,9 +6943,9 @@
 <p>对于不要求强一致性的应用场景，比如说在某些应用中更新用户头像时，我们可以接受这种临时性错误，只要能保证系统的最终一致性即可。但如果在要求强一致性的应用场景中，比如说在金融系统中进行和金钱有关的操作时，我们就需要做好一致性管理，我们可以对索引和数据进行统一加锁处理，或者直接将索引和数据合并。这么说比较抽象，我们以MySQL中的B+树为例，来看看它是怎么管理一致性的。</p>
 <p>MySQL中的B+树实现其实有两种，一种是MyISAM引擎，另一种是InnoDB引擎。它们的核心区别就在于，数据和索引是否是分离的。</p>
 <p>在MyISAM引擎中，B+树的叶子节点仅存储了数据的位置指针，这是一种索引和数据分离的设计方案，叫作非聚集索引。如果要保证MyISAM的数据一致性，那我们需要在表级别上进行加锁处理。
-<img alt="" src="https://static001.geekbang.org/resource/image/dc/c9/dc4d1906373946db6ab45dae64eb9dc9.jpg?wh=1920%2A1080" title="MyISAM的索引数据分离设计" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dc/c9/dc4d1906373946db6ab45dae64eb9dc9.jpg?wh=1920%2A1080" title="MyISAM的索引数据分离设计" /></p>
 <p>在InnoDB中，B+树的叶子节点直接存储了具体数据，这是一种索引和数据一体的方案。叫作聚集索引。由于数据直接就存在索引的叶子节点中，因此InnoDB不需要给全表加锁来保证一致性，它只需要支持行级的锁就可以了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/89/fc/89568b50381a7750bfb6d934e8a208fc.jpg?wh=1920%2A1080" title="InnoDB的索引数据一体设计" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/89/fc/89568b50381a7750bfb6d934e8a208fc.jpg?wh=1920%2A1080" title="InnoDB的索引数据一体设计" /></p>
 <p>所以你看，索引和数据分离也不是万能的“银弹”，我们需要结合具体的使用场景，来进行合适的设计。</p>
 <h2 id="io">设计思想二：减少磁盘IO</h2>
 <p>第6讲我们说过，在大规模系统中，数据往往无法全部存储在内存中。因此，系统必然会涉及磁盘的读写操作。在这种应用场景下，<strong>尽可能减少磁盘IO，往往是保证系统具有高性能的核心设计思路</strong>。</p>
@@ -6962,16 +6962,16 @@
 <p>接下来，我们再说说读写分离，它也是很常见的一种设计方案。在高并发的场景下，如果系统需要对同一份数据同时进行读和写的操作，为了保证线程安全以及数据一致性，我们往往需要对数据操作加锁，但这会导致系统的性能降低。</p>
 <p>而读写分离的设计方案，可以让所有的读操作只读一份数据，让所有的写操作作用在另一份数据上。这样就不存在读写竞争的场景，系统也就不需要加锁和切换了。在读操作频率高于写操作的应用场景中，使用读写分离的设计思想，可以大幅度提升系统的性能。很多我们熟悉的架构都采用这样的设计。</p>
 <p>比如说，MySQL的Master - Slave架构。在MySQL的Master - Slave的架构设计中，master负责接收写请求。在数据写入master以后，master会和多个slave进行同步，将数据更新到所有的slave中。所有的slave仅负责处理读请求。这样，MySQL就可以完成读写分离了。
-<img alt="" src="https://static001.geekbang.org/resource/image/d2/27/d2c548887e5c8617ca38069b50ed5c27.jpg?wh=1920%2A1080" title="Master – slave架构实现读写分离示意图" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d2/27/d2c548887e5c8617ca38069b50ed5c27.jpg?wh=1920%2A1080" title="Master – slave架构实现读写分离示意图" /></p>
 <p>其实不仅仅是MySQL，Redis中也存在类似的Master - Slave的读写分离设计。包括在LevelDB中，MemTable - Immutable MemTable 的设计，其实也是读写分离的一个具体案例。</p>
 <p>除了MySQL和Redis这类的数据存储系统，在倒排索引类的检索系统中，其实也有着类似的设计思路。比如说，在<a href="https://time.geekbang.org/column/article/222807">第9讲</a>中我们讲过，对于索引更新这样的功能，我们往往会使用Double Buffer机制，以及全量索引+增量索引的机制来实现读写分离。通过这样的机制，我们才能保证搜索引擎、广告引擎、推荐引擎等系统能在高并发的应用场景下，依然具备实时的索引更新能力。</p>
 <h2 id="_3">设计思想四：分层处理</h2>
 <p>在大规模检索系统中，不同数据的价值是不一样的，如果我们都使用同样的处理技术，其实会造成系统资源的浪费。因此，将数据分层处理也是非常基础且重要的一种设计。</p>
 <p>最典型的例子就是在<a href="https://time.geekbang.org/column/article/227161">第12讲</a>中，我们提到的非精准Top K检索 + 精准 Top K检索的设计思路了。简单回顾一下，如果我们对所有的检索结果集都进行耗时复杂的精准打分，那会带来大量的资源浪费。所以，我们会先进行初步筛选，快速选出可能比较好的结果，再进行精准筛选。这样的分层打分机制，其实非常像我们在招聘过程中，先进行简历筛选，再进行面试的处理流程。可见，这种设计思路有着非常广泛的使用场景。
-<img alt="" src="https://static001.geekbang.org/resource/image/81/56/81620b228164d406870a6136731d2e56.jpg?wh=1920%2A1080" title="分层检索+分层打分示意图" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/81/56/81620b228164d406870a6136731d2e56.jpg?wh=1920%2A1080" title="分层检索+分层打分示意图" /></p>
 <p>包括我们前面提到的将索引放在内存中而不是磁盘上，这其实也是一种分层处理的思路。我们对索引进行分层，把最有价值的索引放在内存中，保证检索效率。而价值较低的大规模索引，则可以存在磁盘中。</p>
 <p>如果你再仔细回想一下就会发现，这其实和第7讲中，LSM树将它认为最有价值的近期数据放在内存中，然后将其他数据放在磁盘上的思路是非常相似的。甚至是硬件设计也是这样，CPU中的一级缓存和二级缓存，也是基于同样的分层设计理念，将最有价值的数据，存在离CPU最近，也最贵的介质中。
-<img alt="" src="https://static001.geekbang.org/resource/image/2b/dc/2b6ac0f3dcb370c0251ed159dca3bfdc.jpg?wh=1920%2A1080" title="硬件分层架构设计" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2b/dc/2b6ac0f3dcb370c0251ed159dca3bfdc.jpg?wh=1920%2A1080" title="硬件分层架构设计" /></p>
 <p>此外，还有一个典型的分层处理的设计实例就是，为了保证系统的稳定性，我们往往需要在系统负载过高时，启用自动降级机制。而好的自动降级机制，其实也是对流量进行分层处理，将系统认为有价值的流量保留，然后抛弃低价值的流量。</p>
 <p>总结来说，如果我们在应用场景中，对少数的数据进行处理，能带来大量的产出，那分层处理就是一种可行的设计思路。这其实就是<strong>二八原则：20%的资源带来了80%的产出</strong>。</p>
 <h2 id="_4">重点回顾</h2>
@@ -7117,8 +7117,6 @@ Kafka中通过分批，顺序读写IO，也使用Zero Copy加快数据读取速�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

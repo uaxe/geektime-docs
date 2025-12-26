@@ -14271,7 +14271,7 @@
 <p>在PD与TiKV的通讯过程中，PD完全是被动的一方。TiKV节点定期主动向PD报送心跳，分片的元数据信息也就随着心跳一起报送，而PD会将分片调度指令放在心跳的返回信息中。等到TiKV下次报送心跳时，PD就能了解到调度的执行情况。</p>
 <p>由于每次TiKV的心跳中包含了全量的分片元数据，PD甚至可以不落盘任何分片元数据，完全做成一个无状态服务。这样的好处是，PD宕机后选举出的新主根本不用处理与旧主的状态衔接，在一个心跳周期后就可以工作了。当然，在具体实现上，PD仍然会做部分信息的持久化，这可以认为是一种缓存。</p>
 <p>我将这个通讯过程画了下来，希望帮助你理解。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/94/61/946f37b234790208a6643b5703e65d61.jpg?wh=2700%2A1711" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/94/61/946f37b234790208a6643b5703e65d61.jpg?wh=2700%2A1711" /></p>
 <p>三个TiKV节点每次上报心跳时，由主副本（Leader）提供该分片的元数据，这样PD可以获得全量且没有冗余的信息。</p>
 <p>虽然无状态服务有很大的优势，但PD仍然是一个单点，也就是说这个方案还是一个中心化的设计思路，可能存在性能方面的问题。</p>
 <p>有没有完全“去中心化”的设计呢？当然是有的。接下来，我们就看看P2P架构的CockroachDB是怎么解决这个问题的。</p>
@@ -14281,7 +14281,7 @@
 <p>CockroachDB采用了P2P架构，每个节点都要保存完整的元数据，这样节点规模就非常大，当然也就不适用广播机制。而Gossip协议的原理是谣言传播机制，每一次谣言都在几个人的小范围内传播，但最终会成为众人皆知的谣言。这种方式达成的数据一致性是 “最终一致性”，即执行数据更新操作后，经过一定的时间，集群内各个节点所存储的数据最终会达成一致。</p>
 <p>看到这，你可能有点晕。我们在<a href="https://time.geekbang.org/column/article/272104">第2讲</a>就说过分布式数据库是强一致性的，现在搞了个最终一致性的元数据，能行吗？</p>
 <p>这里我先告诉你结论，<strong>CockroachDB真的是基于“最终一致性”的元数据实现了强一致性的分布式数据库</strong>。我画了一张图，我们一起走下这个过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3a/23/3afa38b9a29e2ecfa17f6b809c1e2123.jpg?wh=2700%2A1742" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3a/23/3afa38b9a29e2ecfa17f6b809c1e2123.jpg?wh=2700%2A1742" /></p>
 <ol>
 <li>节点A接到客户端的SQL请求，要查询数据表T1的记录，根据主键范围确定记录可能在分片R1上，而本地元数据显示R1存储在节点B上。</li>
 <li>节点A向节点B发送请求。很不幸，节点A的元数据已经过时，R1已经重新分配到节点C。</li>
@@ -14307,7 +14307,7 @@
 <li>Leader 继续处理下一次请求。</li>
 </ol>
 <p>以上是单个事务的运行情况。那么，当多事务并行操作时，又是什么样子的呢？我画了张图来演示这个过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c4/2b/c46f44da1ae27ffe6545c3d00964ba2b.jpg?wh=2700%2A1707" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c4/2b/c46f44da1ae27ffe6545c3d00964ba2b.jpg?wh=2700%2A1707" /></p>
 <p>我们设定这个Raft组由5个节点组成，T1到T5是先后发生的5个事务操作，被发送到这个Raft组。</p>
 <p>事务T1的操作是将X置为1，5个节点都Append成功，Leader节点Apply到本地状态机，并返回客户端提交成功。事务T2执行时，虽然有一个Follower没有响应，但仍然得到了大多数节点的成功响应，所以也返回客户端提交成功。</p>
 <p>现在，轮到T3事务执行，没有得到超过半数的响应，这时Leader必须等待一个明确的失败信号，比如通讯超时，才能结束这次操作。因为有顺序投票的规则，T3会阻塞后续事务的进行。T4事务被阻塞是合理的，因为它和T3操作的是同一个数据项，但是T5要操作的数据项与T3无关，也被阻塞，显然这不是最优的并发控制策略。</p>
@@ -14335,7 +14335,7 @@
 <p>讲了这么多，回到我们最开始的问题，为什么有时候Paxos不是最佳选择呢？一是架构设计方面的原因，看参与复制的节点规模，规模太大就不适合采用Paxos，同样也不适用其他的共识算法。二是工程实现方面的原因，在适用共识算法的场景下，选择Raft还是Paxos呢？因为Paxos没有一个高质量的开源实现，而Raft则有etcd这个不错的工程实现，所以Raft得到了更广泛的使用。这里的深层原因还是Paxos算法本身过于复杂，直到现在，实现Raft协议的开源项目也要比Paoxs更多、更稳定。</p>
 <p>有关分片元数据的存储，在我看来，TiDB和CockroachDB的处理方式都很优雅，但是TiDB的方案仍然建立在PD这个中心点上，对集群的整体扩展性，对于主副本跨机房、跨地域部署，有一定的局限性。</p>
 <p>关于Raft的优化方法，大的思路就是并行和异步化，其实这也是整个分布式系统中常常采用的方法，在第10讲原子协议的优化中我们还会看到类似的案例。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1a/6e/1a8c2e11b0072edd80c3bd3e5f4dca6e.jpg?wh=2700%2A2314" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1a/6e/1a8c2e11b0072edd80c3bd3e5f4dca6e.jpg?wh=2700%2A2314" /></p>
 <h2 id="_5">思考题</h2>
 <p>最后是今天的思考题时间。我们在<a href="https://time.geekbang.org/column/article/271373">第1讲</a>就提到过分布式数据库具备海量存储能力，那么你猜，这个海量有上限吗？或者说，你觉得分布式数据库的存储容量会受到哪些因素的制约呢？欢迎你在评论区留言和我一起讨论，我会在答疑篇回复这个问题。</p>
 <p>你是不是也经常听到身边的朋友讨论数据复制的相关问题呢，而且得出的结论有可能是错的？如果有的话，希望你能把今天这一讲分享给他/她，我们一起来正确地理解分布式数据库的数据复制是怎么一回事。</p>
@@ -14467,8 +14467,6 @@ BTW, Gossip达成共识要比Raft和Paxos要快么？</p>2020-09-09</li><br/><li
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

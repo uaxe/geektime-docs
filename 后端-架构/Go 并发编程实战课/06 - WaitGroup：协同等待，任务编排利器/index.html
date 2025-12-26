@@ -14028,9 +14028,9 @@
 </code></pre></div>
 <p>因为对64位整数的原子操作要求整数的地址是64位对齐的，所以针对64位和32位环境的state字段的组成是不一样的。</p>
 <p>在64位环境下，state1的第一个元素是waiter数，第二个元素是WaitGroup的计数值，第三个元素是信号量。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/71/ea/71b5fyy6284140986d04c0b6f87aedea.jpg?wh=3033%2A1572" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/71/ea/71b5fyy6284140986d04c0b6f87aedea.jpg?wh=3033%2A1572" /></p>
 <p>在32位环境下，如果state1不是64位对齐的地址，那么state1的第一个元素是信号量，后两个元素分别是waiter数和计数值。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/22/ac/22c40ac54cfeb53669a6ae39020c23ac.jpg?wh=3874%2A1439" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/22/ac/22c40ac54cfeb53669a6ae39020c23ac.jpg?wh=3874%2A1439" /></p>
 <p>然后，我们继续深入源码，看一下Add、Done和Wait这三个方法的实现。</p>
 <p>在查看这部分源码实现时，我们会发现，除了这些方法本身的实现外，还会有一些额外的代码，主要是race检查和异常检查的代码。其中，有几个检查非常关键，如果检查不通过，会出现panic，这部分内容我会在下一小节分析WaitGroup的错误使用场景时介绍。现在，我们先专注在Add、Wait和Done本身的实现代码上。</p>
 <p>我先为你梳理下<strong>Add方法的逻辑</strong>。Add方法主要操作的是state的计数部分。你可以为计数值增加一个delta值，内部通过原子操作把这个值加到计数值上。需要注意的是，这个delta也可以是个负数，相当于为计数值减去一个值，Done方法内部其实就是通过Add(-1)实现的。</p>
@@ -14235,9 +14235,9 @@
 <p>这段代码最大的一个问题，就是第9行copy了WaitGroup的实例w。虽然这段代码能执行成功，但确实是违反了WaitGroup使用之后不要复制的规则。在项目中，我们可以通过vet工具检查出这样的错误。</p>
 <p>Docker <a href="https://github.com/moby/moby/issues/28161">issue 28161</a> 和 <a href="https://github.com/moby/moby/issues/27011">issue 27011</a> ，都是因为在重用WaitGroup的时候，没等前一次的Wait结束就Add导致的错误。Etcd <a href="https://github.com/etcd-io/etcd/issues/6534">issue 6534</a> 也是重用WaitGroup的Bug，没有等前一个Wait结束就Add。</p>
 <p>Kubernetes <a href="https://github.com/kubernetes/kubernetes/pull/59574">issue 59574</a> 的Bug是忘记Wait之前增加计数了，这就属于我们通常认为几乎不可能出现的Bug。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3f/f8/3ff86f54893c23d997113440a3a0e2f8.png?wh=1122%2A680" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3f/f8/3ff86f54893c23d997113440a3a0e2f8.png?wh=1122%2A680" /></p>
 <p>即使是开发Go语言的开发者自己，在使用WaitGroup的时候，也可能会犯错。比如 <a href="https://github.com/golang/go/issues/12813">issue 12813</a>，因为defer的使用，Add方法可能在Done之后才执行，导致计数负值的panic。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2f/5c/2f69127691a431300478d7d7d1c7bd5c.png?wh=1129%2A391" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2f/5c/2f69127691a431300478d7d7d1c7bd5c.png?wh=1129%2A391" /></p>
 <h2 id="_2">总结</h2>
 <p>学完这一讲，我们知道了使用WaitGroup容易犯的错，是不是有些手脚被束缚的感觉呢？其实大可不必，只要我们不是特别复杂地使用WaitGroup，就不用有啥心理负担。</p>
 <p>而关于如何避免错误使用WaitGroup的情况，我们只需要尽量保证下面5点就可以了：</p>
@@ -14249,7 +14249,7 @@
 <li>不遗漏Done方法的调用，否则会导致Wait hang住无法返回。</li>
 </ul>
 <p>这一讲我们详细学习了WaitGroup的相关知识，这里我整理了一份关于WaitGroup的知识地图，方便你复习。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/84/ff/845yyf00c6db85c0yy59867e6de77dff.jpg?wh=2250%2A1741" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/84/ff/845yyf00c6db85c0yy59867e6de77dff.jpg?wh=2250%2A1741" /></p>
 <h2 id="_3">思考题</h2>
 <p>通常我们可以把WaitGroup的计数值，理解为等待要完成的waiter的数量。你可以试着扩展下WaitGroup，来查询WaitGroup的当前的计数值吗？</p>
 <p>欢迎在留言区写下你的思考和答案，我们一起交流讨论。如果你觉得有所收获，也欢迎你把今天的内容分享给你的朋友或同事。</p>
@@ -14495,8 +14495,6 @@ runtime_Semrelease(semap, false, 0)
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

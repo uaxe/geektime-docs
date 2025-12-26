@@ -5907,10 +5907,10 @@
 <p>我们先从一个相对简单的案例说起，一起分析下误操作导致Page Cache被回收掉的情况，它具体是怎样发生的。</p>
 <p>我们知道，对于Page Cache而言，是可以通过drop_cache来清掉的，很多人在看到系统中存在非常多的Page Cache时会习惯使用drop_cache来清理它们，但是这样做是会有一些负面影响的，比如说这些Page Cache被清理掉后可能会引起系统性能下降。为什么？</p>
 <p>其实这和inode有关，那inode是什么意思呢？inode是内存中对磁盘文件的索引，进程在查找或者读取文件时就是通过inode来进行操作的，我们用下面这张图来表示一下这种关系：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7e/99/7ef7747f71ef236e8cf5f9378d80da99.jpg?wh=3500%2A2564" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7e/99/7ef7747f71ef236e8cf5f9378d80da99.jpg?wh=3500%2A2564" /></p>
 <p>如上图所示，进程会通过inode来找到文件的地址空间（address_space），然后结合文件偏移（会转换成page index）来找具体的Page。如果该Page存在，那就说明文件内容已经被读取到了内存；如果该Page不存在那就说明不在内存中，需要到磁盘中去读取。你可以理解为inode是Pagecache Page（页缓存的页）的宿主（host），如果inode不存在了，那么PageCache Page也就不存在了。</p>
 <p>如果你使用过drop_cache来释放inode的话，应该会清楚它有几个控制选项，我们可以通过写入不同的数值来释放不同类型的cache（用户数据Page Cache，内核数据Slab，或者二者都释放），这些选项你可以去看<a href="https://www.kernel.org/doc/Documentation/sysctl/vm.txt">Kernel Documentation的描述</a>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ab/7d/ab748f14be603df45c2570fe8e24707d.jpg?wh=3779%2A1660" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ab/7d/ab748f14be603df45c2570fe8e24707d.jpg?wh=3779%2A1660" /></p>
 <p>于是这样就引入了一个容易被我们忽略的问题：<strong>当我们执行echo 2来drop slab的时候，它也会把Page Cache给drop掉</strong>，很多运维人员都会忽视掉这一点。</p>
 <p>在系统内存紧张的时候，运维人员或者开发人员会想要通过drop_caches的方式来释放一些内存，但是由于他们清楚Page Cache被释放掉会影响业务性能，所以就期望只去drop slab而不去drop pagecache。于是很多人这个时候就运行 echo 2 &gt; /proc/sys/vm/drop_caches，但是结果却出乎了他们的意料：Page Cache也被释放掉了，业务性能产生了明显的下降。</p>
 <p>很多人都遇到过这个场景：系统正在运行着，忽然Page Cache被释放掉了，由于不清楚释放的原因，所以很多人就会怀疑，是不是由其他人/程序执行了drop_caches导致的。那有没有办法来观察这个inode释放引起Page Cache被释放的行为呢？答案是有的。关于这一点，我们在下一节课会讲到。我们先来分析下如何观察是否有人或者有程序执行过drop_caches。</p>
@@ -5923,7 +5923,7 @@
 <p>针对这类问题，你除了在执行drop cache前三思而后行之外，还有其他的一些根治的解决方案。在讲这些解决方案之前，我们先来看一个更加复杂一点的案例，它们有一些共性，解决方案也类似，只是接下来这个案例涉及的内核机制更加复杂。</p>
 <h2 id="page-cache_1">内核机制引起Page Cache被回收而产生的业务性能下降</h2>
 <p>我们在前面已经提到过，在内存紧张的时候会触发内存回收，内存回收会尝试去回收reclaimable（可以被回收的）内存，这部分内存既包含Page Cache又包含reclaimable kernel memory(比如slab)。我们可以用下图来简单描述这个过程：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d3/3c/d33a7264358f20fb063cb49fc3f3163c.jpg?wh=3500%2A2870" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d3/3c/d33a7264358f20fb063cb49fc3f3163c.jpg?wh=3500%2A2870" /></p>
 <p>我简单来解释一下这个图。Reclaimer是指回收者，它可以是内核线程（包括kswapd）也可以是用户线程。回收的时候，它会依次来扫描pagecache page和slab page中有哪些可以被回收的，如果有的话就会尝试去回收，如果没有的话就跳过。在扫描可回收page的过程中回收者一开始扫描的较少，然后逐渐增加扫描比例直至全部都被扫描完。这就是内存回收的大致过程。</p>
 <p>接下来我所要讲述的案例就发生在“relcaim slab”中，我们从前一个案例已然知道，如果inode被回收的话，那么它对应的Page Cache也都会被回收掉，所以如果业务进程读取的文件对应的inode被回收了，那么该文件所有的Page Cache都会被释放掉，这也是容易引起性能问题的地方。</p>
 <p>那这个行为是否有办法观察？这同样也是可以通过/proc/vmstat来观察的，/proc/vmstat简直无所不能（这也是为什么我会在之前说内核开发者更习惯去观察/proc/vmstat）。</p>
@@ -6013,7 +6013,7 @@
 <p>然后你可以发现，drop_caches或者内存回收是回收不了这些内容的，我们的目的也就达到了。</p>
 <p>在有些情况下，对应用程序而言，修改源码是件比较麻烦的事，如果可以不修改源码来达到目的那就最好不过了。Linux内核同样实现了这种不改应用程序的源码而从系统层面调整来保护重要数据的机制，这个机制就是memory cgroup protection。</p>
 <p>它大致的思路是，将需要保护的应用程序使用memory cgroup来保护起来，这样该应用程序读写文件过程中所产生的Page Cache就会被保护起来不被回收或者最后被回收。memory cgroup protection大致的原理如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/71/cc/71e7347264a54773d902aa92535b87cc.jpg?wh=2200%2A1642" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/71/cc/71e7347264a54773d902aa92535b87cc.jpg?wh=2200%2A1642" /></p>
 <p>如上图所示，memory cgroup提供了几个内存水位控制线memory.{min, low, high, max} 。</p>
 <ul>
 <li><strong>memory.max</strong>
@@ -6172,8 +6172,6 @@ https:&#47;&#47;man7.org&#47;linux&#47;man-pages&#47;man2&#47;mlock.2.html</p>20
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -7089,7 +7089,7 @@
 <li>然后，在每个子进程中，都通过 accept() 或 epoll_wait() ，来处理相同的套接字。</li>
 </ul>
 <p>比如，最常用的反向代理服务器 Nginx 就是这么工作的。它也是由主进程和多个 worker 进程组成。主进程主要用来初始化套接字，并管理子进程的生命周期；而 worker 进程，则负责实际的请求处理。我画了一张图来表示这个关系。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/45/7e/451a24fb8f096729ed6822b1615b097e.png?wh=436%2A462" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/45/7e/451a24fb8f096729ed6822b1615b097e.png?wh=436%2A462" /></p>
 <p>这里要注意，accept() 和 epoll_wait() 调用，还存在一个惊群的问题。换句话说，当网络 I/O 事件发生时，多个进程被同时唤醒，但实际上只有一个进程来响应这个事件，其他被唤醒的进程都会重新休眠。</p>
 <ul>
 <li>其中，accept() 的惊群问题，已经在 Linux 2.6 中解决了；</li>
@@ -7100,9 +7100,9 @@
 <p>这里最主要的一个原因就是，这些 worker 进程，实际上并不需要经常创建和销毁，而是在没任务时休眠，有任务时唤醒。只有在 worker 由于某些异常退出时，主进程才需要创建新的进程来代替它。</p>
 <p>当然，你也可以用线程代替进程：主线程负责套接字初始化和子线程状态的管理，而子线程则负责实际的请求处理。由于线程的调度和切换成本比较低，实际上你可以进一步把 epoll_wait() 都放到主线程中，保证每次事件都只唤醒主线程，而子线程只需要负责后续的请求处理。</p>
 <p><strong>第二种，监听到相同端口的多进程模型</strong>。在这种方式下，所有的进程都监听相同的接口，并且开启 SO_REUSEPORT 选项，由内核负责将请求负载均衡到这些监听进程中去。这一过程如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/90/bd/90df0945f6ce5c910ae361bf2b135bbd.png?wh=436%2A462" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/90/bd/90df0945f6ce5c910ae361bf2b135bbd.png?wh=436%2A462" /></p>
 <p>由于内核确保了只有一个进程被唤醒，就不会出现惊群问题了。比如，Nginx 在 1.9.1 中就已经支持了这种模式。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/af/38/af2e6c3a19a6e90098772b5df0605b38.png?wh=850%2A780" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/af/38/af2e6c3a19a6e90098772b5df0605b38.png?wh=850%2A780" />
 （图片来自 <a href="https://www.nginx.com/blog/socket-sharding-nginx-release-1-9-1/">Nginx 官网博客</a>）</p>
 <p>不过要注意，想要使用SO_REUSEPORT选项，需要用 Linux 3.9 以上的版本才可以。</p>
 <h2 id="c1000k">C1000K</h2>
@@ -7123,7 +7123,7 @@
 <p>究其根本，还是 Linux 内核协议栈做了太多太繁重的工作。从网卡中断带来的硬中断处理程序开始，到软中断中的各层网络协议处理，最后再到应用程序，这个路径实在是太长了，就会导致网络包的处理优化，到了一定程度后，就无法更进一步了。</p>
 <p>要解决这个问题，最重要就是跳过内核协议栈的冗长路径，把网络包直接送到要处理的应用程序那里去。这里有两种常见的机制，DPDK 和 XDP。</p>
 <p>第一种机制，DPDK，是用户态网络的标准。它跳过内核协议栈，直接由用户态进程通过轮询的方式，来处理网络接收。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/99/3a/998fd2f52f0a48a910517ada9f2bb23a.png?wh=1600%2A1532" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/99/3a/998fd2f52f0a48a910517ada9f2bb23a.png?wh=1600%2A1532" />
 （图片来自 <a href="https://blog.selectel.com/introduction-dpdk-architecture-principles/">https://blog.selectel.com/introduction-dpdk-architecture-principles/</a>）</p>
 <p>说起轮询，你肯定会下意识认为它是低效的象征，但是进一步反问下自己，它的低效主要体现在哪里呢？是查询时间明显多于实际工作时间的情况下吧！那么，换个角度来想，如果每时每刻都有新的网络包需要处理，轮询的优势就很明显了。比如：</p>
 <ul>
@@ -7133,7 +7133,7 @@
 <p>此外，DPDK 还通过大页、CPU 绑定、内存对齐、流水线并发等多种机制，优化网络包的处理效率。</p>
 <p>第二种机制，XDP（eXpress Data Path），则是 Linux 内核提供的一种高性能网络数据路径。它允许网络包，在进入内核协议栈之前，就进行处理，也可以带来更高的性能。XDP 底层跟我们之前用到的 bcc-tools 一样，都是基于 Linux 内核的 eBPF 机制实现的。</p>
 <p>XDP 的原理如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/06/be/067ef9df4212cd4ede3cffcdac7001be.png?wh=1024%2A560" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/06/be/067ef9df4212cd4ede3cffcdac7001be.png?wh=1024%2A560" />
 （图片来自 <a href="https://www.iovisor.org/technology/xdp">https://www.iovisor.org/technology/xdp</a>）</p>
 <p>你可以看到，XDP 对内核的要求比较高，需要的是 Linux <a href="https://github.com/iovisor/bcc/blob/master/docs/kernel-versions.md#xdp">4.8 以上版本</a>，并且它也不提供缓存队列。基于 XDP 的应用程序通常是专用的网络应用，常见的有 IDS（入侵检测系统）、DDoS 防御、 <a href="https://github.com/cilium/cilium">cilium</a> 容器网络插件等。</p>
 <h2 id="_2">小结</h2>
@@ -7270,8 +7270,6 @@ C可能是concurrtently 的缩写 ？</p>2019-07-02</li><br/><li><span>懵懂的
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

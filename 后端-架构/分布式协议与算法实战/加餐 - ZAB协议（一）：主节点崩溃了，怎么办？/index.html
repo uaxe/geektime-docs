@@ -14147,12 +14147,12 @@
 <li>node，投票的节点，比如节点B。</li>
 </ul>
 <p>假设一个ZooKeeper集群，由节点A、B、C组成，其中节点A是领导者，节点B、C是跟随者（为了方便演示，假设epoch分别是1和1，lastZxid分别是101和102，集群ID分别为2和3）。那么如果节点A宕机了，会如何选举呢？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/46/e5/4667ae63fbdbc613e1d94667544bd0e5.jpg?wh=1142%2A590" title="图1" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/46/e5/4667ae63fbdbc613e1d94667544bd0e5.jpg?wh=1142%2A590" title="图1" /></p>
 <p>首先，当跟随者检测到连接领导者节点的读操作等待超时了，跟随者会变更节点状态，将自己的节点状态变更成LOOKING，然后发起领导者选举（为了演示方便，我们假设这时节点B、C都已经检测到了读操作超时）：
-<img alt="" src="https://static001.geekbang.org/resource/image/2b/23/2bc48cf03938cc37d3513239da847c23.jpg?wh=2691%2A1472" title="图2" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2b/23/2bc48cf03938cc37d3513239da847c23.jpg?wh=2691%2A1472" title="图2" /></p>
 <p>接着，每个节点会创建一张选票，这张选票是投给自己的，也就是说，节点B、C都“自告奋勇”推荐自己为领导者，并创建选票&lt;2, 1, 101, B&gt;和&lt;3, 1, 102, C&gt;，然后各自将选票发送给集群中所有节点，也就是说，B发送给B、C，C也发送给B、C。</p>
 <p>一般而言，节点会先接收到自己发送给自己的选票（因为不需要跨节点通讯，传输更快），也就是说，B会先收到来自B的选票，C会先收到来自C的选票：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e3/06/e32a08ca54943c96fb415a77f2fe7a06.jpg?wh=1142%2A585" title="图3" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e3/06/e32a08ca54943c96fb415a77f2fe7a06.jpg?wh=1142%2A585" title="图3" /></p>
 <p>需要你注意的是，集群的各节点收到选票后，为了选举出数据最完整的节点，对于每一张接收到选票，节点都需要进行领导者PK，也就将选票提议的领导者和自己提议的领导者进行比较，找出更适合作为领导者的节点，约定的规则如下：</p>
 <ul>
 <li>优先检查任期编号（Epoch），任期编号大的节点作为领导者；</li>
@@ -14161,16 +14161,16 @@
 </ul>
 <p>如果选票提议的领导者，比自己提议的领导者，更适合作为领导者，那么节点将调整选票内容，推荐选票提议的领导者作为领导者。</p>
 <p>当节点B、C接收到的选票后，因为选票提议的领导者与自己提议的领导者相同，所以，领导者PK的结果，是不需要调整选票信息，那么节点B、C，正常接收和保存选票就可以了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4c/96/4c0546cfe2dbc11ed99cab414ec12e96.jpg?wh=1142%2A636" title="图4" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4c/96/4c0546cfe2dbc11ed99cab414ec12e96.jpg?wh=1142%2A636" title="图4" /></p>
 <p>接着节点B、C分别接收到来自对方的选票，比如B接收到来自C的选票，C接收到来自B的选票：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5d/d5/5d3fe6b30854490faf096826c62df5d5.jpg?wh=1142%2A573" title="图5" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5d/d5/5d3fe6b30854490faf096826c62df5d5.jpg?wh=1142%2A573" title="图5" /></p>
 <p>对于C而言，它提议的领导者是C，而选票（&lt;2, 1, 101, B&gt;）提议的领导者是B，因为节点C的任期编号与节点B相同，但节点C的事务标识符的最大值比节点B的大，那么，按照约定的规则，相比节点B，节点C更适合作为领导者，也就是说，节点C不需要调整选票信息，正常接收和保存选票就可以了。</p>
 <p>但对于对于节点B而言，它提议的领导者是B，选票（&lt;3, 1, 102, C&gt;）提议的领导者是C，因为节点C的任期编号与节点B相同，但节点C的事务标识符的最大值比节点B的大，那么，按照约定的规则，相比节点B，节点C应该作为领导者，所以，节点B除了接收和保存选票信息，还会更新自己的选票为&lt;3, 1, 102, B&gt;，也就是推荐C作为领导者，并将选票重新发送给节点B、C：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bf/77/bf70a4f1e9c28de2bbd3c134193ae577.jpg?wh=1142%2A605" title="图6" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bf/77/bf70a4f1e9c28de2bbd3c134193ae577.jpg?wh=1142%2A605" title="图6" /></p>
 <p>接着，当节点B、C接收到来自节点B，新的选票时，因为这张选票（&lt;3, 1, 102, B&gt;）提议的领导者，与他们提议的领导者是一样的，都是节点C，所以，他们正常接收和存储这张选票，就可以。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/04/7c/04ec7fdf75160571c8689f040292d57c.jpg?wh=1142%2A583" title="图7" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/04/7c/04ec7fdf75160571c8689f040292d57c.jpg?wh=1142%2A583" title="图7" /></p>
 <p>最后，因为此时节点B、C提议的领导者（节点C）赢得大多数选票了（2张选票），那么，节点B、C将根据投票结果，变更节点状态，并退出选举。比如，因为当选的领导者是节点C，那么节点B将变更状态为FOLLOWING，并退出选举，而节点C将变更状态为LEADING，并退出选举。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a9/03/a9113e0d2653c77ddc41778510784003.jpg?wh=1142%2A571" title="图8" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a9/03/a9113e0d2653c77ddc41778510784003.jpg?wh=1142%2A571" title="图8" /></p>
 <p>你看，这样我们就选举出新的领导者（节点C），这个选举的过程，很容易理解，我在这里只是假设了一种选举的情况，还会存在节点间事务标识符相同、节点在广播投票信息前接收到了其他节点的投票等情况，这里你可以思考一下，课下自己动手操作一下。</p>
 <p>为了帮你在线下更好的阅读代码，自我学习，我想补充一下，逻辑时钟（logicclock）（也就是选举的轮次），会影响选票的有效性，具体来说，逻辑时钟大的节点不会接收来自值小的节点的投票信息。比如，节点A、B的逻辑时钟分别为1和2，那么，节点B将拒绝接收来自节点A的投票信息。</p>
 <p>在这里，我想强调的是，领导者选举的目标，是从大多数节点中选举出数据最完整的节点，也就是大多数节点中，事务标识符值最大的节点。<strong>另外，ZAB本质上是通过“见贤思齐，相互推荐”的方式来选举领导者的。</strong>也就说，根据领导者PK，节点会重新推荐更合适的领导者，最终选举出了大多数节点中数据最完整的节点。</p>
@@ -14190,7 +14190,7 @@
 <p>如果跟随者将自己的状态从跟随者状态变更为选举状态，这就表示跟随者在发起领导者选举，那么，在ZooKeeper中，领导者选举是如何实现的呢？</p>
 <h2 id="_3">如何实现选举？</h2>
 <p>领导者选举，是在FastLeaderElection.lookForLeader()中实现的。我来讲一下核心的流程，大概的流程，就像下面的样子。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/83/57/83c37bc2a25a4e892cf1a5c3a2c6c457.jpg?wh=1142%2A1251" title="图9" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/83/57/83c37bc2a25a4e892cf1a5c3a2c6c457.jpg?wh=1142%2A1251" title="图9" /></p>
 <p>为帮助你更好的理解这个流程，我们来一起走读下核心代码，加深下印象。</p>
 <p>1.在集群稳定运行时，处于跟随者状态的节点，在Follower.followLeader()函数中，周期性地读数据包和处理数据包：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>QuorumPacket qp = new QuorumPacket();
@@ -14399,8 +14399,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

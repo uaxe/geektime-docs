@@ -15183,7 +15183,7 @@
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="kd">let</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a</span><span class="p">.</span><span class="n">clone</span><span class="p">();</span>
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="p">}</span>
 </code></pre></div>
-<p>上面的代码我们创建了三个 Rc，分别是 a、b 和 c。它们共同指向堆上相同的数据，也就是说，堆上的数据有了三个共享的所有者。在这段代码结束时，c 先 drop，引用计数变成 2，然后 b drop、a drop，引用计数归零，堆上内存被释放。<img alt="图片" src="https://static001.geekbang.org/resource/image/a3/8c/a3510f9b565577bc74bc0dcda0b3e78c.jpg?wh=1920x1300" /></p>
+<p>上面的代码我们创建了三个 Rc，分别是 a、b 和 c。它们共同指向堆上相同的数据，也就是说，堆上的数据有了三个共享的所有者。在这段代码结束时，c 先 drop，引用计数变成 2，然后 b drop、a drop，引用计数归零，堆上内存被释放。<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a3/8c/a3510f9b565577bc74bc0dcda0b3e78c.jpg?wh=1920x1300" /></p>
 <p>你也许会有疑问：为什么我们生成了对同一块内存的多个所有者，但是，编译器不抱怨所有权冲突呢？</p>
 <p>仔细看这段代码：首先 a 是 Rc::new(1) 的所有者，这毋庸置疑；然后 b 和 c 都调用了 a.clone()，分别得到了一个新的 Rc，所以从编译器的角度，abc 都各自拥有一个 Rc。如果文字你觉得稍微有点绕，看看 Rc 的 clone() 函数的实现，就很清楚了（<a href="https://doc.rust-lang.org/src/alloc/rc.rs.html#1433-1453">源代码</a>）：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">fn</span><span class="w"> </span><span class="nf">clone</span><span class="p">(</span><span class="o">&amp;</span><span class="bp">self</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">Rc</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
@@ -15199,7 +15199,7 @@
 <p>上一讲我们讲到，在所有权模型下，堆内存的生命周期，和创建它的栈内存的生命周期保持一致。所以 Rc 的实现似乎与此格格不入。的确，如果完全按照上一讲的单一所有权模型，Rust 是无法处理 Rc 这样的引用计数的。</p>
 <p>Rust必须提供一种机制，让代码可以像 C/C++ 那样，<strong>创建不受栈内存控制的堆内存</strong>，从而绕过编译时的所有权规则。Rust 提供的方式是 Box::leak()。</p>
 <p>Box 是 Rust 下的智能指针，它可以强制把任何数据结构创建在堆上，然后在栈上放一个指针指向这个数据结构，但此时堆内存的生命周期仍然是受控的，跟栈上的指针一致。我们后续讲到智能指针时会详细介绍 Box。</p>
-<p>Box::leak()，顾名思义，它创建的对象，从堆内存上泄漏出去，不受栈内存控制，是一个自由的、生命周期可以大到和整个进程的生命周期一致的对象。<img alt="图片" src="https://static001.geekbang.org/resource/image/9f/cd/9f1a17dea75f9cae596a56f51d007ccd.jpg?wh=1920x881" /></p>
+<p>Box::leak()，顾名思义，它创建的对象，从堆内存上泄漏出去，不受栈内存控制，是一个自由的、生命周期可以大到和整个进程的生命周期一致的对象。<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9f/cd/9f1a17dea75f9cae596a56f51d007ccd.jpg?wh=1920x881" /></p>
 <p>所以我们相当于主动撕开了一个口子，允许内存泄漏。注意，在 C/C++ 下，其实你通过 malloc 分配的每一片堆内存，都类似 Rust 下的 Box::leak()。我很喜欢 Rust 这样的设计，它符合最小权限原则（<a href="https://en.wikipedia.org/wiki/Principle_of_least_privilege">Principle of least privilege</a>），最大程度帮助开发者撰写安全的代码。</p>
 <p><strong>有了 Box::leak()，我们就可以跳出 Rust 编译器的静态检查</strong>，保证 Rc 指向的堆内存，有最大的生命周期，然后我们再通过引用计数，在合适的时机，结束这段内存的生命周期。如果你对此感兴趣，可以看 <a href="https://doc.rust-lang.org/src/alloc/rc.rs.html#342-350">Rc::new() 的源码</a>。</p>
 <p>插一句，在学习语言的过程中，不要因为觉得自己是个初学者，就不敢翻阅标准库的源码，相反，遇到不懂的地方，如果你去看对应的源码，得到的是第一手的知识，一旦搞明白，就会学得非常扎实，受益无穷。</p>
@@ -15210,7 +15210,7 @@
 </ul>
 <h3 id="dag">实现 DAG</h3>
 <p>现在我们用 Rc 来实现之前无法实现的 DAG。</p>
-<p>假设 Node 就只包含 id 和指向下游（downstream）的指针，因为 DAG 中的一个节点可能被多个其它节点指向，所以我们使用 <code>Rc&lt;Node&gt;</code> 来表述它；一个节点可能没有下游节点，所以我们用 <code>Option&lt;Rc&lt;Node&gt;&gt;</code> 来表述它。<img alt="图片" src="https://static001.geekbang.org/resource/image/0c/ab/0c5b0ff12963792a55baa43d3b3054ab.jpg?wh=1920x982" /></p>
+<p>假设 Node 就只包含 id 和指向下游（downstream）的指针，因为 DAG 中的一个节点可能被多个其它节点指向，所以我们使用 <code>Rc&lt;Node&gt;</code> 来表述它；一个节点可能没有下游节点，所以我们用 <code>Option&lt;Rc&lt;Node&gt;&gt;</code> 来表述它。<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0c/ab/0c5b0ff12963792a55baa43d3b3054ab.jpg?wh=1920x982" /></p>
 <p>要建立这样一个 DAG，我们需要为 Node 提供以下方法：</p>
 <ul>
 <li>new()：建立一个新的 Node。</li>
@@ -15301,10 +15301,10 @@
 <a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="p">}</span>
 </code></pre></div>
 <p>如果你运行代码3，编译没有任何问题，但在运行到第 9 行时，会得到：“already mutably borrowed: BorrowError” 这样的错误。可以看到，所有权的借用规则在此依旧有效，只不过它在运行时检测。</p>
-<p>这就是外部可变性和内部可变性的重要区别，我们用下表来总结一下：<img alt="" src="https://static001.geekbang.org/resource/image/94/3c/94bd27a93210ea829482663c9138de3c.jpg?wh=3402x1017" /></p>
+<p>这就是外部可变性和内部可变性的重要区别，我们用下表来总结一下：<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/94/3c/94bd27a93210ea829482663c9138de3c.jpg?wh=3402x1017" /></p>
 <h3 id="dag_1">实现可修改DAG</h3>
 <p>好，现在我们对 RefCell 有一个直观的印象，看看如何使用它和 Rc 来让之前的 DAG 变得可修改。</p>
-<p>首先数据结构的 downstream 需要 Rc 内部嵌套一个 RefCell，这样，就可以利用 RefCell 的内部可变性，来获得数据的可变借用了，同时 Rc 还允许值有多个所有者。<img alt="图片" src="https://static001.geekbang.org/resource/image/62/46/6264d51da5c5e9025abf28d7c0dd2e46.jpg?wh=1920x1324" /></p>
+<p>首先数据结构的 downstream 需要 Rc 内部嵌套一个 RefCell，这样，就可以利用 RefCell 的内部可变性，来获得数据的可变借用了，同时 Rc 还允许值有多个所有者。<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/62/46/6264d51da5c5e9025abf28d7c0dd2e46.jpg?wh=1920x1324" /></p>
 <p>完整的代码我放到这里了（<a href="https://play.rust-lang.org/?version=stable&amp;mode=debug&amp;edition=2018&amp;gist=abbb6881ed94a9881ed96ace779d3734">代码4</a>）：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">cell</span><span class="p">::</span><span class="n">RefCell</span><span class="p">;</span>
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">rc</span><span class="p">::</span><span class="n">Rc</span><span class="p">;</span>
@@ -15365,7 +15365,7 @@
 <p>我们对所有权有了更深入的了解，掌握了 Rc / Arc、RefCell / Mutex / RwLock 这些数据结构的用法。</p>
 <p>如果想绕过“一个值只有一个所有者”的限制，我们可以使用 <strong>Rc / Arc 这样带引用计数的智能指针</strong>。其中，Rc 效率很高，但只能使用在单线程环境下；Arc 使用了原子结构，效率略低，但可以安全使用在多线程环境下。</p>
 <p>然而，Rc / Arc 是不可变的，如果想要修改内部的数据，<strong>需要引入内部可变性</strong>，在单线程环境下，可以在 Rc 内部使用 RefCell；在多线程环境下，可以使用 Arc 嵌套 Mutex 或者 RwLock 的方法。</p>
-<p>你可以看这张表快速回顾：<img alt="" src="https://static001.geekbang.org/resource/image/fc/86/fc524d667fabeec0a8a22d0e10531086.jpg?wh=3387x1982" /></p>
+<p>你可以看这张表快速回顾：<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fc/86/fc524d667fabeec0a8a22d0e10531086.jpg?wh=3387x1982" /></p>
 <h3 id="_3">思考题</h3>
 <ol>
 <li>运行下面的代码，查看错误，并阅读 <a href="https://doc.rust-lang.org/std/thread/fn.spawn.html">std::thread::spawn</a> 的文档，找到问题的原因后，修改代码使其编译通过。</li>
@@ -15750,8 +15750,6 @@ self.strong_ref().set(strong + 1);
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

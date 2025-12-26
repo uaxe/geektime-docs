@@ -14831,7 +14831,7 @@
 <p>选型之前，我们得先知道要解决什么问题。消息队列是需要满足高吞吐、高可靠、低延时，并支持多语言访问的基础软件，网络模块最需要解决的是<strong>性能</strong>、<strong>稳定性、开发成本</strong>三个问题。接下来我们就围绕这三点来思考消息队列网络模块应该怎样设计。首先我们先来分析一下网络模块的性能瓶颈可能在哪里。</p>
 <h2 id="_1">网络模块的性能瓶颈分析</h2>
 <p>我们基于最基础的消息队列访问链路图分析。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a8/98/a831a39cd1bf783665eb844257c69898.jpg?wh=3228x1488" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a8/98/a831a39cd1bf783665eb844257c69898.jpg?wh=3228x1488" /></p>
 <p>对于<strong>单个请求</strong>来说，请求流程是：客户端（生产者/消费者）构建请求后，向服务端发送请求包 -&gt; 服务端接收包后，将包交给业务线程处理 -&gt; 业务线程处理完成后，将结果返回给客户端。其中可能消耗性能的有三个点。</p>
 <ul>
 <li><strong>编解码的速度</strong>。上节课我们详细讲过。</li>
@@ -14852,13 +14852,13 @@
 <p>从技术原理来看，高效处理大量TCP连接，在消息队列中主要有单条TCP连接的复用和多路复用两种技术思路。</p>
 <p><strong>1. 单条TCP连接的复用</strong></p>
 <p>这是在一条真实的TCP连接中，创建信道（channel，可以理解为虚拟连接）的概念。通过编程手段，我们把信道当做一条TCP连接使用，做到TCP连接的复用，避免创建大量TCP连接导致系统资源消耗过多。缺点是在协议设计和编码实现的时候有额外开发工作量，而且近年随着异步IO、IO多路复用技术的发展，这种方案有点多余。
-<img alt="" src="https://static001.geekbang.org/resource/image/15/e6/159cca23dd9f28f00bbb55d53e323be6.jpg?wh=3228x1488" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/15/e6/159cca23dd9f28f00bbb55d53e323be6.jpg?wh=3228x1488" /></p>
 <p>因为语言特性、历史背景原因，RabbitMQ用的就是这种方案。</p>
 <p><strong>2. IO多路复用技术</strong></p>
 <p>主流的消息队列Kakfa、RocketMQ、Pulsar的网络模块都是基于IO多路复用的思路开发的。</p>
 <p>IO多路复用技术，是指通过把多个IO的阻塞复用到同一个selector的阻塞上，让系统在单线程的情况下可以同时处理多个客户端请求。最大的优势是系统开销小，系统不需要创建额外的进程或者线程，降低了维护的工作量，也节省了资源。</p>
 <p>目前支持IO多路复用的系统调用有Select、Poll、Epoll等，Java NIO库底层就是基于Epoll机制实现的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d3/75/d30334cf82400efcf1761a439aaab875.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d3/75/d30334cf82400efcf1761a439aaab875.jpg?wh=10666x6000" /></p>
 <p>不过，即使用了这两种技术，<strong>单机能处理的连接数还是有上限的</strong>。</p>
 <p>第一个上限是操作系统的FD上限，如果连接数超过了FD的数量，连接会创建失败。第二个限制是系统资源的限制，主要是CPU和内存。频繁创建、删除或者创建过多连接会消耗大量的物理资源，导致系统负载过高。</p>
 <p>所以你会发现，<strong>每个消息队列的配置中都会提到连接数的限制和系统</strong> <strong>FD</strong> <strong>上限调整</strong>。Linux中可以通过命令查看系统的FD信息。</p>
@@ -14873,7 +14873,7 @@
 <h3 id="reactor"><strong>基于Reactor模型处理高并发请求</strong></h3>
 <p>先看单个请求的处理。</p>
 <p>我们知道，两点之间直线最短。对于单个请求来说，最快的处理方式就是客户端直接发出请求，服务端接收到包后，直接丢给后面的业务线程处理，当业务线程处理成功后，直接返回给客户端。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/31/8b/31ac43088fd290fe9b167cb6f8b35b8b.jpg?wh=3228x1488" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/31/8b/31ac43088fd290fe9b167cb6f8b35b8b.jpg?wh=3228x1488" /></p>
 <p>这种处理模式是最快的，但是这里有两个问题需要解决。</p>
 <ul>
 <li>如何第一时间拿到包交给后端的业务逻辑处理？</li>
@@ -14883,7 +14883,7 @@
 <p>再看高并发请求的情况。</p>
 <p>在高并发的情况下会有很多连接、请求需要处理，核心思路就是并行、多线程处理。那如何并行处理呢？这时候就需要用到 Reactor 模型了。</p>
 <p>Reactor 模型是一种处理并发服务请求的事件设计模式，当主流程收到请求后，通过多路分离处理的方式，把请求分发给相应的请求处理器处理。如下图所示，Reactor 模式包含Reactor、Acceptor、Handler三个角色。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ef/d5/ef7e60fdc7353e58bd39b522628d96d5.jpg?wh=3228x1488" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ef/d5/ef7e60fdc7353e58bd39b522628d96d5.jpg?wh=3228x1488" /></p>
 <ul>
 <li>Reactor：负责监听和分配事件。收到事件后分派给对应的 Handler处理，事件包括连接建立就绪、读就绪、写就绪等。</li>
 <li>Acceptor：负责处理客户端新连接。Reactor 接收到客户端的连接事件后，会转发给 Acceptor，Acceptor接收客户端的连接，然后创建对应的Handler，并向Reactor注册此 Handler。</li>
@@ -14897,34 +14897,34 @@
 </ul>
 <p>我们具体分析一下，看消息队列更适合哪一种。</p>
 <p>单 Reactor 单线程模型，特点是Reactor和Handler都是单线程的串行处理。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d1/4f/d17de8f24bfaa4ea4278499f8436a04f.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d1/4f/d17de8f24bfaa4ea4278499f8436a04f.jpg?wh=10666x6000" /></p>
 <p>优点是所有处理逻辑放在单线程中实现，没有上下文切换、线程竞争、进程通信等问题。缺点是在性能与可靠性方面存在比较严重的问题。</p>
 <p>性能上，因为是单线程处理，无法充分利用 CPU 资源，并且业务逻辑Handler的处理是同步的，容易造成阻塞，出现性能瓶颈。可靠性主要是因为单Reactor是单线程的，如果出现异常不能处理请求，会导致整个系统通信模块不可用。</p>
 <p><strong>所以单</strong> <strong>Reactor</strong> <strong>单进程模型不适用于计算密集型的场景，只适用于业务处理非常快速的场景</strong>。</p>
 <p>相比起来，单 Reactor 多线程模型，业务逻辑处理Handler 变成了多线程，也就是说，获取到 IO读写事件之后，业务逻辑是一批线程在处理。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2b/a6/2b14d7993cbfe6d0c82df5e8886f7ba6.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2b/a6/2b14d7993cbfe6d0c82df5e8886f7ba6.jpg?wh=10666x6000" /></p>
 <p>优点是 Handler 收到响应后通过 send 把响应结果返回给客户端，降低 Reactor 的性能开销，提升整个应用的吞吐。而且 Handler 使用多线程模式，可以充分利用 CPU 的性能，提高了业务逻辑的处理速度。</p>
 <p>缺点是 Handler 使用多线程模式，带来了多线程竞争资源的开销，同时涉及共享数据的互斥和保护机制，实现比较复杂。另外，单个 Reactor 承担所有事件的监听、分发和响应，对于高并发场景，容易造成性能瓶颈。</p>
 <p>在此基础上，主从 Reactor 多线程模型，是让Reactor也变为了多线程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7a/5b/7a4fafd4957ea738d462e015dfb8c55b.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7a/5b/7a4fafd4957ea738d462e015dfb8c55b.jpg?wh=10666x6000" /></p>
 <p>当前业界消息队列的网络模型，比如Pulsar、Kafka、RocketMQ，为了保证性能，都是基于主从 Reactor 多线程模型开发的。</p>
 <p>这种方案，优点是Reactor的主线程和子线程分工明确。主线程只负责接收新连接，子线程负责完成后续的业务处理。同时主线程和子线程的交互也很简单，子线程接收主线程的连接后，只管业务处理即可，无须关注主线程，可以直接在子线程把处理结果返回给客户端。所以，主从Reactor 多线程模型适用于高并发场景，Netty 网络通信框架也采用了这种实现。</p>
 <p>缺点是如果基于NIO从零开始开发，开发的复杂度和成本较高。另外，Acceptor是一个单线程，如果挂了，如何处理客户端新连接是一个风险点。</p>
 <p>为了解决Acceptor的单点问题，有些组件为了保证高可用性，会对主从 Reactor 多线程做一些优化，把Acceptor也变为多线程的形态。我们在公有云上商业化版本的 Kafka 就是使用的这种模型。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/03/cc/032c1b1331eceb41defd944eb0b849cc.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/03/cc/032c1b1331eceb41defd944eb0b849cc.jpg?wh=10666x6000" /></p>
 <p>讲到这里，基于IO多路复用技术和Reactor模型，我们已经可以解决网络模块的性能问题了。接下来我们来看如何提高网络模块的稳定性和降低开发成本。</p>
 <h3 id="_3">基于成熟网络框架提高稳定性并降低开发成本</h3>
 <p>这里的“稳定性”主要指代码的稳定性。因为网络模块的特点是编码非常复杂，要考虑的细节和边界条件非常多，一些异常情况的处理也很细节，需要经过长时间的打磨。但是一旦开发完成，稳定后，代码几乎不需要再改动，因为需求是相对固定的。</p>
 <p>在Java中，网络编程的核心是一个基础的类库——Java NIO库，它的底层是基于Linux/Unix IO复用模型Epoll实现的。</p>
 <p>如果我们要基于Java NIO库开发一个Server，需要处理网络的闪断、客户端的重复接入、连接管理、安全认证、编解码、心跳保持、半包读写、异常处理等等细节，工作量非常大。所以在消息队列的网络编程模型中，<strong>为了提高稳定性或者降低成本，选择现成的、成熟的NIO框架是一个更好的方案。</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/16/58/163fa86b085a25c1d5e1a3cb0e316f58.jpg?wh=10147x2716" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/16/58/163fa86b085a25c1d5e1a3cb0e316f58.jpg?wh=10147x2716" /></p>
 <p>而Netty就是这样一个基于Java NIO封装的成熟框架。所以我们一提到Java的网络编程，最先想到的就是Netty。当前业界主流消息队列RocketMQ、Pulsar也都是基于Netty开发的网络模块，Kafka 因为历史原因是基于Java NIO实现的。</p>
 <p>接下来我们以RocketMQ和Kafka的网络模型为例，来分析一下主流消息队列的网络模型的设计实现。</p>
 <h2 id="_4">主流消息队列的网络模型实现</h2>
 <h3 id="kafka">Kafka 网络模型</h3>
 <p>Kafka的网络层没有用Netty作为底层的通信库，而是直接采用Java NIO实现网络通信。在网络模型中，也是参照Reactor多线程模型，采用多线程、多Selector的设计。</p>
 <p>看整个网络层的结构图。Processor线程和Handler线程之间通过RequestChannel传递数据，RequestChannel中包含一个RequestQueue队列和多个ResponseQueues队列。每个Processor线程对应一个ResponseQueue。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1d/fc/1d7c282b40c75d7c42966a60d35552fc.jpg?wh=3228x1932" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1d/fc/1d7c282b40c75d7c42966a60d35552fc.jpg?wh=3228x1932" /></p>
 <p>具体流程上：</p>
 <ul>
 <li>一个Acceptor接收客户端建立连接的请求，创建Socket连接并分配给Processor处理。</li>
@@ -14934,7 +14934,7 @@
 <h3 id="rocketmq">RocketMQ 网络模型</h3>
 <p>RocketMQ 采用Netty组件作为底层通信库，遵循Reactor多线程模型，同时又在Reactor模型上做了一些扩展和优化。所以它的网络模型是Netty的网络模型，Netty底层采用的是主从Reactor多线程模型，模型的原理逻辑跟前面讲到的主从Reactor多线程模型是一样的。</p>
 <p>在主从Reactor多线程模型的理论基础上，我们来分析一下RocketMQ中NettyRemotingServer 的具体实现形式。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a1/14/a1dd1a870050dc0bb825e28815a51214.jpg?wh=3228x1488" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a1/14/a1dd1a870050dc0bb825e28815a51214.jpg?wh=3228x1488" /></p>
 <p>具体流程上：</p>
 <ol>
 <li>一个 Reactor 主线程负责监听 TCP网络连接请求，建立好连接，创建SocketChannel，并注册到Selector上。RocketMQ的源码中会自动根据OS的类型选择NIO和Epoll，也可以通过参数配置，监听真正的网络数据。</li>
@@ -14946,7 +14946,7 @@
 <p>但是到这里还没有结束，NIO编程属于TCP层网络编程，我们还需要进行协议设计、编解码、链路的建立/关闭等工作，才算完成一个完整的网络模块的开发。有没有更好的方案可以解决这些问题，减少我们的工作量呢？</p>
 <h2 id="nio-rpc">NIO 编程和 RPC 框架</h2>
 <p>要想不关心底层的调用细节（如底层的网络协议和传输协议等），我们可以调用远端机器上的函数或方法来实现，也就是RPC（Remote Procedure Call）远程过程调用。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/68/e9/6843dd12f1a5d30636d58d386a99c7e9.jpg?wh=10666x2548" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/68/e9/6843dd12f1a5d30636d58d386a99c7e9.jpg?wh=10666x2548" /></p>
 <p>因为RPC调用的是一个远端对象，调用者和被调用者处于不同的节点上，想完成调用，必须实现4个能力。</p>
 <ul>
 <li><strong>网络传输协议</strong>：远端调用底层需要经过网络传输，所以需要选择网络通信协议，比如TCP。</li>
@@ -15099,8 +15099,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

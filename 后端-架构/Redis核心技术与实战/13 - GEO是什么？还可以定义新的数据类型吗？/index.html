@@ -14802,14 +14802,14 @@
 </ol>
 <p>可以看到，一辆车（或一个用户）对应一组经纬度，并且随着车（或用户）的位置移动，相应的经纬度也会变化。</p>
 <p>这种数据记录模式属于一个key（例如车ID）对应一个value（一组经纬度）。当有很多车辆信息要保存时，就需要有一个集合来保存一系列的key和value。Hash集合类型可以快速存取一系列的key和value，正好可以用来记录一系列车辆ID和经纬度的对应关系，所以，我们可以把不同车辆的ID和它们对应的经纬度信息存在Hash集合中，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c8/0e/c8d3f1951874da0d916ed51ccdce9e0e.jpg?wh=2461%2A1445" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c8/0e/c8d3f1951874da0d916ed51ccdce9e0e.jpg?wh=2461%2A1445" /></p>
 <p>同时，Hash类型的HSET操作命令，会根据key来设置相应的value值，所以，我们可以用它来快速地更新车辆变化的经纬度信息。</p>
 <p>到这里，Hash类型看起来是一个不错的选择。但问题是，对于一个LBS应用来说，除了记录经纬度信息，还需要根据用户的经纬度信息在车辆的Hash集合中进行范围查询。一旦涉及到范围查询，就意味着集合中的元素需要有序，但Hash类型的元素是无序的，显然不能满足我们的要求。</p>
 <p>我们再来看看使用<strong>Sorted Set类型</strong>是不是合适。</p>
 <p>Sorted Set类型也支持一个key对应一个value的记录模式，其中，key就是Sorted Set中的元素，而value则是元素的权重分数。更重要的是，Sorted Set可以根据元素的权重分数排序，支持范围查询。这就能满足LBS服务中查找相邻位置的需求了。</p>
 <p>实际上，GEO类型的底层数据结构就是用Sorted Set来实现的。咱们还是借着叫车应用的例子来加深下理解。</p>
 <p>用Sorted Set来保存车辆的经纬度信息时，Sorted Set的元素是车辆ID，元素的权重分数是经纬度信息，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a9/4e/a9a6bc78ea3bb652ef1404020dd2934e.jpg?wh=2356%2A1403" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a9/4e/a9a6bc78ea3bb652ef1404020dd2934e.jpg?wh=2356%2A1403" /></p>
 <p>这时问题来了，Sorted Set元素的权重分数是一个浮点数（float类型），而一组经纬度包含的是经度和纬度两个值，是没法直接保存为一个浮点数的，那具体该怎么进行保存呢？</p>
 <p>这就要用到GEO类型中的GeoHash编码了。</p>
 <h3 id="geohash">GeoHash的编码方法</h3>
@@ -14823,12 +14823,12 @@
 <p>我们先做第一次二分区操作，把经度区间[-180,180]分成了左分区[-180,0)和右分区[0,180]，此时，经度值116.37是属于右分区[0,180]，所以，我们用1表示第一次二分区后的编码值。</p>
 <p>接下来，我们做第二次二分区：把经度值116.37所属的[0,180]区间，分成[0,90)和[90, 180]。此时，经度值116.37还是属于右分区[90,180]，所以，第二次分区后的编码值仍然为1。等到第三次对[90,180]进行二分区，经度值116.37落在了分区后的左分区[90, 135)中，所以，第三次分区后的编码值就是0。</p>
 <p>按照这种方法，做完5次分区后，我们把经度值116.37定位在[112.5, 123.75]这个区间，并且得到了经度值的5位编码值，即11010。这个编码过程如下表所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3c/f2/3cb007yy63c820d6dd2e4999608683f2.jpg?wh=2890%2A850" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3c/f2/3cb007yy63c820d6dd2e4999608683f2.jpg?wh=2890%2A850" /></p>
 <p>对纬度的编码方式，和对经度的一样，只是纬度的范围是[-90，90]，下面这张表显示了对纬度值39.86的编码过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/65/6d/65f41469866cb94963b4c9afbf2b016d.jpg?wh=2887%2A838" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/65/6d/65f41469866cb94963b4c9afbf2b016d.jpg?wh=2887%2A838" /></p>
 <p>当一组经纬度值都编完码后，我们再把它们的各自编码值组合在一起，组合的规则是：最终编码值的偶数位上依次是经度的编码值，奇数位上依次是纬度的编码值，其中，偶数位从0开始，奇数位从1开始。</p>
 <p>我们刚刚计算的经纬度（116.37，39.86）的各自编码值是11010和10111，组合之后，第0位是经度的第0位1，第1位是纬度的第0位1，第2位是经度的第1位1，第3位是纬度的第1位0，以此类推，就能得到最终编码值1110011101，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4a/87/4a8296e841f18ed4f3a554703ebd5887.jpg?wh=3000%2A1441" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4a/87/4a8296e841f18ed4f3a554703ebd5887.jpg?wh=3000%2A1441" /></p>
 <p>用了GeoHash编码后，原来无法用一个权重分数表示的一组经纬度（116.37，39.86）就可以用1110011101这一个值来表示，就可以保存为Sorted Set的权重分数了。</p>
 <p>当然，使用GeoHash编码后，我们相当于把整个地理空间划分成了一个个方格，每个方格对应了GeoHash中的一个分区。</p>
 <p>举个例子。我们把经度区间[-180,180]做一次二分区，把纬度区间[-90,90]做一次二分区，就会得到4个分区。我们来看下它们的经度和纬度范围以及对应的GeoHash组合编码。</p>
@@ -14839,10 +14839,10 @@
 <li>分区四：[0,180]和[0,90]，编码11。</li>
 </ul>
 <p>这4个分区对应了4个方格，每个方格覆盖了一定范围内的经纬度值，分区越多，每个方格能覆盖到的地理空间就越小，也就越精准。我们把所有方格的编码值映射到一维空间时，相邻方格的GeoHash编码值基本也是接近的，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2a/74/2a2a650086acf9700c0603a4be8ceb74.jpg?wh=2187%2A1761" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2a/74/2a2a650086acf9700c0603a4be8ceb74.jpg?wh=2187%2A1761" /></p>
 <p>所以，我们使用Sorted Set范围查询得到的相近编码值，在实际的地理空间上，也是相邻的方格，这就可以实现LBS应用“搜索附近的人或物”的功能了。</p>
 <p>不过，我要提醒你一句，有的编码值虽然在大小上接近，但实际对应的方格却距离比较远。例如，我们用4位来做GeoHash编码，把经度区间[-180,180]和纬度区间[-90,90]各分成了4个分区，一共16个分区，对应了16个方格。编码值为0111和1000的两个方格就离得比较远，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0d/ba/0d64c9765ab72a50abef16a0275bc0ba.jpg?wh=2871%2A2250" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0d/ba/0d64c9765ab72a50abef16a0275bc0ba.jpg?wh=2871%2A2250" /></p>
 <p>所以，为了避免查询不准确问题，我们可以同时查询给定经纬度所在的方格周围的4个或8个方格。</p>
 <p>好了，到这里，我们就知道了，GEO类型是把经纬度所在的区间编码作为Sorted Set中元素的权重分数，把和经纬度相关的车辆ID作为Sorted Set中元素本身的值保存下来，这样相邻经纬度的查询就可以通过编码值的大小范围查询来实现了。接下来，我们再来聊聊具体如何操作GEO类型。</p>
 <h3 id="geo_1">如何操作GEO类型？</h3>
@@ -14875,12 +14875,12 @@
 <li>refcount：记录了对象的引用计数；</li>
 <li>*ptr：是指向数据的指针。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/05/af/05c2d546e507d8a863c002e2173c71af.jpg?wh=1096%2A1521" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/05/af/05c2d546e507d8a863c002e2173c71af.jpg?wh=1096%2A1521" /></p>
 <p>RedisObject结构借助<code>*ptr</code>指针，就可以指向不同的数据类型，例如，<code>*ptr</code>指向一个SDS或一个跳表，就表示键值对中的值是String类型或Sorted Set类型。所以，我们在定义了新的数据类型后，也只要在RedisObject中设置好新类型的type和encoding，再用<code>*ptr</code>指向新类型的实现，就行了。</p>
 <h3 id="_2">开发一个新的数据类型</h3>
 <p>了解了RedisObject结构后，定义一个新的数据类型也就不难了。首先，我们需要为新数据类型定义好它的底层结构、type和encoding属性值，然后再实现新数据类型的创建、释放函数和基本命令。</p>
 <p>接下来，我以开发一个名字叫作NewTypeObject的新数据类型为例，来解释下具体的4个操作步骤。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/88/99/88702464f8bc80ea11b26ab157926199.jpg?wh=3000%2A505" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/88/99/88702464f8bc80ea11b26ab157926199.jpg?wh=3000%2A505" /></p>
 <p><strong>第一步：定义新数据类型的底层结构</strong></p>
 <p>我们用newtype.h文件来保存这个新类型的定义，具体定义的代码如下所示：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>struct NewTypeObject {
@@ -15126,8 +15126,6 @@ LBS 服务可以考虑实现它，已和公司的一个上司沟通个，大家�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -7412,34 +7412,34 @@
 </code></pre></div>
 <p>错过这期内容的同学可以先返回<a href="http://time.geekbang.org/column/article/67968">第7期文章</a>思考一下这个问题，思考之余也可以看看其他同学给出的方案，我看留言很多同学的思路都是正确的，我们来详细看看MapReduce实现SQL的原理。</p>
 <p>这是一条非常常见的SQL统计分析语句，统计不同年龄的用户访问不同网页的兴趣偏好，对于产品运营和设计很有价值。具体数据输入和执行结果请看下面的图示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0a/37/0ade10e49216575962e071d6fe9a7137.jpg?wh=634%2A314" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0a/37/0ade10e49216575962e071d6fe9a7137.jpg?wh=634%2A314" /></p>
 <p>左边是要分析的数据表，右边是分析结果。实际上把左边表相同的行进行累计求和，就得到右边的表了，看起来跟WordCount的计算很相似。确实也是这样，我们看下这条SQL语句的MapReduce的计算过程，按照MapReduce编程模型，map和reduce函数的输入输出以及函数处理过程分别是什么。</p>
 <p>首先，看下map函数的输入Key和Value，我们主要看Value。Value就是左边表中每一行的数据，比如&lt;1, 25&gt;这样。map函数的输出就是以输入的Value作为Key，Value统一设为1，比如&lt;&lt;1, 25&gt;, 1&gt;这样。</p>
 <p>map函数的输出经过shuffle以后，相同的Key及其对应的Value被放在一起组成一个&lt;Key, Value集合&gt;，作为输入交给reduce函数处理。比如&lt;&lt;2, 25&gt;, 1&gt;被map函数输出两次，那么到了reduce这里，就变成输入&lt;&lt;2, 25&gt;, &lt;1, 1&gt;&gt;，这里的Key是&lt;2, 25&gt;，Value集合是&lt;1, 1&gt;。</p>
 <p>在reduce函数内部，Value集合里所有的数字被相加，然后输出。所以reduce的输出就是&lt;&lt;2, 25&gt;, 2&gt;。</p>
 <p>讲起来有点拗口，我把这个过程画成了一张图，看起来就清楚多了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bc/57/bc088edf00478c835003272696c44c57.jpg?wh=1003%2A436" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bc/57/bc088edf00478c835003272696c44c57.jpg?wh=1003%2A436" /></p>
 <p>这样一条很有实用价值的SQL就被很简单的MapReduce计算过程处理好了。</p>
 <p>在数据仓库中，SQL是最常用的分析工具，既然一条SQL可以通过MapReduce程序实现，那么有没有工具能够自动将SQL生成MapReduce代码呢？这样数据分析师只要输入SQL，就可以自动生成MapReduce可执行的代码，然后提交Hadoop执行，也就完美解决了我们最开始提出的问题。问题的答案，也就是这个神奇的工具就是Hadoop大数据仓库Hive。</p>
 <h2 id="hive">Hive的架构</h2>
 <p>Hive能够直接处理我们输入的SQL语句（Hive的SQL语法和数据库标准SQL略有不同），调用MapReduce计算框架完成数据分析操作。下面是它的架构图，我们结合架构图来看看Hive是如何实现将SQL生成MapReduce可执行代码的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/26/ea/26287cac9a9cfa3874a680fdbcd795ea.jpg?wh=720%2A383" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/26/ea/26287cac9a9cfa3874a680fdbcd795ea.jpg?wh=720%2A383" /></p>
 <p>我们通过Hive的Client（Hive的命令行工具，JDBC等）向Hive提交SQL命令。如果是创建数据表的DDL（数据定义语言），Hive就会通过执行引擎Driver将数据表的信息记录在Metastore元数据组件中，这个组件通常用一个关系数据库实现，记录表名、字段名、字段类型、关联HDFS文件路径等这些数据库的Meta信息（元信息）。</p>
 <p>如果我们提交的是查询分析数据的DQL（数据查询语句），Driver就会将该语句提交给自己的编译器Compiler进行语法分析、语法解析、语法优化等一系列操作，最后生成一个MapReduce执行计划。然后根据执行计划生成一个MapReduce的作业，提交给Hadoop MapReduce计算框架处理。</p>
 <p>对于一个较简单的SQL命令，比如：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>SELECT * FROM status_updates WHERE status LIKE ‘michael jackson’;
 </code></pre></div>
 <p>它对应的Hive执行计划如下图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cb/a6/cb1236ad035ca01cffbb9df47fa88fa6.jpg?wh=1744%2A1544" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cb/a6/cb1236ad035ca01cffbb9df47fa88fa6.jpg?wh=1744%2A1544" /></p>
 <p>Hive内部预置了很多函数，Hive的执行计划就是根据SQL语句生成这些函数的DAG（有向无环图），然后封装进MapReduce的map和reduce函数中。这个例子中，map函数调用了三个Hive内置函数TableScanOperator、FilterOperator、FileOutputOperator，就完成了map计算，而且无需reduce函数。</p>
 <h2 id="hivejoin">Hive如何实现join操作</h2>
 <p>除了上面这些简单的聚合（group by）、过滤（where）操作，Hive还能执行连接（join on）操作。文章开头的例子中，pv_users表的数据在实际中是无法直接得到的，因为pageid数据来自用户访问日志，每个用户进行一次页面浏览，就会生成一条访问记录，保存在page_view表中。而age年龄信息则记录在用户表user中。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/82/2d/8254710229b1d749d08f7a0bb799ac2d.jpg?wh=720%2A306" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/82/2d/8254710229b1d749d08f7a0bb799ac2d.jpg?wh=720%2A306" /></p>
 <p>这两张表都有一个相同的字段userid，根据这个字段可以将两张表连接起来，生成前面例子的pv_users表，SQL命令是</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>SELECT pv.pageid, u.age FROM page_view pv JOIN user u ON (pv.userid = u.userid);
 </code></pre></div>
 <p>同样，这个SQL命令也可以转化为MapReduce计算，连接的过程如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/25/2a/25d62b355c976beb5b26af865ac2b92a.jpg?wh=720%2A347" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/25/2a/25d62b355c976beb5b26af865ac2b92a.jpg?wh=720%2A347" /></p>
 <p>从图上看，join的MapReduce计算过程和前面的group by稍有不同，因为join涉及两张表，来自两个文件（夹），所以需要在map输出的时候进行标记，比如来自第一张表的输出Value就记录为&lt;1, X&gt;，这里的1表示数据来自第一张表。这样经过shuffle以后，相同的Key被输入到同一个reduce函数，就可以根据表的标记对Value数据求笛卡尔积，用第一张表的每条记录和第二张表的每条记录连接，输出就是join的结果。</p>
 <p>所以我们如果打开Hive的源代码，看join相关的代码，会看到一个两层for循环，对来自两张表的记录进行连接操作。</p>
 <h2 id="_1">小结</h2>
@@ -7631,8 +7631,6 @@ Time taken: 26.01 seconds, Fetched: 3 row(s)</p>2018-12-15</li><br/><li><span>�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

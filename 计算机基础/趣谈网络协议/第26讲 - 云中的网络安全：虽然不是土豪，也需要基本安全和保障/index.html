@@ -6244,14 +6244,14 @@
 <p>我们来复习一下，当一个网络包进入一台机器的时候，都会做什么事情。</p>
 <p>首先拿下MAC头看看，是不是我的。如果是，则拿下IP头来。得到目标IP之后呢，就开始进行路由判断。在路由判断之前，这个节点我们称为<strong>PREROUTING</strong>。如果发现IP是我的，包就应该是我的，就发给上面的传输层，这个节点叫作<strong>INPUT</strong>。如果发现IP不是我的，就需要转发出去，这个节点称为<strong>FORWARD</strong>。如果是我的，上层处理完毕后，一般会返回一个处理结果，这个处理结果会发出去，这个节点称为<strong>OUTPUT</strong>，无论是FORWARD还是OUTPUT，都是路由判断之后发生的，最后一个节点是<strong>POSTROUTING</strong>。</p>
 <p>整个过程如图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a7/49/a7b549514cf6d750f7dfb1e488ebdd49.jpg?wh=2126%2A889" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a7/49/a7b549514cf6d750f7dfb1e488ebdd49.jpg?wh=2126%2A889" /></p>
 <p>整个包的处理过程还是原来的过程，只不过为什么要格外关注这<strong>五个节点</strong>呢？</p>
 <p>是因为在Linux内核中，有一个框架叫Netfilter。它可以在这些节点插入hook函数。这些函数可以截获数据包，对数据包进行干预。例如做一定的修改，然后决策是否接着交给TCP/IP协议栈处理；或者可以交回给协议栈，那就是<strong>ACCEPT</strong>；或者过滤掉，不再传输，就是<strong>DROP</strong>；还有就是<strong>QUEUE</strong>，发送给某个用户态进程处理。</p>
 <p>这个比较难理解，经常用在内部负载均衡，就是过来的数据一会儿传给目标地址1，一会儿传给目标地址2，而且目标地址的个数和权重都可能变。协议栈往往处理不了这么复杂的逻辑，需要写一个函数接管这个数据，实现自己的逻辑。</p>
 <p>有了这个Netfilter框架就太好了，你可以在IP转发的过程中，随时干预这个过程，只要你能实现这些hook函数。</p>
 <p>一个著名的实现，就是<strong>内核模块ip_tables</strong>。它在这五个节点上埋下函数，从而可以根据规则进行包的处理。按功能可分为四大类：连接跟踪（conntrack）、数据包的过滤（filter）、网络地址转换（nat）和数据包的修改（mangle）。其中连接跟踪是基础功能，被其他功能所依赖。其他三个可以实现包的过滤、修改和网络地址转换。</p>
 <p>在用户态，还有一个你肯定知道的客户端程序iptables，用命令行来干预内核的规则。内核的功能对应iptables的命令行来讲，就是<strong>表和链</strong>的概念。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/74/95/746131a029919768c4f00a0fe7fayy95.jpg?wh=2483%2A1613" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/74/95/746131a029919768c4f00a0fe7fayy95.jpg?wh=2483%2A1613" /></p>
 <p>iptables的表分为四种：raw--&gt;mangle--&gt;nat--&gt;filter。这四个优先级依次降低，raw不常用，所以主要功能都在其他三种表里实现。每个表可以设置多个链。</p>
 <p>filter表处理过滤功能，主要包含三个链：</p>
 <ul>
@@ -6274,7 +6274,7 @@
 <li>POSTROUTING链。</li>
 </ul>
 <p>将iptables的表和链加入到上面的过程图中，就形成了下面的图和过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e0/ec/e06c112fce8e3f3bc8a89c52f86fdfec.jpg?wh=2588%2A1113" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e0/ec/e06c112fce8e3f3bc8a89c52f86fdfec.jpg?wh=2588%2A1113" /></p>
 <ol>
 <li>数据包进入的时候，先进mangle表的PREROUTING链。在这里可以根据需要，改变数据包头内容之后，进入nat表的PREROUTING链，在这里可以根据需要做Dnat，也就是目标地址转换。</li>
 <li>进入路由判断，要判断是进入本地的还是转发的。</li>
@@ -6296,12 +6296,12 @@
 <p>这样就搞定了，其他的账户都封死，就一个防盗门可以进出，只要防盗门是五星级的，就比较安全了。</p>
 <p>这些规则都可以在虚拟机里，自己安装iptables自己配置。但是如果虚拟机数目非常多，都要配置，对于用户来讲就太麻烦了，能不能让云平台把这部分工作做掉呢？</p>
 <p>当然可以了。在云平台上，一般允许一个或者多个虚拟机属于某个安全组，而属于不同安全组的虚拟机之间的访问以及外网访问虚拟机，都需要通过安全组进行过滤。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/06/21/069e51d949312246yy9d2764e6d6c921.jpg?wh=2743%2A1841" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/06/21/069e51d949312246yy9d2764e6d6c921.jpg?wh=2743%2A1841" /></p>
 <p>例如图中，我们会创建一系列的网站，都是前端在Tomcat里面，对外开放8080端口。数据库使用MySQL，开放3306端口。</p>
 <p>为了方便运维，我们创建两个安全组，将Tomcat所在的虚拟机放在安全组A里面。在安全组A里面，允许任意IP地址0.0.0.0/0访问8080端口，但是对于ssh的22端口，仅仅允许管理员网段203.0.113.0/24访问。</p>
 <p>我们将MySQL所在的虚拟机放在安全组B里面。在安全组B里面，仅仅允许来自安全组A的机器访问3306端口，但是对于ssh的22端口，同样允许管理员网段203.0.113.0/24访问。</p>
 <p>这些安全组规则都可以自动下发到每个在安全组里面的虚拟机上，从而控制一大批虚拟机的安全策略。这种批量下发是怎么做到的呢？你还记得这幅图吗？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/24/24/246db57c915d9ccf6e0d66182de0fe24.jpg?wh=720%2A977" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/24/24/246db57c915d9ccf6e0d66182de0fe24.jpg?wh=720%2A977" /></p>
 <p>两个VM都通过tap网卡连接到一个网桥上，但是网桥是二层的，两个VM之间是可以随意互通的，因而需要有一个地方统一配置这些iptables规则。</p>
 <p>可以多加一个网桥，在这个网桥上配置iptables规则，将在用户在界面上配置的规则，放到这个网桥上。然后在每台机器上跑一个Agent，将用户配置的安全组变成iptables规则，配置在这个网桥上。</p>
 <p>安全问题解决了，iptables真强大！别忙，iptables除了filter，还有nat呢，这个功能也非常重要。</p>
@@ -6310,7 +6310,7 @@
 <p>你有没有思考过这个问题，TCP的访问都是一去一回的，而你在你家里连接WiFi的IP地址是一个私网IP，192.168.1.x。当你通过你们家的路由器访问163网站之后，网站的返回结果如何能够到达你的笔记本电脑呢？肯定不能通过192.168.1.x，这是个私网IP，不具有公网上的定位能力，而且用这个网段的人很多，茫茫人海，怎么能够找到你呢？</p>
 <p>所以当你从你家里访问163网站的时候，在你路由器的出口，会做Snat的，运营商的出口也可能做Snat，将你的私网IP地址，最终转换为公网IP地址，然后163网站就可以通过这个公网IP地址返回结果，然后再nat回来，直到到达你的笔记本电脑。</p>
 <p>云平台里面的虚拟机也是这样子的，它只有私网IP地址，到达外网网口要做一次Snat，转换成为机房网IP，然后出数据中心的时候，再转换为公网IP。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1a/1a/1a5d299c2eb5480eda93a8f8e3b3ca1a.jpg?wh=720%2A951" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1a/1a/1a5d299c2eb5480eda93a8f8e3b3ca1a.jpg?wh=720%2A951" /></p>
 <p>这里有一个问题是，在外网网口上做Snat的时候，是全部转换成一个机房网IP呢，还是每个虚拟机都对应一个机房网IP，最终对应一个公网IP呢？前面也说过了，公网IP非常贵，虚拟机也很多，当然不能每个都有单独的机房网和公网IP了，因此这种Snat是一种特殊的Snat，MASQUERADE（地址伪装）。</p>
 <p>这种方式下，所有的虚拟机共享一个机房网和公网的IP地址，所有从外网网口出去的，都转换成为这个IP地址。那又一个问题来了，都变成一个公网IP了，当163网站返回结果的时候，给谁呢，再nat成为哪个私网的IP呢？</p>
 <p>这就是Netfilter的连接跟踪（conntrack）功能了。对于TCP协议来讲，肯定是上来先建立一个连接，可以用“源/目的IP+源/目的端口”唯一标识一条连接，这个连接会放在conntrack表里面。当时是这台机器去请求163网站的，虽然源地址已经Snat成公网IP地址了，但是conntrack表里面还是有这个连接的记录的。当163网站返回数据的时候，会找到记录，从而找到正确的私网IP地址。</p>
@@ -6337,7 +6337,7 @@
 <p>我们的专栏更新到第26讲，不知你掌握得如何？是不是有很多问题想要跟我面对面探讨呢？这里就有一个机会。</p>
 <p>今天晚上8:30，我会在极客时间APP里做一个直播，主题是“技术人如何在技术浪潮中线性成长？”，我会把我们讲过的网络协议作为案例，在直播中展开讲解，也会分享我从业多年来的心得体会。<strong>你可以直接在这里留言提问，也可以准备好问题在直播的时候和我交流。</strong></p>
 <p>欢迎你来看直播！我们晚上见！</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/00/ab/001997ebd09dd7e9f649f183207cdfab.jpg?wh=900%2A500" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/00/ab/001997ebd09dd7e9f649f183207cdfab.jpg?wh=900%2A500" /></p>
 <div><strong>精选留言（15）</strong></div>
 <ul>
 <li><span>小宇宙</span> 👍（57） 💬（1）<p>k8s的kube-proxy 就是利用的iptables 做流量转发和负载均衡的，service 利用nat 将相应的流量转发到对应的pod中，另外iptables 有一个probability特性，可以设置probability的百分比是多少，从而实现负载均衡</p>2018-08-24</li><br/><li><span>Gx</span> 👍（23） 💬（2）<p>对表和链比较迷糊的同学，结合这个博客的内容看起来可能更容易理解，http:&#47;&#47;www.zsythink.net&#47;archives&#47;1199</p>2019-04-06</li><br/><li><span>lji</span> 👍（2） 💬（1）<p>一点疑问：如果说多人共享一个 IP 访问 163.com，通过 Snat 转换出去之后是
@@ -6464,8 +6464,6 @@ iptables还有扩展的NFQUEUE，可以指定分配给某个范围的多个队�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

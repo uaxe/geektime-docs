@@ -5549,7 +5549,7 @@
 <p>实际上冲突是不可避免的，只是CRDT采用了某种策略，就像一个和事佬一样，帮助协同编辑的各方妥善安排了冲突。但这个策略已经超出了这讲的范畴，有兴趣你可以自行了解一下LWW（即Last Writer Wins）策略。当冲突发生时，谁对谁错不重要，重要的是，各方能协商一致，且各方都可稳妥地拿到这个协商结果。</p>
 <p>CRDT是一个算法，而且还挺复杂的，那么有没有实现了这个算法的库呢？</p>
 <p>必须有！适合JavaScript生态圈的，有3个，分别是Yjs，automerge和ref-crdts。这三者的性能对比，你可以参考下面这个图（<a href="https://zhuanlan.zhihu.com/p/452980520">引自雪碧的文章</a>）：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f7/cd/f7b460yy629b5b2fa91c4f1c43cfefcd.png?wh=675x395" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f7/cd/f7b460yy629b5b2fa91c4f1c43cfefcd.png?wh=675x395" /></p>
 <p>这三个都是当前主流的CRDT实现，它们主要的应用场合都是多人协作在线文档，但他们也支持json这样的数据结构，所以，也可以用于低代码平台的多人协作功能。</p>
 <p>这里你要注意图中红色的箭头，Yjs的效率非常高，几乎与横轴贴合在一起。所以应该选择哪个，就不需要我多说了吧？</p>
 <p>前面我说了，多人协作的难点首先是冲突，既然有首先，那当然就有其次了。其次的难点就是<strong>历史记录管理</strong>。</p>
@@ -5570,13 +5570,13 @@
 <p>简而言之就是及时，及时意味着任何修改，都要及时记录。注意只需要及时记录就好，不需要及时同步给各个协同者。</p>
 <p>因为及时记录下来的同时，一个时间戳和插入位置就被生成并记录到编辑历史中。此时即使有多人在同时编辑，产生大量编辑记录，但各个历史记录的时间戳却各不一样。即使此时网络都堵塞了，导致这些编辑记录都未能及时同步，也没关系的。在网络恢复之后，他人的编辑记录同步过来后，不同插入位置的编辑记录不会有冲突，它们会按照时序在本地生效。相同插入位置的编辑记录则以LWW策略，挑选最后一个改写记录作为最终结果。</p>
 <p>这个过程的示意图如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/31/3d/3187a0f0099898c5ede8e28e8de3573d.png?wh=1756x980" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/31/3d/3187a0f0099898c5ede8e28e8de3573d.png?wh=1756x980" /></p>
 <p>那在低代码平台上，啥情况下会出现保存不及时的情形？</p>
 <p>这就和低代码的开发方式的特征有关了。可视化开发是低代码的主要特征，因此在开发过程中，如果涉及复杂的配置，不可避免地需要使用对话框来承载。比如下面这个例子，弹出一个对话框来组织一次复杂配置的过程，是很常见的：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e1/a7/e1389cee5a48307d9da44da63e1053a7.gif?wh=1253x798" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e1/a7/e1389cee5a48307d9da44da63e1053a7.gif?wh=1253x798" /></p>
 <p>注意，为了使用友好，对话框会有确定按钮，等用户点击确定按钮之后，再一次性保存使用的配置，点击取消则会丢弃对话框上所有修改，这是一个很有用的功能。</p>
 <p>问题就出在这个地方了。如果对话框上的修改未能及时保存下来，有人在某个对话框上编辑的同时，恰好另一个人也打开了同一个对话框开始配置，这个情况下，冲突就出现了：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b5/87/b5c8163ab7aa707403d6a210ac92cf87.png?wh=1888x1262" title="图中虚线的编辑记录与他人打开同一个对话框时的记录是相同的" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b5/87/b5c8163ab7aa707403d6a210ac92cf87.png?wh=1888x1262" title="图中虚线的编辑记录与他人打开同一个对话框时的记录是相同的" /></p>
 <p>你可能会有疑问，此时LWW策略不再适用了吗？</p>
 <p>其实，LWW是适用的，但问题在于这样非常不友好。为啥呢？因为对话框承载的是复杂配置，包含大量的配置项，使用LWW简单粗暴地进行二选一，这样必然有人的工作会被白白浪费掉。再者，即使在同一个对话框上，也有可能未编辑到同一个属性，此时记录1和记录2是可以直接合并的，因此我们不能简单粗暴地使用LWW策略来处理。</p>
 <p>在这个情形下，CRDT无法避免冲突。</p>
@@ -5608,17 +5608,17 @@
 <p>收到分享的开发人员，就可以像对普通工程那样对它做编辑。每次编辑产生的修改记录也和普通工程一样，被发送给后端，持久化到该开发人员名下的那份冗余的数据里，所有持有该冗余数据的开发人员此时是各干各的，互不影响。可以看到，这个过程对已有的流程是完全没有冲击的，除了新增的分享功能之外，完全复用原有流程。</p>
 <p><strong>难点在于冗余的数据如何实现归一</strong>。</p>
 <p>如果要做到两两合并，过程会非常复杂，而且极其容易出错。因此我做了一个约束，冗余的数据能且只能合并到最原始的版本去。下面是相应的示意图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ac/4a/ace77a750505178a7106cd65888bd44a.png?wh=1244x894" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ac/4a/ace77a750505178a7106cd65888bd44a.png?wh=1244x894" /></p>
 <p>无论数据在中途被转发了多少次，它始终记录着原始账户名。只有原始账号才能发起合并操作，并且，每次合并只能指定一个目标冗余数据。这样就可以控制每次合并动作都只发生在两份数据之间，并且合并的方向是确定的，始终都是合入到原始所有者的版本中去。在合并完成之后，原始数据所有者会把合并后的数据发送给对方，对方收到数据后，不需要合并，直接覆盖掉合并前的数据即可完成两者同步。</p>
 <p>在实际操作时，也可以做进一步的约束，不允许二次分享应用数据，这样会让这个拓扑图看上去简单许多，但是这对数据归一的复杂性没有帮助，只是看上去简单一些而已。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/94/4c/94c3d8b79fc4cd802yy59a35ef067c4c.png?wh=1358x1266" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/94/4c/94c3d8b79fc4cd802yy59a35ef067c4c.png?wh=1358x1266" /></p>
 <p>接下来我们再说说如何合并两份数据。经过前面的一番约束之后，单次合并只剩下两份数据了，看起来可以直接合并，并且不可能出现冲突了。真的是这样吗？你可以先思考思考。</p>
 <p>虽然只有两份数据了，但是这两份数据依然是有3个状态，只要有3个状态的合并就必然会有潜在的冲突。其实这两份数据完全可以拿git的两个分支来类比，如下图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8b/78/8b05e629945819345cd42870d95a1178.png?wh=1532x542" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8b/78/8b05e629945819345cd42870d95a1178.png?wh=1532x542" /></p>
 <p>一开始只有一份数据，在分享出去的一刹那，就产生了分叉，并且这两个分叉将在两个不同的开发人员手里独自演进。只要修改没有冲突，那就可以直接无脑合并，所以合并前的关键步骤就是如何检测有哪些冲突点。比如上面这图，是拿节点2和节点3来比对冲突点吗？</p>
 <p>只有两个节点是不会有冲突的，至少要有3个节点才会有冲突，图中的分叉点1就是这第三个节点。比对过程是这样的，拿节点2和节点1相比，得出一组修改集，每个修改点是由属性xpath和属性值变更行号组成的二元组。再拿节点3和节点1相比，得出另一组修改集。然后从这两组修改集中筛选出所有相同修改点。二元组的两个属性都相等，则认为是同一个修改点。每一个相同的修改点，就是一个冲突点。</p>
 <p>如果一个冲突点都没有，那意味着可以直接合并，合并之后的历史记录如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/5f/c9/5f6663c35ac5feb5740971e158fbefc9.png?wh=1844x388" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5f/c9/5f6663c35ac5feb5740971e158fbefc9.png?wh=1844x388" /></p>
 <p>图中虚线框是原来两个分支各自使用修改点融合在一起后的集合。这个过程就和git合并时，把一些commit squash在一起然后rebase，是一样的。</p>
 <p>当冲突出现时，是否有LWW这样的策略可以用呢？</p>
 <p>很可惜，没有，只能手工解决冲突。单行属性值的冲突，可以二选一，多行属性值冲突，则需要采用和git合并代码时相似的解决方式。<a href="https://microsoft.github.io/monaco-editor">Monaco</a>这个编辑器内置提供了diff功能，带有差异点着色功能，非常棒，再次推荐你使用。</p>
@@ -5753,8 +5753,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

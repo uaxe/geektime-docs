@@ -14514,18 +14514,18 @@
 <p>接下来，我们就以Nginx以及建立了Lua语言生态的OpenResty为例，看看负载均衡是怎样扩展系统的，以及Nginx和同源的OpenResty有何不同。</p>
 <h2 id="_1">负载均衡是如何扩展系统提升性能的？</h2>
 <p>通过AKF立方体X轴扩展系统时，负载均衡只需要能够透传协议，并选择负载最低的上游应用作为流量分发对象即可。这样，三层（网络层）、四层（传输层）负载均衡都可用于扩展系统，甚至在单个局域网内你还可以使用二层（数据链路层）负载均衡。其中，分发流量的路由算法既可以使用RoundRobin轮转算法，也可以基于TCP连接或者UDP Session使用最少连接数算法，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a6/yd/a614d25af06a6439874a12d7748afyyd.jpg?wh=807%2A604" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a6/yd/a614d25af06a6439874a12d7748afyyd.jpg?wh=807%2A604" /></p>
 <p>然而，基于AKF Y轴扩展系统时，负载均衡必须根据功能来分发请求，也就是说它必须解析完应用层协议，才能明白这是什么请求。因此，如LVS这样工作在三层和四层的负载均衡就无法满足需求了，我们需要Nginx这样的七层（应用层）负载均衡，它能够从请求中获取到描述功能的关键信息，并以此为依据路由请求。比如当HTTP请求中的URL描述功能时，Nginx就可以用location匹配URL，再基于location来路由请求，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/19/73/198619be633e7db39e6c8c817078b673.jpg?wh=971%2A643" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/19/73/198619be633e7db39e6c8c817078b673.jpg?wh=971%2A643" /></p>
 <p>基于AKF Z轴扩展时，如果只是使用了网络报文中的源IP地址，那么三层、四层负载均衡都能胜任。然而如果需要帐号、访问对象等用户信息扩展系统，仍然只能使用七层负载均衡从请求中获得。比如，Nginx可以通过$变量获取到URL参数或者HEADER头部的值，再以此作为路由算法的输入参数。</p>
 <p>因此，<strong>七层负载均衡是分布式系统提升性能的必备工具。</strong>除了基于各种路由策略分发流量，提高性能及可用性（如宕机迁移）外，负载均衡还需要完成上、下游协议间的适配、转换。例如考虑到信息安全，跑在公网上的外部协议常基于TLS/SSL协议，而在效率优先的企业内网中，一般不会使用大幅降低性能的TLS协议，因此负载均衡需要拥有卸载或者装载TLS层的能力。</p>
 <p>再比如，下游客户端多样且难以保持一致（比如IE6这个古董浏览器仍然存在于当下的互联网中），因此常使用HTTP协议与服务器通讯，而上游组件则依据开发团队或者系统架构的特点，会选择CGI、uWSGI、gRPC等协议，这样负载均衡还得拥有转换各种协议的功能。Nginx可以通过反向代理模块，轻松适配各类协议，如下所示（通过stream模块，Nginx也支持四层负载均衡）：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ey/93/eyy0dfeeb4783de585789f1c5b768393.jpg?wh=554%2A406" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ey/93/eyy0dfeeb4783de585789f1c5b768393.jpg?wh=554%2A406" /></p>
 <p>从性能角度，Nginx支持C10M级别的并发连接，其原因你可以参考本专栏第1、2部分的内容。从功能角度，良好的模块化设计，使得Nginx可以完成各类协议的适配，不只包括第3部分课程介绍过的通用协议，甚至支持Redis、MySQL等专有协议。因此，Nginx是目前最好用的负载均衡。</p>
 <h2 id="nginxlua">Nginx上为什么可以执行Lua代码？</h2>
 <p>OpenResty也非常流行，其实它就是Nginx，只是通过扩展的C模块支持在Nginx中嵌入Lua语言，这样Lua模块构建出的生态就可以与C模块协作使用，大幅度提升了开发效率。我们先来看下OpenResty与Nginx之间的关系。</p>
 <p>OpenResty源代码由<strong>官方Nginx、第三方C模块、Lua语言模块以及一些工具脚本</strong>构成。编译Nginx时，OpenResty将自己的第三方C模块按照Nginx的规则添加到可执行文件中，包括ngx_http_lua_module和ngx_stream_lua_module这两个C模块，它们允许Lua语言运行在Nginx进程中，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a7/8e/a73f1f14bec13dddd497aeb4a5393b8e.jpg?wh=7313%2A2567" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a7/8e/a73f1f14bec13dddd497aeb4a5393b8e.jpg?wh=7313%2A2567" /></p>
 <p><strong>Lua模块既能够享受Nginx的高性能，又通过“协程”</strong>（参见<a href="https://time.geekbang.org/column/article/233629">[第5讲]</a>）<strong>、Lua脚本语言提高了开发效率</strong>，这也是OpenResty最大的优点。我们先来看看Lua语言是怎么嵌入到Nginx中的。</p>
 <p><strong>Nginx在进程启动、处理请求时提供了许多钩子函数，允许第三方C模块将其代码放在这些钩子函数中执行。同时，Nginx还允许C模块自行解析nginx.conf中出现的配置项。</strong>这种架构允许OpenResty将Lua代码写进nginx.conf文件，再基于<a href="https://luajit.org/">LuaJIT</a> 即时编译到Nginx中执行。</p>
 <p>ngx_http_lua_module模块也正是通过OpenResty提供的以下11个指令嵌入Lua代码的：</p>
@@ -14536,15 +14536,15 @@
 <li>记录access.log日志时嵌入Lua代码，通过<strong>log_by_lua</strong>指令实现。</li>
 </ul>
 <p>如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/97/c3/9747cc2830cb65513ea0f4e5603b9fc3.jpg?wh=1504%2A1368" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/97/c3/9747cc2830cb65513ea0f4e5603b9fc3.jpg?wh=1504%2A1368" /></p>
 <p>ngx_stream_lua_module模块与之类似，这里不再赘述。</p>
 <p>当然，如果Lua代码只是可以在Nginx进程中执行，它是无法处理用户请求的。我们还需要让Lua代码与Nginx中的C代码互相调用，去获取、改变HTTP请求、响应的内容。因此，ngx_http_lua_module和ngx_stream_lua_module这两个模块通过<a href="https://luajit.org/ext_ffi.html">FFI</a> 技术，将C函数通过Ngx库中的Lua API，暴露给纯Lua代码，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b3/58/b30b937e7866b9e588ce3e0427b1b758.jpg?wh=7052%2A3186" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b3/58/b30b937e7866b9e588ce3e0427b1b758.jpg?wh=7052%2A3186" /></p>
 <p>这样，通过nginx.conf文件中的11个指令，以及FFI技术提供的SDK，Lua代码才真正可以处理请求，Lua生态从这里开始延伸，因此，OpenResty上还提供了进一步提高开发效率的Lua模块库（参见/usr/local/openresty/lualib/目录）。关于FFI技术及OpenResty提供的HTTP SDK，你可以参考 <a href="https://time.geekbang.org/course/intro/100020301">《Nginx核心知识100讲》中的第147-154课</a>。</p>
 <h2 id="nginxopenresty">Nginx与OpenResty的差别在哪里？</h2>
 <p>清楚了OpenResty与Nginx间的相同之处，我们再来看，二者默认编译出的Nginx可执行程序有何不同之处。</p>
 <p>首先看版本差异。当你在<a href="http://nginx.org/en/download.html">官网</a>下载Nginx时，会发现有3类版本：Mainline、Stable和Legacy。其中，Mainline是单号版本，<strong>它是含有最新功能的主线版本，迭代速度最快。Stable是mainline版本稳定运行一段时间后，将单号大版本转换为双号的稳定版本</strong>，比如1.18.0就是由1.17.10转换而来。Legacy则是曾经的稳定版本，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/63/59/63yy17990a31578a4e3ba00af7b67859.jpg?wh=1344%2A1046" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/63/59/63yy17990a31578a4e3ba00af7b67859.jpg?wh=1344%2A1046" /></p>
 <p>你可以通过源代码中的CHANGES文件，通过4种不同类型的变更查看版本间的差异，包括：</p>
 <ul>
 <li>表示新功能的<strong>Feature</strong>，比如下图中HTTP服务新增的auth_delay指令。</li>
@@ -14552,7 +14552,7 @@
 <li>表示已知特性变更的<strong>Change</strong>，比如Nginx曾经允许HTTP请求头部中出现多个Host头部，但在1.17.9这个Change之后，这类HTTP请求将作为非法请求处理。</li>
 <li>表示安全升级的<strong>Security</strong>，比如1.15.6版本就修复了CVE-2018-16843等3个安全问题。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c3/7e/c366e0f928dfc149da5a4df8cb15c27e.jpg?wh=1944%2A1074" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c3/7e/c366e0f928dfc149da5a4df8cb15c27e.jpg?wh=1944%2A1074" /></p>
 <p>当你安装好了OpenResty或者Nginx后，你可以通过nginx -v命令查看它们的版本。你会发现，<strong>2014年以后发布的OpenResty都是运行在单号Mainline版本上的：</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a># /usr/local/nginx/sbin/nginx -v
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>nginx version: nginx/1.18.0
@@ -14560,7 +14560,7 @@
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>nginx version: openresty/1.15.8.3
 </code></pre></div>
 <p>通常我们会选择稳定的Stable版本，OpenResty为什么会选择单号的Mainline版本呢？这是因为，<strong>Nginx与OpenResty的版本发布频率完全不同</strong>，2012年后Nginx每年大约发布10多个版本，如下图所示（versions统计了每年发布的版本数，图中其他3条拆线统计了每年feature、bugfix、change的变更次数）：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bd/68/bd39d1fd2abbcf1787a34aeb008fa368.jpg?wh=1225%2A899" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bd/68/bd39d1fd2abbcf1787a34aeb008fa368.jpg?wh=1225%2A899" /></p>
 <p>OpenResty每年的版本更新频率是个位数，特别是从2018年到现在，OpenResty只发布了4个版本。所以<strong>为了使用尽量运行在最新版本上，OpenResty选择了Mainline单号版本。</strong></p>
 <p>你可能会想，OpenResty并没有修改Nginx的源代码，为什么不能由用户在官方Nginx上自行添加C模块，实现OpenResty的安装呢？这源于部分OpenResty C模块，没有按照Nginx架构指定的顺序添加到模块列表中，而且它们的编译环境也过于复杂。因此，OpenResty放弃了Nginx官方的configure文件，用户需要使用OpenResty改造过的configure脚本编译Nginx。</p>
 <p>再来看模块间的差异。如果你留意OpenResty与Nginx间二进制文件的体积，会发现使用默认配置时，<strong>OpenResty的可执行文件大了5倍，</strong>如下所示：</p>
@@ -14704,8 +14704,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

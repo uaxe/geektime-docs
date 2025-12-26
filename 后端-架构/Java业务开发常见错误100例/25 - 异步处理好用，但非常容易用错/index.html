@@ -14553,7 +14553,7 @@
 <p>使用类似RabbitMQ、RocketMQ等MQ系统来做消息队列实现异步处理，虽然说消息可以落地到磁盘保存，即使MQ出现问题消息数据也不会丢失，但是异步流程在消息发送、传输、处理等环节，都可能发生消息丢失。此外，任何MQ中间件都无法确保100%可用，需要考虑不可用时异步流程如何继续进行。</p>
 <p>因此，<strong>对于异步处理流程，必须考虑补偿或者说建立主备双活流程</strong>。</p>
 <p>我们来看一个用户注册后异步发送欢迎消息的场景。用户注册落数据库的流程为同步流程，会员服务收到消息后发送欢迎消息的流程为异步流程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/62/93/629d9f0557cd7f06ac9ee2e871524893.png?wh=1596%2A836" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/62/93/629d9f0557cd7f06ac9ee2e871524893.png?wh=1596%2A836" /></p>
 <p>我们来分析一下：</p>
 <ul>
 <li>蓝色的线，使用MQ进行的异步处理，我们称作主线，可能存在消息丢失的情况（虚线代表异步调用）；</li>
@@ -14690,7 +14690,7 @@
 <p>在今天这一讲的一开始，我们提到异步处理的一个重要优势，是实现消息广播。</p>
 <p>消息广播，和我们平时说的“广播”意思差不多，就是希望同一条消息，不同消费者都能分别消费；而队列模式，就是不同消费者共享消费同一个队列的数据，相同消息只能被某一个消费者消费一次。</p>
 <p>比如，同一个用户的注册消息，会员服务需要监听以发送欢迎短信，营销服务同样需要监听以发送新用户小礼物。但是，会员服务、营销服务都可能有多个实例，我们期望的是同一个用户的消息，可以同时广播给不同的服务（广播模式），但对于同一个服务的不同实例（比如会员服务1和会员服务2），不管哪个实例来处理，处理一次即可（工作队列模式）：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/79/14/79994116247045ff90652254770a6d14.png?wh=1548%2A814" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/79/14/79994116247045ff90652254770a6d14.png?wh=1548%2A814" /></p>
 <p>在实现代码的时候，我们务必确认MQ系统的机制，确保消息的路由按照我们的期望。</p>
 <p>对于类似RocketMQ这样的MQ来说，实现类似功能比较简单直白：如果消费者属于一个组，那么消息只会由同一个组的一个消费者来消费；如果消费者属于不同组，那么每个组都能消费一遍消息。</p>
 <p>而对于RabbitMQ来说，消息路由的模式采用的是队列+交换器，队列是消息的载体，交换器决定了消息路由到队列的方式，配置比较复杂，容易出错。所以，接下来我重点和你讲讲RabbitMQ的相关代码实现。</p>
@@ -14737,11 +14737,11 @@
 <a id="__codelineno-5-37" name="__codelineno-5-37" href="#__codelineno-5-37"></a>}
 </code></pre></div>
 <p>使用12345和45678两个端口启动两个程序实例后，调用sendMessage接口发送一条消息，输出的日志，显示<strong>同一个会员服务两个实例都收到了消息</strong>：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bd/5f/bd649f78f2f3a7c732b8883fd4d5255f.png?wh=2918%2A120" /></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/96/04/96278ba64ac411d5910d7ce8073c7304.png?wh=2898%2A126" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bd/5f/bd649f78f2f3a7c732b8883fd4d5255f.png?wh=2918%2A120" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/96/04/96278ba64ac411d5910d7ce8073c7304.png?wh=2898%2A126" /></p>
 <p><strong>出现这个问题的原因是，我们没有理清楚RabbitMQ直接交换器和队列的绑定关系。</strong></p>
 <p>如下图所示，RabbitMQ的直接交换器根据routingKey对消息进行路由。由于我们的程序每次启动都会创建匿名（随机命名）的队列，所以相当于每一个会员服务实例都对应独立的队列，以空routingKey绑定到直接交换器。用户服务发出消息的时候也设置了routingKey为空，所以直接交换器收到消息之后，发现有两条队列匹配，于是都转发了消息：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c6/f8/c685c1a07347b040ee5ba1b48ce00af8.png?wh=1864%2A446" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c6/f8/c685c1a07347b040ee5ba1b48ce00af8.png?wh=1864%2A446" /></p>
 <p>要修复这个问题其实很简单，对于会员服务不要使用匿名队列，而是使用同一个队列即可。把上面代码中的匿名队列替换为一个普通队列：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>private static final String QUEUE = &quot;newuserQueue&quot;;
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>@Bean
@@ -14750,7 +14750,7 @@
 <a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>}
 </code></pre></div>
 <p>测试发现，对于同一条消息来说，两个实例中只有一个实例可以收到，不同的消息按照轮询分发给不同的实例。现在，交换器和队列的关系是这样的：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/65/7b/65205002a2cdde62d55330263afd317b.png?wh=1724%2A424" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/65/7b/65205002a2cdde62d55330263afd317b.png?wh=1724%2A424" /></p>
 <p><strong>第二步，进一步完整实现用户服务需要广播消息给会员服务和营销服务的逻辑。</strong></p>
 <p>我们希望会员服务和营销服务都可以收到广播消息，但会员服务或营销服务中的每个实例只需要收到一次消息。</p>
 <p>代码如下，我们声明了一个队列和一个广播交换器FanoutExchange，然后模拟两个用户服务和两个营销服务：</p>
@@ -14801,9 +14801,9 @@
 <a id="__codelineno-7-45" name="__codelineno-7-45" href="#__codelineno-7-45"></a>}
 </code></pre></div>
 <p>我们请求四次sendMessage接口，注册四个用户。通过日志可以发现，<strong>一条用户注册的消息，要么被会员服务收到，要么被营销服务收到，显然这不是广播</strong>。那，我们使用的FanoutExchange，看名字就应该是实现广播的交换器，为什么根本没有起作用呢？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/34/6d/34e2ea5e0f38ac029ff3d909d8b9606d.png?wh=2974%2A390" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/34/6d/34e2ea5e0f38ac029ff3d909d8b9606d.png?wh=2974%2A390" /></p>
 <p>其实，广播交换器非常简单，它会忽略routingKey，广播消息到所有绑定的队列。在这个案例中，两个会员服务和两个营销服务都绑定了同一个队列，所以这四个服务只能收到一次消息：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/20/cb/20adae38645d1cc169756fb4888211cb.png?wh=1656%2A462" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/20/cb/20adae38645d1cc169756fb4888211cb.png?wh=1656%2A462" /></p>
 <p>修改方式很简单，我们把队列进行拆分，会员和营销两组服务分别使用一条独立队列绑定到广播交换器即可：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>@Slf4j
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>@Configuration
@@ -14851,9 +14851,9 @@
 <a id="__codelineno-8-44" name="__codelineno-8-44" href="#__codelineno-8-44"></a>}
 </code></pre></div>
 <p>现在，交换器和队列的结构是这样的：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9a/78/9a3b06605913aa17025854dfbe6a5778.png?wh=1640%2A434" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9a/78/9a3b06605913aa17025854dfbe6a5778.png?wh=1640%2A434" /></p>
 <p>从日志输出可以验证，对于每一条MQ消息，会员服务和营销服务分别都会收到一次，一条消息广播到两个服务的同时，在每一个服务的两个实例中通过轮询接收：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/29/63/2975386cec273f3ca54b42872d9f4b63.png?wh=2886%2A390" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/29/63/2975386cec273f3ca54b42872d9f4b63.png?wh=2886%2A390" /></p>
 <p>所以说，理解了RabbitMQ直接交换器、广播交换器的工作方式之后，我们对消息的路由方式了解得很清晰了，实现代码就不会出错。</p>
 <p>对于异步流程来说，消息路由模式一旦配置出错，轻则可能导致消息的重复处理，重则可能导致重要的服务无法接收到消息，最终造成业务逻辑错误。</p>
 <p>每个MQ中间件对消息的路由处理的配置各不相同，我们一定要先了解原理再着手编码。</p>
@@ -14895,7 +14895,7 @@
 <a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>}
 </code></pre></div>
 <p>调用sendMessage接口发送两条消息，然后来到RabbitMQ管理台，可以看到这两条消息始终在队列中，不断被重新投递，导致重新投递QPS达到了1063。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/11/54/1130fc65dee6acba4df08227baf4d554.jpg?wh=2284%2A1281" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/11/54/1130fc65dee6acba4df08227baf4d554.jpg?wh=2284%2A1281" /></p>
 <p>同时，在日志中可以看到大量异常信息：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>[20:02:31.533] [org.springframework.amqp.rabbit.RabbitListenerEndpointContainer#0-1] [WARN ] [o.s.a.r.l.ConditionalRejectingErrorHandler:129 ] - Execution of Rabbit message listener failed.
 <a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>org.springframework.amqp.rabbit.support.ListenerExecutionFailedException: Listener method &#39;public void org.geekbang.time.commonmistakes.asyncprocess.deadletter.MQListener.handler(java.lang.String)&#39; threw exception
@@ -14928,7 +14928,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>throw new AmqpRejectAndDontRequeueException(&quot;error&quot;);
 </code></pre></div>
 <p>但，我们更希望的逻辑是，对于同一条消息，能够先进行几次重试，解决因为网络问题导致的偶发消息处理失败，如果还是不行的话，再把消息投递到专门的一个死信队列。对于来自死信队列的数据，我们可能只是记录日志发送报警，即使出现异常也不会再重复投递。整个逻辑如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/40/28/40f0cf14933178fd07690372199e8428.png?wh=1478%2A684" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/40/28/40f0cf14933178fd07690372199e8428.png?wh=1478%2A684" /></p>
 <p>针对这个问题，Spring AMQP提供了非常方便的解决方案：</p>
 <ul>
 <li>首先，定义死信交换器和死信队列。其实，这些都是普通的交换器和队列，只不过被我们专门用于处理死信消息。</li>
@@ -15208,8 +15208,6 @@ return super.equals(yzfBeanObj);
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

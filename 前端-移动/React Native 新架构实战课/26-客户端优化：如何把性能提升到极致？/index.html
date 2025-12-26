@@ -5935,14 +5935,14 @@
 <p>你好，我是众文，这一讲继续由我和惠姝来讲解。第22讲中我们讲解了如何用自定义组件满足业务的个性化需求，除了这一点之外，在 React Native 的应用中，还有一点是大家探讨得比较多的，就是性能优化这部分。</p>
 <p>和原生开发相比，React Native 比较明显的不足在于页面加载速度，比如秒开率、页面加载的时长等。但在我们实际的落地过程中，React Native 页面达到了秒开的级别，我们是如何做到的呢？</p>
 <p>其实，一个未经优化的、比较复杂的、动态更新的 React Native 应用，从大体上讲，可以分为 3 个瓶颈（以下数据来自我们的实际业务案例）：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0c/yy/0cd583fae8ef9fe0d4fcb1b939ac09yy.png?wh=1204x482" /></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/72/b7/72637b200c229ea2429636ffc2acecb7.png?wh=1920x749" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0c/yy/0cd583fae8ef9fe0d4fcb1b939ac09yy.png?wh=1204x482" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/72/b7/72637b200c229ea2429636ffc2acecb7.png?wh=1920x749" /></p>
 <p>当然，其中还涉及 JavaScript 侧的优化。今天我们主要站从客户端角度，讲述React Native 如何在客户端侧将性能优化到极致，带你开启 React Native 的秒开世界。</p>
 <h2 id="_1">环境预创建</h2>
 <p>在 React Native 最新架构中，Turbo Module 是按需加载，而不是像旧框架一般，一股脑初始化所有的 Native Modules，同时 Hermes 引擎放弃了 JIT，在启动速度方面也有明显提升。</p>
 <p>那么，抛开这两个新版本的优化，在启动速度方面，客户端还能做些什么呢？有的，那就是 <strong>React Native 环境预创建</strong>。</p>
 <p>在混合工程中，React Native 环境与加载页面的关系如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/cb/ce/cb6be36c212515883353714ff1ab83ce.png?wh=954x770" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cb/ce/cb6be36c212515883353714ff1ab83ce.png?wh=954x770" /></p>
 <p>从上图中可以看到，在混合应用中，独立的 React Native 载体页都拥有自己的执行环境。Native 域包括 React View、Native Modules；JavaScript 域包括 JavaScript 引擎、JS Modules、业务代码；中间通信使用 Bridge/JSI。</p>
 <p>当然，业内也有多个页面复用一个引擎的优化。但是多页面复用一个引擎存在一些问题，比如JavaScript 上下文隔离、多页面渲染错乱、JavaScript 引擎不可逆异常，等等。而且复用的性能不稳定，考虑到投入产出比、维护成本等方面，通常在混合开发中，采用的是一个载体页一个引擎。</p>
 <p>一个 React Native 页面加载渲染逻辑，可以大致分为以下几步：</p>
@@ -5950,7 +5950,7 @@
 </code></pre></div>
 <p>环境初始化这一步包含创建 JavaScript 引擎、Bridge、加载 Native Modules（旧版）。根据我们的测试，初始化这一步，特别是在 Android 环境中，比较耗时。</p>
 <p>那么，如何进行 React Native 环境初始化耗时优化呢？我们可以提前将 React Native 环境创建好，流程如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/87/1b/874951373fe72a395086ddcd6yyef21b.png?wh=728x752" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/87/1b/874951373fe72a395086ddcd6yyef21b.png?wh=728x752" /></p>
 <p>具体的代码如下 （Java）：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>public class RNFactory {
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>// 单例
@@ -6013,26 +6013,26 @@
 <a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>}
 </code></pre></div>
 <p>内部的 CLASS_PROPS_CACHE、EMPTY_PROPS_MAP 都是非线程安全的数据结构，并发时可能会存在 Map 扩容转换问题 （HashMap Node 转红黑树结构），又比如 DynmicFromMap也有此问题：
-<img alt="图片" src="https://static001.geekbang.org/resource/image/61/02/613fea41d575817922bdcb9ecc636c02.png?wh=1920x1005" /></p>
+<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/61/02/613fea41d575817922bdcb9ecc636c02.png?wh=1920x1005" /></p>
 <p>那么，这个问题如何解决呢？你可以参考<a href="https://time.geekbang.org/column/article/518965">《混合应用：如何从零开始集成 React Native？》</a>框架 Bug 修复部分，对同步的地方进行处理。</p>
 <h2 id="_2">异步更新</h2>
 <p>原先我们进入 React Native 载体页后需要先下载最新的 JavaScript 代码包版本，若有更新，就要下载最新的包并加载。在这个过程中，我们会经历两次网络请求。如果用户网络比较差，那他从进入页面到渲染页面内容需要等待较长时间。</p>
 <p>所以我们针对部分特殊的页面，采取了异步更新的策略。这里所说的特殊页面可以由业务来指定，比如更新频率相对比较低的页面、页面进入路径较短的页面，等等。</p>
 <p>异步更新策略的主要思路为在进入页面之前选择性地提前下载 JavaScript 代码包，进入载体页后再看 JavaScript 代码包是否有缓存，如果有，我们就优先加载缓存并渲染；然后再异步检测是否有最新版本的 JavaScript 代码包，如果有，下载到本地并进行缓存，再等下次进入载体页时生效。</p>
 <p>我们先看一下从一个页面进入到一个 React Native 载体页后需要哪些流程：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/92/2b/92aac7a2015029fd091799a8fd0b7e2b.png?wh=531x361" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/92/2b/92aac7a2015029fd091799a8fd0b7e2b.png?wh=531x361" /></p>
 <p>流程图中可以看出，我们从进入载体页到渲染页面，需要两次网络请求，不管网速快还是慢，这个流程算是比较漫长的，但在进行异步更新后，我们的流程就会变成下图这样：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f8/8e/f8b52bd6babd2686e1004cf22dc1608e.png?wh=531x411" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f8/8e/f8b52bd6babd2686e1004cf22dc1608e.png?wh=531x411" /></p>
 <p>在业务页面中，我们可以对 JavaScript 代码包进行提前下载并缓存，在用户跳转到 React Native 页面后，检测是否有缓存的 JavaScript 代码包，如果有我们就直接渲染页面。这样就不需要等待版本号检测网络接口以及下载最新包的网络接口，也不依赖于用户的网络情况，减少了用户等待时间。</p>
 <p>在渲染页面的同时，我们通过异步检测 JavaScript 代码包的版本，若有新版本就进行更新并缓存，下次生效。当然，业务也可以选择更新完最新包之后，提示用户有新版本页面，以及是否选择刷新并加载最新页面。</p>
 <h2 id="_3">接口预缓存</h2>
 <p>对 React Native 环境初始化、bundle 加载流程进行优化后，我们的React Native 页面就可以达到秒开级别了。不过，React Native 页面加载后，进入 JavaScript 业务执行区间，大部分业务都不可避免地会进行网络交互，请求服务器数据进行渲染，这部分其实也有很大的优化空间。我们现在就来分析分析。</p>
 <p>我们先来看下具备热更新能力的 React Native 加载流程：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/44/46/440119a0899e5914f35e86efd25e9646.png?wh=1504x1034" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/44/46/440119a0899e5914f35e86efd25e9646.png?wh=1504x1034" /></p>
 <p>你可以看到，整个流程是从 React Native 环境初始化到热更新 ，再到JavaScript 业务代码执行，最后到业务界面展示。链路比较长，而且每一个步骤都依赖前一个步骤的结果。特别是热更新流程，最长可涉及两次网络调用，分别是检测是否需要更新与下载最新 bundle 文件。</p>
 <p>那么这个时候，我们就想到，在等待网络返回的过程中，Native 能不能把闲置的 CPU 资源利用起来呢？</p>
 <p>我们都知道，目前手机性能越来越强大，多核、4G/5G 使我们的“冲浪”体验越来越好。而且，Native 具备先天的多线程能力。在纯客户端开发中，我们经常使用接口数据缓存策略来提升用户体验，在最新数据返回前，先使用缓存数据进行页面渲染。那么在 React Native 中，我们也可以参考这一思路，对整个流程进行优化：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f8/b9/f8fb64dc07f20ddf88e5708a53f42ab9.png?wh=918x1120" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f8/b9/f8fb64dc07f20ddf88e5708a53f42ab9.png?wh=918x1120" /></p>
 <p>具体代码，我也放在了下面 (Java)。</p>
 <ul>
 <li>首先是预请求实体类：</li>
@@ -6093,7 +6093,7 @@
 <p>前面也提到了，React Native 页面的 JavaScript 代码包是热更新平台根据版本号进行下发的，每次有业务改动，我们都需要通过网络请求更新代码包。</p>
 <p>不过，其实只要 React Native 官方版本没有发生变化，JavaScript 代码包中 React Native 源码相关的部分是不会发生变化的，所以我们不需要在每次业务包更新的时候都进行下发，在工程中内置一份就好了。</p>
 <p>因此，我们可以将一个 JavaScript 代码包拆分成两个部分：一个是 Common 部分，也就是 React Native 源码部分，这一部分除非React Native官方版本进行升级，几乎不会发生变化；另一个是业务代码部分，也就是我们需要动态下载的部分。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/06/b7/06b66a591c76d37fb1c60e58fa0426b7.png?wh=688x486" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/06/b7/06b66a591c76d37fb1c60e58fa0426b7.png?wh=688x486" /></p>
 <p>我们在打包时，对 React Native 代码包进行处理，拆分成 Common 包和业务代码包。Common包内置到工程中（至少为几百kb的大小），业务代码包进行动态下载。然后我们利用 JSContext 环境，在进入载体页后在环境中先加载 Common包，再加载业务代码包就可以完整的渲染出 React Native 页面：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>//载体页
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>- (void)loadSourceForBridge:(RCTBridge *)bridge
@@ -6127,10 +6127,10 @@
 <h2 id="_5">按需加载</h2>
 <p>其实我们通过前面拆包的方案，已经减少了动态下载的业务代码包的大小。但是还会存在部分业务非常庞大，拆包后业务代码包的大小依然很大的情况，依然会导致下载速度较慢，并且还会受网络情况的影响。</p>
 <p>因此，我们可以再次针对业务代码包进行拆分，<strong>将一个业务代码包拆分为一个主包和多个子包的方式</strong>。在进入页面后优先请求主包的 JavaScript 代码资源，能够快速地渲染首屏页面，紧接着用户点击某一个模块时，再继续下载对应模块的代码包并进行渲染，就能再进一步减少加载时间。示例如图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7c/3c/7c961a3a314ab265a78ede03a187233c.png?wh=1002x544" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7c/3c/7c961a3a314ab265a78ede03a187233c.png?wh=1002x544" /></p>
 <p>那么，什么时候需要把业务代码包拆分成一个主包和多个子包呢？把什么模块作为主包，什么模块作为子包比较合适呢？我举一个简单的例子给你解释一下。</p>
 <p>其实在简单的业务中，我们并不需要对业务代码包进行拆分，但是在交互较为复杂的页面中，可能需要进行拆包。下面我们看一下这个包含Tab的业务页面：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/70/4f/70ffeaccdcda8e40bf47dc2a6d955b4f.png?wh=301x541" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/70/4f/70ffeaccdcda8e40bf47dc2a6d955b4f.png?wh=301x541" /></p>
 <p>这个页面中包含三个Tab，也就是Tab1、Tab2和Tab3。如果这三个Tab中的内容相似，我们当然就不需要对业务代码包进行拆分了。但是如果这三个Tab中的内容差异化较大，页面模版完全不相同，我们就可以对业务代码包进行拆分。</p>
 <p>比如三个Tab页面中，A页面是列表布局，B页面是瀑布流布局，C页面是视频页面，这几个页面之间的布局、样式、方案均无法统一管理。我们就对这三个不同的页面进行拆分，当用户选择某一个页面时，加载对应页面的样式以及布局。</p>
 <p>我们可以将头部title、subtitle部分以及三个tab作为主包优先进行渲染，其次Tab1、Tab2、Tab3部分再分别打成子包，然后再根据用户选中的Tab，将对应的代码包下载下来并渲染。这样我们可以就减少每次下载的代码包的大小，加快渲染速度</p>
@@ -6140,7 +6140,7 @@
 <p>而除了 JSI 之外，React Native 0.60 以后的版本开始支持 <a href="https://www.react-native.cn/docs/hermes">Hermes 引擎</a>。对比 JSC 引擎，Hermes 引擎在启动速度、代码执行效率上都有大幅提升，所以接下来我们就来重点讲解 Hermes 引擎的特点、它的优化手段以及如何在移动端启用。</p>
 <h2 id="hermes">Hermes 引擎</h2>
 <p>Facebook 在 ChainReact 2019 大会上正式推出了新一代 JavaScript 执行引擎 Hermes。Hermes 是个轻量级的 JavaScript 引擎，专门对移动端上运行 ReactNative 进行了优化，Hermes 可执行字节码，也可以执行 JavaScript。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/36/cc/3699ac99c8cc113a17ab3271230843cc.png?wh=622x484" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/36/cc/3699ac99c8cc113a17ab3271230843cc.png?wh=622x484" /></p>
 <p>在分析性能数据时，Facebook 团队发现 JavaScript 引擎是影响启动性能和应用包体积的重要因素。JavaScriptCore 最初是为桌面浏览器端设计，相较于桌面端，移动端能力有太多的限制。所以，为了能从底层对移动端进行性能优化，Facebook 团队选择自建 JavaScript 引擎，设计了Hermes。</p>
 <p>那新设计的 Hermes 引擎能带来怎样的提升呢？Chain React 大会上官方给出了 Hermes 引擎一组数据：</p>
 <ul>
@@ -6153,7 +6153,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>读取源码文件 -&gt; 解析转换成字节码 -&gt; 执行
 </code></pre></div>
 <p>不过，在运行时解析源码转换字节码是一种时间浪费，所以 Hermes 选择预编译的方式在编译期间生成字节码。这样做，一方面避免了不必要的转换时间；另一方面，多出的时间可以用来优化字节码，从而提高执行效率。相关示意图如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6d/9e/6d704ce81c62d6aa3dd3307e14008d9e.png?wh=1920x943" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6d/9e/6d704ce81c62d6aa3dd3307e14008d9e.png?wh=1920x943" /></p>
 <p>第二点是放弃了JIT。为了加快执行效率，现在主流的 JavaScript 引擎都会使用一个 JIT 编译器，在运行时通过转换成机器码的方式优化 JavaScript 代码。Faceback 团队认为 JIT 编译器主要有两个问题：</p>
 <ul>
 <li>要在启动时候预热，对启动时间有影响；</li>
@@ -6163,7 +6163,7 @@
 <p>当然了，Hermes 也会带来一些问题，首先就是Hermes 编译的字节码文件比纯文本 JavaScript 文件增大不少，第二点就是执行纯文本 JavaScript 耗时长。</p>
 <p>那么，我们要如何开启 Hermes呢？除了可以参考<a href="https://reactnative.dev/docs/hermes">官方文档</a>快速开启Hermes，下面我会也会给你介绍如何在混合工程中开启 Hermes引擎，我们以 Android 为例进行讲解。</p>
 <p>第一步，获取 hermes.aar 文件 （node_modules/hermes-engine）：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/23/8b/23e27d4dc66ff7074290f0503da4078b.jpeg?wh=838x464" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/23/8b/23e27d4dc66ff7074290f0503da4078b.jpeg?wh=838x464" /></p>
 <p>第二步，将 hermes-cppruntime-release.aar 与 hermes-release.aar 放到工程的 libs 目录总，然后在模块的 build.gradle 中添加依赖，这两个 aar 中主要是 hermes 和 libc++_shared so 文件：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>dependencies {
 <a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>implementation(name:&#39;hermes-cppruntime-release&#39;, ext:&#39;aar&#39;)
@@ -6342,8 +6342,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

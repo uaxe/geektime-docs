@@ -6718,7 +6718,7 @@
 <h3 id="slab_1">走进SLAB对象</h3>
 <p>何为SLAB对象？在SLAB分配器中，它把一个内存页面或者一组连续的内存页面，划分成大小相同的块，其中这一个小的内存块就是SLAB对象，但是这一组连续的内存页面中不只是SLAB对象，还有SLAB管理头和着色区。</p>
 <p>我画个图你就明白了，如下所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1b/22/1b210fe094e7eba4b19ef118f76e6322.jpg?wh=5881x2933" title="SLAB对象示意图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1b/22/1b210fe094e7eba4b19ef118f76e6322.jpg?wh=5881x2933" title="SLAB对象示意图" /></p>
 <p>上图中有一个内存页面和两个内存页面的SLAB，你可能对着色区有点陌生，我来给你讲解一下。</p>
 <p>这个着色区也是一块动态的内存块，建立SLAB时才会设置它的大小，目的是为了错开不同SLAB中的对象地址，降低硬件Cache行中的地址争用，以免导致Cache抖动效应，整个系统性能下降。</p>
 <p>SLAB头其实是一个数据结构，但是它不一定放在保存对象内存页面的开始。通常会有一个保存SLAB管理头的SLAB，在Linux中，SLAB管理头用kmem_cache结构来表示，代码如下。</p>
@@ -6746,7 +6746,7 @@
 <a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>};
 </code></pre></div>
 <p>上述代码中，有多少个CPU，就会有多少个array_cache类型的变量。这种为每个CPU构造一个变量副本的同步机制，就是<strong>每CPU变量</strong>（per-cpu-variable）。array_cache结构中"entry[]"表示了一个遵循LIFO顺序的数组，"avail"和"limit"分别指定了当前可用对象的数目和允许容纳对象的最大数目。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/83/b6/8392800e70d37795c902b0d5dfebe5b6.jpg?wh=4008x2196" title="kmem_cache结构图解" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/83/b6/8392800e70d37795c902b0d5dfebe5b6.jpg?wh=4008x2196" title="kmem_cache结构图解" /></p>
 <h3 id="kmem_cache">第一个kmem_cache</h3>
 <p>第一个kmem_cache是哪里来的呢？其实它是静态定义在代码中的，如下所示。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>static struct kmem_cache kmem_cache_boot = {
@@ -6874,13 +6874,13 @@
 </code></pre></div>
 <p>上述代码中的注释已经很清楚了，cache_grow_begin函数会为kmem_cache结构分配用来存放对象的页面，随后会调用与之对应的cache_grow_end函数，把这页面挂载到kmem_cache_node结构的链表中，并让页面指向kmem_cache结构。</p>
 <p>这样kmem_cache_node，kmem_cache，page这三者之间就联系起来了。你再看一下后面的图，就更加清楚了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e7/30/e7b479af38d5ed1ab00f35b4fe88fe30.jpg?wh=5437x3654" title="SLAB全局结构示意图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e7/30/e7b479af38d5ed1ab00f35b4fe88fe30.jpg?wh=5437x3654" title="SLAB全局结构示意图" /></p>
 <p>上图中page可能是一组连续的pages，但是只会把第一个page挂载到kmem_cache_node中，同时，在slab_map_pages函数中又让page指向了kmem_cache。</p>
 <p>但你要特别留意kmem_cache_node中的三个链表，它们分别挂载的pages，有一部分是空闲对象的page、还有对象全部都已经分配的page，以及全部都为空闲对象的page。这是为了提高分配时查找kmem_cache的性能。</p>
 <h2 id="slab_2">SLAB分配对象的过程</h2>
 <p>有了前面对SLAB数据结构的了解，SLAB分配对象的过程你自己也能推导出来，无非是根据请求分配对象的大小，查找对应的kmem_cache结构，接着从这个结构中获取arry_cache结构，然后分配对象。</p>
 <p>如果没有空闲对象了，就需要在kmem_cache对应的kmem_cache_node结构中查找有空闲对象的kmem_cache。如果还是没找到，最后就要分配内存页面新增kmem_cache结构了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/78/fe/78868f267073d4b0a8fb73b15bb41bfe.jpg?wh=2828x2700" title="SLAB分配对象的过程图解" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/78/fe/78868f267073d4b0a8fb73b15bb41bfe.jpg?wh=2828x2700" title="SLAB分配对象的过程图解" /></p>
 <p>下面我们从接口开始了解这些过程。</p>
 <h3 id="slab_3">SLAB分配接口</h3>
 <p>其实在Linux内核中，用的最多的是kmalloc函数，经常用于分配小的缓冲区，或者数据结构分配实例空间，这个函数就是SLAB分配接口，它是用来分配对象的，这个对象就是一小块内存空间。</p>
@@ -7352,8 +7352,6 @@ index = fls(size - 1);
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -6471,7 +6471,7 @@
 <p>说到数据库的查询优化，你第一个想到的肯定是建索引，那我就先来讲讲SQLite的索引优化。</p>
 <p><strong>索引优化</strong></p>
 <p>正确使用索引在大部分的场景可以大大降低查询速度，微信的数据库优化也是通过索引开始。下面是索引使用非常简单的一个例子，我们先从索引表找到数据对应的rowid，然后再从原数据表直接通过rowid查询结果。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/57/d9/57fd28e1464b7ffbb1ba2b5379b84ad9.gif?wh=672%2A141" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/57/d9/57fd28e1464b7ffbb1ba2b5379b84ad9.gif?wh=672%2A141" /></p>
 <p>关于SQLite索引的原理网上有很多文章，在这里我推荐一些参考资料给你：</p>
 <ul>
 <li><a href="https://www.cnblogs.com/huahuahu/p/sqlite-suo-yin-de-yuan-li-ji-ying-yong.html">SQLite索引的原理</a></li>
@@ -6494,13 +6494,13 @@
 <p><strong>页大小与缓存大小</strong></p>
 <p>在I/O文件系统中，我讲过数据库就像一个小文件系统一样，事实上它内部也有页和缓存的概念。</p>
 <p>对于SQLite的DB文件来说，页（page）是最小的存储单位，如下图所示每个表对应的数据在整个DB文件中都是通过一个一个的页存储，属于同一个表不同的页以B树（B-tree）的方式组织索引，每一个表都是一棵B树。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c9/f3/c9b494da11233c98f2a54abfe2921ef3.png?wh=567%2A384" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c9/f3/c9b494da11233c98f2a54abfe2921ef3.png?wh=567%2A384" /></p>
 <p>跟文件系统的页缓存（Page Cache）一样，SQLite会将读过的页缓存起来，用来加快下一次读取速度。页大小默认是1024Byte，缓存大小默认是1000页。更多的编译参数你可以查看官方文档<a href="https://sqlite.org/pragma.html#pragma_journal_mode">PRAGMA Statements</a>。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>PRAGMA page_size = 1024
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>PRAGMA cache_size = 1000
 </code></pre></div>
 <p>每个页永远只存放一个表或者一组索引的数据，即不可能同一个页存放多个表或索引的数据，表在整个DB文件的第一个页就是这棵B树的根页。继续以上图为例，如果想查询rowID为N+2的数据，我们首先要从sqlite_master查找出table的root page的位置，然后读取root page、page4这两个页，所以一共会需要3次I/O。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f2/1c/f232cbaff34236a1933182a02c685a1c.png?wh=696%2A468" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f2/1c/f232cbaff34236a1933182a02c685a1c.png?wh=696%2A468" /></p>
 <p>从上表可以看到，增大page size并不能不断地提升性能，在拐点以后可能还会有副作用。我们可以通过PRAGMA改变默认page size的大小，也可以再创建DB文件的时候进行设置。但是需要注意如果存在老的数据，需要调用vacuum对数据表对应的节点重新计算分配大小。</p>
 <p>在微信的内部测试中，如果使用4KB的page size性能提升可以在5%～10%。但是考虑到历史数据的迁移成本，最终还是使用1024Byte。<strong>所以这里建议大家在新建数据库的时候，就提前选择4KB作为默认的page size以获得更好的性能。</strong></p>
 <p><strong>其他优化</strong></p>
@@ -6527,11 +6527,11 @@
 <p><strong>2. 加密与安全</strong></p>
 <p>数据库的安全主要有两个方面，一个是防注入，一个是加密。防注入可以通过静态安全扫描的方式，而加密一般会使用SQLCipher支持。</p>
 <p>SQLite的加解密都是以页为单位，默认会使用AES算法加密，加/解密的耗时跟选用的密钥长度有关。下面是<a href="https://github.com/Tencent/wcdb/wiki/Android-Benchmark">WCDB Android Benchmark</a>的数据，详细的信息请查看链接里的说明，从结论来说对Create来说影响会高达到10倍。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5f/81/5f5ac545e346a45f1c3fcfa504300b81.png?wh=1302%2A402" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5f/81/5f5ac545e346a45f1c3fcfa504300b81.png?wh=1302%2A402" /></p>
 <p>关于WCDB加解密的使用，你可以参考<a href="https://mp.weixin.qq.com/s/NFnYEXSxAaHBqpi7WofSPQ">《微信移动数据库组件WCDB（四） — Android 特性篇》</a>。</p>
 <p><strong>3. 全文搜索</strong></p>
 <p>微信的全文搜索也是一个技术导向的项目，最开始的时候性能并不是很理想，经常会被人“批斗”。经过几个版本的优化迭代，目前看效果还是非常不错的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d2/d9/d2a09d040d0d915e78d7598457d6d1d9.png?wh=1038%2A574" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d2/d9/d2a09d040d0d915e78d7598457d6d1d9.png?wh=1038%2A574" /></p>
 <p>关于全文搜索，你可以参考这些资料：</p>
 <ul>
 <li><a href="https://sqlite.org/fts3.html">SQLite FTS3 and FTS4 Extensions</a></li>
@@ -6551,13 +6551,13 @@
 <p><strong>2. 耗时监控</strong></p>
 <p>本地测试过于依赖开发人员的自觉性，所以很多时候我们依然需要建立线上大数据的监控。因为微信集成了自己的SQLite源码，所以可以非常方便地增加自己想要的监控模块。</p>
 <p>WCDB增加了<a href="https://tencent.github.io/wcdb/references/android/reference/com/tencent/wcdb/database/SQLiteTrace.html">SQLiteTrace</a>的监控模块，有以下三个接口：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f3/8a/f3f0b4b43e4911dc0655694fca90358a.png?wh=1288%2A324" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f3/8a/f3f0b4b43e4911dc0655694fca90358a.png?wh=1288%2A324" /></p>
 <p>我们可以通过这些接口监控数据库busy、损耗以及执行耗时。针对耗时比较长的SQL语句，需要进一步检查是SQL语句写得不好，还是需要建立索引。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/12/5d/12c3d1b494fc4fb60fa0a429a8ff805d.png?wh=588%2A246" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/12/5d/12c3d1b494fc4fb60fa0a429a8ff805d.png?wh=588%2A246" /></p>
 <p><strong>3. 智能监控</strong></p>
 <p>对于查询结果的监控只是我们监控演进的第二阶段，在这个阶段我们依然需要人工介入分析，而且需要比较有经验的人员负责。</p>
 <p>我们希望SQL语句的分析可以做到智能化，是完全不需要门槛的。微信开源的Matrix里面就有一个智能化分析SQLite语句的工具：<a href="https://mp.weixin.qq.com/s/laUgOmAcMiZIOfM2sWrQgw">Matrix SQLiteLint – SQLite 使用质量检测</a>。<strong>它根据分析SQL语句的语法树，结合我们日常数据库使用的经验，抽象出索引使用不当、<code>select*</code>等六大问题。</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a4/81/a40411af3c91c9d58cac27f4f53aaa81.png?wh=940%2A380" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a4/81/a40411af3c91c9d58cac27f4f53aaa81.png?wh=940%2A380" /></p>
 <p>可能有同学会感叹为什么微信的人可以想到这样的方式，事实上这个思路在MySQL中是非常常见的做法。美团也开源了它们内部的SQL优化工具SQLAdvisor，你可以参考这些资料：</p>
 <ul>
 <li><a href="https://tech.meituan.com/SQL_parser_used_in_mtdp.html">SQL解析在美团的应用</a></li>
@@ -6701,8 +6701,6 @@ Android 系统默认提供的 SQLiteConnecionPool ，主连接只有一个（可
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

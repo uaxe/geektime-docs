@@ -7235,7 +7235,7 @@
 <p>因此，在接下来的几讲，我将带你一起梳理这些常见算子的用法与用途。不同的算子，就像是厨房里的炒勺、铲子、刀具和各式各样的锅碗瓢盆，只有熟悉了这些“厨具”的操作方法，才能在客人点餐的时候迅速地做出一桌好菜。</p>
 <p>今天这一讲，我们先来学习同一个RDD内部的数据转换。掌握RDD常用算子是做好Spark应用开发的基础，而数据转换类算子则是基础中的基础，因此我们优先来学习这类RDD算子。</p>
 <p>在这些算子中，我们重点讲解的就是map、mapPartitions、flatMap、filter。这4个算子几乎囊括了日常开发中99%的数据转换场景，剩下的mapPartitionsWithIndex，我把它留给你作为课后作业去探索。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a3/88/a3ec138b50456604bae8ce22cdf56788.jpg?wh=1599x1885" title="RDD算子分类表" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a3/88/a3ec138b50456604bae8ce22cdf56788.jpg?wh=1599x1885" title="RDD算子分类表" /></p>
 <p>俗话说，巧妇难为无米之炊，要想玩转厨房里的厨具，我们得先准备好米、面、油这些食材。学习RDD算子也是一样，要想动手操作这些算子，咱们得先有RDD才行。</p>
 <p>所以，接下来我们就一起来看看RDD是怎么创建的。</p>
 <h2 id="rdd">创建RDD</h2>
@@ -7337,7 +7337,7 @@
 <p>可以看到，在上面的改进代码中，mapPartitions以数据分区（匿名函数的形参partition）为粒度，对RDD进行数据转换。具体的数据处理逻辑，则由代表数据分区的形参partition进一步调用map(f)来完成。你可能会说：“partition. map(f)仍然是以元素为粒度做映射呀！这和前一个版本的实现，有什么本质上的区别呢？”</p>
 <p>仔细观察，你就会发现，相比前一个版本，我们把实例化MD5对象的语句挪到了map算子之外。如此一来，以数据分区为单位，实例化对象的操作只需要执行一次，而同一个数据分区中所有的数据记录，都可以共享该MD5对象，从而完成单词到哈希值的转换。</p>
 <p>通过下图的直观对比，你会发现，以数据分区为单位，mapPartitions只需实例化一次MD5对象，而map算子却需要实例化多次，具体的次数则由分区内数据记录的数量来决定。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c7/8d/c76be8ff89f1c37e52e9f17b66bf398d.jpg?wh=1920x779" title="map与mapPartitions的区别" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c7/8d/c76be8ff89f1c37e52e9f17b66bf398d.jpg?wh=1920x779" title="map与mapPartitions的区别" /></p>
 <p>对于一个有着上百万条记录的RDD来说，其数据分区的划分往往是在百这个量级，因此，相比map算子，mapPartitions可以显著降低对象实例化的计算开销，这对于Spark作业端到端的执行性能来说，无疑是非常友好的。</p>
 <p>实际上。除了计算哈希值以外，对于数据记录来说，凡是可以共享的操作，都可以用mapPartitions算子进行优化。这样的共享操作还有很多，比如创建用于连接远端数据库的Connections对象，或是用于连接Amazon S3的文件系统句柄，再比如用于在线推理的机器学习模型，等等，不一而足。你不妨结合实际工作场景，把你遇到的共享操作整理到留言区，期待你的分享。</p>
 <p>相比mapPartitions，mapPartitionsWithIndex仅仅多出了一个数据分区索引，这个数据分区索引可以为我们获取分区编号，当你的业务逻辑中需要使用到分区编号的时候，不妨考虑使用这个算子来实现代码。除了这个额外的分区索引以外，mapPartitionsWithIndex在其他方面与mapPartitions是完全一样的。</p>
@@ -7350,7 +7350,7 @@
 <li>去掉集合“外包装”，提取集合元素。</li>
 </ul>
 <p>这么说比较抽象，我们还是来举例说明。假设，我们再次改变Word Count的计算逻辑，由原来统计单词的计数，改为统计相邻单词共现的次数，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b9/6a/b9feyy652bb60d7d30a25e3e122a9f6a.jpg?wh=1920x764" title="变更Word Count计算逻辑" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b9/6a/b9feyy652bb60d7d30a25e3e122a9f6a.jpg?wh=1920x764" title="变更Word Count计算逻辑" /></p>
 <p>对于这样的计算逻辑，我们该如何使用flatMap进行实现呢？这里我们先给出代码实现，然后再分阶段地分析flatMap的映射过程：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1">// 读取文件内容</span>
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">lineRDD</span><span class="p">:</span><span class="w"> </span><span class="nc">RDD</span><span class="p">[</span><span class="nc">String</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_</span><span class="w"> </span><span class="c1">// 请参考第一讲获取完整代码</span>
@@ -7365,7 +7365,7 @@
 <p>在上面的代码中，我们采用匿名函数的形式，来提供映射函数f。这里f的形参是String类型的line，也就是源文件中的一行文本，而f的返回类型是Array[String]，也就是String类型的数组。在映射函数f的函数体中，我们先用split语句把line转化为单词数组，然后再用for循环结合yield语句，依次把单个的单词，转化为相邻单词词对。</p>
 <p>注意，for循环返回的依然是数组，也即类型为Array[String]的词对数组。由此可见，函数f的类型是（String） =&gt; （Array[String]），也就是刚刚说的第一步，<strong>从元素到集合</strong>。但如果我们去观察转换前后的两个RDD，也就是lineRDD和wordPairRDD，会发现它们的类型都是RDD[String]，换句话说，它们的元素类型都是String。</p>
 <p>回顾map与mapPartitions这两个算子，我们会发现，转换前后RDD的元素类型，与映射函数f的类型是一致的。但在flatMap这里，却出现了RDD元素类型与函数类型不一致的情况。这是怎么回事呢？其实呢，这正是flatMap的“奥妙”所在，为了让你直观地理解flatMap的映射过程，我画了一张示意图，如下所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a6/bd/a6bcd12fbc377405557c1aaf63cd24bd.jpg?wh=1920x840" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a6/bd/a6bcd12fbc377405557c1aaf63cd24bd.jpg?wh=1920x840" /></p>
 <p>不难发现，映射函数f的计算过程，对应着图中的步骤1与步骤2，每行文本都被转化为包含相邻词对的数组。紧接着，flatMap去掉每个数组的“外包装”，提取出数组中类型为String的词对元素，然后以词对为单位，构建新的数据分区，如图中步骤3所示。这就是flatMap映射过程的第二步：<strong>去掉集合“外包装”，提取集合元素</strong>。</p>
 <p>得到包含词对元素的wordPairRDD之后，我们就可以沿用Word Count的后续逻辑，去计算相邻词汇的共现次数。你不妨结合文稿中的代码与第一讲中Word Count的代码，去实现完整版的“相邻词汇计数统计”。</p>
 <h3 id="filterrdd">filter：过滤RDD</h3>
@@ -7673,8 +7673,6 @@ at $line34.$read$$iw$$iw$$iw$$iw$$iw$$iw$$iw$$iw$$iw.$anonfun$cleanWordPairRDD$1
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

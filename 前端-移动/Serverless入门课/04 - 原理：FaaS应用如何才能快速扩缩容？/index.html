@@ -5151,26 +5151,26 @@
 </code></pre></div>
 <p>我来试着描述下你PC此时的状态，首先客户端与PC建立了200个TCP/IP的连接，这时PC还可以勉强承受得住。然后200个客户端同时发起HTTP请求"/ GET"，我们Web服务的主进程，会创建“CPU核数-1”个子进程并发，来处理这些请求。注意，这里CPU核数之所以要减一，是因为有一个要留给主进程。</p>
 <p>例如4核CPU就会创建3条子进程，并发处理3个客户端请求，剩下的客户端请求排队等待；子进程开始处理"/ GET"，命中路由规则，进入对应的Control函数，返回index.html给客户端；子进程发送完index.html文件后，被主进程回收，主进程又创建一个新的子进程去处理下一个客户端请求，直到所有的客户端请求都处理完。具体如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bb/b1/bb998d5ac7b84cf0468932afad2448b1.png?wh=1502%2A662" title="PC状态示意图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bb/b1/bb998d5ac7b84cf0468932afad2448b1.png?wh=1502%2A662" title="PC状态示意图" /></p>
 <p>理解了这一点，接下来的问题就很简单了。如果我问你，为了提升我们客户端队列的处理速度，我们应该怎么做？我想答案你应该已经脱口而出了。</p>
 <h2 id="_1">纵向扩缩容与横向扩缩容</h2>
 <p>是的，我们很容易想到最直接的方式就是增加CPU的核数。要增加CPU的核数，我们可以通过升级单台机器配置，例如从4核变成8核，那并发的子进程就有7个了。</p>
 <p>除了直接增加CPU的核数，我们还可以增加机器数（还是增加一个4核的），我们用2台机器，让500个客户端访问一台，剩下500个客户端访问另外一台，这样我们并发的子进程也能增加到6个。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/65/51/652b85301f140dc4d3b2b0e35fafa151.png?wh=1184%2A776" title="纵向扩缩容 &amp; 横向扩缩容" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/65/51/652b85301f140dc4d3b2b0e35fafa151.png?wh=1184%2A776" title="纵向扩缩容 &amp; 横向扩缩容" /></p>
 <p>我画了张图，你可以看看。增加或减少单机性能就是纵向扩缩容，纵向扩缩容随着性能提升成本曲线会陡增，通常我们采用时要慎重考虑。而增加或减少机器数量就是横向扩缩容，横向扩缩容成本更加可控，也是我们最常用的默认扩缩容方式。这里我估计很多人知道，为了照顾初学者，所以再啰嗦下。</p>
 <p>你理解了这一点，我们就要增加难度了。因为index.html只是单个文件，如果是数据呢？无论是纵向还是横向扩缩容，我们都需要重启机器。现在待办列表的数据保存在内存中，它每次重启都会被还原到最开始的时候，那我们要如何在扩缩容的时候保存我们的数据呢？</p>
 <p>在讲解这个问题前，我们还是需要简化一下模型。我们先从宏观架构角度去看“待办任务”Web服务端数据流的网络拓扑图，数据请求从左往右，经过我们架构设计的各个节点后，最终获取到它要的数据，然后聚合数据并返回。那在这个过程中，哪些节点可以扩缩容，哪些节点不容易扩缩容呢？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d3/54/d39538136a0fafcc3fa4c7e0d5c8f554.png?wh=1302%2A570" title="“待办任务”Web服务端数据流网络拓扑图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d3/54/d39538136a0fafcc3fa4c7e0d5c8f554.png?wh=1302%2A570" title="“待办任务”Web服务端数据流网络拓扑图" /></p>
 <h2 id="stateful-vs-stateless">Stateful VS Stateless</h2>
 <p>网络拓扑中的节点，我们可以根据是否保存状态分为Stateful和Stateless。Stateful就是有状态的节点，Stateful节点用来保存状态，也就是存储数据，因此Stateful节点我们需要额外关注，需要保障稳定性，不能轻易改动。例如通常数据库都会采用主-从结构，当主节点出问题时，我们立即切换到从节点，让Stateful节点整体继续提供服务。</p>
 <p>Stateless就是无状态的节点，Stateless不存储任何状态，或者只能短暂存储不可靠的部分数据。Stateless节点没有任何状态，因此在并发量高的时候，我们可以对Stateless节点横向扩容，而没有流量时我们可以缩容到0（是不是有些熟悉了？）。Stateful节点则不行，如果面对流量峰值峰谷的流量差比较大时，我们要按峰值去设计Stateful节点来抗住高流量，没有流量时我们也要维持开销。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e2/40/e2a28f3a4dbd473fe2db11c7116b9140.png?wh=1414%2A658" title="“待办任务”Web服务端数据流网络拓扑图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e2/40/e2a28f3a4dbd473fe2db11c7116b9140.png?wh=1414%2A658" title="“待办任务”Web服务端数据流网络拓扑图" /></p>
 <p>在我们“待办任务”的项目中，数据库就是典型Stateful节点，因为它要持久化保存用户的待办任务。另外负载均衡也是Stateful节点，就跟我们思维试验中保存客户端队列的主进程一样，它要保存客户端的链接，才能将我们Web应用的处理结果返回给客户端。</p>
 <p>回到我们的进程模型，<strong>用完即毁型是天然的Stateless</strong>，因为它执行完就销毁，你无法单纯用它持久化存储任何值；<strong>常驻进程型则是天然的Stateful</strong>，因为它的主进程不退出，主进程可以存储部分值。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c5/51/c5ee951df1c8c5f9e88d5d44ffdb2551.png?wh=1414%2A1156" title="进程模型实例" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c5/51/c5ee951df1c8c5f9e88d5d44ffdb2551.png?wh=1414%2A1156" title="进程模型实例" /></p>
 <p>如上图所示，我们将待办任务列表的数据存储在了主进程的内存中，而在FaaS中，即使我们在常驻进程型的主进程中保存了值，它也可能会被云服务商回收。即便我们购买了预留实例，但扩容出来的节点与节点之间，它们各自内存中的数据是无法共享的，这个我们上节课有讲过。</p>
 <p>所以我们要让常驻进程型也变成Stateless，我们就要避免在主进程中保存值，或者只保存临时变量，而将持久化保存的值，移出去交给Stateful的节点，例如数据库。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f6/27/f637868794ce276e85fb209b845da527.png?wh=1738%2A1162" title="进程模型实例" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f6/27/f637868794ce276e85fb209b845da527.png?wh=1738%2A1162" title="进程模型实例" /></p>
 <p>我们将主进程节点中的数据独立出来，主进程不保存数据，这时我们的应用就变成Stateless。数据我们放入独立出来的数据库Stateful节点，网络拓扑图就是上面这张图。这个例子也就变成了我们上节课讲常驻进程型FaaS的例子，我们在主进程启动时连接数据库，通过子进程访问数据库数据，但这样做的弊端其实也很明显，它会直接增加冷启动时间。那有没有更好的解决方案呢？</p>
 <p>换一种数据持久化的思路，我们为什么非要自己连接数据库呢？我们对数据的增删改查，无非就是子进程复用主进程建立好的TCP链接，发送数据库语句，获取数据。咱们大胆想象下，如果向数据库发送指令，变成HTTP访问数据接口POST、DELETE、PUT、GET，那是不是就可以利用上一课的数据编排和服务编排了？</p>
 <p>是的，铺垫了这么多，就是为了引出我们今天的主角：BaaS化。数据接口的POST、DELETE、PUT、GET其实就是语义化的RESTful API[2] 的HTTP方法。用MySQL举例，那POST对应CREATE指令，DELETE对应DELETE指令，PUT对应UPDATE指令，GET对应SELECT指令，语义上是一一对应的，因此我们可以天然地将MySQL的操作转为RESTful API操作。</p>
@@ -5178,7 +5178,7 @@
 <p>再进一步考虑，既然FaaS不适合用作Stateful的节点，那我们是不是可以将Stateful的操作全部变成数据接口，外移？这样我们的FaaS就可以用我们上一课讲的数据编排，自由扩缩容了。</p>
 <h2 id="baas">后端应用BaaS化</h2>
 <p>BaaS这个词我们前面已经讲过了，在我看来，BaaS化的核心思想就是将后端应用转换成<strong>NoOps的数据接口</strong>，这样FaaS在SFF层就可以放开手脚，而不用再考虑冷启动时间了。其实我们上一课在讲SFF的时候，后端应用就是一定程度的BaaS化。后端应用接口化只是BaaS化的一小部分，BaaS化最重要的部分是后端数据接口应用的开发人员也可以不再关心服务端运维的事情。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f4/c2/f47b84ac700130339e3422908a9931c2.png?wh=1782%2A856" title="SFF示意图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f4/c2/f47b84ac700130339e3422908a9931c2.png?wh=1782%2A856" title="SFF示意图" /></p>
 <p>回顾一下，<a href="https://time.geekbang.org/column/article/224559">[第 1 课]</a> 中我们说的<strong>Serverless应用 = FaaS+BaaS</strong>，相信此刻你一定会有不一样的感悟了吧。</p>
 <p>BaaS化的概念容易理解，但实际上要实践，将我们的网站后端改造BaaS化，就比较困难，这其中主要的难点在于后端的运维体系如何Serverless化，改造后端BaaS化的内容相比FaaS的SFF要复杂得多。在本专栏后续的课程中，我将通过我们的创业项目“待办任务”Web服务逐步演进，带你一起学习后端BaaS化，不过你也不必有压力，因为我们在学习FaaS的过程中已经掌握的知识点，也是适用于后端BaaS化的。</p>
 <p>另外值得一提的是，云服务商也在大力发展BaaS，例如AWS提供的DynamoDB服务或Aurora服务。数据库就是BaaS化的，我们无需关心服务端运维，也无需关心IP，我们只要通过域名和密钥访问我们的DB，就像使用数据编排一样。而且BaaS的阵营还在不停壮大，不要忘了我们手中还有服务编排这一利器。</p>
@@ -5487,8 +5487,6 @@ console.log(`Example app listening at http:&#47;&#47;localhost:${port}`);
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

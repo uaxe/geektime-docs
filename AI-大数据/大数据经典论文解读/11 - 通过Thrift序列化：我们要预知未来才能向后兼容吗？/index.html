@@ -7873,7 +7873,7 @@
 <p>我们先来看看，在之前的论文里，Google有没有说过他们是用什么样的编码来存储数据的。</p>
 <p>在MapReduce的论文里，Google说MapReduce的实现，输入输出都是字符串，然后让开发者自己决定去做数据的解码，或者编码变成自己需要的类型。的确，最简单的编码数据的方式，就是用字符串把数据存下来，再用各种方法解析就好了。</p>
 <p>如果你是做后端开发的，那么日常读写数据最常见的办法之一，无非就是<strong>CSV格式</strong>。举一个最简单的例子，要想把Google这样的搜索引擎，每一次搜索后的用户点击记录给存储下来，就会是下面这样的：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/52/5b/52bf3b6a944c5e5fc077ff86d021285b.jpg?wh=1920x870" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/52/5b/52bf3b6a944c5e5fc077ff86d021285b.jpg?wh=1920x870" /></p>
 <p>我们希望存储的数据</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>user_id,search_term,rank,landing_url,click_timestmap
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>597819210,大数据,4,&quot;https://aws.amazon.com/cn/big-data/what-is-big-data/&quot;,1592373781
@@ -7983,7 +7983,7 @@
 <p>而Thrift里的<strong>TBinaryProtocol的实现方式</strong>也很简单，那就是顺序写入数据的过程中，不仅会写入数据的值（field-value），还会写入数据的编号（field-id）和类型（field-type）；读取的时候也一样。并且，在每一条记录的结束都会写下一个标志位。</p>
 <p>这样，在读取数据的时候，老版本的v1代码，看到自己没有见过的编号就可以跳过。新版本的v2代码，对于老数据里没有的字段，也就是读不到值而已，并不会出现不兼容的情况。</p>
 <p><strong>在这个机制下，我们顺序排列的编号，就起到了版本的作用，而我们不需要再专门去进行数据版本的管理了。</strong></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/73/51/7354c9c60254bc184b9ea7974155e451.jpg?wh=1920x1080" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/73/51/7354c9c60254bc184b9ea7974155e451.jpg?wh=1920x1080" /></p>
 <p>Thrift更详细的结构的规格书，可以参看对应开源项目中的<a href="https://github.com/apache/thrift/blob/master/doc/specs/thrift-protocol-spec.md">文档</a></p>
 <p>而且，<strong>写下编号还带来了一个好处</strong>，就是我们不再需要确保每个字段都填上值了，这个帮我们解决了很多问题。</p>
 <p>我们可以废弃字段，并且这些废弃的字段不会占用存储空间。我们会随着需求变更不断新加字段，数十乃至上百个字段的struct在真实的工程场景中是非常正常的。而在这个过程中，很多字段都会被逐步废弃不再使用。如果这些字段仍然要占用存储空间的话，也会是一大浪费。</p>
@@ -7998,17 +7998,17 @@
 <p>顾名思义，<strong>TCompactProtocol就是一种“紧凑”的编码方式</strong>。Thrift的IDL都是从1开始编号的，而且通常两个字段的编号是连续的。所以这个协议在存储编号的时候，存储的不是编号的值，而是存储编号和上一个编号的差。</p>
 <p>比如，第一个编号是1，第二个编号是5，编号2、3、4没有值或者已经被我们废弃掉了，那么，第二个编号存储的直接就是4。这种方式叫做<strong>Delta Encoding</strong>，在倒排索引中也经常会用到，用来节约存储空间。我们用4个bit来存储这个差值。</p>
 <p>然后，我们再通过另外4个bit表示类型信息。那么通常来说，通过一个字节，我们就能把编号和类型表示出来。毕竟，我们的类型不到16种，4个bit就够了，而通常两个字段之间的差，也不会超过15，也就是4个bit能表示的最大整型数。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6e/a8/6e90cf645d8ba7a33dfd497a63da52a8.jpg?wh=1920x712" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6e/a8/6e90cf645d8ba7a33dfd497a63da52a8.jpg?wh=1920x712" /></p>
 <p>TCompactProtocol的实现其实很简单，如果你想深入了解细节，可以直接去读一读<a href="https://github.com/apache/thrift/blob/master/lib/java/src/org/apache/thrift/protocol/TCompactProtocol.java">源码</a></p>
 <p>不过，如果两个序号的差如果超过15怎么办呢？那么，我们就通过1个字节来表示类型，然后再用1~5个字节来表示两个连续编号之间的差，也就是下面我要介绍的<strong>ZigZag+VQL</strong>的编码方式。</p>
 <h3 id="zigzagvql">ZigZag编码+VQL可变长数值表示</h3>
 <p>很多时候，我们存储的整数都不会很大，比如通过一个整型数来表示系统中存在的状态，我们并不需要2的32次方，也就是40亿种状态，可能一个字节的127种状态就绰绰有余了。</p>
 <p>所以，TCompactProtocol对于所有的整数类型的值，都采用了<a href="https://en.wikipedia.org/wiki/Variable-length_quantity">可变长数值</a>（VQL，Variable-length quantity）的表示方式，通过1~N个byte来表示整数。</p>
 <p>这个编码方式的每一个字节的高位，都会用第一个bit用来标记，也就是第一个bit用来标记整个整数是否还需要读入下一个字节，而后面的7个bit用来表示实际存放的数据。这样，一个32位的整型数，最少只要用一个字节来表示，最多也只需要用5个字节来表示，因为7bit x 5=35 bit已经足够有32位了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6d/08/6dfdaba653c70444468d05b6d24e3508.jpg?wh=1920x1051" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6d/08/6dfdaba653c70444468d05b6d24e3508.jpg?wh=1920x1051" /></p>
 <p>而因为整型数的负数，首位一定是1。这样，对于像-1这样常用的数，用16进制表示就会是 0XFFFFFFFF，用0和1表示的话就是连续32个1，会占用5个字节。所以，后面7个bit一组的编码，并没有采用普通的编码方式，而是采用了一种叫做<strong>ZigZag</strong>的编码方式。</p>
 <p>简单来说，就是负数变成正数，而正数去乘以2。这样的情况下，7个bit就可以表示-64到63这128个数了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/13/e9/13104c5ef486bcd891d525ffb78b1ae9.jpg?wh=1920x1001" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/13/e9/13104c5ef486bcd891d525ffb78b1ae9.jpg?wh=1920x1001" /></p>
 <p>通过ZigZag+VQL的编码方式，只要整数的绝对值小，占用的空间就少</p>
 <p>通过ZigZag+VQL这两种方式，你可以看到，存储一个整数，常常只需要2个字节就够了，可以说大大缩小了需要占用的硬盘空间。</p>
 <h2 id="_2">跨语言、跨协议和可扩展性</h2>
@@ -8048,7 +8048,7 @@
 </code></pre></div>
 <p>Thrift的IDL支持直接定义RPC，其实RPC方法的调用，在网络上也是编码成一条“数据”</p>
 <p><strong>跨语言+序列化+RPC，使得Thrift解决了一个在“大数据领域”中很重要的问题，就是习惯于使用不同编程语言团队之间的协作问题</strong>。通过定义一个中间格式的Thrift IDL文件，然后通过Thrift自动生成代码，写Web应用的PHP工程师和写后端数据系统的Java工程师，就可以直接无缝协作了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9b/69/9b49f37da76bdafeb5f82e914587c569.jpg?wh=1920x820" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9b/69/9b49f37da76bdafeb5f82e914587c569.jpg?wh=1920x820" /></p>
 <p>不仅如此，Thrift的设计非常清晰，也非常容易扩展。我们可以根据它的规格书，支持更多的语言，乃至自己定义和实现协议。Thrift封装好了各类接口，使得底层编码数据的协议（Protocol）、定义如何传输数据的Transport都是可以替换的。你只需要实现Thrift的一系列函数接口，就能实现一个你需要的协议。</p>
 <p>这也是为什么，Thrift也支持JSON、XML这些序列化的方式。如果你想要把对应的数据传输和处理方式，从TCP换成HTTP，那么也只需要实现一个对应的Transport就可以了。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">writeMessageBegin</span><span class="p">(</span><span class="n">name</span><span class="p">,</span><span class="w"> </span><span class="n">type</span><span class="p">,</span><span class="w"> </span><span class="n">seq</span><span class="p">)</span>
@@ -8249,8 +8249,6 @@ writeFieldBeginInternal()的部分源码：
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

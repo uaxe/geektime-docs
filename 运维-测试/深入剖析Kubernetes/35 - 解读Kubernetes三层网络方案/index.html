@@ -6700,7 +6700,7 @@
 <p>在上一篇文章中，我以网桥类型的Flannel插件为例，为你讲解了Kubernetes里容器网络和CNI插件的主要工作原理。不过，除了这种模式之外，还有一种纯三层（Pure Layer 3）网络方案非常值得你注意。其中的典型例子，莫过于Flannel的host-gw模式和Calico项目了。</p>
 <p>我们先来看一下Flannel的host-gw模式。</p>
 <p>它的工作原理非常简单，我用一张图就可以和你说清楚。为了方便叙述，接下来我会称这张图为“host-gw示意图”。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3d/25/3d8b08411eeb49be2658eb4352206d25.png?wh=2880%2A1528" title="图1 Flannel host-gw示意图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3d/25/3d8b08411eeb49be2658eb4352206d25.png?wh=2880%2A1528" title="图1 Flannel host-gw示意图" /></p>
 <p>假设现在，Node 1上的Infra-container-1，要访问Node 2上的Infra-container-2。</p>
 <p>当你设置Flannel使用host-gw模式之后，flanneld会在宿主机上创建这样一条规则，以Node 1为例：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>$ ip route
@@ -6733,7 +6733,7 @@
 <p>这个“重型武器”，就是BGP。</p>
 <p><strong>BGP的全称是Border Gateway Protocol，即：边界网关协议</strong>。它是一个Linux内核原生就支持的、专门用在大规模数据中心里维护不同的“自治系统”之间路由信息的、无中心的路由协议。</p>
 <p>这个概念可能听起来有点儿“吓人”，但实际上，我可以用一个非常简单的例子来为你讲清楚。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2e/9b/2e4b3bee1d924f4ae25e2c1fd115379b.jpg?wh=1738%2A893" title="图2 自治系统" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2e/9b/2e4b3bee1d924f4ae25e2c1fd115379b.jpg?wh=1738%2A893" title="图2 自治系统" /></p>
 <p>在这个图中，我们有两个自治系统（Autonomous System，简称为AS）：AS 1和AS 2。而所谓的一个自治系统，指的是一个组织管辖下的所有IP网络和路由器的全体。你可以把它想象成一个小公司里的所有主机和路由器。在正常情况下，自治系统之间不会有任何“来往”。</p>
 <p>但是，如果这样两个自治系统里的主机，要通过IP地址直接进行通信，我们就必须使用路由器把这两个自治系统连接起来。</p>
 <p>比如，AS 1里面的主机10.10.0.2，要访问AS 2里面的主机172.17.0.3的话。它发出的IP包，就会先到达自治系统AS 1上的路由器 Router 1。</p>
@@ -6761,7 +6761,7 @@
 <li>BIRD。它就是BGP的客户端，专门负责在集群里分发路由规则信息。</li>
 </ol>
 <p><strong>除了对路由信息的维护方式之外，Calico项目与Flannel的host-gw模式的另一个不同之处，就是它不会在宿主机上创建任何网桥设备</strong>。这时候，Calico的工作方式，可以用一幅示意图来描述，如下所示（在接下来的讲述中，我会统一用“BGP示意图”来指代它）：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8d/1b/8db6dee96c4242738ae2878e58cecd1b.jpg?wh=1560%2A836" title="图3 Calico工作原理" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8d/1b/8db6dee96c4242738ae2878e58cecd1b.jpg?wh=1560%2A836" title="图3 Calico工作原理" /></p>
 <p>其中的绿色实线标出的路径，就是一个IP包从Node 1上的Container 1，到达Node 2上的Container 4的完整路径。</p>
 <p>可以看到，Calico的CNI插件会为每个容器设置一个Veth Pair设备，然后把其中的一端放置在宿主机上（它的名字以cali前缀开头）。</p>
 <p>此外，由于Calico没有使用CNI的网桥模式，Calico的CNI插件还需要在宿主机上为每个容器的Veth Pair设备配置一条路由规则，用于接收传入的IP包。比如，宿主机Node 2上的Container 4对应的路由规则，如下所示：</p>
@@ -6794,14 +6794,14 @@
 <p>上面这条规则里的下一跳地址是192.168.2.2，可是它对应的Node 2跟Node 1却根本不在一个子网里，没办法通过二层网络把IP包发送到下一跳地址。</p>
 <p><strong>在这种情况下，你就需要为Calico打开IPIP模式。</strong></p>
 <p>我把这个模式下容器通信的原理，总结成了一张图片，如下所示（接下来我会称之为：IPIP示意图）：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4d/c9/4dd9ad6415caf68da81562d9542049c9.jpg?wh=1696%2A1056" title="图4 Calico IPIP模式工作原理" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4d/c9/4dd9ad6415caf68da81562d9542049c9.jpg?wh=1696%2A1056" title="图4 Calico IPIP模式工作原理" /></p>
 <p>在Calico的IPIP模式下，Felix进程在Node 1上添加的路由规则，会稍微不同，如下所示：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>10.233.2.0/24 via 192.168.2.2 tunl0
 </code></pre></div>
 <p>可以看到，尽管这条规则的下一跳地址仍然是Node 2的IP地址，但这一次，要负责将IP包发出去的设备，变成了tunl0。注意，是T-U-N-L-0，而不是Flannel UDP模式使用的T-U-N-0（tun0），这两种设备的功能是完全不一样的。</p>
 <p>Calico使用的这个tunl0设备，是一个IP隧道（IP tunnel）设备。</p>
 <p>在上面的例子中，IP包进入IP隧道设备之后，就会被Linux内核的IPIP驱动接管。IPIP驱动会将这个IP包直接封装在一个宿主机网络的IP包中，如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fc/90/fc2b4173782b7a993f4a43a2cb966f90.jpg?wh=2248%2A1034" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fc/90/fc2b4173782b7a993f4a43a2cb966f90.jpg?wh=2248%2A1034" /></p>
 <p>图5 IPIP封包方式</p>
 <p>其中，经过封装后的新的IP包的目的地址（图5中的Outer IP Header部分），正是原IP包的下一跳地址，即Node 2的IP地址：192.168.2.2。</p>
 <p>而原IP包本身，则会被直接封装成新IP包的Payload。</p>
@@ -7000,8 +7000,6 @@ flannel的vxlan和calico的ipip模式都可以选择，它们都通过内核模�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

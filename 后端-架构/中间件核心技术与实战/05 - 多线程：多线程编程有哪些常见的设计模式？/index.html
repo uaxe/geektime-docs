@@ -14298,14 +14298,14 @@
 <p>通常，我们可以遵循这样的原则：<strong>对于Request-Response等需要用户交互的场景，建议使用有界队列，避免内存溢出；对于框架内部线程之间的交互，可以根据实际情况加以选择。</strong></p>
 <p>我们通过几个例子来看一下具体的场景。</p>
 <p>项目开发中通常会遇到文件下载、DevOps的系统发布等比较耗时的请求，这类场景就非常适合使用线程池。基本的工作方式如图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/98/87/987b4a04eb0a92bfac98ffd8bae93687.jpg?wh=1900x977" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/98/87/987b4a04eb0a92bfac98ffd8bae93687.jpg?wh=1900x977" /></p>
 <p>在与用户交互的场景中，如果几十万个文件下载请求同时提交到线程池，当线程池中的所有线程都在处理任务时，无法及时处理的请求就会存储到线程池中的阻塞队列中。这就很容易使内存耗尽，从而触发Full-GC，导致系统无法正常运作。</p>
 <p>因此，这类场景我建议使用有界队列，直接拒绝暂时处理不了的请求，并给用户返回一条消息“请求排队中，请稍后再试”，这就保证了系统的可用性。</p>
 <p><strong>在一个线程或多个线程向一个阻塞队列中添加数据时，通常也会使用有界队列。</strong>记得我在开发数据同步产品时，为了实现源端与目标端线程，就采用了阻塞队列，下面是一张示意图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3a/cb/3af7bc6d5d3ddc1dfec08c595cfe18cb.jpg?wh=1920x636" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3a/cb/3af7bc6d5d3ddc1dfec08c595cfe18cb.jpg?wh=1920x636" /></p>
 <p>为了实现MySQL增量同步，Canal线程源源不断地将MySQL数据写入到阻塞队列，然后目标端线程从队列中读取数据并写入到MQ。如果写入端的写入速度变慢，阻塞队列中的数据就变得越来越多，一旦不加以控制就可能导致内存溢出。所以，为了避免由于写入端性能瓶颈造成的整个系统的不可用，这时候需要引入有界阻塞队列。这样，队列满了之后，我们就能让源端线程处于阻塞状态，从而对源端进行限流。</p>
 <p><strong>但在选择阻塞队列时还可能有另外一种情况，那就是一个线程对应多个阻塞队列，这时我们一般会采用无界阻塞队列+size的机制，实现细粒度限流</strong>。当时，我设计的RocketMQ消费模型是下面这样：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/bc/fc/bcaf3ee4ce2d22532c01977f694b43fc.jpg?wh=1920x787" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bc/fc/bcaf3ee4ce2d22532c01977f694b43fc.jpg?wh=1920x787" /></p>
 <p>一个拉取线程轮流从Broker端队列(q0、q1)中拉取消息，然后根据队列分别放到不同的阻塞队列中，每一个阻塞队列会单独分配单个或多个线程去处理。</p>
 <p>这个时候，采用有界队列可能出现问题。如果我们采用有界队列，一旦其中一个阻塞队列对应的下游消费者处理性能降低，阻塞队列中没有剩余空间存储消息，就会阻塞消息发送线程，最终造成另外一个任务也无法拉取新的消息。显然，这会让整体并发度降低，影响性能。</p>
 <p>那如果采用无界队列呢？单纯使用无界队列容易导致内存泄露，触发更严重的后果，好像也不是一个好的选择。</p>
@@ -14346,7 +14346,7 @@
 <h3 id="future">Future模式</h3>
 <p>多线程领域一个非常经典的设计模式是Future模式。它指的是主线程向另外一个线程提交任务时，无须等待任务执行完毕，而是立即返回一个凭证，也就是Future。这时主线程还可以做其他的事情，不会阻塞。等到需要异步执行结果时，主线程调用Future的get方法，如果异步任务已经执行完毕，则立即获取结果；如果任务还没执行完，则主线程阻塞，等待执行结果。</p>
 <p>Future模式的核心要领是将多个请求进行异步化处理，并且可以得到返回结果。我们来看一个示例：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d7/5d/d747892fb50087110ce994b010356d5d.jpg?wh=1920x1110" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d7/5d/d747892fb50087110ce994b010356d5d.jpg?wh=1920x1110" /></p>
 <p>当一个请求在处理时，需要发起多个远程调用，并且返回多个请求，再根据结果进行下一步处理。它的伪代码如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>Object result1 = sendRpcToUserCenter(); // @1
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>Object result2 = sendRpcToOrgCenter(0); // @2
@@ -14407,7 +14407,7 @@
 </ul>
 <p>因为线程池是一个较重的资源，而中间件领域的开发追求极致的性能，所以在中间件开发领域通常不会直接使用线程池来实现Future模式。</p>
 <p>RocketMQ会使用CountDownLatch来实现Future模式，它的设计非常精妙，我们先一起来看一下它的序列图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/2d/6d/2dfeb68590951c60cfbf4242fefd026d.jpg?wh=1920x1082" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2d/6d/2dfeb68590951c60cfbf4242fefd026d.jpg?wh=1920x1082" /></p>
 <p>可以看到，SendMessageThread会首先创建一个GroupCommitRequest请求对象，并提交到刷盘线程，然后发送线程阻塞，等待刷盘动作完成。刷盘线程在执行具体刷盘逻辑后，会调用request的通知方法，唤醒发送线程。</p>
 <p>乍一看，主线程提交刷盘任务之后并没有返回一个Future，那为什么说这是Future模式呢？这就是RocketMQ的巧妙之处了。它其实是把请求对象当作Future来使用了。我们来看一下GroupCommitRequest的实现代码：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>public static class GroupCommitRequest {
@@ -14446,7 +14446,7 @@
 <p>程序设计中一个非常重要的思想是解耦合，在Java设计领域也有一条重要的设计原则就是要职责单一。基于这些原则，通常一个功能需要多个角色相互协作才能正常完成。</p>
 <p>生产者-消费者模式正是这种思想的体现，它的理论也很简单，我们这里不会深入介绍。但我想用RocketMQ举一个实操的例子。</p>
 <p>在RocketMQ消费线程模型中，应用程序在启动消费者时，首先需要根据负载算法进行队列负载，然后消息拉取线程会根据负载线程计算的结果有针对性地拉取消息。交互流程如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/38/a8/38d8604ea92661009fc711d226b345a8.jpg?wh=1920x1081" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/38/a8/38d8604ea92661009fc711d226b345a8.jpg?wh=1920x1081" /></p>
 <p>Rebalace线程作为生产者，会根据业务逻辑生成消息拉取任务，然后Pull线程作为消费者会从队列中获取任务，执行对应的逻辑；如果当前没有可执行的逻辑，Pull线程则会阻塞等待，当生产者将新的任务存入到阻塞队列中后，Pull线程会再次被唤醒。</p>
 <p>系统的运行过程中会存在很多意料之外的突发事件，在高并发领域更是这样。所以在进行系统架构设计时，我们必须具备底线思维，对系统进行必要的兜底，防止最坏的情况发生，这里最常见的做法就是采用限流机制。</p>
 <p>所以在这节课的最后，我们一起来看看并发编程领域如何实现<strong>限流</strong>。</p>
@@ -14664,8 +14664,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

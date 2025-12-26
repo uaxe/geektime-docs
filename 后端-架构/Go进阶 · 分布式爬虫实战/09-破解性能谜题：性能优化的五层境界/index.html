@@ -14917,7 +14917,7 @@
 </code></pre></div>
 <p>从功能上来看，这段代码没有问题。但是，这种写法忽略了一个事实，如下图所示，往切片中添加数据时，切片会自动扩容，Go运行时会创建新的内存空间并执行拷贝（详细的扩容过程可以参考《Go语言底层原理剖析》）。</p>
 <p>自动扩容显然不是没有成本的。在循环操作中执行这样的代码会放大性能损失，减慢程序的运行。性能损失的对比可参考<a href="https://github.com/uber-go/guide/blob/master/style.md#prefer-specifying-container-capacity">这篇文章</a>。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/42/a5/4266f7accbac63e3c7d142a0cfe9d1a5.jpg?wh=1920x835" title="切片扩容底层原理" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/42/a5/4266f7accbac63e3c7d142a0cfe9d1a5.jpg?wh=1920x835" title="切片扩容底层原理" /></p>
 <p>我们可以改写一下上面这段程序，在初始化时指定合适的切片容量：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>func createSlice(n int) []string {
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>slice := make([]string, 0, n*3)
@@ -14932,10 +14932,10 @@
 <p>除了遵守常见的规范，要写出合理的代码，还需要对算法和数据结构进行设计改造。有人说“程序=算法+数据结构”，可见这两者的重要性。</p>
 <p><strong>对于算法来说，关键算法的调整常常能够给性能带来数倍的提升。</strong>例如，将冒泡排序（o(n^2)）替换为快速排序(o(n*logn))，将线性查找(o(n)) 替换为二分查找（o(log n)），甚至到哈希表的方式（o(1)），都是常见的算法升级。</p>
 <p><strong>对数据结构的优化指的是添加或更改正在处理的数据的表示。</strong>数据结构在很大程度上决定了数据的处理方式，进而决定了时间与空间复杂度。举一个简单的例子，如下图所示，如果在链表的头部节点添加一个表明链表长度的字段，就不必遍历链表才能得到链表的总长度了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e8/7b/e832b3ed7e0a407d73a5d483fcf95c7b.png?wh=1920x403" title="链表中加入链表长度" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e8/7b/e832b3ed7e0a407d73a5d483fcf95c7b.png?wh=1920x403" title="链表中加入链表长度" /></p>
 <p><strong>有时候，我们需要做一些空间换时间的trade-off。</strong>缓存就是一种提高性能，减少数据库访问和防止全局结构锁的机制。缓存这种空间换时间的策略，在高并发程序中的应用非常广泛。不管是CPU多级缓存、Go的运行时调度器，还是Go内存分配管理，甚至标准库中sync.Pool的设计都包含了利用局部缓存提高整体并发速度的设计。</p>
 <p><strong>在设计算法与数据结构时要考虑的另一个重要因素是实现的复杂度。</strong>如下图所示，Go 1.13之前，内存分配使用了Treap平衡树，Treap 是一种引入了随机数的二叉树搜索树，它的实现简单，并且引入的随机数和必要的旋转保证了比较好的平衡特性。又如，Redis中选择跳表这样的数据结构是考虑到了红黑树等结构在实现上的复杂性。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0f/eb/0ffb4fe7a8a8dae36a11be48a52353eb.jpg?wh=1920x722" title="Treap平衡树" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0f/eb/0ffb4fe7a8a8dae36a11be48a52353eb.jpg?wh=1920x722" title="Treap平衡树" /></p>
 <p>当完成重要过程的优化之后，你应该对修改的功能进行Benckmark性能测试，并通过<code>benchstat</code> 工具对比两次Benckmark的差别，做到心中有数。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>$ benchstat old.txt new.txt
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>name        old time/op  new time/op  delta
@@ -14955,7 +14955,7 @@
 <p>举一个例子，程序中常常使用JSON进行结构体的序列化，但是由于标准JSON库使用了大量反射，当并发量大幅度增加时，JSON标准库的耗时就可能变为瓶颈，这时需要考虑将标准库替换为更快的第三方库，甚至需要使用protobuf等更快的序列化方式。</p>
 <p>还有一些优化涉及到Go语言的编译时和运行时。例如，之前介绍过的将环境变量GOMAXPROC调整为更合适的大小，本质上就是在修改运行时可并行的线程数量。</p>
 <p>此外，当并发量上来之后，垃圾回收（GC）也可能成为系统的瓶颈所在。GC有一段STW的时长完全不能执行用户协程，并且在并行标记期间会占用25%的CPU时间。如果STW时间过长，或者并发标记阶段由于频繁的内存分配触发了辅助标记，都会导致程序无法有效处理用户协程，产生严重的响应超时问题。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/29/a2/29754c818bb1018d3c895ed62986b7a2.jpg?wh=1920x773" title="垃圾回收过程" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/29/a2/29754c818bb1018d3c895ed62986b7a2.jpg?wh=1920x773" title="垃圾回收过程" /></p>
 <p>一般这类GC问题可以通过修改代码逻辑减少内存分配频繁，或是借助sync.pool等内存池复用内存来解决。另外，运行时也暴露了一些有限的API能够干预垃圾回收的运行，在特殊情况下调整这些参数能够提高程序运行效率：</p>
 <ul>
 <li>运行时环境变量GOGC可以调整GC的内存触发水位，当GOGC=off时，它甚至能够关闭GC的执行；</li>
@@ -14966,7 +14966,7 @@
 <h3 id="_4">危险的尝试</h3>
 <p>最后，代码实施阶段，由于迫不得已的原因，可能还需要进行一些特别的“危险的尝试”。</p>
 <p>例如，由于很多机器学习库是用C或者C++完成的，因此需要使用CGO的技术。我曾经深度写过CGO相关的项目，可以说是苦不堪言。你可以看看下面这段代码，在这里，开发会面临各种问题：没有编辑器的提示，语法繁琐，难以调试，内存不受到Go运行时的管理。所以说不到万不得已，不要使用CGO。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/70/e8/70ce07eeccc4a9b797205264c51289e8.png?wh=1680x520" title="真实项目中使用CGO的例子" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/70/e8/70ce07eeccc4a9b797205264c51289e8.png?wh=1680x520" title="真实项目中使用CGO的例子" /></p>
 <p>另外，Go语言语法本身屏蔽了指针的操作，但有些场景为了提高性能，或为了使用某些高级能力会用到unsafe库操作指针。然而，想要正确地使用unsafe是很难的。</p>
 <ul>
 <li>首先，Go语言中的unsafe库本身不是向后兼容的，这意味着在当前版本中有效的代码在之后的版本中的行为是未知的。</li>
@@ -14977,7 +14977,7 @@
 <p>接下来我们继续看看程序的基座，也就是操作系统对性能的影响。</p>
 <h2 id="_5">操作系统级别</h2>
 <p>程序是运行在操作系统基座之上的，程序所处的环境和操作系统的一些特性会深刻影响程序的性能。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1b/6d/1b7505949a0ac36d8d4d1c4e681d846d.jpg?wh=1920x1278" title="Linux操作系统架构" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1b/6d/1b7505949a0ac36d8d4d1c4e681d846d.jpg?wh=1920x1278" title="Linux操作系统架构" /></p>
 <p>如图所示，Linux操作系统位于硬件与用户应用程序之间。它一方面托管了与硬件的交互，另一方面提供了与应用程序交互的API。具体来说，Linux操作系统提供了下面几个重要的功能：</p>
 <ul>
 <li>进程管理，例如进程启动与管理；</li>
@@ -14989,7 +14989,7 @@
 <p>一个程序通常会用到操作系统提供的多种服务，<strong>要在操作系统层面解决瓶颈问题，我们要做的第一步就是明确我们需要优化哪一个方向</strong>。例如，我们希望排查系统CPU利用率高的问题，主要关注的是操作系统对进程的管理与调度；如果要排查内存问题，则主要关注内存分配与缓存等问题；如果网络耗时过长，我们主要关注的则是操作系统的网络协议栈。当然，有一些问题可能是交叉的，例如，频繁的内存与磁盘的交换（swap）也会导致CPU利用率的飙升。</p>
 <p><strong>要在操作系统层面解决瓶颈问题，我们要做的第二步是熟悉我们希望优化的操作系统的核心功能流程与架构，</strong>从而才能有针对性地使用相关工具进行验证。例如，要排查CPU利用率过低的问题，需要明确操作系统如何将程序调度到CPU中执行、哪些问题可能导致CPU陷入等待或者发生切换、中断。</p>
 <p>要解决这些问题，我们需要掌握相应的概念和知识，其中就包括了操作系统调度的原理。操作系统将程序分为了多个线程，并将线程调度到 CPU 上运行。为了公平地调度每一个线程，Linux2.6之后引入了CFS调度器，如下图所示。线程按照运行的优先级存储在红黑树结构中，红黑树中最左侧的线程会优先被调度执行。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/42/yy/42703bdab1528fa2840985a4336284yy.jpg?wh=1920x1278" title="Linux CFS调度" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/42/yy/42703bdab1528fa2840985a4336284yy.jpg?wh=1920x1278" title="Linux CFS调度" /></p>
 <p>下面几种情况都可能导致应用程序的CPU利用率低：</p>
 <ul>
 <li>从线程可以运行到线程实际运行仍然有一定延时，当运行的程序越来越多，这种延迟会更加明显；</li>
@@ -15000,9 +15000,9 @@
 <p><strong>在操作系统层面解决瓶颈问题的第三步，是要用对应的工具验证和排查瓶颈问题。</strong></p>
 <p>例如我们要排查系统CPU利用率异常的问题，其实就是要查看CPU在一段时间内更多的在做哪一部分的工作。我们期望CPU能够更多的执行应用程序交代的工作，而不是陷入到执行内核线程或者是大量时间堵塞在与硬件设备的I/O交互中。</p>
 <p>我们有多种工具可以观察当前操作系统的资源利用情况。以CPU利用率为例，最常见的TOP命令可以查看用户CPU使用率、系统CPU使用率、IO WAIT率。而mpstat命令可以查看CPU软中断和硬中断使用率。不同指标的使用率上升对应的常见原因如图所示。从而我们可以更进一步明确CPU利用率异常的原因。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/38/df/38c47d2641fa6a834825f936301ea6df.jpg?wh=1920x861" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/38/df/38c47d2641fa6a834825f936301ea6df.jpg?wh=1920x861" /></p>
 <p>如果你想要了解更多在操作系统级别分析CPU、内存、文件、网络、磁盘等资源的现状、瓶颈、方法和工具，可以参考《Systems Performance, 2nd Edition》这本书。像perf这类工具甚至可以查看到操作系统的线程堆栈信息，输出CPU火焰图，快速寻找最可能的代码瓶颈。在某一个程序卡死导致无法响应的时候，或者在排查程序调用耗时过长问题时尤其有用。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d1/8c/d17862aa97da84928900yyd1b7c51e8c.png?wh=1796x932" title="perf生成的火焰图" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d1/8c/d17862aa97da84928900yyd1b7c51e8c.png?wh=1796x932" title="perf生成的火焰图" /></p>
 <p>容器化时代对分析和排查性能问题又提出了新的挑战。例如，Linux通过Cgroup和Namespace技术构建了轻量级的虚拟容器把资源隔离开，这样容器只能够使用限制好的资源，而不能使用宿主机的全部资源。</p>
 <p>由于操作系统的很多观测手段还不成熟，一些初学者很容易被误导。例如在容器中top命令获得的cpu idle 和load average信息实际上是宿主机的信息，而进程的利用率等信息只是容器内部的信息。如果不清楚信息实际的含义，将导致我们得出错误的结论。这时候我们就可以使用像<a href="https://github.com/google/cadvisor">cadvisor</a>这种第三方库获取容器的相应指标。</p>
 <p>操作系统为我们屏蔽掉了不同硬件处理的细节，但操作系统也是一个特殊的软件，仍然是运行在硬件之上的，硬件的性能决定了处理速度的上限，硬件的设计值得我们在设计软件时参考，有效利用硬件的特性也能加速软件的运行，下面让我们看看性能优化的硬件级别。</p>
@@ -15010,13 +15010,13 @@
 <p>操作系统的底座是硬件，上层开发者很少涉及硬件层面的内容，这是因为操作系统已经为我们屏蔽了硬件的细节。但是了解现代处理器的架构对于理解程序运行，书写高质量代码甚至解决一些棘手问题来说仍然意义重大。</p>
 <p>大多数现代通用计算机的架构（个人电脑、笔记本电脑和服务器）都是基于冯·诺依曼的体系搭建的。它们的架构是由多个核心组成的中央处理器 （CPU）。每个内核都可以使用保存在随机存储器（RAM）或任何其他存储器（如寄存器或高速缓存）中的数据来执行所需要的指令。</p>
 <p>下图是具有多核CPU和统一内存访问（UMA）的计算机体系结构，CPU通过总线与外部组件连接。当处理器数量增加时，由于对共享总线资源的争用，使用系统总线会出现可伸缩性问题，因此现代多核计算机通常采用了优化后的NUMA架构。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/98/04/980c044208776833231847db5920d204.jpg?wh=1920x1372" title="具有多核CPU和统一内存访问 (UMA) 的计算机体系结构" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/98/04/980c044208776833231847db5920d204.jpg?wh=1920x1372" title="具有多核CPU和统一内存访问 (UMA) 的计算机体系结构" /></p>
 <p>和之前提到的操作系统的优化思路一样，<strong>硬件级别的优化也需要明确某一个优化的方向并熟悉其内部的架构。</strong></p>
 <p>CPU、内存、磁盘的架构都可谓别有洞天。以CPU为例，其内部包含了L1、L2和L3级缓存，了解这些缓存特性将有助于我们加快程序速度。</p>
 <p>由于CPU高速缓存的特性，访问之前获取过的数据及其相邻数据的速度会更快。CPU高速缓存的特性影响了程序数据结构的设计。例如Go语言哈希表在解决哈希冲突时就考虑了CPU高速缓存的特性，使用了优化后的拉链法，每一个桶中存储了8 个元素，加快了哈希表的访问速度。</p>
 <p>CPU缓存的特性还涉及到伪共享（False Sharing）。当多线程修改看似互相独⽴的变量时，如果这些变量共享同⼀个缓存⾏，就会在⽆意中影响彼此的性能，在Go源码中就常常看到这样的设计。</p>
 <p>除此之外，现代CPU还有另一个特性：分支预测。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/bc/20/bc7893af3f031a189e434cb4ee176020.png?wh=637x479" title="分支预测好比铁路分叉道口" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bc/20/bc7893af3f031a189e434cb4ee176020.png?wh=637x479" title="分支预测好比铁路分叉道口" /></p>
 <p>CPU 应用了各种算法和启发式方法来猜测程序在未来的分支，以便将执行的指令提前预取到CPU的缓存中，加快执行速度。</p>
 <p>分支的预测是怎么实现的呢？下面我用两个函数来说明一下。请你思考一下，下面的两个程序有区别吗？从表面看，它们都执行了10000×1000×100次操作，但是它们实际运行的时间却相差很大。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>func fast(){
@@ -15045,7 +15045,7 @@
 <p>好了，这节课就讲到这里。</p>
 <p>性能分析的广度与深度都是超出想象的，它非常考验开发者的功力。如果没有方法论的支撑，找到性能问题并快速调优无异于大海捞针。</p>
 <p>在这两节课里，我通过分层抽象的方法，带着你从最底层的硬件到最上层的系统设计，从设计、开发到发现问题和调优，拆解了性能问题的方方面面。希望能够帮助你查漏补缺，在遇到瓶颈问题时有的放矢。我也给你画了一张详细的思维导图，供你随时查看。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b4/7c/b4233007431c2cd74c261f8717e5737c.jpg?wh=1920x3089" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b4/7c/b4233007431c2cd74c261f8717e5737c.jpg?wh=1920x3089" /></p>
 <p>我们花了两节课程学习高性能程序前期的设计，但你可能有一个疑问，我们应该在哪一个阶段处理掉性能问题更好呢？</p>
 <p>这个问题让我想起了扁鹊三兄弟的故事。扁鹊三兄弟的医术大哥最高，二哥其次，扁鹊最差。但是只有扁鹊名动天下。原因是大哥的医术最高，可以防患于未然。而扁鹊在病人病入膏肓、奄奄一息之时下虎狼之药，起死回生。这正是善战者无赫赫之名的道理。</p>
 <p>我想，对于有追求的开发者，我们佩服的是扁鹊大哥这样的人物。<strong>如果我们能够在项目设计之初，就规避掉未来很长时间内可能遇到的性能瓶颈，又哪里会在出问题之后再手忙脚乱呢？</strong></p>
@@ -15174,8 +15174,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

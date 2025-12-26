@@ -14428,7 +14428,7 @@
 <p>我们要彻底搞明白这个问题的话，就要从数据删除流程说起了。</p>
 <h1 id="_1">数据删除流程</h1>
 <p>我们先再来看一下InnoDB中一个索引的示意图。在前面<a href="https://time.geekbang.org/column/article/69236">第4</a>和<a href="https://time.geekbang.org/column/article/69636">第5</a>篇文章中，我和你介绍索引时曾经提到过，InnoDB里的数据都是用B+树的结构组织的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f0/c8/f0b1e4ac610bcb5c5922d0b18563f3c8.png?wh=1142%2A856" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f0/c8/f0b1e4ac610bcb5c5922d0b18563f3c8.png?wh=1142%2A856" /></p>
 <p>图1 B+树索引示意图</p>
 <p>假设，我们要删掉R4这个记录，InnoDB引擎只会把R4这个记录标记为删除。如果之后要再插入一个ID在300和600之间的记录时，可能会复用这个位置。但是，磁盘文件的大小并不会缩小。</p>
 <p>现在，你已经知道了InnoDB的数据是按页存储的，那么如果我们删掉了一个数据页上的所有记录，会怎么样？</p>
@@ -14442,7 +14442,7 @@
 <p>实际上，<strong>不止是删除数据会造成空洞，插入数据也会。</strong></p>
 <p>如果数据是按照索引递增顺序插入的，那么索引是紧凑的。但如果数据是随机插入的，就可能造成索引的数据页分裂。</p>
 <p>假设图1中page A已经满了，这时我要再插入一行数据，会怎样呢？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/80/ea/8083f05a4a4c0372833a6e01d5a8e6ea.png?wh=1142%2A1522" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/80/ea/8083f05a4a4c0372833a6e01d5a8e6ea.png?wh=1142%2A1522" /></p>
 <p>图2 插入数据导致页分裂</p>
 <p>可以看到，由于page A满了，再插入一个ID是550的数据时，就不得不再申请一个新的页面page B来保存数据了。页分裂完成后，page A的末尾就留下了空洞（注意：实际上，可能不止1个记录的位置是空洞）。</p>
 <p>另外，更新索引上的值，可以理解为删除一个旧的值，再插入一个新值。不难理解，这也是会造成空洞的。</p>
@@ -14453,7 +14453,7 @@
 <p>你可以新建一个与表A结构相同的表B，然后按照主键ID递增的顺序，把数据一行一行地从表A里读出来再插入到表B中。</p>
 <p>由于表B是新建的表，所以表A主键索引上的空洞，在表B中就都不存在了。显然地，表B的主键索引更紧凑，数据页的利用率也更高。如果我们把表B作为临时表，数据从表A导入表B的操作完成后，用表B替换A，从效果上看，就起到了收缩表A空间的作用。</p>
 <p>这里，你可以使用alter table A engine=InnoDB命令来重建表。在MySQL 5.5版本之前，这个命令的执行流程跟我们前面描述的差不多，区别只是这个临时表B不需要你自己创建，MySQL会自动完成转存数据、交换表名、删除旧表的操作。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/02/cd/02e083adaec6e1191f54992f7bc13dcd.png?wh=1142%2A856" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/02/cd/02e083adaec6e1191f54992f7bc13dcd.png?wh=1142%2A856" /></p>
 <p>图3 改锁表DDL</p>
 <p>显然，花时间最多的步骤是往临时表插入数据的过程，如果在这个过程中，有新的数据要写入到表A的话，就会造成数据丢失。因此，在整个DDL过程中，表A中不能有更新。也就是说，这个DDL不是Online的。</p>
 <p>而在<strong>MySQL 5.6版本开始引入的Online DDL，对这个操作流程做了优化。</strong></p>
@@ -14465,7 +14465,7 @@
 <li>临时文件生成后，将日志文件中的操作应用到临时文件，得到一个逻辑数据上与表A相同的数据文件，对应的就是图中state3的状态；</li>
 <li>用临时文件替换表A的数据文件。</li>
 </ol>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2d/f0/2d1cfbbeb013b851a56390d38b5321f0.png?wh=1142%2A856" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2d/f0/2d1cfbbeb013b851a56390d38b5321f0.png?wh=1142%2A856" /></p>
 <p>图4 Online DDL</p>
 <p>可以看到，与图3过程的不同之处在于，由于日志文件记录和重放操作这个功能的存在，这个方案在重建表的过程中，允许对表A做增删改操作。这也就是Online DDL名字的来源。</p>
 <p>我记得有同学在第6篇讲表锁的文章<a href="https://time.geekbang.org/column/article/69862">《全局锁和表锁 ：给表加个字段怎么索这么多阻碍？》</a>的评论区留言说，DDL之前是要拿MDL写锁的，这样还能叫Online DDL吗？</p>
@@ -14520,7 +14520,7 @@
 <h1 id="_4">上期问题时间</h1>
 <p>在上期文章最后，我留给你的问题是，如果一个高配的机器，redo log设置太小，会发生什么情况。</p>
 <p>每次事务提交都要写redo log，如果设置太小，很快就会被写满，也就是下面这个图的状态，这个“环”将很快被写满，write pos一直追着CP。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a2/e5/a25bdbbfc2cfc5d5e20690547fe7f2e5.jpg?wh=1142%2A856" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a2/e5/a25bdbbfc2cfc5d5e20690547fe7f2e5.jpg?wh=1142%2A856" /></p>
 <p>这时候系统不得不停止所有更新，去推进checkpoint。</p>
 <p>这时，你看到的现象就是<strong>磁盘压力很小，但是数据库出现间歇性的性能下跌。</strong></p>
 <p>评论区留言点赞板：</p>
@@ -14678,8 +14678,6 @@ inplace 表示在 innodb 引擎完成所有操作，对 server 层是透明的�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

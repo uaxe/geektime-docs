@@ -14643,13 +14643,13 @@
 <p>前面几篇文章我们介绍了线程池、Future、CompletableFuture和CompletionService，仔细观察你会发现这些工具类都是在帮助我们站在任务的视角来解决并发问题，而不是让我们纠缠在线程之间如何协作的细节上（比如线程之间如何实现等待、通知等）。<strong>对于简单的并行任务，你可以通过“线程池+Future”的方案来解决；如果任务之间有聚合关系，无论是AND聚合还是OR聚合，都可以通过CompletableFuture来解决；而批量的并行任务，则可以通过CompletionService来解决。</strong></p>
 <p>我们一直讲，并发编程可以分为三个层面的问题，分别是分工、协作和互斥，当你关注于任务的时候，你会发现你的视角已经从并发编程的细节中跳出来了，你应用的更多的是现实世界的思维模式，类比的往往是现实世界里的分工，所以我把线程池、Future、CompletableFuture和CompletionService都列到了分工里面。</p>
 <p>下面我用现实世界里的工作流程图描述了并发编程领域的简单并行任务、聚合任务和批量并行任务，辅以这些流程图，相信你一定能将你的思维模式转换到现实世界里来。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/47/2d/47f3e1e8834c99d9a1933fb496ffde2d.png?wh=1142%2A706" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/47/2d/47f3e1e8834c99d9a1933fb496ffde2d.png?wh=1142%2A706" /></p>
 <p>从上到下，依次为简单并行任务、聚合任务和批量并行任务示意图</p>
 <p>上面提到的简单并行、聚合、批量并行这三种任务模型，基本上能够覆盖日常工作中的并发场景了，但还是不够全面，因为还有一种“分治”的任务模型没有覆盖到。<strong>分治</strong>，顾名思义，即分而治之，是一种解决复杂问题的思维方法和模式；具体来讲，指的是<strong>把一个复杂的问题分解成多个相似的子问题，然后再把子问题分解成更小的子问题，直到子问题简单到可以直接求解</strong>。理论上来讲，解决每一个问题都对应着一个任务，所以对于问题的分治，实际上就是对于任务的分治。</p>
 <p>分治思想在很多领域都有广泛的应用，例如算法领域有分治算法（归并排序、快速排序都属于分治算法，二分法查找也是一种分治算法）；大数据领域知名的计算框架MapReduce背后的思想也是分治。既然分治这种任务模型如此普遍，那Java显然也需要支持，Java并发包里提供了一种叫做Fork/Join的并行计算框架，就是用来支持分治这种任务模型的。</p>
 <h2 id="_1">分治任务模型</h2>
 <p>这里你需要先深入了解一下分治任务模型，分治任务模型可分为两个阶段：一个阶段是<strong>任务分解</strong>，也就是将任务迭代地分解为子任务，直至子任务可以直接计算出结果；另一个阶段是<strong>结果合并</strong>，即逐层合并子任务的执行结果，直至获得最终结果。下图是一个简化的分治任务模型图，你可以对照着理解。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d2/6a/d2649d8db8e5642703aa5563d76eb86a.png?wh=1142%2A711" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d2/6a/d2649d8db8e5642703aa5563d76eb86a.png?wh=1142%2A711" /></p>
 <p>简版分治任务模型图</p>
 <p>在这个分治任务模型里，任务和分解后的子任务具有相似性，这种相似性往往体现在任务和子任务的算法是相同的，但是计算的数据规模是不同的。具备这种相似性的问题，我们往往都采用递归算法。</p>
 <h2 id="forkjoin">Fork/Join的使用</h2>
@@ -14694,7 +14694,7 @@
 <p>ForkJoinPool本质上也是一个生产者-消费者的实现，但是更加智能，你可以参考下面的ForkJoinPool工作原理图来理解其原理。ThreadPoolExecutor内部只有一个任务队列，而ForkJoinPool内部有多个任务队列，当我们通过ForkJoinPool的invoke()或者submit()方法提交任务时，ForkJoinPool根据一定的路由规则把任务提交到一个任务队列中，如果任务在执行过程中会创建出子任务，那么子任务会提交到工作线程对应的任务队列中。</p>
 <p>如果工作线程对应的任务队列空了，是不是就没活儿干了呢？不是的，ForkJoinPool支持一种叫做“<strong>任务窃取</strong>”的机制，如果工作线程空闲了，那它可以“窃取”其他工作任务队列里的任务，例如下图中，线程T2对应的任务队列已经空了，它可以“窃取”线程T1对应的任务队列的任务。如此一来，所有的工作线程都不会闲下来了。</p>
 <p>ForkJoinPool中的任务队列采用的是双端队列，工作线程正常获取任务和“窃取任务”分别是从任务队列不同的端消费，这样能避免很多不必要的数据竞争。我们这里介绍的仅仅是简化后的原理，ForkJoinPool的实现远比我们这里介绍的复杂，如果你感兴趣，建议去看它的源码。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e7/31/e75988bd5a79652d8325ca63fcd55131.png?wh=1142%2A677" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e7/31/e75988bd5a79652d8325ca63fcd55131.png?wh=1142%2A677" /></p>
 <p>ForkJoinPool工作原理图</p>
 <h2 id="mapreduce">模拟MapReduce统计单词数量</h2>
 <p>学习MapReduce有一个入门程序，统计一个文件里面每个单词的数量，下面我们来看看如何用Fork/Join并行计算框架来实现。</p>
@@ -14984,8 +14984,6 @@ main##2
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

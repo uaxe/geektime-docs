@@ -6512,10 +6512,10 @@
 </code></pre></div>
 <p>上面的代码是一份代码，两个进程，父进程经过fork产生了子进程，子进程从25行代码开始运行。其中非常重要的是调用pipe函数，作用是建立一个管道。函数参数fd是文件句柄数组，其中fd[0]的句柄表示读端，而fd[1]句柄表示写端。
 我们立马来测试一下，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/32/d8/32c9c15d05d06617552yyc0629ec2bd8.jpg?wh=1920x1042" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/32/d8/32c9c15d05d06617552yyc0629ec2bd8.jpg?wh=1920x1042" /></p>
 <p>上图中，子进程通过管道获取了父进程写入的信息，可是为什么我们通过pipe和fork可以很轻松地在父子进程之间建立管道呢？</p>
 <p>如果你把管道想象成一个只存在于内存中的、共享的特殊文件，就很好理解了。不过你要注意，<strong>该文件有两个文件描述符，一个是专用于读，一个专用于写。</strong>我再给你画一幅图帮你梳理逻辑，如下所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/cf/fc/cfc533ed115cef3fff7e93f10eeyy3fc.jpg?wh=1920x1489" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cf/fc/cfc533ed115cef3fff7e93f10eeyy3fc.jpg?wh=1920x1489" /></p>
 <p>上图中pipe函数会使Linux在父进程中建立一个文件和两个file结构，分别用于读取和写入。调用fork之后，由于复制了父进程的数据结构，所以子进程也具备了这两个file结构，并且都指向同一个inode结构。inode结构在Linux中代表一个文件，这个inode会分配一些内存页面来缓存数据。但对于管道文件来说，这些页面中的数据不会写入到磁盘。</p>
 <p>这也是为什么在应用程序中管道是用文件句柄索引，并使用文件读写函数来读写管道，因为管道本质上就是一个内存中的文件。</p>
 <p>和读写文件一样，读写管道也有相应的规则：当管道中没有数据可读时，进程调用read时会阻塞，即进程暂停执行，一直等到管道有数据写入为止；当管道中的数据被写满的时候，进程调用write时阻塞，直到有其它进程从管道中读走数据。</p>
@@ -6558,11 +6558,11 @@
 第一步，main函数中通过sigaction结构设置相关信号，例如信号处理回调函数和一个信号标志。接着是第二步，安装信号，通过sigaction函数把信号信息传递给Linux内核，Linux内核会在这个进程上，根据信号信息安装好信号。</p>
 <p>之后是第三步，产生信号，alarm函数会让Linux内核设置一个定时器，到了特定的时间点后，内核发现时间过期了就会给进程发出一个SIGALRM信号，由Linux内核查看该进程是否安装了信号处理函数，以及是否屏蔽了该信号。确定之后，Linux内核会保存进程当前上下文，然后构建一个执行信号处理函数的栈帧，让进程返回到信号处理函数运行。</p>
 <p>我们来运行代码证明一下，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/54/6e/546eyy8c54b0f0fc85b0d9d06393286e.jpg?wh=1920x1042" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/54/6e/546eyy8c54b0f0fc85b0d9d06393286e.jpg?wh=1920x1042" /></p>
 <p>可以看到，程序运行起来等待4秒后，内核产生了SIGALRM信号，然后开始执行handle_timer函数。请注意，<strong>我们在main函数没有调用handle_timer函数，它是由内核异步调用的。</strong>在handle_timer函数中输出了信号码，然后就调用exit退出进程了。</p>
 <p>信号码是什么呢？它就是一个整数，是一种信号的标识，代表某一种信号。SIGALRM定义为14。你可以用kill -l 命令查看Linux系统支持的全部信号。我把常用的一些信号列出来了，如下表所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/82/c5/8265b26c55665f3877883a6fe87bb0c5.jpg?wh=4778x5165" />
-<img alt="图片" src="https://static001.geekbang.org/resource/image/77/c2/770bc5f521a00df15e5a2e6e0fd495c2.jpg?wh=1920x1849" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/82/c5/8265b26c55665f3877883a6fe87bb0c5.jpg?wh=4778x5165" />
+<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/77/c2/770bc5f521a00df15e5a2e6e0fd495c2.jpg?wh=1920x1849" /></p>
 <p>上面都是Linux的标准信号，它们大多数来源于键盘输入、硬件故障、系统调用、应用程序自身的非法运算。一旦信号产生了，进程就会有三种选择：忽略、捕捉、执行默认操作。其实大多数应用开发者都采用忽略信号或者执行信号默认动作，这是一种“信号来了，我不管”的姿态。</p>
 <p>一般信号的默认动作就是忽略，有一些信号的默认动作可能是终止进程、终止进程并保存内存信息、停止进程、恢复进程，你可以自己对照上表，看看具体是哪些信号。还有一些信号，比如SIGKILL、SIGSTOP，它是不能由应用自己捕捉处理的，也不能被忽略，只能执行操作系统的默认操作。为什么要这么规定呢？</p>
 <p>我们想一想，如果SIGKILL、SIGSTOP信号能被捕捉和忽略，那么超级用户和系统自己就没有可靠的手段使进程终止或停止了。</p>
@@ -6645,7 +6645,7 @@
 </code></pre></div>
 <p>上面的代码逻辑很简单：首先我们在主进程中调用fork建立一个子进程。接着子进程开始执行subprocmain函数，并在其中安装了SIGUSR1信号处理函数，让子进程进入睡眠。4秒钟后主进程产生了SIGALRM信号，并执行了其处理函数handle_timer，在该函数中调用sigqueue函数，向子进程发出SIGUSR1信号，同时传递了相关信息。最后，子进程执行handle_sigusr1函数处理了SIGUSR1信号，打印相应信息后退出。
 运行结果如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/86/81/86b82eb937e7ec9cc8912aa920681a81.jpg?wh=1920x1042" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/86/81/86b82eb937e7ec9cc8912aa920681a81.jpg?wh=1920x1042" /></p>
 <p>上图输出的结果，正确地展示了两个信号的处理过程：第一个SIGALRM信号是Linux内核中的定时器产生；而第二个SIGUSR1信号是我们调用sigqueue函数手动产生的。</p>
 <p>sigqueue的函数原型如下所示：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>typedef union sigval {
@@ -6661,7 +6661,7 @@
 </code></pre></div>
 <p>到这里，我们就可以总结一下。<strong>信号是Linux内核基于一些特定的事件，并且这些事件要让进程感知到，从而实现的一种内核与进程之间、进程与进程之间的异步通信机制。</strong></p>
 <p>我们画一幅图来简单了解一下Linux内核对信号机制的实现，如下所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/84/e9/84266740dc3610d61d17b93fda119fe9.jpg?wh=1920x821" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/84/e9/84266740dc3610d61d17b93fda119fe9.jpg?wh=1920x821" /></p>
 <p>无论是硬件事件还是系统调用触发信号，都会演变成设置进程数据结构task_struct中pending对应的位。这其中每个位对应一个信号，设置了pending中的位还不够，我们还要看一看，blocked中对应的位是不是也被设置了。</p>
 <p>如果blocked中对应的位也被设置了，就不能触发信号（这是给信号提供一种阻塞策略，对于有些信号没有用，如SIGKILL、SIGSTOP等）；否则就会触发该位对应的action，根据其中的标志位查看是否捕获信号，进而调用其中sa_handler对应的函数。</p>
 <p>那怎么判断信号最终是不是抵达了呢？这会表现为异步调用了进程某个函数。到这里，Linux提供的进程间异步通信——信号，我们就讲完了。</p>
@@ -6671,7 +6671,7 @@
 <p>管道能连接两个进程，一个进程的数据从管道的一端流向管道另一端的进程。如果管道空了则读进程休眠，管道满了则写进程休眠。这些同步手段由操作系统来完成，对用户是透明的。shell中常使用“|”在两个进程之间建立管道，让一个进程的输出数据，成为另一个进程的输入数据。</p>
 <p>除了管道，信号也是Linux下经典的通信方式。信号比较特殊，它总是异步地打断进程，使得正在运行的进程转而去处理信号。信号来源硬件、系统，和其它进程。发送信号时，也能携带一些数据。</p>
 <p>这节课的要点，我梳理了导图，供你参考。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/89/75/890e2d66d58106e225aeeyy19e268775.jpg?wh=1920x1523" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/89/75/890e2d66d58106e225aeeyy19e268775.jpg?wh=1920x1523" /></p>
 <h3 id="_4">思考题</h3>
 <p>请概述一下管道和信号这两种通信机制的不同。</p>
 <p>期待你在留言区跟我交流互动，也希望你可以把这节课分享给更多朋友。</p>
@@ -6808,8 +6808,6 @@ Q6：Hello OS可以安装在虚拟机上吗？
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

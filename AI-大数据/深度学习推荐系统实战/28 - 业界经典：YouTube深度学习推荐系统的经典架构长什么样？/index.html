@@ -7442,13 +7442,13 @@
 <li>二是由于YouTube的视频基数巨大，用户难以发现喜欢的内容。</li>
 </ul>
 <p>这样的内容特点简直就是深度学习推荐系统最适合扎根的土壤，所以YouTube也是最早落地深度学习的一线公司。那YouTube的深度学习推荐系统架构长什么样呢？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/47/05/47c0fa06ffc18912b027fe920ac30905.jpg?wh=1630%2A1032" title="图1 YouTube推荐系统整体架构" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/47/05/47c0fa06ffc18912b027fe920ac30905.jpg?wh=1630%2A1032" title="图1 YouTube推荐系统整体架构" /></p>
 <p>上图就是YouTube在2016年发布的推荐系统架构。我们可以看到，为了对海量的视频进行快速、准确的排序，YouTube也采用了经典的召回层+排序层的推荐系统架构。</p>
 <p><strong>它的推荐过程可以分成二级。第一级是用候选集生成模型（Candidate Generation Model）完成候选视频的快速筛选，在这一步，候选视频集合由百万降低到几百量级，这就相当于经典推荐系统架构中的召回层。第二级是用排序模型（Ranking Model）完成几百个候选视频的精排，这相当于经典推荐系统架构中的排序层。</strong></p>
 <p>无论是候选集生成模型还是排序模型，YouTube都采用了深度学习的解决方案。下面，就让我们详细讲讲这两个深度学习模型是如何构建起来的。</p>
 <h2 id="_1">候选集生成模型</h2>
 <p>首先，是用于视频召回的候选集生成模型，它的模型架构如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/69/cf/6968873184cf93194aa476398c2e35cf.jpg?wh=1772%2A1538" title="图2 YouTube候选集生成模型架构" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/69/cf/6968873184cf93194aa476398c2e35cf.jpg?wh=1772%2A1538" title="图2 YouTube候选集生成模型架构" /></p>
 <p>我们一起自下而上地好好看一看这个模型的结构。</p>
 <p>最底层是它的输入层，输入的特征包括用户历史观看视频的Embedding向量，以及搜索词的Embedding向量。对于这些Embedding特征，YouTube是利用用户的观看序列和搜索序列，采用了类似Item2vec的预训练方式生成的。</p>
 <p>当然，我们也完全可以采用Embedding跟模型在一起End2End训练的方式来训练模型。至于预训练和End2End训练这两种方式孰优孰劣，我们也探讨过很多次了，你可以自己再深入思考一下。</p>
@@ -7460,7 +7460,7 @@
 <p>总的来讲，YouTube推荐系统的候选集生成模型，是一个标准的利用了Embedding预训练特征的深度推荐模型，它遵循我们之前实现的Embedding MLP模型的架构，只是在最后的输出层有所区别。</p>
 <h2 id="_2">候选集生成模型独特的线上服务方法</h2>
 <p>好，现在我们就详细说一说，为什么候选集生成模型要用“视频ID”这个标签，来代替“用户会不会点击视频”这个标签作为预测目标。事实上，这跟候选集生成模型独特的线上服务方式紧密相关。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e9/69/e9a20bc7260296e09078509e3f42df69.jpg?wh=1772%2A471" title="图3 模型服务部分示意图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e9/69/e9a20bc7260296e09078509e3f42df69.jpg?wh=1772%2A471" title="图3 模型服务部分示意图" /></p>
 <p>细心的同学可能已经留意到，架构图左上角的模型服务（Serving）方法与模型训练方法完全不同。在候选集生成模型的线上服务过程中，YouTube并没有直接采用训练时的模型进行预测，而是采用了一种最近邻搜索的方法，我们曾经在<a href="https://time.geekbang.org/column/article/301739">第12讲</a>详细讲过基于Embedding的最近邻搜索方法，不记得的同学可以先去回顾一下。</p>
 <p>具体来说，在模型服务过程中，网络结构比较复杂，如果我们对每次推荐请求都端到端地运行一遍模型，处理一遍候选集，那模型的参数数量就会巨大，整个推断过程的开销也会非常大。</p>
 <p><strong>因此，在通过“候选集生成模型”得到用户和视频的Embedding后，我们再通过Embedding最近邻搜索的方法，就可以提高模型服务的效率了。这样一来，我们甚至不用把模型推断的逻辑搬上服务器，只需要将用户Embedding和视频Embedding存到特征数据库就行了。</strong>再加上可以使用局部敏感哈希这类快速Embedding查找方法，这对于百万量级规模的候选集生成过程的效率提升是巨大的。</p>
@@ -7474,7 +7474,7 @@
 <p>如果你喜欢这种通过学习业界实践方案，把知识串联起来的方式，可以给我留言反馈，我也会在之后的课程中多采用这样的方式。</p>
 <h2 id="_3">排序模型</h2>
 <p>通过候选集生成模型，YouTube已经得到了几百个候选视频的集合了，下一步就是利用排序模型进行精排序。下图就是YouTube深度学习排序模型的架构，我们一起来看一看。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/28/1a/28e0acbb64760670ee94d015025da81a.jpg?wh=1670%2A994" title="图3 YouTube的深度学习排序模型的架构" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/28/1a/28e0acbb64760670ee94d015025da81a.jpg?wh=1670%2A994" title="图3 YouTube的深度学习排序模型的架构" /></p>
 <p>第一眼看上去，你可能会认为排序模型的网络结构与候选集生成模型没有太大区别，在模型结构上确实是这样的，它们都遵循Embedding MLP的模型架构。但是我们来看其中的细节，特别是输入层和输出层的部分，它们跟候选集生成模型还是有很大不同的，这就是我们要重点关注的。</p>
 <p>我们先看输入层，相比于候选集生成模型需要对几百万候选集进行粗筛，排序模型只需对几百个候选视频进行排序，因此可以引入更多特征进行精排。具体来说，YouTube的输入层从左至右引入的特征依次是：</p>
 <ol>
@@ -7503,7 +7503,7 @@
 <p>候选集生成模型是一个典型的Embedding MLP的架构，我们要注意的是它的输出层，它是一个多分类的输出层，预测的是用户点击了“哪个”视频。在候选集生成模型的serving过程中，需要从输出层提取出视频Embedding，从最后一层ReLU层得到用户Embedding，然后利用最近邻搜索快速得到候选集。</p>
 <p>排序模型同样是一个Embedding MLP的架构，不同的是，它的输入层包含了更多的用户和视频的特征，输出层采用了Weighted LR作为输出层，并且使用观看时长作为正样本权重，让模型能够预测出观看时长，这更接近YouTube要达成的商业目标。</p>
 <p>好了，这些关键知识点，我也总结在了下面的表格中，希望它能帮助你加深记忆。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/60/2e/60509d00835ac95ayya3bdeb17f0532e.jpeg?wh=1920%2A1080" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/60/2e/60509d00835ac95ayya3bdeb17f0532e.jpeg?wh=1920%2A1080" /></p>
 <p>在这节课结束前，关于YouTube的推荐模型我还想多说几句。事实上，YouTube的推荐系统论文中还包含了更多的细节，业界真正好的论文并不多，YouTube的这篇《Deep Neural Networks for YouTube Recommendations》绝对是不可多得的一篇，我甚至推荐大家逐句来读，抓住每一个细节。</p>
 <p>当然，你也可以在我的书《深度学习推荐系统》中的相应章节找到更多的实现细节。这些内容让我曾经受益匪浅，相信也会对你有所帮助。</p>
 <h2 id="_5">课后思考</h2>
@@ -7650,8 +7650,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

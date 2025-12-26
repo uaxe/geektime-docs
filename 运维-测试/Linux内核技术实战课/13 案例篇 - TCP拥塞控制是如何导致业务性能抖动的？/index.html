@@ -5963,11 +5963,11 @@
 <p>在这些问题中，TCP的拥塞控制就在发挥着作用。</p>
 <h2 id="tcp">TCP拥塞控制是如何对业务网络性能产生影响的 ？</h2>
 <p>我们先来看下TCP拥塞控制的大致原理。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5c/3c/5c4504d70ce3abc939yyca54780dd43c.jpg?wh=3055%2A2029" title="TCP拥塞控制" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5c/3c/5c4504d70ce3abc939yyca54780dd43c.jpg?wh=3055%2A2029" title="TCP拥塞控制" /></p>
 <p>上图就是TCP拥塞控制的简单图示，它大致分为四个阶段。</p>
 <h4 id="1">1. 慢启动</h4>
 <p>TCP连接建立好后，发送方就进入慢速启动阶段，然后逐渐地增大发包数量（TCP Segments）。这个阶段每经过一个RTT（round-trip time），发包数量就会翻倍。如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/05/4d/0534ce8d1e3a09a1def9c27e387eb64d.jpg?wh=2873%2A1919" title="TCP Slow Start示意图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/05/4d/0534ce8d1e3a09a1def9c27e387eb64d.jpg?wh=2873%2A1919" title="TCP Slow Start示意图" /></p>
 <p>初始发送数据包的数量是由init_cwnd（初始拥塞窗口）来决定的，该值在Linux内核中被设置为10（TCP_INIT_CWND），这是由Google的研究人员总结出的一个经验值，这个经验值也被写入了<a href="https://tools.ietf.org/html/rfc6928">RFC6928</a>。并且，Linux内核在2.6.38版本中也将它从默认值3修改为了Google建议的10，你感兴趣的话可以看下这个commit： <a href="https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=442b9635c569fef038d5367a7acd906db4677ae1">tcp: Increase the initial congestion window to 10</a>。</p>
 <p>增大init_cwnd可以显著地提升网络性能，因为这样在初始阶段就可以一次性发送很多TCP Segments，更加细节性的原因你可以参考<a href="https://tools.ietf.org/html/rfc6928">RFC6928</a>的解释。</p>
 <p>如果你的内核版本比较老（低于CentOS-6的内核版本），那不妨考虑增加init_cwnd到10。如果你想要把它增加到一个更大的值，也不是不可以，但是你需要根据你的网络状况多做一些实验，从而得到一个较为理想的值。因为如果初始拥塞窗口设置得过大的话，可能会引起很高的TCP重传率。当然，你也可以通过ip route的方式来更加灵活地调整该值，甚至将它配置为一个sysctl控制项。</p>
@@ -5975,7 +5975,7 @@
 <p>在慢启动阶段，当拥塞窗口（cwnd）增大到一个阈值（ ssthresh，慢启动阈值）后，TCP拥塞控制就进入了下一个阶段：拥塞避免（Congestion Avoidance）。</p>
 <h4 id="2">2.拥塞避免</h4>
 <p>在这个阶段cwnd不再成倍增加，而是一个RTT增加1，即缓慢地增加cwnd，以防止网络出现拥塞。网络出现拥塞是难以避免的，由于网络链路的复杂性，甚至会出现乱序（Out of Order）报文。乱序报文产生原因之一如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0c/99/0c2ce093d74a1dc76f39b7cbdd386699.jpg?wh=2716%2A1817" title="TCP乱序报文" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0c/99/0c2ce093d74a1dc76f39b7cbdd386699.jpg?wh=2716%2A1817" title="TCP乱序报文" /></p>
 <p>在上图中，发送端一次性发送了4个TCP segments，但是第2个segment在传输过程中被丢弃掉了，那么接收方就接收不到该segment了。然而第3个TCP segment和第4个TCP segment能够被接收到，此时3和4就属于乱序报文，它们会被加入到接收端的ofo queue（乱序队列）里。</p>
 <p>丢包这类问题在移动网络环境中比较容易出现，特别是在一个网络状况不好的环境中，比如在电梯里丢包率就会很高，而丢包率高就会导致网络响应特别慢。在数据中心内部的服务上很少会有数据包在网络链路中被丢弃的情况，我说的这类丢包问题主要是针对网关服务这种和外部网络有连接的服务上。</p>
 <p>针对我们的网关服务，我们自己也做过一些TCP单边优化工作，主要是优化Cubic拥塞控制算法，以缓解丢包引起的网络性能下降问题。另外，Google前几年开源的一个新的<a href="https://github.com/google/bbr">拥塞控制算法BBR</a>在理论上也可以很好地缓解TCP丢包问题，但是在我们的实践中，BBR的效果并不好，因此我们最终也没有使用它。</p>
@@ -6008,7 +6008,7 @@
 <p>除了网络状况外，发送方还需要知道接收方的处理能力。如果接收方的处理能力差，那么发送方就必须要减缓它的发包速度，否则数据包都会挤压在接收方的缓冲区里，甚至被接收方给丢弃掉。接收方的处理能力是通过另外一个窗口——rwnd（接收窗口）来表示的。那么，接收方的rwnd又是如何影响发送方的行为呢？</p>
 <h2 id="_1">接收方是如何影响发送方发送数据的？</h2>
 <p>同样地，我也画了一张简单的图，来表示接收方的rwnd是如何影响发送方的：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e9/27/e920b93740d9677c5419dee332086827.jpg?wh=2877%2A1843" title="rwnd与cwnd" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e9/27/e920b93740d9677c5419dee332086827.jpg?wh=2877%2A1843" title="rwnd与cwnd" /></p>
 <p>如上图所示，接收方在收到数据包后，会给发送方回一个ack，然后把自己的rwnd大小写入到TCP头部的win这个字段，这样发送方就能根据这个字段来知道接收方的rwnd了。接下来，发送方在发送下一个TCP segment的时候，会先对比发送方的cwnd和接收方的rwnd，得出这二者之间的较小值，然后控制发送的TCP segment个数不能超过这个较小值。</p>
 <p>关于接收方的rwnd对发送方发送行为的影响，我们曾经遇到过这样的案例：业务反馈说Server向Client发包很慢，但是Server本身并不忙，而且网络看起来也没有问题，所以不清楚是什么原因导致的。对此，我们使用tcpdump在server上抓包后发现，Client响应的ack里经常出现win为0的情况，也就是Client的接收窗口为0。于是我们就去Client上排查，最终发现是Client代码存在bug，从而导致无法及时读取收到的数据包。</p>
 <p>对于这种行为，我同样给Linux内核写了一个patch来监控它：<a href="https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=fb223502ec0889444965f602f57b1f45f9e9845e">tcp: add SNMP counter for zero-window drops</a> 。这个patch里增加了一个新的SNMP 计数：TCPZeroWindowDrop。如果系统中发生了接收窗口太小而无法收包的情况，就会产生该事件，然后该事件可以通过/proc/net/netstat里的TCPZeroWindowDrop这个字段来查看。</p>
@@ -6161,8 +6161,6 @@ ssh使用的TCP协议，也就是它是有连接的，这个连接对内核而�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

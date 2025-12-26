@@ -14615,7 +14615,7 @@
 <p>首先，我们来了解下什么是跳表（skiplist）。</p>
 <p><strong>跳表其实是一种多层的有序链表。</strong>在课程中，为了便于说明，我把跳表中的层次从低到高排个序，最底下一层称为level0，依次往上是level1、level2等。</p>
 <p>下图展示的是一个3层的跳表。其中，头结点中包含了三个指针，分别作为leve0到level2上的头指针。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/35/23/35b2c22120952e1fac46147664e75b23.jpg?wh=2000x626" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/35/23/35b2c22120952e1fac46147664e75b23.jpg?wh=2000x626" /></p>
 <p>可以看到，在level 0上一共有7个结点，分别是3、11、23、33、42、51、62，这些结点会通过指针连接起来，同时头结点中的level0指针会指向结点3。然后，在这7个结点中，结点11、33和51又都包含了一个指针，同样也依次连接起来，且头结点的level 1指针会指向结点11。这样一来，这3个结点就组成了level 1上的所有结点。</p>
 <p>最后，结点33中还包含了一个指针，这个指针会指向尾结点，同时，头结点的level 2指针会指向结点33，这就形成了level 2，只不过level 2上只有1个结点33。</p>
 <p>好，在对跳表有了直观印象后，我们再来看看跳表实现的具体数据结构。</p>
@@ -14639,7 +14639,7 @@
 <p>然后，因为跳表是一个多层的有序链表，每一层也是由多个结点通过指针连接起来的。因此在跳表结点的结构定义中，还包含了一个zskiplistLevel结构体类型的<strong>level数组</strong>。</p>
 <p>level数组中的每一个元素对应了一个zskiplistLevel结构体，也对应了跳表的一层。而zskiplistLevel结构体定义了一个指向下一结点的前向指针（<code>*forward</code>），这就使得结点可以在某一层上和后续结点连接起来。同时，zskiplistLevel结构体中还定义了<strong>跨度</strong>，这是用来记录结点在某一层上的<code>*forward</code>指针和该指针指向的结点之间，跨越了level0上的几个结点。</p>
 <p>我们来看下面这张图，其中就展示了33结点的level数组和跨度情况。可以看到，33结点的level数组有三个元素，分别对应了三层level上的指针。此外，在level数组中，level 2、level1和level 0的跨度span值依次是3、2、1。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fb/e7/fb90e5eb40d39ced5d5896b3e10640e7.jpg?wh=2000x552" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fb/e7/fb90e5eb40d39ced5d5896b3e10640e7.jpg?wh=2000x552" /></p>
 <p>最后，因为跳表中的结点都是按序排列的，所以，对于跳表中的某个结点，我们可以把从头结点到该结点的查询路径上，各个结点在所查询层次上的<code>*forward</code>指针跨度，做一个累加。这个累加值就可以用来计算该结点在整个跳表中的顺序，另外这个结构特点还可以用来实现Sorted Set的rank操作，比如ZRANK、ZREVRANK等。</p>
 <p>好，了解了跳表结点的定义后，我们可以来看看跳表的定义。在跳表的结构中，定义了跳表的头结点和尾结点、跳表的长度，以及跳表的最大层数，如下所示。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>typedef struct zskiplist {
@@ -14676,24 +14676,24 @@
 <p>这样一来，有了level数组之后，一个跳表结点就可以在多层上被访问到了。而一个结点的level数组的层数也就决定了，该结点可以在几层上被访问到。</p>
 <p>所以，当我们要决定结点层数时，实际上是要决定level数组具体有几层。</p>
 <p>一种设计方法是，让每一层上的结点数约是下一层上结点数的一半，就像下面这张图展示的。第0层上的结点数是7，第1层上的结点数是3，约是第0层上结点数的一半。而第2层上的结点就33一个，约是第1层结点数的一半。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4e/b3/4ed4fce0d36bd4c4d2ec99cd2e4bb9b3.jpg?wh=2000x525" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4e/b3/4ed4fce0d36bd4c4d2ec99cd2e4bb9b3.jpg?wh=2000x525" /></p>
 <p>这种设计方法带来的好处是，当跳表从最高层开始进行查找时，由于每一层结点数都约是下一层结点数的一半，这种查找过程就类似于二分查找，<strong>查找复杂度可以降低到O(logN)</strong>。</p>
 <p>但这种设计方法也会带来负面影响，那就是为了维持相邻两层上结点数的比例为2:1，一旦有新的结点插入或是有结点被删除，那么插入或删除处的结点，及其后续结点的层数都需要进行调整，而这样就带来了额外的开销。</p>
 <p>我先来给你举个例子，看下不维持结点数比例的影响，这样虽然可以不调整层数，但是会增加查询复杂度。</p>
 <p>首先，假设当前跳表有3个结点，其数值分别是3、11、23，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e8/bf/e86e7ac5938a17120bd84c158a5f8fbf.jpg?wh=1610x418" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e8/bf/e86e7ac5938a17120bd84c158a5f8fbf.jpg?wh=1610x418" /></p>
 <p>接着，假设现在要插入一个结点15，如果我们不调整其他结点的层数，而是直接插入结点15的话，那么插入后，跳表level 0和level 1两层上的结点数比例就变成了为4:1，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4b/a4/4ba3e67fd4c66a0b79fcd87bf918e2a4.jpg?wh=1783x431" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4b/a4/4ba3e67fd4c66a0b79fcd87bf918e2a4.jpg?wh=1783x431" /></p>
 <p>而假设我们持续插入多个结点，但是仍然不调整其他结点的层数，这样一来，level0上的结点数就会越来越多，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/54/eb/54745b8f90ac9872fa3f5ca947df20eb.jpg?wh=2000x491" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/54/eb/54745b8f90ac9872fa3f5ca947df20eb.jpg?wh=2000x491" /></p>
 <p>相应的，如果我们要查找大于11的结点，就需要在level 0的结点中依次顺序查找，复杂度就是O(N)了。所以，为了降低查询复杂度，我们就需要维持相邻层结点数间的关系。</p>
 <p>好，接下来，我们再来看下维持相邻层结点数为2:1时的影响。</p>
 <p>比如，我们可以把结点23的level数组中增加一层指针，如下图所示。这样一来，level 0和level 1上的结点数就维持在了2:1。但相应的代价就是，我们也需要给level数组重新分配空间，以便增加一层指针。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ea/e1/ea55df10ae9c88a0bbafca8d4af509e1.jpg?wh=2000x421" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ea/e1/ea55df10ae9c88a0bbafca8d4af509e1.jpg?wh=2000x421" /></p>
 <p>类似的，如果我们要在有7个结点的跳表中删除结点33，那么结点33后面的所有结点都要进行调整：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e8/1a/e8e2ae100c81fcf2dc9bc66d3b3cc51a.jpg?wh=2000x466" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e8/1a/e8e2ae100c81fcf2dc9bc66d3b3cc51a.jpg?wh=2000x466" /></p>
 <p>调整后的跳表如下图所示。你可以看到，结点42和62都要新增level数组空间，这样能分别保存3层的指针和2层的指针，而结点51的level数组则需要减少一层。也就是说，这样的调整会带来额外的操作开销。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cd/75/cdf7eb5543d757399c6edd18385ebf75.jpg?wh=2000x491" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cd/75/cdf7eb5543d757399c6edd18385ebf75.jpg?wh=2000x491" /></p>
 <p>因此，为了避免上述问题，跳表在创建结点时，采用的是另一种设计方法，即<strong>随机生成每个结点的层数</strong>。此时，相邻两层链表上的结点数并不需要维持在严格的2:1关系。这样一来，当新插入一个结点时，只需要修改前后结点的指针，而其他结点的层数就不需要随之改变了，这就降低了插入操作的复杂度。</p>
 <p>在Redis源码中，跳表结点层数是由<strong>zslRandomLevel函数</strong>决定。zslRandomLevel函数会把层数初始化为1，这也是结点的最小层数。然后，该函数会生成随机数，如果随机数的值小于ZSKIPLIST_P（指跳表结点增加层数的概率，值为0.25），那么层数就增加1层。因为随机数取值到[0,0.25)范围内的概率不超过25%，所以这也就表明了，每增加一层的概率不超过25%。下面的代码展示了zslRandomLevel函数的执行逻辑，你可以看下。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>#define ZSKIPLIST_MAXLEVEL 64  //最大层数为64
@@ -14957,8 +14957,6 @@ leveldb 中也使用了 skiplist 来实现了 Memory Write Buffer，并且使用
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

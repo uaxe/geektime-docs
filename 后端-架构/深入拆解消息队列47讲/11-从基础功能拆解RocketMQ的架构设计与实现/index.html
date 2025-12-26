@@ -14830,7 +14830,7 @@
 <h2 id="rocketmq"><strong>RocketMQ 系统架构</strong></h2>
 <p>在正式讲解之前，我们先来看一下RocketMQ的架构图。</p>
 <p>如下图所示，RocketMQ由 <strong>Producer</strong>、<strong>NameServer</strong>、<strong>Broker</strong>、<strong>Consumer</strong> 四大模块组成。其中，NameServer是RocketMQ的元数据存储组件。另外，在RocketMQ 5.0后，还增加了Proxy模块，用来支持gRPC协议，并为后续的计算存储分离架构做准备。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6a/38/6af4ab5debc9535849ab7da3e5022f38.jpg?wh=10666x4161" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6a/38/6af4ab5debc9535849ab7da3e5022f38.jpg?wh=10666x4161" /></p>
 <p>RocketMQ有Topic、MessageQueue、Group的概念，一个Topic可以包含一个或多个MessageQueue，一个Group 可以订阅一个或多个Topic。MessageQueue是具体消息数据的存储单元，订阅的时候通过Group来管理消费订阅关系。</p>
 <p>从流程上看，Broker 在启动的时候会先连接NameServer，将各自的元数据信息上报给NameServer，NameServer会在内存中存储元数据信息。客户端在连接集群的时候，会配置对应的 NameServer 地址，通过连接NameServer来实现客户端寻址，从而连接上对应的Broker。</p>
 <p>客户端在发送数据的时候，会指定Topic或MessageQueue。Broker收到数据后，将数据存储到对应的Topic中，消息存储在Topic的不同Queue中。在底层的文件存储中，所有Queue的数据是存储在同一个CommitLog文件中的。在订阅的时候会先创建对应的Group，消费消息后，再确认数据。</p>
@@ -14839,28 +14839,28 @@
 <h2 id="_1">协议和网络模块</h2>
 <p>在协议方面，如下图所示，RocketMQ 5.0 之前支持自定义的Remoting协议，在5.0之后，增加了gRPC协议的支持。</p>
 <p>这是在Proxy组件上完成了对gRPC协议的支持，用的是<a href="https://time.geekbang.org/column/article/670596">第03讲</a>的代理（Proxy）模式。即Broker依旧只支持Remoting协议，如果需要支持gRPC协议，那么就需要单独部署Proxy组件。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b1/c9/b1b45ffe1bf5e2870e53124815440dc9.jpg?wh=10666x4063" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b1/c9/b1b45ffe1bf5e2870e53124815440dc9.jpg?wh=10666x4063" /></p>
 <p>在传输层协议方面，Remoting和gRPC都是基于TCP协议传输的。Remoting 直接基于四层的TCP协议通信，gRPC是基于七层的HTTP2协议通信，不过 HTTP2 底层也是基于TCP，它们本质上都是应用层的协议。</p>
 <p>讲到这，不知道你是否会想：<strong>Remoting</strong> <strong>不够用吗？为什么还需要</strong> <strong>gRPC</strong> <strong>呢？</strong></p>
 <p>在我看来，Remoting 从功能、性能、灵活性来看没有太大的问题。它的主要缺点是私有协议客户端的重复开发成本，以及与第三方服务集成的不便捷。因为是私有协议，所以Remoting在多语言SDK开发时，基础网络模块的工作（如连接管理、网络模型设计、心跳管理等）都需要重新开发，工作量很高。另外，生态连接在 RocketMQ 是一个很重要的工作，gRPC作为公有协议，有很多天然的生态集成能力，比如Service Mesh、Kubernetes生态等等。</p>
 <p>关于Remoting协议的细节，我们在<a href="https://time.geekbang.org/column/article/670596">第03讲</a>介绍协议时已经详细讲述了，这里不再重复。下面我们来聊一下gRPC协议，先来看一下gRPC的架构图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b9/a3/b961c1a2a899610d7c0e0b5f24dcd0a3.png?wh=800x480" title="图片来源：https://www.wallarm.com/what/the-concept-of-grpc" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b9/a3/b961c1a2a899610d7c0e0b5f24dcd0a3.png?wh=800x480" title="图片来源：https://www.wallarm.com/what/the-concept-of-grpc" /></p>
 <p>如上图所示，gRPC 分为Client端和Server端，底层基于HTTP2通信，内置了编解码模块，也定义好了Client和Server之间的调用方式，同时支持TLS加密，是一个完整的RPC框架。所以我们可以看到它在底层已经实现了网络通信、协议的设计、编解码框架等所有基础的工作。从使用的角度来说，gRPC 提供了各个语言的开发库，只需要集成对应语言的开发库，即可完成网络模块的开发，很轻便。详情情况你可以参考 <a href="https://grpc.io/docs/languages/">gRPC 各语言官方文档</a>。</p>
 <p>因为我们在<a href="https://time.geekbang.org/column/article/670965">第04讲</a>就分析了RocketMQ网络模块的详细实现，这里就不重复讲了。接下来我们看一下RocketMQ的存储层。</p>
 <h2 id="_2">数据存储</h2>
 <p>RocketMQ 同 RabbitMQ 一样，数据存储模块也分为元数据存储和消息数据存储两部分。</p>
 <h3 id="_3">元数据存储</h3>
 <p>先来看一下元数据存储。RocketMQ 的元数据信息实际是存储在Broker上的，Broker启动时将数据上报到NameServer模块中汇总缓存。NameServer是一个简单的TCP Server，专门用来接收、存储、分发 Broker 上报的元数据信息。这些元数据信息是存储在NameServer内存中的，NameServer不会持久化去存储这些数据。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/27/53/278f259567c197cb42b8134880d0cb53.jpg?wh=10666x5489" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/27/53/278f259567c197cb42b8134880d0cb53.jpg?wh=10666x5489" /></p>
 <p>如上图所示，Broker 启动或删除时，会调用NameServer的注册和退出接口，每个Broker都会存储自己节点所属的元数据信息（比如有哪些Topic、哪些Queue 在本节点上），在Broker启动时，会把全量的数据上报到 NameServer 中。</p>
 <p>从部署形态上看，NameServer 是多节点部署的，是一个集群。 但是不同节点之间是没有相互通信的，所以本质上多个NameServer节点间数据没有一致性的概念，是各自维护自己的数据，由每台Broker上报元数据来维护每台 NameServer 节点上数据的准确性。</p>
 <p>由于NameServer不负责具体消息数据的存储和分发，所以在请求频率、负载方面都不会很高。所以在大多数场景下，NameServer都是可以多集群共享的。从功能上看，它对RocketMQ的作用相当于RabbitMQ的Mnesia。</p>
 <p>讲完了元数据，我们再来看消息数据。</p>
 <h3 id="_4">消息数据</h3>
 <p>RocketMQ 消息数据的最小存储单元是MessageQueue，也就是我们常说的Queue或Partition。Topic可以包含一个或多个MessageQueue，数据写入到Topic后，最终消息会分发到对应的MessageQueue中存储。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0d/79/0dc590cca3709d82e04d3561e9223879.jpg?wh=10666x4366" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0d/79/0dc590cca3709d82e04d3561e9223879.jpg?wh=10666x4366" /></p>
 <p>在底层的文件存储方面，并不是一个MessageQueue对应一个文件存储的，而是一个节点对应一个总的存储文件，单个Broker 节点下所有的队列共用一个日志数据文件（CommitLog）来存储，和RabbitMQ采用的是同一种存储结构。存储结构如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e5/69/e54d8fb1dffecbc91b978728b48a5369.png?wh=1142x763" title="图片来源：https://github.com/apache/rocketmq/blob/develop/docs/cn/image/rocketmq_design_1.png" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e5/69/e54d8fb1dffecbc91b978728b48a5369.png?wh=1142x763" title="图片来源：https://github.com/apache/rocketmq/blob/develop/docs/cn/image/rocketmq_design_1.png" /></p>
 <p>图中主要包含 CommitLog、ConsumeQueue、IndexFile 三个跟消息存储相关的文件，下面我们来简单了解一下。</p>
 <ul>
 <li><strong>CommitLog</strong> 是消息主体以及元数据存储主体，每个节点只有一个，客户端写入到所有MessageQueue的数据，最终都会存储到这一个文件中。</li>
@@ -14873,7 +14873,7 @@
 <p>好了，协议、网络、数据存储我们就都讲完了，接下来看一下RocketMQ客户端的生产者和消费者的实现。</p>
 <h2 id="_5">生产者和消费者</h2>
 <p>RocketMQ的客户端连接服务端是需要经过客户端寻址的。如下图所示，首先和NameServer 完成寻址，拿到Topic/MessageQueue和Broker的对应关系后，接下来才会和Broker进行交互。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c3/c8/c37175b6ba7ec1fc369f561e849b4fc8.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c3/c8/c37175b6ba7ec1fc369f561e849b4fc8.jpg?wh=10666x6000" /></p>
 <h3 id="_6">生产端</h3>
 <p>生产端的基础模块（如连接管理、心跳检测、协议构建、序列化等工作），则会以协议和网络层的设计为准，使用不同编程语言 SDK 完成对应的开发。例如，在Java中，我们可以使用Netty 来构建客户端，进行TCP通信，根据Remoting协议构建请求数据，序列化后向服务端发起请求，或者直接使用 gRPC 框架的客户端进行通信。</p>
 <p>从生产端来看，生产者是将数据发送到Topic或者Queue里面的。如果是发送到Topic，则数据要经历生产数据分区分配的过程。<strong>即决定消息要发送到哪个目标分区。</strong></p>
@@ -14888,12 +14888,12 @@
 <p>由于Topic和Queue模型的存在，在启动消费的时候，就需要先分配消费者和分区消费关系。这个过程就是 RocketMQ 消费端负载均衡。在实现中，消息按照哪种逻辑分配给哪个消费者，就是由消费者负载均衡策略所决定的。</p>
 <p>根据消费者类型的不同，消费者负载均衡策略分为消息粒度负载均衡和队列粒度负载均衡两种模式。这里简单了解下。</p>
 <p><strong>消息粒度负载均衡</strong>是指同一消费者分组内的多个消费者，将按照消息粒度平均分摊主题中的所有消息。即同一个队列中的消息，会被平均分配给多个消费者共同消费。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bb/59/bb949f7cde7e5c710b7232b9978f3759.jpg?wh=10666x4626" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bb/59/bb949f7cde7e5c710b7232b9978f3759.jpg?wh=10666x4626" /></p>
 <p><strong>队列粒度负载均衡</strong>是指同一消费者分组内的多个消费者，将按照队列粒度消费消息，即每个队列仅被一个消费者消费。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/27/be/278ceayydfbe148a7c7767497b5ccdbe.jpg?wh=10666x6000" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/27/be/278ceayydfbe148a7c7767497b5ccdbe.jpg?wh=10666x6000" />
 消息粒度负载均衡就是我们之前在<a href="https://time.geekbang.org/column/article/673672">第08讲</a>讲到的共享消费模式，而队列粒度负载均衡就是独占消费模式。大部分情况下，我推荐你优先使用队列粒度负载均衡。</p>
 <p>当消费端消费数据成功后，就需要保存消费进度信息。RocketMQ通过提交消费位点信息来保存消费进度。在服务端，RocketMQ会为每个消费分组维护一份消费位点信息，信息中会保存消费的<strong>最大位点、最小位点、当前消费位点</strong>等内容。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/db/42/db391cae3483d129fe5fc1d31eb2d242.jpg?wh=10666x4259" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/db/42/db391cae3483d129fe5fc1d31eb2d242.jpg?wh=10666x4259" />
 从实现来看，客户端消费完数据后，就会调用Broker的消费位点更新接口，提交当前消费的位点信息。</p>
 <p>在服务端，消息被某个消费者消费完成后，不会立即在队列中被删除，以便当消费者客户端停止又再次重新上线时，会严格按照服务端保存的消费进度继续处理消息。如果服务端保存的历史位点信息已过期被删除，此时消费位点向前移动至服务端存储的最小位点。</p>
 <p>讲完了生产者和消费者，接下来我们来看看RocketMQ对HTTP协议的支持和集群管控操作的实现。</p>
@@ -14901,7 +14901,7 @@
 <p>RocketMQ原生不支持HTTP协议的生产消费，但是在一些云厂商的商业化版本是支持的。从技术上来看，HTTP协议的支持和gRPC的支持可以是一个技术思路，即通过使用Proxy模式来实现。</p>
 <p>同样的，RocketMQ的管控也是不支持HTTP协议的操作的。RocketMQ的管控操作都是通过Remoting协议支持的，在gRPC协议中也不支持管控操作。即在Broker中，通过Remoting协议暴露不同的接口或者在NameServer中暴露TCP的接口，来实现一些对应的管控操作。</p>
 <p>客户端 SDK 会集成调用服务端这些接口的逻辑。命令行工具就是通过客户端SDK来完成管控操作，也可以在代码中通过SDK来执行管控操作。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/93/5e/9353b611ea01ff5b0a91fd6e6d510d5e.jpg?wh=10666x3716" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/93/5e/9353b611ea01ff5b0a91fd6e6d510d5e.jpg?wh=10666x3716" /></p>
 <h2 id="_8">总结</h2>
 <p>现在我们来总结一下RocketMQ。</p>
 <ol>
@@ -15069,8 +15069,6 @@ Pop模式：RocketMQ 5.0以后新增了Pop模式，它主要是将消费分区�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -5533,7 +5533,7 @@
 <p>相较于ISO制定的MPEG的视频压缩标准，ITU-T制定的H.261、H.262、H.263、H.264一系列视频编码标准是另外一套体系。其中H.264汲取了以往标准制定中积累的经验，采用简洁的设计，使用的范围越来越广。</p>
 <p>现在用得最多的就是H.264标准，H.264创造了多参考帧、多块类型、整数变换、帧内预测等新的压缩技术，使用了更精细的分象素运动矢量（1/4、1/8）和新一代的环路滤波器，大大提高了压缩性能，系统更加完善。从H.264开始，它与Mpeg标准的AVC合并成为了一个，后续又衍生出了H.265、H.266等新一代的视频编码标准。</p>
 <p>除了上述两个组织制定的标准之外，还有Google制定的VP系列的视频编码和我们国家AVS工作组制定的AVS编码标准，整体的图示如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/41/65/41166ca9a0e91958737abf4085144a65.png?wh=1920x705" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/41/65/41166ca9a0e91958737abf4085144a65.png?wh=1920x705" /></p>
 <p>接下来我们会重点学习H.264这一视频编码的工作原理及它的封装格式。</p>
 <h2 id="_2">编码器的工作编码原理介绍</h2>
 <p>由于人类眼睛的生理特点（视锥细胞对亮度的敏感程度强于颜色的敏感程度），所以出现了YUV420P的无损表示格式，但只是做到这样还是远远不够的，还应该使用有损的压缩方式，将YUV420P的原始数据压缩到更小，而压缩主要考虑到视频有以下两个特性。</p>
@@ -5544,7 +5544,7 @@
 <p>第一是去除时域上的冗余信息；第二是去除单张视频帧的空间冗余信息。那这两部分工作也是编码器工作的重点，这节课我就来介绍一下这两部分的通用实现手段，但是在不同的编码器中实现的方式又有所不同，编码出来的视频质量以及性能消耗也是不同的，而性能和质量也是开发者选用编码器的衡量指标。</p>
 <h3 id="_3">帧类型介绍</h3>
 <p>在尝试着消除冗余信息（不论是时间的冗余信息还是空间的冗余信息）之前，先来假设一个视频内容，一个帧率（fps）为30的电影，下面是前四帧的内容：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/70/f8/709aef5c1774e77cf0f5e261e5513af8.png?wh=460x122" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/70/f8/709aef5c1774e77cf0f5e261e5513af8.png?wh=460x122" /></p>
 <p>在这四帧视频帧中，我们可以看到大量的重复信息，比如蓝色的背景，它从第一帧到第四帧并没有任何变化，为了消除这些冗余信息，我们可以将视频帧的类型抽象为3种类型。</p>
 <ul>
 <li>I Frame</li>
@@ -5559,15 +5559,15 @@
 </ul>
 <p>相比于P帧只参考前面的视频帧内容，B帧又增加了对后边视频帧的参考，这样可以提供更好的压缩，但是这对于编码器来讲，计算量增大的同时还增加了编码输出的延迟时间（因为需要参考后续过来的视频帧），所以在一些实时性要求较高的场景下通常不使用B帧。</p>
 <p>这些帧类型共同组成了一个完整的视频，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7b/cd/7be705a825b80c7c7fff6883b9edfecd.png?wh=894x150" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7b/cd/7be705a825b80c7c7fff6883b9edfecd.png?wh=894x150" /></p>
 <p>如果仅从存储或者网络带宽角度来衡量，我们可以认为I帧是最昂贵的，P帧会便宜一些，但是最便宜的是B帧。接下来我们看一下，这几种类型的帧是如何产生的。</p>
 <h3 id="_4">消除时间上的冗余信息</h3>
 <p>我们先来一起讨论一下如何消除视频帧在时间上的冗余信息，比较成熟的技术就是帧间预测技术（inter-frame prediction），先来看这两帧视频帧。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/fd/19/fd5b05ea17636b48f45114e5dae9f819.png?wh=406x204" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fd/19/fd5b05ea17636b48f45114e5dae9f819.png?wh=406x204" /></p>
 <p>我们将去除掉时间上的冗余信息来达到使用更少的字节存储这两帧视频帧的目的，首先想到的就是这两帧视频帧相减，得到Diff值，就是我们要进行编码的东西，如下图所示。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/cc/49/cc5dfe676f5677c6088f90cf06f1be49.png?wh=350x312" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cc/49/cc5dfe676f5677c6088f90cf06f1be49.png?wh=350x312" /></p>
 <p>但其实还有一种更好的方法，可以使用更少的比特数来存储第二帧视频帧的内容，首先我们将每一帧视频帧（frame_0）分为很多个部分，然后将这两帧视频帧中的每一部分进行匹配，这种算法我们可以看作是运动估计，如下图所示。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c0/07/c0a62654a38408e260f17a02c1cdb207.png?wh=442x222" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c0/07/c0a62654a38408e260f17a02c1cdb207.png?wh=442x222" /></p>
 <p>在第一帧变化到第二帧的过程中，我们可以估计第一帧视频帧中的黑色球从点（x=0, y=25）到点（x=7, y=26），而x和y组成的值的集合就叫做运动向量。我们可以更进一步来节省编码内容，即只对这两帧之间的运动矢量差进行编码，所以最终运动矢量是x=6（6-0)） y=1（26-25）。当然在真实的编码过程中，图中的小球会再被划分为N个部分，前面把它当作一部分只是为了方便理解。所以我们可以看到，当应用了运动估算算法之后，编码的数据要比简单地计算Diff值进行编码的数据要少得多。</p>
 <p>我们可以使用FFmpeg工具来查看一个视频编码的运动矢量情况，命令如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ffplay -flags2 +export_mvs -vf codecview=mv=pf+bf+bb input.flv
@@ -5575,30 +5575,30 @@
 <p>到这里，时间冗余信息我们可以靠运动估计算法给消除掉了，而要想使用运动估计，就需要一个帧作为参考帧，一般称之为I帧，那么I帧是如何进行压缩的呢？其实就是接下来我们要讲解的空间冗余信息的消除部分。</p>
 <h3 id="_5">消除空间上的冗余信息</h3>
 <p>在一帧视频帧中我们可以看到大量的重复信息。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/25/e8/25f1f6d2ca5904449565a1f36a54bbe8.png?wh=310x180" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/25/e8/25f1f6d2ca5904449565a1f36a54bbe8.png?wh=310x180" /></p>
 <p>从图中可以看到有大量的蓝色和白色组成，如果这是一帧I帧的话，我们就无法使用帧间预测技术来压缩它了。但我们还是有办法来压缩这张图片，因为它的重复信息还是比较多的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/14/9e/142e17837d89a38f425089cfa976679e.png?wh=208x306" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/14/9e/142e17837d89a38f425089cfa976679e.png?wh=208x306" /></p>
 <p>如图所示，我们将对标出来的红色块的部分进行编码，我们可以根据红色块周围的颜色趋势来预测当前部分的颜色值，比如可以预测，帧将继续垂直地传播颜色，这意味着未知像素的颜色将保持其邻居的值，如图所示。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d8/83/d821cdfbfe1eb9f0f68ba54ebf831283.png?wh=274x218" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d8/83/d821cdfbfe1eb9f0f68ba54ebf831283.png?wh=274x218" /></p>
 <p>但是我们的预测有可能是错误的，所以我们需要使用另外一项技术，即帧内预测技术。我们使用真正的值减去预测的值可以得到一个矩阵，如下所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ca/34/ca2e9ac9c72dcyyff8c632e4b525da34.png?wh=894x274" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ca/34/ca2e9ac9c72dcyyff8c632e4b525da34.png?wh=894x274" /></p>
 <p>我们通过帧内预测技术实现了空间压缩，也简单了解了空间压缩的原理，但是一个编码器的内部工作机制还是非常复杂的，有非常多的复杂流程，最经典的就是DCT变换，它利用图像在低频部分的能量分布比较多，在高频比较少这一特点，将图像变换到频域上来进一步消除空间的冗余信息，这就是有损压缩最核心的一部分。除此之外，编码器还需要使用量化、熵编码等步骤共同来编码出最终的视频。如果你有兴趣了解更多的内部细节，可以参考libx264的<a href="https://www.videolan.org/developers/x264.html">官方文档</a>。</p>
 <h2 id="h264nalu">H264的NALU</h2>
 <p>NALU的全称是Network Abstract Layer Unit，即网络抽象层，在H.264/AVC视频编码标准中，整个系统框架被分成了两层，即视频编码层面（VCL）和网络抽象层面（NAL）。前者负责有效表示视频数据的内容，而后者负责格式化数据并提供头信息，以保证数据适合各种信道和存储介质上的传输。我们平时的每帧数据就是一个NAL单元，也就是我们常说的NALU。一个完整的NALU由Header和Payload组成，其中Header部分占一个字节，每一位代表含义如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1e/2c/1e028c99df9604b7a4e73234f954022c.png?wh=1778x660" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1e/2c/1e028c99df9604b7a4e73234f954022c.png?wh=1778x660" /></p>
 <p>其中第一位固定为0；第二位、第三位组成一个nal_ref_idc代表了这个NAL的重要性，取值范围是0～3，值越大表示当前NALU越重要，需要优先受到保护，比如IDR、SPS、PPS类型的NALU，这个值一定不是0；最后5位共同组成NALUType，判定规则就是“与”上0x1f得出的值再和下述数值做比较。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/5f/23/5f68020098883f082b5d5bee60f66c23.png?wh=892x558" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5f/23/5f68020098883f082b5d5bee60f66c23.png?wh=892x558" /></p>
 <p>我们经常使用的有IDR、SEI、SPS、PPS，IDR代表了关键帧，从这一帧开始不需要再参考前序的视频帧。SEI帧代表视频增强信息的帧，像之前风靡一时的视频答题应用就使用这种类型的帧来承载题目以及答案，通常用法是把这个帧加入到每一个关键帧的前面。</p>
 <p>SPS和PPS保存了一组编码视频序列的全局参数，每一帧编码后的数据所依赖的参数保存在图像参数集里，里面的信息至关重要，如果其中的数据丢失或出现错误，那么解码过程很可能会失败。一般情况下SPS和PPS的NAL Unit处于整个码流的起始位置，初始化解码器的时候需要将这两者设置给解码器。你从图中也可以看到像SEI帧它的nal_ref_idc就是等于0的，而像IDR、SPS、PPS类型的nal_ref_idc就不能为0。</p>
 <h2 id="h264">H.264的封装格式</h2>
 <p>在熟悉了H.264里面的NALU之后，接下来我们就再介绍一下H.264里面的封装格式，就像音频的AAC编码有两种封装格式，H.264的编码也有两种封装格式，一种是AVCC格式，一种是Annex-B格式。</p>
 <h3 id="avcc">AVCC格式</h3>
 <p>AVCC格式也叫AVC1格式，是属于MPEG-4标准定义的格式，通常用于存储MP4/FLV/MKV等文件，也可以用于RTMP直播中，格式如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/84/66/84f4b95b9941ayyc62f29c33a85f1a66.png?wh=1920x195" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/84/66/84f4b95b9941ayyc62f29c33a85f1a66.png?wh=1920x195" /></p>
 <p>最前面是extraData部分，这部分描述了整体编码的一些信息，主要部分是由sps和pps组成，后边跟的是许多个NALU，但是每一个NALU前面一般会使用4个字节来表示这个NALU的长度，然后紧接着跟着这个NALU。</p>
 <h3 id="annex-b">Annex-B格式</h3>
 <p>Annex-B格式也叫MPEG-2 transport stream format格式，是属于MPEG-4标准定义的格式，通常用于ts流以及视频会议中，格式如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/54/5d/54c4ede90471200129dfb33668a11c5d.png?wh=1920x249" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/54/5d/54c4ede90471200129dfb33668a11c5d.png?wh=1920x249" /></p>
 <p>其中startCode有可能是三个字节或者四个字节，会用0x001或者0x0001来表示，这个格式会以它作为NALU的分界点，SPS和PPS按照一个NALU的方式写在头部。</p>
 <p>在FFmpeg中提供了一个bitstreamFilter叫做h264_mp4toannexb，在解码场景中可以方便地将AVCC格式的H.264转换为Annexb格式的H.264。当然在编码场景中，如果需要逆方向的格式转换，你也可以自己将startCode部分替换为NALULength。</p>
 <h2 id="_6">小结</h2>
@@ -5736,8 +5736,6 @@ Q3：修改歌词，然后唱出完整的音乐，有这样的软件吗？
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

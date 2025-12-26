@@ -7179,7 +7179,7 @@
 <p>今天我们就来揭晓答案。首先，在功能方面，这4个算子都用于RDD内部的数据转换，而学习过Shuffle的工作原理之后，我们不难发现，这4个算子当中，没有任何一个算子，会引入Shuffle计算。</p>
 <p>而今天我们要学习的几个算子则恰恰相反，它们都会引入繁重的Shuffle计算。这些算子分别是groupByKey、reduceByKey、aggregateByKey和sortByKey，也就是表格中加粗的部分。</p>
 <p>我们知道，在数据分析场景中，典型的计算类型分别是分组、聚合和排序。而groupByKey、reduceByKey、aggregateByKey和sortByKey这些算子的功能，恰恰就是用来实现分组、聚合和排序的计算逻辑。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c9/fc/c97a717512897749d5db659fb583c8fc.jpg?wh=1597x1977" title="RDD算子分类表" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c9/fc/c97a717512897749d5db659fb583c8fc.jpg?wh=1597x1977" title="RDD算子分类表" /></p>
 <p>尽管这些算子看上去相比其他算子的适用范围更窄，也就是它们只能作用（Apply）在Paired RDD之上，所谓Paired RDD，它指的是元素类型为（Key，Value）键值对的RDD。</p>
 <p>但是在功能方面，可以说，它们承担了数据分析场景中的大部分职责。因此，掌握这些算子的用法，是我们能够游刃有余地开发数据分析应用的重要基础。那么接下来，我们就通过一些实例，来熟悉并学习这些算子的用法。</p>
 <p>我们先来说说groupByKey，坦白地说，相比后面的3个算子，groupByKey在我们日常开发中的“出镜率”并不高。之所以要先介绍它，主要是为后续的reduceByKey和aggregateByKey这两个重要算子做铺垫。</p>
@@ -7200,7 +7200,7 @@
 <p>结合前面的代码可以看到，相比之前的Word Count，我们仅需做两个微小的改动，即可实现新的计算逻辑。第一个改动，是把map算子的映射函数f，由原来的word =&gt; （word，1）变更为word =&gt; （word，word），这么做的效果，是把kvRDD元素的Key和Value都变成了单词。</p>
 <p>紧接着，第二个改动，我们用groupByKey替换了原先的reduceByKey。相比reduceByKey，groupByKey的用法要简明得多。groupByKey是无参函数，要实现对Paired RDD的分组、收集，我们仅需在RDD之上调用groupByKey()即可。</p>
 <p>尽管groupByKey的用法非常简单，但它的计算过程值得我们特别关注，下面我用一张示意图来讲解上述代码的计算过程，从而让你更加直观地感受groupByKey可能存在的性能隐患。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6f/77/6f1c7fb6bebd3yy43b1404835fe86d77.jpg?wh=1920x1071" title="groupByKey计算过程" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6f/77/6f1c7fb6bebd3yy43b1404835fe86d77.jpg?wh=1920x1071" title="groupByKey计算过程" /></p>
 <p>从图上可以看出，为了完成分组收集，对于Key值相同、但分散在不同数据分区的原始数据记录，Spark需要通过Shuffle操作，跨节点、跨进程地把它们分发到相同的数据分区。我们之前在<a href="https://time.geekbang.org/column/article/420399">第6讲</a>中说了，<strong>Shuffle是资源密集型计算</strong>，对于动辄上百万、甚至上亿条数据记录的RDD来说，这样的Shuffle计算会产生大量的磁盘I/O与网络I/O开销，从而严重影响作业的执行性能。</p>
 <p>虽然groupByKey的执行效率较差，不过好在它在应用开发中的“出镜率”并不高。原因很简单，在数据分析领域中，分组收集的使用场景很少，而分组聚合才是统计分析的刚需。</p>
 <p>为了满足分组聚合多样化的计算需要，Spark提供了3种RDD算子，允许开发者灵活地实现计算逻辑，它们分别是reduceByKey、aggregateByKey和combineByKey。</p>
@@ -7236,7 +7236,7 @@
 </code></pre></div>
 <p>观察上面的代码片段，不难发现，reduceByKey算子的用法还是比较简单的，只需要先定义好聚合函数f，然后把它传给reduceByKey算子就行了。那么在运行时，上述代码的计算又是怎样的一个过程呢？</p>
 <p>我把reduceByKey的计算过程抽象成了下图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ac/85/aca17fe4d0fa5a52f4b9e73056aa1185.jpg?wh=1920x951" title="reduceByKey计算过程" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ac/85/aca17fe4d0fa5a52f4b9e73056aa1185.jpg?wh=1920x951" title="reduceByKey计算过程" /></p>
 <p>从图中你可以看出来，尽管reduceByKey也会引入Shuffle，但相比groupByKey以全量原始数据记录的方式消耗磁盘与网络，reduceByKey在落盘与分发之前，会先在Shuffle的Map阶段做初步的聚合计算。</p>
 <p>比如，在数据分区0的处理中，在Map阶段，reduceByKey把Key同为Streaming的两条数据记录聚合为一条，聚合逻辑就是由函数f定义的、取两者之间Value较大的数据记录，这个过程我们称之为“<strong>Map端聚合</strong>”。相应地，数据经由网络分发之后，在Reduce阶段完成的计算，我们称之为“<strong>Reduce端聚合</strong>”。</p>
 <p>你可能会说：“做了Map聚合又能怎样呢？相比groupByKey，reduceByKey带来的性能收益并不算明显呀！”确实，就上面的示意图来说，我们很难感受到reduceByKey带来的性能收益。不过，量变引起质变，在工业级的海量数据下，相比groupByKey，reduceByKey通过在Map端大幅削减需要落盘与分发的数据量，往往能将执行效率提升至少一倍。</p>
@@ -7259,7 +7259,7 @@
 <li>f2的形参类型，必须与f1的结果类型保持一致。</li>
 </ul>
 <p>不同类型之间的一致性描述起来比较拗口，咱们不妨结合示意图来加深理解：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b0/f7/b0a1c86590f4213fa0fc62f5dd4ca3f7.jpg?wh=1920x568" title="aggregateByKey参数之间的类型一致性" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b0/f7/b0a1c86590f4213fa0fc62f5dd4ca3f7.jpg?wh=1920x568" title="aggregateByKey参数之间的类型一致性" /></p>
 <p>熟悉了aggregateByKey的用法之后，接下来，我们用aggregateByKey这个算子来实现刚刚提到的“先加和，再取最大值”的计算逻辑，代码实现如下所示：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1">// 把RDD元素转换为（Key，Value）的形式</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">kvRDD</span><span class="p">:</span><span class="w"> </span><span class="nc">RDD</span><span class="p">[(</span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="nc">Int</span><span class="p">)]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cleanWordRDD</span><span class="p">.</span><span class="n">map</span><span class="p">(</span><span class="n">word</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">(</span><span class="n">word</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">))</span>
@@ -7278,7 +7278,7 @@
 <a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="kd">val</span><span class="w"> </span><span class="n">wordCounts</span><span class="p">:</span><span class="w"> </span><span class="nc">RDD</span><span class="p">[(</span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="nc">Int</span><span class="p">)]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">kvRDD</span><span class="p">.</span><span class="n">aggregateByKey</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">(</span><span class="n">f1</span><span class="p">,</span><span class="w"> </span><span class="n">f2</span><span class="p">)</span>
 </code></pre></div>
 <p>怎么样？是不是很简单？结合计算逻辑的需要，我们只需要提前定义好两个聚合函数，同时保证参数之间的类型一致性，然后把初始值、聚合函数传入aggregateByKey算子即可。按照惯例，我们还是通过aggregateByKey在运行时的计算过程，来帮你深入理解算子的工作原理：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/62/f3/62d25ab5df4fa53da4283263bb2128f3.jpg?wh=1920x1040" title="reduceByKey计算过程" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/62/f3/62d25ab5df4fa53da4283263bb2128f3.jpg?wh=1920x1040" title="reduceByKey计算过程" /></p>
 <p>不难发现，在运行时，与reduceByKey相比，aggregateByKey的执行过程并没有什么两样，最主要的区别，还是Map端聚合与Reduce端聚合的计算逻辑是否一致。值得一提的是，与reduceByKey一样，aggregateByKey也可以通过Map端的初步聚合来大幅削减数据量，在降低磁盘与网络开销的同时，提升Shuffle环节的执行性能。</p>
 <h2 id="sortbykey">sortByKey：排序</h2>
 <p>在这一讲的最后，我们再来说说sortByKey这个算子，顾名思义，它的功能是“按照Key进行排序”。给定包含（Key，Value）键值对的Paired RDD，sortByKey会以Key为准对RDD做排序。算子的用法比较简单，只需在RDD之上调用sortByKey()即可：</p>
@@ -7465,8 +7465,6 @@ https:&#47;&#47;github.com&#47;Spoon94&#47;spark-practice&#47;blob&#47;master&#4
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

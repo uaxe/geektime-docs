@@ -6264,7 +6264,7 @@
 <p>那么，你知道还有一种东西叫“WebSocket”吗？</p>
 <p>单从名字上看，“Web”指的是HTTP，“Socket”是套接字调用，那么这两个连起来又是什么意思呢？</p>
 <p>所谓“望文生义”，大概你也能猜出来，“WebSocket”就是运行在“Web”，也就是HTTP上的Socket通信规范，提供与“TCP Socket”类似的功能，使用它就可以像“TCP Socket”一样调用下层协议栈，任意地收发数据。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ee/28/ee6685c7d3c673b95e46d582828eee28.png?wh=1142%2A502" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ee/28/ee6685c7d3c673b95e46d582828eee28.png?wh=1142%2A502" /></p>
 <p>更准确地说，“WebSocket”是一种基于TCP的轻量级网络通信协议，在地位上是与HTTP“平级”的。</p>
 <h2 id="websocket">为什么要有WebSocket</h2>
 <p>不过，已经有了被广泛应用的HTTP协议，为什么要再出一个WebSocket呢？它有哪些好处呢？</p>
@@ -6292,7 +6292,7 @@
 <p>不过WebSocket和HTTP/2的关注点不同，WebSocket更<strong>侧重于“实时通信”</strong>，而HTTP/2更侧重于提高传输效率，所以两者的帧结构也有很大的区别。</p>
 <p>WebSocket虽然有“帧”，但却没有像HTTP/2那样定义“流”，也就不存在“多路复用”“优先级”等复杂的特性，而它自身就是“全双工”的，也就不需要“服务器推送”。所以综合起来，WebSocket的帧学习起来会简单一些。</p>
 <p>下图就是WebSocket的帧结构定义，长度不固定，最少2个字节，最多14字节，看着好像很复杂，实际非常简单。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/29/c4/29d33e972dda5a27aa4773eea896a8c4.png?wh=2468%2A1523" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/29/c4/29d33e972dda5a27aa4773eea896a8c4.png?wh=2468%2A1523" /></p>
 <p>开头的两个字节是必须的，也是最关键的。</p>
 <p>第一个字节的第一位“<strong>FIN</strong>”是消息结束的标志位，相当于HTTP/2里的“END_STREAM”，表示数据发送完毕。一个消息可以拆成多个帧，接收方看到“FIN”后，就可以把前面的帧拼起来，组成完整的消息。</p>
 <p>“FIN”后面的三个位是保留位，目前没有任何意义，但必须是0。</p>
@@ -6303,7 +6303,7 @@
 <p>这么分析下来，其实WebSocket的帧头就四个部分：“<strong>结束标志位+操作码+帧长度+掩码</strong>”，只是使用了变长编码的“小花招”，不像HTTP/2定长报文头那么简单明了。</p>
 <p>我们的实验环境利用OpenResty的“lua-resty-websocket”库，实现了一个简单的WebSocket通信，你可以访问URI“/38-1”，它会连接后端的WebSocket服务“ws://127.0.0.1/38-0”，用Wireshark抓包就可以看到WebSocket的整个通信过程。</p>
 <p>下面的截图是其中的一个文本帧，因为它是客户端发出的，所以需要掩码，报文头就在两个字节之外多了四个字节的“Masking-key”，总共是6个字节。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c9/94/c91ee4815097f5f9059ab798bb841594.png?wh=1269%2A634" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c9/94/c91ee4815097f5f9059ab798bb841594.png?wh=1269%2A634" /></p>
 <p>而报文内容经过掩码，不是直接可见的明文，但掩码的安全强度几乎是零，用“Masking-key”简单地异或一下就可以转换出明文。</p>
 <h2 id="websocket_3">WebSocket的握手</h2>
 <p>和TCP、TLS一样，WebSocket也要有一个握手过程，然后才能正式收发数据。</p>
@@ -6318,7 +6318,7 @@
 <li>Sec-WebSocket-Key：一个Base64编码的16字节随机数，作为简单的认证密钥；</li>
 <li>Sec-WebSocket-Version：协议的版本号，当前必须是13。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8f/97/8f007bb0e403b6cc28493565f709c997.png?wh=2096%2A865" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8f/97/8f007bb0e403b6cc28493565f709c997.png?wh=2096%2A865" /></p>
 <p>服务器收到HTTP请求报文，看到上面的四个字段，就知道这不是一个普通的GET请求，而是WebSocket的升级请求，于是就不走普通的HTTP处理流程，而是构造一个特殊的“101 Switching Protocols”响应报文，通知客户端，接下来就不用HTTP了，全改用WebSocket协议通信。（有点像TLS的“Change Cipher Spec”）</p>
 <p>WebSocket的握手响应报文也是有特殊格式的，要用字段“Sec-WebSocket-Accept”验证客户端请求报文，同样也是为了防止误连接。</p>
 <p>具体的做法是把请求头里“Sec-WebSocket-Key”的值，加上一个专用的UUID “258EAFA5-E914-47DA-95CA-C5AB0DC85B11”，再计算SHA-1摘要。</p>
@@ -6328,7 +6328,7 @@
 </code></pre></div>
 <p>客户端收到响应报文，就可以用同样的算法，比对值是否相等，如果相等，就说明返回的报文确实是刚才握手时连接的服务器，认证成功。</p>
 <p>握手完成，后续传输的数据就不再是HTTP报文，而是WebSocket格式的二进制帧了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/84/03/84e9fa337f2b4c2c9f14760feb41c903.png?wh=1254%2A707" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/84/03/84e9fa337f2b4c2c9f14760feb41c903.png?wh=1254%2A707" /></p>
 <h2 id="_1">小结</h2>
 <p>浏览器是一个“沙盒”环境，有很多的限制，不允许建立TCP连接收发数据，而有了WebSocket，我们就可以在浏览器里与服务器直接建立“TCP连接”，获得更多的自由。</p>
 <p>不过自由也是有代价的，WebSocket虽然是在应用层，但使用方式却与“TCP Socket”差不多，过于“原始”，用户必须自己管理连接、缓存、状态，开发上比HTTP复杂的多，所以是否要在项目中引入WebSocket必须慎重考虑。</p>
@@ -6346,7 +6346,7 @@
 <li>结合自己的实际工作，你觉得WebSocket适合用在哪些场景里？</li>
 </ol>
 <p>欢迎你把自己的学习体会写在留言区，与我和其他同学一起讨论。如果你觉得有所收获，也欢迎把文章分享给你的朋友。</p>
-<p><img alt="unpreview" src="https://static001.geekbang.org/resource/image/4b/5b/4b81de6b5c57db92ed7808344482ef5b.png?wh=1769%2A3348" /></p>
+<p><img alt="unpreview" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4b/5b/4b81de6b5c57db92ed7808344482ef5b.png?wh=1769%2A3348" /></p>
 <div><strong>精选留言（15）</strong></div>
 <ul>
 <li><span>许童童</span> 👍（32） 💬（2）<p>思考题：
@@ -6482,8 +6482,6 @@ Socket主要强调他是在TCP上的一层薄薄的封装，实现通信方式�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

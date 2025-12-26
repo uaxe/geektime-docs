@@ -14046,10 +14046,10 @@
 <li><strong>水平分库</strong></li>
 </ul>
 <p>某些表太大，单个数据库存储不下，或者数据库的读写性能有压力。通过水平分库，我们把一张表拆成多张表，每张表存放部分记录，分别保存在不同的数据库里，水平分库需要对应用做比较大的改造。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6a/81/6a414d387a08a6dc291c3a3a9e763c81.jpg?wh=2284%2A1280" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6a/81/6a414d387a08a6dc291c3a3a9e763c81.jpg?wh=2284%2A1280" /></p>
 <p>当时，1号店已经通过服务化，实现了订单库的<strong>垂直拆分</strong>，它的订单库主要包括订单基本信息表、订单商品明细表、订单扩展表。这里的问题不是表的数量太多，而是单表的数据量太大，读写性能差。所以，1号店通过<strong>水平分库</strong>，把这3张表的记录分到多个数据库当中，从而分散了数据库的存储和性能压力。</p>
 <p>水平分库后，应用通过订单服务来访问多个订单数据库，具体的方式如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7c/9f/7cf1df5c241cd515d5e89456d2a7f39f.jpg?wh=2284%2A1580" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7c/9f/7cf1df5c241cd515d5e89456d2a7f39f.jpg?wh=2284%2A1580" /></p>
 <p>原来的一个Oracle库被现在的多个MySQL库给取代了，每个MySQL数据库包括了1主1备2从，都支持读写分离，主备之间通过自带的同步机制来实现数据同步。所以，你可以发现，<strong>这个项目实际包含了水平分库和去Oracle两大改造目标。</strong></p>
 <h2 id="_2">分库策略</h2>
 <p>我们先来讨论一下水平分库的具体策略，包括要选择哪个分库维度，数据记录如何划分，以及要分为几个数据库。</p>
@@ -14064,7 +14064,7 @@
 <li>该ID不出现。</li>
 </ol>
 <p>最后，我们分别统计这三个字段的使用情况，假设共有500个SQL访问订单库，3个候选字段出现的情况如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/26/9a/26480ace17c1629c24f5881f65f2fa9a.jpg?wh=2284%2A1160" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/26/9a/26480ace17c1629c24f5881f65f2fa9a.jpg?wh=2284%2A1160" /></p>
 <p>从这张表来看，结论非常明显，我们应该选择用户ID来进行分库。</p>
 <p>不过，等一等，这<strong>只是静态分析</strong>。我们知道，每个SQL访问的频率是不一样的，所以，我们还要分析每个SQL的实际访问量。</p>
 <p>在项目中，我们分析了Top15执行次数最多的SQL （它们占总执行次数85%，具有足够代表性），按照执行的次数，如果使用用户ID进行分库，这些SQL 85%会落到单个数据库，13%落到多个数据库，只有2%需要遍历所有的数据库。所以说，<strong>从SQL动态执行次数的角度来看</strong>，用户ID分库也明显优于使用其他两个ID进行分库。</p>
@@ -14077,7 +14077,7 @@
 <li><strong>根据ID取模进行分库</strong>，比如把用户ID mod 10，余数为0的记录放到第一个库，余数为1的放到第二个库，以此类推。</li>
 </ol>
 <p>这两种分法，各自存在优缺点，如下表所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3b/81/3bf9fb5fb9e1569cf4478c493c02f081.jpg?wh=2284%2A1980" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3b/81/3bf9fb5fb9e1569cf4478c493c02f081.jpg?wh=2284%2A1980" /></p>
 <p>在实践中，为了运维方便，选择ID取模进行分库的做法比较多。同时为了数据迁移方便，一般分库的数量是按照倍数增加的，比如说，一开始是4个库，二次分裂为8个，再分成16个。这样对于某个库的数据，在分裂的时候，一半数据会移到新库，剩余的可以不用动。与此相反，如果我们每次只增加一个库，所有记录都要按照新的模数做调整。</p>
 <p>在这个项目中，我们结合订单数据的实际情况，最后采用的是<strong>取模</strong>的方式来拆分记录。</p>
 <p><strong>补充说明：</strong>按照取模进行分库，每个库记录数一般比较均匀，但也有些数据库，存在超级ID，这些ID的记录远远超过其他ID。比如在广告场景下，某个大广告主的广告数可能占很大比例。如果按照广告主ID取模进行分库，某些库的记录数会特别多，对于这些超级ID，需要提供单独库来存储记录。</p>
@@ -14118,7 +14118,7 @@
 <p>Lookup表的记录数和订单库记录总数相等，但它只有2个字段，所以存储和查询性能都不是问题，这个表在单独的数据库里存放。在实际使用时，我们可以通过<strong>分布式缓存</strong>，来优化Lookup表的查询性能。此外，对于新增的订单，除了写订单表，我们同时还要写Lookup表。</p>
 <h2 id="_10">整体架构</h2>
 <p>通过以上分析，最终的1号店订单水平分库的总体技术架构如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3a/9c/3ae46ab0d2d5430f03b436c87247d59c.jpg?wh=2284%2A1800" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3a/9c/3ae46ab0d2d5430f03b436c87247d59c.jpg?wh=2284%2A1800" /></p>
 <ul>
 <li><strong>上层应用</strong>通过订单服务访问数据库；</li>
 <li><strong>分库代理</strong>实现了分库相关的功能，包括聚合运算、订单ID到用户ID的映射，做到分库逻辑对订单服务透明；</li>
@@ -14280,8 +14280,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

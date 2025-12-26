@@ -7232,7 +7232,7 @@
 <li>将哈希值对并行度（Parallelism）取模</li>
 </ul>
 <p>由于左表与右表在并行度（分区数）上是一致的，因此，按照同样的规则分发数据之后，一定能够保证id字段值相同的薪资数据与员工数据坐落在同样的Executors中。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/5a/6a/5a5531dd1dea1b2d5c710f026c5aae6a.jpg?wh=1920x726" title="Shuffle Join工作原理" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5a/6a/5a5531dd1dea1b2d5c710f026c5aae6a.jpg?wh=1920x726" title="Shuffle Join工作原理" /></p>
 <p>如上图所示，颜色相同的矩形代表Join Keys相同的数据记录，可以看到，在Map阶段，数据分散在不同的Executors当中。经过Shuffle过后，Join Keys相同的记录被分发到了同样的Executors中去。接下来，在Reduce阶段，Reduce Task就可以使用HJ、SMJ、或是NLJ算法在Executors内部完成数据关联的计算。</p>
 <p>Spark SQL之所以在默认情况下一律采用Shuffle Join，原因在于Shuffle Join的“万金油”属性。也就是说，<strong>在任何情况下，不论数据的体量是大是小、不管内存是否足够，Shuffle Join在功能上都能够“不辱使命”，成功地完成数据关联的计算</strong>。然而，有得必有失，功能上的完备性，往往伴随着的是性能上的损耗。</p>
 <p>学习过 <a href="https://time.geekbang.org/column/article/420399">Shuffle的原理</a>（第6讲）之后，不用我多说，Shuffle的弊端想必你早已烂熟于心。我们知道，从CPU到内存，从磁盘到网络，Shuffle的计算几乎需要消耗所有类型的硬件资源。尤其是磁盘和网络开销，这两座大山往往是应用执行的性能瓶颈。</p>
@@ -7250,19 +7250,19 @@
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="kd">val</span><span class="w"> </span><span class="n">jointDF</span><span class="p">:</span><span class="w"> </span><span class="nc">DataFrame</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">salaries</span><span class="p">.</span><span class="n">join</span><span class="p">(</span><span class="n">bcEmployees</span><span class="p">,</span><span class="w"> </span><span class="n">salaries</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">)</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="n">employees</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">),</span><span class="w"> </span><span class="s">&quot;inner&quot;</span><span class="p">)</span>
 </code></pre></div>
 <p>在Broadcast Join的执行过程中，Spark SQL首先从各个Executors收集employees表所有的数据分片，然后在Driver端构建广播变量bcEmployees，构建的过程如下图实线部分所示。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/48/4d/4814b57f9d9e4a98217773f161d9de4d.jpg?wh=1920x697" title="Broadcast Join工作原理" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/48/4d/4814b57f9d9e4a98217773f161d9de4d.jpg?wh=1920x697" title="Broadcast Join工作原理" /></p>
 <p>可以看到，散落在不同Executors内花花绿绿的矩形，代表的正是employees表的数据分片。这些数据分片聚集到一起，就构成了广播变量。接下来，如图中虚线部分所示，携带着employees表全量数据的广播变量bcEmployees，被分发到了全网所有的Executors当中去。</p>
 <p>在这种情况下，体量较大的薪资表数据只要“待在原地、保持不动”，就可以轻松关联到跟它保持之一致的员工表数据了。通过这种方式，Spark SQL成功地避开了Shuffle这种“劳师动众”的数据分发过程，转而用广播变量的分发取而代之。</p>
 <p>尽管广播变量的创建与分发同样需要消耗网络带宽，但相比Shuffle Join中两张表的全网分发，因为仅仅<strong>通过分发体量较小的数据表来完成数据关联，Spark SQL的执行性能显然要高效得多</strong>。这种小投入、大产出，用极小的成本去博取高额的性能收益，可以说是“四两拨千斤”！</p>
 <h2 id="spark-sqljoin">Spark SQL支持的Join策略</h2>
 <p>不论是Shuffle Join，还是Broadcast Join，一旦数据分发完毕，理论上可以采用HJ、SMJ和NLJ这3种实现机制中的任意一种，完成Executors内部的数据关联。因此，两种分发模式，与三种实现机制，它们组合起来，总共有6种分布式Join策略，如下图所示。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ec/74/ece8f8d14fcb5d089d61ac76376f9874.jpg?wh=1920x754" title="6种分布式Join策略" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ec/74/ece8f8d14fcb5d089d61ac76376f9874.jpg?wh=1920x754" title="6种分布式Join策略" /></p>
 <p>虽然组合起来选择多样，但你也不必死记硬背，抓住里面的规律才是关键，我们一起来分析看看。</p>
 <p>在这6种Join策略中，Spark SQL支持其中的5种来应对不用的关联场景，也即图中蓝色的5个矩形。对于等值关联（Equi Join），Spark SQL优先考虑采用Broadcast HJ策略，其次是Shuffle SMJ，最次是Shuffle HJ。对于不等值关联（Non Equi Join），Spark SQL优先考虑Broadcast NLJ，其次是Shuffle NLJ。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f6/a2/f661e892f7d1179aff2532d27caa9da2.jpg?wh=1905x504" title="Spark SQL对不同Join策略的选择倾向" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f6/a2/f661e892f7d1179aff2532d27caa9da2.jpg?wh=1905x504" title="Spark SQL对不同Join策略的选择倾向" /></p>
 <p>不难发现，<strong>不论是等值关联、还是不等值关联，只要Broadcast Join的前提条件成立，Spark SQL一定会优先选择Broadcast Join相关的策略</strong>。那么问题来了，Broadcast Join的前提条件是什么呢？</p>
 <p>回顾Broadcast Join的工作原理图，我们不难发现，<strong>Broadcast Join得以实施的基础，是被广播数据表（图中的表2）的全量数据能够完全放入Driver的内存、以及各个Executors的内存</strong>，如下图所示。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/19/aa/19429ae459a3fdeeac0b16a76435f1aa.jpeg?wh=1378x394" title="Broadcast Join工作原理" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/19/aa/19429ae459a3fdeeac0b16a76435f1aa.jpeg?wh=1378x394" title="Broadcast Join工作原理" /></p>
 <p>另外，为了避免因广播表尺寸过大而引入新的性能隐患，Spark SQL要求被广播表的内存大小不能超过8GB。</p>
 <p>好，这里我们简单总结一下。只要被广播表满足上述两个条件，我们就可以利用SQL Functions中的broadcast函数来创建广播变量，进而利用Broadcast Join策略来提升执行性能。</p>
 <p>当然，在Broadcast Join前提条件不成立的情况下，Spark SQL就会退化到Shuffle Join的策略。在不等值的数据关联中，Spark SQL只有Shuffle NLJ这一种选择，因此咱们无需赘述。</p>
@@ -7270,13 +7270,13 @@
 <p>学习过Shuffle之后，我们知道，Shuffle在Map阶段往往会对数据做排序，而这恰恰正中SMJ机制的下怀。对于已经排好序的两张表，SMJ的复杂度是O(M + N)，这样的执行效率与HJ的O(M)可以说是不相上下。再者，SMJ在执行稳定性方面，远胜于HJ，在内存受限的情况下，SMJ可以充分利用磁盘来顺利地完成关联计算。因此，考虑到Shuffle SMJ的诸多优势，Shuffle HJ就像是关公后面的周仓，Spark SQL向来对之视而不见，所以对于HJ你大概知道它的作用就行。</p>
 <h2 id="_1">重点回顾</h2>
 <p>好啦，到此为止，今天的课程就全部讲完了，我们一起来做个总结。首先，我们一起分析、对比了单机环境中不同Join机制的优劣势，我把它们整理到了下面的表格中，供你随时查看。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d0/93/d08bb6866c98c5e308ee5f415d1f7d93.jpg?wh=1920x453" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d0/93/d08bb6866c98c5e308ee5f415d1f7d93.jpg?wh=1920x453" /></p>
 <p>在分布式环境中，要想利用上述机制完成数据关联，Spark SQL首先需要把两张表中Join Keys一致的数据分发到相同的Executors中。</p>
 <p>因此，数据分发是分布式数据关联的基础和前提。Spark SQL支持Shuffle和广播两种数据分发模式，相应地，Join也被分为Shuffle Join和Broadcast Join，其中Shuffle Join是默认的关联策略。关于两种策略的优劣势对比，我也整理到了如下的表格中，供你参考。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2b/04/2b8d95fe525d6f197f869cfd381c2d04.jpg?wh=2053x702" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2b/04/2b8d95fe525d6f197f869cfd381c2d04.jpg?wh=2053x702" /></p>
 <p>结合三种实现机制和两种数据分发模式，Spark SQL支持5种分布式Join策略。对于这些不同的Join策略，Spark SQL有着自己的选择偏好，我把它整理到了如下的表格中，供你随时查看。</p>
 <p><strong>其中，Broadcast Join的生效前提，是基表能够放进内存，且存储尺寸小于8GB。只要前提条件成立，Spark SQL就会优先选择Broadcast Join。</strong></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f6/a2/f661e892f7d1179aff2532d27caa9da2.jpg?wh=1905x504" title="Spark SQL对不同Join策略的选择倾向" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f6/a2/f661e892f7d1179aff2532d27caa9da2.jpg?wh=1905x504" title="Spark SQL对不同Join策略的选择倾向" /></p>
 <h2 id="_2">每课一练</h2>
 <p>在6种分布式Join策略中，Spark SQL唯独没有支持Broadcast SMJ，你能想一想，为什么Spark SQL没有选择支持这种Join策略吗？提示一下，你可以从SMJ与HJ的执行效率入手做分析。</p>
 <p>欢迎你在留言区跟我交流互动，也推荐你把这一讲分享给更多同事、朋友。</p>
@@ -7415,8 +7415,6 @@ result_data.show()
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

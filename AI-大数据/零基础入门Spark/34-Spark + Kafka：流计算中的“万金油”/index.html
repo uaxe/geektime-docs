@@ -7279,13 +7279,13 @@
 <p>今天这一讲，咱们就来结合实例，说一说Spark与Kafka这对“万金油”组合如何使用。随着业务飞速发展，各家公司的集群规模都是有增无减。在集群规模暴涨的情况下，资源利用率逐渐成为大家越来越关注的焦点。毕竟，不管是自建的Data center，还是公有云，每台机器都是真金白银的投入。</p>
 <h2 id="_1">实例：资源利用率实时计算</h2>
 <p>咱们今天的实例，就和资源利用率的实时计算有关。具体来说，我们首先需要搜集集群中每台机器的资源（CPU、内存）利用率，并将其写入Kafka。然后，我们使用Spark的Structured Streaming来消费Kafka数据流，并对资源利用率数据做初步的分析与聚合。最后，再通过Structured Streaming，将聚合结果打印到Console、并写回到Kafka，如下图所示。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/29/45/2968c988151de68798233229842c7e45.jpg?wh=1920x576" title="资源利用率实时计算流程图" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/29/45/2968c988151de68798233229842c7e45.jpg?wh=1920x576" title="资源利用率实时计算流程图" /></p>
 <p>一般来说，在工业级应用中，上图中的每一个圆角矩形，在部署上都是独立的。绿色矩形代表待监测的服务器集群，蓝色矩形表示独立部署的Kafka集群，而红色的Spark集群，也是独立部署的。所谓独立部署，它指的是，集群之间不共享机器资源，如下图所示。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8c/c7/8cba5a71a01c64a1dae52b13fc5144c7.jpg?wh=1920x970" title="独立部署示意图" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8c/c7/8cba5a71a01c64a1dae52b13fc5144c7.jpg?wh=1920x970" title="独立部署示意图" /></p>
 <p>如果你手头上没有这样的部署环境，也不用担心。要完成资源利用率实时计算的实例，咱们不必非要依赖独立部署的分布式集群。实际上，仅在单机环境中，你就可以复现今天的实例。</p>
 <h2 id="_2">课程安排</h2>
 <p>今天这一讲涉及的内容比较多，在正式开始课程之前，咱们不妨先梳理一下课程内容，让你做到心中有数。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/29/45/2968c988151de68798233229842c7e45.jpg?wh=1920x576" title="资源利用率实时计算流程图" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/29/45/2968c988151de68798233229842c7e45.jpg?wh=1920x576" title="资源利用率实时计算流程图" /></p>
 <p>对于上图的1、2、3、4这四个步骤，我们会结合代码实现，分别讲解如下这四个环节：</p>
 <p>1.生成CPU与内存消耗数据流，写入Kafka；
 2.Structured Streaming消费Kafka数据，并做初步聚合；
@@ -7308,7 +7308,7 @@
 <p>好啦，了解了Kafka的核心功能与特性之后，接下来，我们说一说Kafka的系统架构。与大多数主从架构的大数据组件（如HDFS、YARN、Spark、Presto、Flink，等等）不同，Kafka为无主架构。也就是说，在Kafka集群中，没有Master这样一个角色来维护全局的数据状态。</p>
 <p>集群中的每台Server被称为Kafka Broker，Broker的职责在于存储生产者生产的消息，并为消费者提供数据访问。Broker与Broker之间，都是相互独立的，彼此不存在任何的依赖关系。</p>
 <p>如果就这么平铺直叙去介绍Kafka架构的话，难免让你昏昏欲睡，所以我们上图解。配合示意图解释Kafka中的关键概念，会更加直观易懂。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9e/1e/9e60c6667b7ec728281575e5b19b081e.jpg?wh=1920x967" title="Kafka架构示意图" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9e/1e/9e60c6667b7ec728281575e5b19b081e.jpg?wh=1920x967" title="Kafka架构示意图" /></p>
 <p>刚刚说过，Kafka为无主架构，它依赖ZooKeeper来存储并维护全局元信息。所谓元信息，它指的是消息在Kafka集群中的分布与状态。在逻辑上，消息隶属于一个又一个的Topic，也就是消息的话题或是主题。在上面的示意图中，蓝色圆角矩形所代表的消息，全部隶属于Topic A；而绿色圆角矩形，则隶属于Topic B。</p>
 <p>而在资源利用率的实例中，我们会创建两个Topic，一个是CPU利用率cpu-monitor，另一个是内存利用率mem-monitor。<strong>生产者在向Kafka写入消息的时候，需要明确指明，消息隶属于哪一个Topic</strong>。比方说，关于CPU的监控数据，应当发往cpu-monitor，而对于内存的监控数据，则应该发往mem-monitor。</p>
 <p>为了平衡不同Broker之间的工作负载，在物理上，同一个Topic中的消息，以分区、也就是Partition为粒度进行存储，示意图中的圆角矩形，代表的正是一个个数据分区。在Kafka中，一个分区，实际上就是磁盘上的一个文件目录。而消息，则依序存储在分区目录的文件中。</p>
@@ -7504,7 +7504,7 @@
 <a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="p">.</span><span class="n">awaitTermination</span><span class="p">()</span>
 </code></pre></div>
 <p>利用上述代码，通过终端，我们可以直接观察到Structured Streaming获取的Kafka消息，从而对亟待处理的消息，建立一个感性的认知，如下图所示。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/44/8a/44ae590e0172409d7605d347fbac918a.jpg?wh=1920x583" title="CPU利用率消息示例" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/44/8a/44ae590e0172409d7605d347fbac918a.jpg?wh=1920x583" title="CPU利用率消息示例" /></p>
 <p>在上面的数据中，除了Key、Value以外，其他信息都是消息的元信息，也即消息所属Topic、所在分区、消息的偏移地址、录入Kafka的时间，等等。</p>
 <p>在咱们的实例中，Key对应的是发送资源利用率数据的服务器节点，而Value则是具体的CPU或是内存利用率。初步熟悉了消息的Schema与构成之后，接下来，咱们就可以有的放矢地去处理这些实时的数据流了。</p>
 <p>对于这些每两秒钟就产生的资源利用率数据，假设我们仅关心它们在一定时间内（比如10秒钟）的平均值，那么，我们就可以结合Trigger与聚合计算来做到这一点，代码如下所示。</p>
@@ -7527,7 +7527,7 @@
 <a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a><span class="p">.</span><span class="n">awaitTermination</span><span class="p">()</span>
 </code></pre></div>
 <p>可以看到，我们利用Fixed interval trigger，每隔10秒创建一个Micro-batch。然后，在一个Micro-batch中，我们按照发送消息的服务器做分组，并计算CPU利用率平均值。最后将统计结果打印到终端，如下图所示。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/eb/ee/eb18aa02064583dd681d2c5b09cea1ee.jpg?wh=1920x1222" title="统计CPU利用率均值" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/eb/ee/eb18aa02064583dd681d2c5b09cea1ee.jpg?wh=1920x1222" title="统计CPU利用率均值" /></p>
 <h3 id="kafka_2">再次写入Kafka</h3>
 <p>实际上，除了把结果打印到终端外，我们还可以把它写回Kafka。我们知道Structured Streaming支持种类丰富的Sink，除了常用于测试的Console以外，还支持File、Kafka、Foreach(Batch)，等等。要把数据写回Kafka也不难，我们只需在writeStream API中，指定format为Kafka并设置相关选项即可，如下表所示。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">dfCPU</span>
@@ -7553,13 +7553,13 @@
 <p>这里有两点需要特别注意，一个是<strong>读取与写入的Topic要分开，以免造成逻辑与数据上的混乱</strong>。再者，细心的你可能已经发现，<strong>写回Kafka的数据，在Schema上必须用“key”和“value”这两个固定的字段</strong>，而不能再像写入Console时，可以灵活地定义类似于“clientName”和“avgCPUUsage”这样的字段名，关于这一点，还需要你特别关注。</p>
 <h2 id="_5">重点回顾</h2>
 <p>好啦，到此为止，我手把手地带你实现了Kafka与Spark的集成，完成了图中涉及的每一个环节，也即从消息的生产、到写入Kafka，再到消息的消费与处理，并最终写回Kafka。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/29/45/2968c988151de68798233229842c7e45.jpg?wh=1920x576" title="资源利用率实时计算流程图" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/29/45/2968c988151de68798233229842c7e45.jpg?wh=1920x576" title="资源利用率实时计算流程图" /></p>
 <p>今天的内容比较多，你除了需要掌握集成中的每一个环节与用法外，还需要了解一些有关Kafka的基本概念与特性。Kafka是应用最为广泛的消息中间件（Messaging Queue），它的核心功能有三个：</p>
 <p>1.连接消息生产者与消息消费者；
 2.缓存生产者生产的消息（或者说事件）；
 3.有能力让消费者以最低延迟访问到消息。
 对于Kafka的一些基本概念，你无需死记硬背，在需要的时候，回顾后面这张架构图即可。这张图中，清楚地标记了Kafka的基础概念，以及消息生产、缓存与消费的简易流程。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9e/1e/9e60c6667b7ec728281575e5b19b081e.jpg?wh=1920x967" title="Kafka架构示意图" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9e/1e/9e60c6667b7ec728281575e5b19b081e.jpg?wh=1920x967" title="Kafka架构示意图" /></p>
 <p>而对于Kafka与Spark两者的集成，不管是Structured Streaming通过readStream API消费Kafka消息，还是使用writeStream API将计算结果写入Kafka，你只需要记住如下几点，即可轻松地搭建这对“万金油”组合。</p>
 <ul>
 <li>在format函数中，指定Kafka为Source或Sink；</li>
@@ -7568,7 +7568,7 @@
 </ul>
 <h2 id="_6">每课一练</h2>
 <p>请你结合本讲中CPU利用率的代码，针对内存利用率，完成示意图中的各个环节，也即内存利用率消息的生产、写入Kafka（步骤1）、消息的消费与计算（步骤2、3），聚合结果再次写入Kafka（步骤4）。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/29/45/2968c988151de68798233229842c7e45.jpg?wh=1920x576" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/29/45/2968c988151de68798233229842c7e45.jpg?wh=1920x576" /></p>
 <p>欢迎你把今天这讲内容转发给更多同事、朋友，跟他一起动手试验一下Spark + Kafka的实例，我再留言区等你分享。</p>
 <div><strong>精选留言（1）</strong></div>
 <ul>
@@ -7689,8 +7689,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

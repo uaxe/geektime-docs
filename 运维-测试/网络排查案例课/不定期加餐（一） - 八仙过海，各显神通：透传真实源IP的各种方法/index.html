@@ -6350,7 +6350,7 @@
 <li>后一个TCP连接的客户端IP是LB的SNAT IP，服务端IP是SIP。</li>
 </ul>
 <p>由此，我们可以得到以下示意图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9b/51/9b6101727ca01dbdb2c16b67c1440251.jpg?wh=2000x722" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9b/51/9b6101727ca01dbdb2c16b67c1440251.jpg?wh=2000x722" /></p>
 <p>在这个过程中，LB把这两个表面上没有任何联系的TCP连接“映射”了起来，所以也只有LB知道，从哪个真实源IP（这里的CIP）来的请求被转发到了哪一个后端的连接上去了。</p>
 <p>在这种设计之下，可怜的服务端（SIP）却<strong>只能看到LB的SNAT IP，对CIP是一无所知</strong>，就导致了上面说的好几个功能一个都用不上。</p>
 <p>不过别急，我们有这么几种方法来解决这个难题。我会按网络层级来一一介绍，分别是应用层方法、传输层方法，还有网络层方法。</p>
@@ -6365,7 +6365,7 @@
 </code></pre></div>
 <p>那为什么会有多个IP的情形呢？因为一个HTTP请求，可能会被多个HTTP代理等系统转发，每一级代理都可能会把上一个代理的IP，附加到这个X-Forwarded-For头部的值里面。最左边的IP就是真实源IP，后面跟着的多个IP就是依次经过的各个代理或者LB的IP。</p>
 <p>我们来看个例子。下面是截取的某个抓包文件的HTTP请求的部分，能看到X-Forwarded-For头部，它的值为真实源IP。同时也看到还有另外一个头部X-Forwarded-Proto，它的值为真实客户端跟这个代理之间通信的协议，此处为HTTP，当然也可以是HTTPS。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/dc/8e/dc6f69f0f2dc03be38ec5f6135a8c58e.png?wh=754x76" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dc/8e/dc6f69f0f2dc03be38ec5f6135a8c58e.png?wh=754x76" /></p>
 <p>不过，X-Forwarded-For这个标准，虽然用一种相对低的成本解决了“服务器不能获取真实源IP”的问题，但它本身还是有一些不足的，我们来看一下。</p>
 <ul>
 <li><strong>源IP信息的伪造问题</strong></li>
@@ -6393,7 +6393,7 @@
 <li>对于接收方来说，需要有能力把TCP Options里面的IP地址读取出来。</li>
 </ul>
 <p>这里，我们先来看一下TCP Options在TCP header里面的位置：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/13/c9/134aa8498fda4d2a212eb58a7705a7c9.png?wh=1259x502" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/13/c9/134aa8498fda4d2a212eb58a7705a7c9.png?wh=1259x502" /></p>
 <blockquote>
 <p><a href="https://en.wikipedia.org/wiki/Transmission_Control_Protocol">图片来源</a></p>
 </blockquote>
@@ -6404,9 +6404,9 @@
 <li>op-data。</li>
 </ul>
 <p>TOA采用的kind是254，长度为6个字节（用于IPv4）。我们来看一下TOA的工作原理示意图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b2/d6/b216a4941885e549ce69f07b932d93d6.jpg?wh=2000x671" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b2/d6/b216a4941885e549ce69f07b932d93d6.jpg?wh=2000x671" /></p>
 <p>我们可以到Github上<a href="https://xn--19g">TOA的repo</a>了解到更多的实现细节。比如，我们可以看一下TOA源码中toa_data的数据结构：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/73/73/73fa81424e7b50412225eef89334b273.png?wh=346x218" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/73/73/73fa81424e7b50412225eef89334b273.png?wh=346x218" /></p>
 <p>可见，opcode（op-kind）是一个字节，opsize（op-length）是1个字节，端口（客户端的）是2个字节，ip地址是4个字节，也就是TOA传递了真实源IP和真实源端口的信息。</p>
 <p>TOA具体的工作原理是，TOA模块hook了内核网络中的结构体inet_stream_ops的inet_getname函数，替换成了自定义函数。这个自定义函数会判断TCP header中是否有op-kind为254的部分。如果有，就取出其中的IP和端口值，作为返回值。</p>
 <p>这样的话，当来自用户空间的程序调用getpeername()这个系统调用时，拿到的IP就不再是IP报文的源IP，而是TCP Options里面携带的真实源IP了。比如服务器加载TOA后（当然LB也要支持TOA），那么在access log里面的remote IP一列，就会是真实源IP；而不加载TOA模块的话，就只是LB的SNAT IP了。</p>
@@ -6417,24 +6417,24 @@
 <li>服务端也需要支持Proxy Protocol，以此来识别三次握手后的这个额外的数据包，提取出真实源IP。</li>
 </ul>
 <p>我们可以看一下它具体的工作原理：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a8/cf/a87712ec596bb9d0a34a9fb44yy918cf.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a8/cf/a87712ec596bb9d0a34a9fb44yy918cf.jpg?wh=2000x1125" /></p>
 <p>那么目前，除了HAProxy以外，其实也有不少软件已经支持了Proxy Protocol，比如Nginx，以及各大公有云的服务，比如AWS（亚马逊云）和GCP（谷歌云）。我们还是拿鲜活的抓包信息来展示一下。测试环境是：client -&gt; HAProxy (enabled with proxy protocol as proxy) -&gt; nginx (enabled with proxy protocol as server)。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cc/d3/cc09cac24dbbcc8643c140c1034627d3.jpg?wh=2000x345" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cc/d3/cc09cac24dbbcc8643c140c1034627d3.jpg?wh=2000x345" /></p>
 <p>首先，我们从客户端发起HTTP请求，然后在HAProxy上抓包，获取信息如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7c/0a/7c204094338a08564669f0a33f0fb30a.png?wh=1864x1284" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7c/0a/7c204094338a08564669f0a33f0fb30a.png?wh=1864x1284" /></p>
 <p>可见，整个抓包文件中第9个包（也就是服务端连接的第四个包），就是那个关键的携带了真实源IP信息的包，我们可以直接在Wireshark下方的报文详情里看到它的文本格式的内容：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>PROXY<span class="w"> </span>TCP<span class="w"> </span><span class="m">10</span>.0.2.2<span class="w"> </span><span class="m">10</span>.0.2.15<span class="w"> </span><span class="m">51866</span><span class="w"> </span><span class="m">80</span>
 </code></pre></div>
 <p>其中，10.0.2.2就是真实源IP，10.0.2.15是VIP，51866是真实源端口，80是VIP端口。</p>
 <p>而这里你要知道，默认的HAProxy和Nginx配置都是不启用Proxy Protocol的，所以需要额外进行这些配置。</p>
 <p>另外，如果中间LB（这个例子里是HAProxy）启用了Proxy Protocol，而后端服务器（这个例子里是Nginx）没启用，那么客户端会收到HTTP 400 bad request。究其原因，是因为不启用Proxy Protocol的Nginx，会认为握手后的第一个包并没有遵循HTTP协议规范，所以给出了HTTP 400的报错回复。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/23/76/237bfc77513710f7b7e06cec5bff3876.jpg?wh=2000x374" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/23/76/237bfc77513710f7b7e06cec5bff3876.jpg?wh=2000x374" /></p>
 <h3 id="netscalertcp-ip-header">NetScaler的TCP IP header</h3>
 <p>这是Citrix（也就是NetScaler的厂商）提供的自家的方案。它的原理跟Proxy Protocol是类似的，也是在握手之后，立即发送一个包含真实源IP信息的TCP包，而差别仅仅在于<strong>数据格式不同</strong>。也就是说，这个方式的原理也可以借用Proxy Protocol的那张图来说明：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0f/11/0f11c82b347902868af12312d737e811.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0f/11/0f11c82b347902868af12312d737e811.jpg?wh=2000x1125" /></p>
 <p>然后，后端服务器也需要进行适当改造以支持这个行为，也就是需要读取相应字段，提取出源IP信息。</p>
 <p>我们可以来看一下<a href="https://support.citrix.com/article/CTX205670">Citrix官网文档</a>中的例子：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/eb/9c/eb64f4043cc1f8998dc51cabf289749c.png?wh=491x103" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/eb/9c/eb64f4043cc1f8998dc51cabf289749c.png?wh=491x103" /></p>
 <p>可见，在握手的三个包之后，第四个包里面包含了真实源IP信息。也就是图中黄色高亮的部分：0a 67 06 1e。换算成十进制就是10.103.6.30。</p>
 <p>这种算是私有协议了，支持场景会比Proxy Protocol更少一些，所以需要服务端开发人员对此进行代码改造，来让应用程序能够识别这个包里面的信息。</p>
 <h2 id="_3">网络层方法</h2>
@@ -6444,7 +6444,7 @@
 <li>网络层：直接把真实源IP传输到后端。</li>
 </ul>
 <p>让我们看一下三角模式示意图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/80/4c/80b810923431ac3c307e1b6392c8874c.jpg?wh=1967x827" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/80/4c/80b810923431ac3c307e1b6392c8874c.jpg?wh=1967x827" /></p>
 <p>具体的IPIP隧道加三角模式的配置细节网上很容易搜到，这里就不赘述了。显而易见，这种模式里，客户端地址（CIP）是被服务端直接可见的，看起来貌似最为直接，也不需要任何应用层和传输层的改造。</p>
 <p>不过，这种方式的缺点也比较明显。</p>
 <ul>
@@ -6586,8 +6586,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

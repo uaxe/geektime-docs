@@ -5544,13 +5544,13 @@
 <p>接下来我们看输出部分，输出部分由音频的输出和视频的输出两部分组成。不过可以确定的是，不论音频的输出还是视频的输出，都需要用一个独立的线程来管理，这两个线程会先去输入模块管理的队列中拿出音视频的裸数据，然后分别进行音视频的渲染，最终让用户听得到声音、看得到画面，这两个模块被称为<strong>音频输出模块</strong>和<strong>视频输出模块</strong>。</p>
 <p>再来思考一件事情，输出模块都在各自的线程中，由于两个输出模块的播放频率以及线程控制没有任何关系，这就导致了另外一个问题：音画没有对齐。在上面我们规划的各个模块里，还没有一个模块的职责是负责音视频同步，所以需要再建立一个模块来负责相关的工作，这个模块就是<strong>音视频同步模块</strong>。</p>
 <p>到这里，我们把模块都拆分完了，具体的模块分布如图所示。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8b/a3/8b32157027f571d4b4d53158f06cd4a3.png?wh=1920x918" title="架构设计图" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8b/a3/8b32157027f571d4b4d53158f06cd4a3.png?wh=1920x918" title="架构设计图" /></p>
 <p>左侧是输入模块，负责将多媒体文件处理成音视频裸数据；中间是音视频的队列负责存储音视频的裸数据；右侧中间是音视频同步模块，负责音视频的同步；音频输出与视频输出模块负责音视频的渲染。基于以上的模块拆分，我们就可以设计整体架构，然后为每个模块来做技术选型了。</p>
 <h2 id="_4">架构设计</h2>
 <p>了解了具体的模块后，我们来整体看一下不同模块之间如何组装到一起。</p>
 <p>音视频同步模块向外界暴露获取音频数据、视频数据的接口，这两个接口提供数据的同时要保持同步。音视频同步模块在内部组装输入模块，负责解码线程的调度。然后我们把音视频同步模块、音频输出模块、视频输出模块封装到调度器模块中，调度器模块会分别向音频输出模块和视频输出模块注册回调函数，调度器模块的回调函数中就调用音视频同步模块来获取音频数据和视频数据。</p>
 <p>基于以上架构设计，我们可以进一步整理类图设计，如图所示。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/2c/4f/2cff86a464a7862e2a1a71f84d271b4f.png?wh=1920x1122" title="类图设计" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2c/4f/2cff86a464a7862e2a1a71f84d271b4f.png?wh=1920x1122" title="类图设计" /></p>
 <p>我们可以详细地看一下类图设计中的各个模块。</p>
 <ul>
 <li>VideoPlayerController：调度器模块的类，内部维护音视频同步模块、音频输出模块、视频输出模块，向上层业务暴露开始播放、暂停、继续播放、停止播放等接口；向音频输出模块和视频输出模块暴露两个获取裸数据的接口。</li>
@@ -5573,9 +5573,9 @@
 <p>因此我们这里选择使用软件解码器，它有更高的兼容性及更简单的API调用接口。另外考虑兼容性，以后可能需要硬件解码来提升性能，所以在设计解码模块的时候，我们可以更多地使用面向接口的设计，方便之后更加高效地替换实现。</p>
 <h3 id="_7">输出模块</h3>
 <p>下面我们来看音频输出模块，我们知道音频渲染的技术选型有多种，让我们简单回顾一下。
-<img alt="" src="https://static001.geekbang.org/resource/image/ac/b3/ac19d5c52c511e55fd82b35d19647fb3.png?wh=2126x666" />
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ac/b3/ac19d5c52c511e55fd82b35d19647fb3.png?wh=2126x666" />
 首先是Android平台，常用的就是Java层的AudioTrack和Native层的OpenSL ES。由于播放器的核心逻辑是在Native层，在AudioTrack和OpenSL ES之间，我们还是选择OpenSL ES，因为这样省去了JNI的数据传递，并且OpenSL ES在播放声音方面的延迟更低，缺点就是OpenSL ES提供的API比起AudioTrack不够友好，调试也不太方便，但是总体来衡量，还是OpenSL ES更合适些。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a6/95/a6f8ca3dc1bc6046c5112yy522e4b495.jpg?wh=1254x444" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a6/95/a6f8ca3dc1bc6046c5112yy522e4b495.jpg?wh=1254x444" /></p>
 <p>而iOS平台，比较常见的就是AudioQueue和AudioUnit，AudioQueue是更高层次的音频API，是建立在AudioUnit的基础之上的，提供的API更加简单，在这里选用AudioQueue其实也是可以的，但是我们最终选择了AudioUnit，首先是因为音频渲染过程中有可能存在音频格式的转换，这时使用AudioUnit会更加方便；其次我们也要为后续的录音、音效处理等打下使用AudioUnit的基础。所以这里我们最终选择AudioUnit作为实现方案。</p>
 <p>然后是视频输出模块，技术选型肯定要选择OpenGL ES，因为不论在Android还是iOS平台我们都可以利用它高效地渲染视频。此外，在这里使用OpenGL ES还有一个好处，那就是扩展性。我们可以利用OpenGL ES处理图像的巨大优势，来对视频做一个后处理，比如增加去块滤波器、对比度等效果器，让用户感觉视频更加清晰。</p>
 <p>前面我们已经学习了如何在Android平台和iOS平台搭建OpenGL ES的环境，在Android平台使用EGL来为OpenGL ES提供上下文环境，使用SurfaceView（TextureView）的Surface来构造显示对象，最终输出到SurfaceView（TextureView）上；在iOS平台使用EAGL来为OpenGL ES提供上下文环境，自己定义一个继承自UIView的View，使用EAGLLayer作为渲染对象，最终渲染到这个自定义的View上。</p>
@@ -5586,7 +5586,7 @@
 <p>最后是控制器，控制器需要把上述的三个模块合理地组装起来。在开始播放的时候，需要把资源的地址（有可能是本地的文件，也有可能是网络的资源文件）传递给AVSynchronizer。如果能够成功地打开文件，那么就去实例化VideoOutput和AudioOutput。</p>
 <p>在实例化这两个类的同时，要传入回调函数，这两个回调函数又分别去调用AVSynchronizer里获取音频和视频帧的方法，这样就可以有序地组织多个模块，最终如果暂停、继续的指令调用下来，也相应地去调用各个模块对应的生命周期方法。</p>
 <h2 id="_10">小结</h2>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fa/85/fac701bff764c01405f2b15373b85685.png?wh=1726x1866" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fa/85/fac701bff764c01405f2b15373b85685.png?wh=1726x1866" /></p>
 <p>这节课我带你完成了视频播放器的场景分析和架构设计，学到这里我相信在你心里视频播放器的核心架构已经基本成型了。但是如果想要成为一个优秀的架构师，仅仅做到这些其实是不够的，我们必须在做完整个架构之后，再针对这个架构给出风险评估与部分测试用例，下面我们也逐一来分析一下。</p>
 <p>首先是风险评估，由于我们最终做的项目是运行在移动平台上的，所以对于移动平台的设备碎片化（尤其是Android平台，碎片化更加严重）这一现象，必须要有足够的设备作为测试目标，以保证没有兼容性问题，设备所属的平台架构也应该覆盖到arm、armv7、arm64等平台。</p>
 <p>然后是性能的评估，性能包括CPU消耗、内存占用、耗电量与发热量，其中一些风险点在这一期项目中可能无法完全解决，那我们就需要在架构设计中留出足够的扩展来应对这些风险。其实，目前来看最大的风险就是软件解码这部分，长期来看，需要有硬件解码的替代方案。</p>
@@ -5740,8 +5740,6 @@ Q2：这个播放器项目有源码吗？ 有的话，安卓、iOS两个平台�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

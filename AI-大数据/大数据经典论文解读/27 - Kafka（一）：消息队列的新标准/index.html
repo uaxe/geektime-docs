@@ -7919,13 +7919,13 @@
 <p>如果是各自写各自的日志文件，而我们为了后续的MapReduce能够按小时去处理数据，那么我们100台应用服务器不管有多少日志，每小时就会至少产生100个文件。而大量的小文件，本身是不适合MapReduce这样，擅长顺序读而不是随机读的数据处理方式的。</p>
 <p>一方面，在HDFS上，每个文件无论大小，至少都要占用一个Block也就是64MB大小，那么大量的小文件，就会浪费很多存储空间。另一方面，MapReduce里，对于每个单独的文件都需要一个独立的Map Task来读取，这会使得我们后续处理数据的额外开销（overhead）变得很大。</p>
 <p>而如果我们让很多个应用服务器，往同一个HDFS的文件里写，其实一样会遇到<strong>性能问题</strong>。虽然，在HDFS（GFS）里，数据的追加写入是有一致性保障的。但是，我在前面讲<a href="https://time.geekbang.org/column/article/422468">GFS的论文</a>的时候说过，我们往同一个文件里写，客户端之间一样会互相竞争。这个竞争发生在chunkserver的主副本上，所有的数据追加写入，都会在这里排队。由chunkserver的主副本，来决定下一条记录是由哪一个客户端来写。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/cd/e6/cd111d95dde55f57eb7cecf23da4e7e6.jpg?wh=1920x1080" title="GFS中的数据写入流程，如果很多个客户端都尝试在同一个文件上追加写入[br]那么它们会在这个文件的主副本所在的chunkserver解决冲突问题，多个客户端会在这里“排队”[br]也就是图里的第4步" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cd/e6/cd111d95dde55f57eb7cecf23da4e7e6.jpg?wh=1920x1080" title="GFS中的数据写入流程，如果很多个客户端都尝试在同一个文件上追加写入[br]那么它们会在这个文件的主副本所在的chunkserver解决冲突问题，多个客户端会在这里“排队”[br]也就是图里的第4步" /></p>
 <p>归根到底，是HDFS（GFS）这样的分布式文件系统，对于单个文件，只适合一个客户端<strong>顺序大批量的写入</strong>。在单个文件上，它的高性能是指高吞吐量。而它所支持的高并发，则是很多个不同的应用，通过不同的客户端去读写不同的文件。这样，它的并发会分配到不同的chunkserver上去，互相之间也不会有竞争。</p>
 <h3 id="_2">日志收集系统</h3>
 <p>所以，为了更适合HDFS（GFS）这样的特性，我们需要一个中间层来帮助解决问题。这个中间层，通常被称为<strong>日志收集器</strong>（Log Collector）。其中，Facebook推出了开源的Scribe，Cloudera推出了Flume。</p>
 <p>这些日志收集系统的架构也并不难懂。简单来说，就是各个应用服务器上，有一个日志收集器的客户端。多个客户端，会把日志发送到一个日志汇集（Log Aggregator）的服务器里。而多个日志汇集的服务器，还可以再次用类似的方式进行汇集。这样，通过一个类似于<strong>多层树状</strong>的结构，最终只有几个日志汇集服务器会向HDFS写入数据。</p>
 <p>这种方式，使得我们既不会有太多的并发写入请求，直接打到HDFS上，同时又尽可能地发挥了，HDFS顺序写入数据高吞吐量的优势。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d5/fc/d5bc65a730677609b0fa2f382e130afc.jpg?wh=1920x1480" title="Scribe这样的日志收集器，作为应用服务器和HDFS之间的中间层[br]避免了大量应用服务器的请求都要直接访问HDFS的并发压力问题" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d5/fc/d5bc65a730677609b0fa2f382e130afc.jpg?wh=1920x1480" title="Scribe这样的日志收集器，作为应用服务器和HDFS之间的中间层[br]避免了大量应用服务器的请求都要直接访问HDFS的并发压力问题" /></p>
 <p>而且，这些系统本身，就已经设计了各种容错机制。比如，在网络传输中断的情况下，Scribe会先把数据写入到本地磁盘，等待网络恢复的时候再做“断点续传”。不过，在2011年这个时间节点，像Scribe这样的系统，仍然不是一个流式数据处理系统，而只是一个日志收集器（Log Collector）。实际上，它并不是实时不断地向HDFS写入数据，而是<strong>定时地向HDFS上转存（Dump）文件</strong>。</p>
 <p>只不过，这个“定时”很频繁，比如每5分钟，甚至每1分钟就向HDFS上写入一个日志文件。不过，因为我们已经做了所有应用服务器的日志汇集，即使有1000台服务器，这一分钟也只有一个日志文件，并不会遇到大量碎片化的小文件的问题。</p>
 <p>而能够每分钟都把最新的日志文件放上HDFS，就使得数据分析的工作也能够按分钟进行了。虽然说，这些分析工作仍然是通过频繁运行MapReduce任务来进行的。但是，能够更及时地获取实时的数据反馈，已经对实际的广告效果、搜索质量产生了很大的帮助。</p>
@@ -7934,7 +7934,7 @@
 <p>比如说，数据分析程序，往往想要分析最近1分钟、5分钟的广告点击的数据。那么，Scribe就需要每分钟生成一个新文件，放到HDFS上。而且，这个文件的文件名需要能够分辨出来，这是哪一分钟的日志。</p>
 <p>可是光这样还不够，因为Scribe里，也可能会出现网络中断、硬件故障等等的问题，所以我们很有可能，在运行MapReduce任务去分析数据的时候，Scribe还没有把文件放到HDFS上。那么，我们的MapReduce分析程序，就需要对这种情况进行容错，比如，下一分钟的时候，它需要去读取最近5分钟的数据，看看Scribe上传的新文件里，是否会有本该在上一分钟里读到的数据。</p>
 <p>而这些机制，意味着下游的MapReduce任务，需要去了解上游的日志收集器的实现机制。并且两边根据像文件名规则之类的隐式协议产生了依赖，这就使得数据分析程序写起来会很麻烦，维护起来也不轻松。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8a/80/8ac772caee537a8dd56a2c1df9aa6a80.jpg?wh=1920x963" title="Scribe和MapReduce通过文件名隐式地传递信息，MapReduce也要考虑Scribe的延时等潜在的不可靠问题" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8a/80/8ac772caee537a8dd56a2c1df9aa6a80.jpg?wh=1920x963" title="Scribe和MapReduce通过文件名隐式地传递信息，MapReduce也要考虑Scribe的延时等潜在的不可靠问题" /></p>
 <p>这也是为什么，像Storm和Kafka这样的系统站上了历史舞台。上节课里，我们已经对Storm有所认识和了解了。那么Kafka，是我们使用Storm里必然会使用的一个环节。</p>
 <h3 id="kafka_1">Kafka的系统架构</h3>
 <p>首先，我们仍然可以把Kafka看成是一个类似于Scribe这样的日志收集器。上游的应用服务器仍然会把日志发送给Kafka集群，但是在Kafka的下游，它不仅能把对应的数据，作为文件上传到HDFS上。同时，像Storm这样的流式数据处理系统，它的Spout会直接从Kafka里获取数据，而不是从HDFS上去读文件。这个时候，Kafka其实变成了一个<strong>分布式的消息队列</strong>。</p>
@@ -7945,14 +7945,14 @@
 <li>第一种，是根据<strong>业务情况</strong>进行分组，在Kafka里，对应的就是Topic（主题）这个概念。比如我们可能既有广告日志，又有搜索日志，两种日志的格式和用途都不一样，那么我们就会通过Topic区分开来。</li>
 <li>第二种，是进行<strong>数据分区</strong>，这个和我们见过的其他分布式系统进行分区的原因是一样的。一方面，分区可以帮助我们水平扩展系统的处理能力；同一个Topic的日志，可以平均分配到多台物理服务器上，确保系统可以并行处理。另一方面，这也是一个有效的“容错”机制，一旦有某一个Broker所在的物理服务器出现了硬件故障，那么上游的Producer，可以把日志发到其他的Broker上，来确保系统仍然可以正常运作。</li>
 </ul>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9c/0b/9caa25640b75ed78677385d04546a10b.png?wh=591x451" title="论文中的图1，Kafka本身的架构并不复杂，业务上通过Topic划分日志，水平扩展层面通过Partition进行分区" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9c/0b/9caa25640b75ed78677385d04546a10b.png?wh=591x451" title="论文中的图1，Kafka本身的架构并不复杂，业务上通过Topic划分日志，水平扩展层面通过Partition进行分区" /></p>
 <p>最后是<strong>Consumer</strong>，也就是实际去处理日志的消费者。我们去读取Kafka数据，把它放到HDFS上的程序，就是一个消费者。而我们去获取实时日志，进行分析的程序，也同样是一个消费者，比如一个已经提交运行的Storm Topology。Kafka对于它所处理的消息，是支持多个Consumer的，这个可以从两个层面来看：</p>
 <ul>
 <li>首先，是同样一条消息，可能有不同用途的应用程序都需要读取，它们都是Kafka的消费者。比如上传日志到HDFS是一个Consumer，Storm的Toplogy是另一个Consumer。</li>
 <li>其次，是同一个用途的应用程序，可以有多个并行的消费者，来同时并行处理数据，确保下游的Consumer有足够的吞吐量。</li>
 </ul>
 <p>为了区分这两种“多个消费者”代表的不同含义，Kafka把每一个用途的Consumer程序，称之为一个<strong>Consumer Group</strong>。也就是说，Kafka里，会有很多个不同的Consumer Group，它们会根据自己的用途去消费相同的消息。而一个Consumer Group里，会有很多个Consumer，不同Consumer之间分摊压力，会去消费不同的消息。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/91/5f/9197b49a0ef0c0b892c7bd78e9ba455f.jpg?wh=1920x1480" title="理解Partition（分区）、Consumer（消费者）、Consumer Group（消费者组）之间的关系" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/91/5f/9197b49a0ef0c0b892c7bd78e9ba455f.jpg?wh=1920x1480" title="理解Partition（分区）、Consumer（消费者）、Consumer Group（消费者组）之间的关系" /></p>
 <p>到这里，你可能会觉得，看起来Kafka也没有什么特别的呀。似乎和一般的消息队列的功能差不多，我们通过配置一下Scribe这样的日志收集器，同样也能够实现类似的功能呀。我们把下游有哪些消费者，写到一个配置文件里。通过读取配置文件，也部署一些Scribe进程，把汇集的日志向下游也发起一份就好了。</p>
 <p>的确，在遇到Kafka之前，我自己就是这样通过Storm提供的ScribeSpout，来进行实时数据处理的。也就是由上游的流式传输系统，主动向下游“推（Push）”数据。</p>
 <h3 id="_3">拉数据而不是推数据</h3>
@@ -7972,10 +7972,10 @@
 <p>在实际的实现上，Kafka是这么做的。每一个Topic会有很多个Partition，分布到不同的物理机器上。一个物理机上，可能会分配到多个Partition。实际存储的时候，我们的一个Partition是一个逻辑上的日志文件。在物理上，这个日志文件会给实现成一组大小基本相同的Segment文件，比如每个Segment是1GB大小。每当有新消息从Producer发过来的时候，Broker就会把消息追加写入到最后那个Segment文件里。</p>
 <p>而为了性能考虑，Kafka支持我们自己设置，是每次写入到把数据刷新到硬盘里，还是在写入了一定数量的日志或者经过一个固定的时间的时候，才把文件刷新到硬盘里。</p>
 <p>Broker会在内存里维护一个简单的索引，这个索引其实就是每个通过一个虚拟的偏移量，指向一个具体的Segment文件。那么在Consumer要消费数据的时候，就是根据Consumer本地维护的已经处理完的偏移量，在索引里找到实际的Segment文件，然后去读取数据就好了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e4/27/e4744d9c75ebd7a8f4e0a8ea0ef93b27.png?wh=901x641" title="论文中的图2，Partition是一个逻辑上的日志文件，在物理上会拆分成多个同样大小的Segment文件，顺序存储日志" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e4/27/e4744d9c75ebd7a8f4e0a8ea0ef93b27.png?wh=901x641" title="论文中的图2，Partition是一个逻辑上的日志文件，在物理上会拆分成多个同样大小的Segment文件，顺序存储日志" /></p>
 <h3 id="linux">优秀的Linux文件系统</h3>
 <p>因为本质上，Kafka是直接使用本地的文件系统承担了消息队列持久化的功能，所以Kafka干脆没有实现任何缓存机制，而是<strong>直接依赖了Linux文件系统里的页缓存</strong>（Page Cache）。Kafka写入的数据，本质上都还是在Page Cache。而且因为我们是进行流式数据处理，读写的数据有很强的时间局部性，Broker刚刚写入的数据，几乎立刻会被下游的Consumer读取访问，所以大量的数据读写都会命中缓存。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/96/8f/96472df3cea4312a6f6e97194e35d38f.jpg?wh=2000x1542" title="Kafka直接通过mmap（Memory Mapped Files）来写入数据，使得数据读写的性能很好" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/96/8f/96472df3cea4312a6f6e97194e35d38f.jpg?wh=2000x1542" title="Kafka直接通过mmap（Memory Mapped Files）来写入数据，使得数据读写的性能很好" /></p>
 <p>而没有自己在内存里面实现缓存，也避免了两个问题。</p>
 <p><strong>第一个是JVM里面的GC（垃圾回收）的开销。</strong>如果我们有大量的消息是缓存在内存里，那么处理完了之后，就需要通过GC销毁这些对象，腾出空间来容纳新的需要缓存的对象，而JVM的GC开销，可能会短时间大幅度影响Broker的性能。</p>
 <p><strong>第二个是缓存的“冷启动问题”。</strong>如果我们的Broker进程挂掉了，重新启动了一个新的进程，那么此时，我们的内存里是没有任何缓存数据的，这个时候读取数据的性能，会比一个已经长时间运行、内存中缓存了很多数据的系统的性能，差上很多。</p>
@@ -8123,8 +8123,6 @@ ACK 机制：生产者发送消息后，消费者收到消息后的确认机制
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

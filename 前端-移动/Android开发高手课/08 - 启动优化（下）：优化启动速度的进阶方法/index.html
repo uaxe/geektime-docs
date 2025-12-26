@@ -6389,16 +6389,16 @@
 <p>除了上期讲的常规的优化方法，我还有一些与业务无关的“压箱底”方法可以帮助加快应用的启动速度。当然有些方法会用到一些黑科技，它就像一把双刃剑，需要你做深入的评估和测试。</p>
 <p><strong>1. I/O 优化</strong></p>
 <p>在负载过高的时候，I/O性能下降得会比较快。特别是对于低端机，同样的I/O操作耗时可能是高端机器的几十倍。<strong>启动过程不建议出现网络I/O</strong>，相比之下，磁盘I/O是启动优化一定要抠的点。首先我们要清楚启动过程读了什么文件、多少个字节、Buffer是多大、使用了多长时间、在什么线程等一系列信息。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b9/d7/b901216f4231f43475ca1227f25b6ed7.png?wh=1292%2A336" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b9/d7/b901216f4231f43475ca1227f25b6ed7.png?wh=1292%2A336" /></p>
 <p>那么如何实现I/O的监控呢？我今天先卖个关子，下一期我会详细和你聊聊I/O方面的知识。</p>
 <p>通过上面的数据，我们发现chat.db的大小竟然达到500MB。我们经常发现本地启动明明非常快，为什么线上有些用户就那么慢？这可能是一些用户本地积累了非常多的数据，我们也发现有些微信的重度用户，他的DB文件竟然会超过1GB。所以，<strong>重度用户是启动优化一定要覆盖的群体</strong>，我们要做一些特殊的优化策略。</p>
 <p>还有一个是数据结构的选择问题，我们在启动过程只需要读取Setting.sp的几项数据，不过SharedPreference在初始化的时候还是要全部数据一起解析。<strong>如果它的数据量超过1000条，启动过程解析时间可能就超过100毫秒</strong>。如果只解析启动过程用到的数据项则会很大程度减少解析时间，启动过程适合使用随机读写的数据结构。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/84/73/84c061b93f84e6b20b36d2ee004b7473.png?wh=671%2A492" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/84/73/84c061b93f84e6b20b36d2ee004b7473.png?wh=671%2A492" /></p>
 <p>可以将ArrayMap改造成支持随机读写、延时解析的数据存储方式。同样我们今天也不再展开这部分内容，这些知识会在存储优化的相关章节进一步展开。</p>
 <p><strong>2. 数据重排</strong></p>
 <p>在上面的表格里面，我们读取test.io文件中1KB数据，因为Buffer不小心写成了1 byte，总共要读取1000次。那系统是不是真的会读1000次磁盘呢？</p>
 <p>事实上1000次读操作只是我们发起的次数，并不是真正的磁盘I/O次数。你可以参考下面Linux文件I/O流程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/30/b4/30a46524d9c91b8b137c73b2c87654b4.png?wh=1382%2A456" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/30/b4/30a46524d9c91b8b137c73b2c87654b4.png?wh=1382%2A456" /></p>
 <p>Linux文件系统从磁盘读文件的时候，会以block为单位去磁盘读取，一般block大小是4KB。也就是说一次磁盘读写大小至少是4KB，然后会把4KB数据放到页缓存Page Cache中。如果下次读取文件数据已经在页缓存中，那就不会发生真实的磁盘I/O，而是直接从页缓存中读取，大大提升了读的速度。所以上面的例子，我们虽然读了1000次，但事实上只会发生一次磁盘I/O，其他的数据都会在页缓存中得到。</p>
 <p>Dex文件用的到的类和安装包APK里面各种资源文件一般都比较小，但是读取非常频繁。我们可以利用系统这个机制将它们按照读取顺序重新排列，减少真实的磁盘I/O次数。</p>
 <p><strong>类重排</strong></p>
@@ -6412,7 +6412,7 @@
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>}
 </code></pre></div>
 <p>然后通过ReDex的<a href="https://github.com/facebook/redex/blob/master/docs/Interdex.md">Interdex</a>调整类在Dex中的排列顺序，最后可以利用010 Editor查看修改后的效果。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5f/04/5f118a4064ada2fc6b978f4025d57404.png?wh=1920%2A581" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5f/04/5f118a4064ada2fc6b978f4025d57404.png?wh=1920%2A581" /></p>
 <p>我多次提到的<a href="https://github.com/facebook/redex">ReDex</a>，是Facebook开源的Dex优化工具，它里面有非常多好用的东西，后续我们会有更详细的介绍。</p>
 <p><strong>资源文件重排</strong></p>
 <p>Facebook在比较早的时候就使用“资源热图”来实现资源文件的重排，最近支付宝在<a href="https://mp.weixin.qq.com/s/79tAFx6zi3JRG-ewoapIVQ">《通过安装包重排布优化Android端启动性能》</a>中也详细讲述了资源重排的原理和落地方法。</p>
@@ -6436,12 +6436,12 @@
 <a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>}
 </code></pre></div>
 <p>调整安装包文件排列需要修改7zip源码实现支持传入文件列表顺序，同样最后可以利用010 Editor查看修改后的效果。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ea/b1/eaef116a5c0d6be1f3687b159fd214b1.png?wh=1920%2A337" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ea/b1/eaef116a5c0d6be1f3687b159fd214b1.png?wh=1920%2A337" /></p>
 <p>这两个优化可能会带来100～200毫秒的提高，<strong>我们还可以大大减少启动过程I/O的时间波动</strong>。特别是对于中低端机器来说，经常发现启动时间波动非常大，这个波动跟CPU调度相关，但更多时候是跟I/O相关。</p>
 <p>可能有同学会问，这些优化思路究竟是怎么样想出来的呢？其实利用文件系统和磁盘读取机制的优化思路，在服务端和Windows上早已经不是什么新鲜事。<strong>所谓的创新，不一定是创造前所未有的东西。我们将已有的方案移植到新的平台，并且很好地结合该平台的特性将其落地，就是一个很大的创新。</strong></p>
 <p><strong>3. 类的加载</strong></p>
 <p>在WeMobileDev公众号发布的<a href="https://mp.weixin.qq.com/s/-NmkSwZu83HAmzKPawdTqQ">《微信Android热补丁实践演进之路》</a>中，我提过在加载类的过程有一个verify class的步骤，它需要校验方法的每一个指令，是一个比较耗时的操作。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d2/d2/d2dbf21396e16c0cd53bbc3c0be405d2.png?wh=1920%2A1043" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d2/d2/d2dbf21396e16c0cd53bbc3c0be405d2.png?wh=1920%2A1043" /></p>
 <p>我们可以通过Hook来去掉verify这个步骤，这对启动速度有几十毫秒的优化。不过我想说，其实最大的优化场景在于首次和覆盖安装时。以Dalvik平台为例，一个2MB的Dex正常需要350毫秒，将classVerifyMode设为VERIFY_MODE_NONE后，只需要150毫秒，节省超过50%的时间。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>// Dalvik Globals.h
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>gDvm.classVerifyMode = VERIFY_MODE_NONE;
@@ -6477,11 +6477,11 @@
 <li>80%绘制。当页面绘制超过80%的时候认为是启动完成，不过可能会把闪屏当成启动结束的点，不一定是我们所期望的。</li>
 <li>图像识别。手动输入一张启动结束的图片，当实验系统认为当前截屏页面有80%以上相似度时，就认为是启动结束。这种方法更加灵活可控，但是实现难度会稍微高一点。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ac/fd/acbbb4f9b147d68bfe9ab519642616fd.png?wh=1920%2A947" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ac/fd/acbbb4f9b147d68bfe9ab519642616fd.png?wh=1920%2A947" /></p>
 <p>启动的实验室监控可以定期自动去跑，需要注意的是，我们应该覆盖高、中、低端机不同的场景。但是使用录屏的方式也有一个缺陷，就是出现问题时我们需要人工二次定位具体是什么代码所导致的。</p>
 <p><strong>2. 线上监控</strong></p>
 <p>实验室覆盖的场景和机型还是有限的，是驴是马我们还是要发布到线上进行验证。针对线上，启动监控会更加复杂一些。<a href="https://developer.android.google.cn/topic/performance/vitals/launch-time">Android Vitals</a>可以对应用冷启动、温启动时间做监控。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/27/84/27f427f00755a723f8f9b2ada3540f84.png?wh=1908%2A490" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/27/84/27f427f00755a723f8f9b2ada3540f84.png?wh=1908%2A490" /></p>
 <p>事实上，每个应用启动的流程都非常复杂，上面的图并不能真实反映每个应用的启动耗时。启动耗时的计算需要考虑非常多的细节，比如：</p>
 <ul>
 <li>启动结束的统计时机。是否是使用用户真正可以操作的时间作为启动结束的时间。</li>
@@ -6646,8 +6646,6 @@ runtime.setVerificationEnabled(true);
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

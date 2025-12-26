@@ -14608,7 +14608,7 @@
 <p><strong>4.复制类型判断与执行阶段</strong></p>
 <p>这样，等到主从库之间的握手完成后，从库就会给主库发送PSYNC命令。紧接着，主库会根据从库发送的命令参数作出相应的三种回复，分别是<strong>执行全量复制、执行增量复制、发生错误</strong>。最后，从库在收到上述回复后，就会根据回复的复制类型，开始执行具体的复制操作。</p>
 <p>下图展示了主从复制的整体过程及四个阶段，你可以看下。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c0/c4/c0e917700f6146712bf9a74830d9d4c4.jpg?wh=1920x740" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c0/c4/c0e917700f6146712bf9a74830d9d4c4.jpg?wh=1920x740" /></p>
 <p>好，了解了主从复制的主要阶段后，接下来，我们就具体学习下Redis是如何使用不同的状态及转换，来让从库完成和主库的数据复制操作的。</p>
 <h2 id="_2">基于状态机的主从复制实现</h2>
 <p>首先你要知道，基于状态机实现主从复制的好处，就是当你在开发程序时，只需要考虑清楚在不同状态下具体要执行的操作，以及状态之间的跳转条件就行了。所以，Redis源码中采用的基于状态机跳转的设计思路和主从复制的实现，就是很值得你学习的一点。</p>
@@ -14648,7 +14648,7 @@
 <a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>replicationSetMaster(c-&gt;argv[1]-&gt;ptr, port);
 </code></pre></div>
 <p>而replicationSetMaster函数除了会记录主库的IP、端口号之外，还会把从库实例的状态机设置为<strong>REPL_STATE_CONNECT</strong>。此时，主从复制的初始化阶段就完成了，状态机会从REPL_STATE_NONE变迁为REPL_STATE_CONNECT。这个过程如下所示：
-<img alt="图片" src="https://static001.geekbang.org/resource/image/7c/e1/7c46c8f72f4391d29a6bcdyy8a64e6e1.jpg?wh=1920x749" /></p>
+<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7c/e1/7c46c8f72f4391d29a6bcdyy8a64e6e1.jpg?wh=1920x749" /></p>
 <h3 id="_4"><strong>建立连接阶段</strong></h3>
 <p>接着，我们来了解下建立连接阶段的状态机变化。</p>
 <p>当从库实例进入这个阶段时，状态已经变成了REPL_STATE_CONNECT。那么，<strong>从库是何时开始和主库建立网络连接的呢？</strong></p>
@@ -14696,14 +14696,14 @@
 <a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>}
 </code></pre></div>
 <p>所以，当从库实例的状态变为REPL_STATE_CONNECTING时，建立连接的阶段就完成了。这个初始化阶段和建立连接阶段的状态机变迁如下图所示，你可以参考下。
-<img alt="图片" src="https://static001.geekbang.org/resource/image/dd/aa/dd6176abeb3ba492f15a93bd0b4a84aa.jpg?wh=1920x738" /></p>
+<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dd/aa/dd6176abeb3ba492f15a93bd0b4a84aa.jpg?wh=1920x738" /></p>
 <h3 id="_5"><strong>主从握手阶段</strong></h3>
 <p>接下来，当主从库建立网络连接后，从库实例其实并没有立即开始进行数据同步，而是会先和主库之间进行握手通信。</p>
 <p>握手通信的目的，主要包括从库和主库进行验证，以及从库将自身的IP和端口号发给主库。如我前面所说，这个阶段涉及的状态变迁会比较多，不过其变迁的逻辑实际上是比较清晰的。</p>
 <p>首先，在建立连接阶段的最后，从库实例的状态机处于<strong>REPL_STATE_CONNECTING</strong>状态。一旦主库和从库的连接建立后，从库实例的syncWithMaster函数就会被回调。在这个函数中，如果从库实例的状态是REPL_STATE_CONNECTING，那么实例会发送PING消息给主库，并将状态机置为<strong>REPL_STATE_RECEIVE_PONG</strong>。</p>
 <p>当从库收到主库返回的PONG消息后，接下来，从库会依次给主库发送验证信息、端口号、IP、对RDB文件和无盘复制的支持情况。每一次的握手通信发送消息时，都会对应从库的一组状态变迁。比如，当从库要给主库发送验证信息前，会将自身状态机置为REPL_STATE_SEND_AUTH，然后，从库给主库发送实际的验证信息。验证信息发送完成后，从库状态机会变迁为REPL_STATE_RECEIVE_AUTH，并开始读取主库返回验证结果信息。</p>
 <p>这样一来，当从库对端口号、IP，以及对RDB文件和无盘复制的支持情况进行握手时，也就是在SEND和RECEIVE两种状态间变迁。为了便于你掌握这些状态的变迁，这里我放了一张图，其中显示了从初始化阶段到主从握手阶段的各状态变化，你可以参考下。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c2/cf/c2946565d547bd52063ff1a79ec426cf.jpg?wh=1920x1080" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c2/cf/c2946565d547bd52063ff1a79ec426cf.jpg?wh=1920x1080" /></p>
 <h3 id="_6"><strong>复制类型判断与执行阶段</strong></h3>
 <p>当从库和主库完成握手后，从库会读取主库返回的CAPA消息响应，此时，状态机为<strong>REPL_STATE_RECEIVE_CAPA</strong>。紧接着，从库的状态变迁为<strong>REPL_STATE_SEND_PSYNC</strong>，表明要开始向主库发送PSYNC命令，开始实际的数据同步。</p>
 <p>此时，从库会调用slaveTryPartialResynchronization函数，向主库发送PSYNC命令，并且状态机的状态会置为<strong>REPL_STATE_RECEIVE_PSYNC</strong>。下面的代码显示了这三个状态的变迁：</p>
@@ -14784,7 +14784,7 @@
 <a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a>server.repl_state = REPL_STATE_TRANSFER;
 </code></pre></div>
 <p>好了，到这里，我们就学习了从库在复制类型判断和执行阶段的状态机变迁。我把主从复制各阶段的状态变迁整合在一起，画了下面这张图，以便你更好地掌握。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f6/97/f6e25eb125f0d70694d92597dca3e197.jpg?wh=1920x1080" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f6/97/f6e25eb125f0d70694d92597dca3e197.jpg?wh=1920x1080" /></p>
 <h2 id="_7">小结</h2>
 <p>主从复制是Redis、MySQL等数据库或存储系统，用来实现高可用性的方法。要实现主从复制，则需要应对整个过程中Redis在不同状态下的各种处理逻辑，因此，如何正确实现主从复制，并且不遗漏可能的状态，是我们在实际开发中需要面对的问题。</p>
 <p>这节课我们学习了Redis主从复制的设计思想与实现方法。Redis采用了<strong>状态机驱动</strong>的方法，为从库实例设置状态变量。在整个复制过程中，代码逻辑会根据从库状态机的变迁，处理不同状态下的情况。</p>
@@ -14995,8 +14995,6 @@ REPL_STATE_CONNECTED,       &#47;* Connected to master *&#47;
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

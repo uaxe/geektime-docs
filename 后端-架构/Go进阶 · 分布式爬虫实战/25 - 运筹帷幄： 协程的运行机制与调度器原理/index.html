@@ -15087,7 +15087,7 @@
 <p>为什么Go 语言需要在线程的基础上抽象出协程的概念，而不是直接操作线程呢？要回答这个问题，就需要深入理解线程和协程的区别。下面我就简单从调度方式、上下文切换的速度、调度策略、栈的大小这四个方面分析一下线程和协程的不同之处。</p>
 <h3 id="_1">调度方式</h3>
 <p>Go 语言中的协程是从属于某一个线程的，协程与线程的关系为多对多的对应关系。Go 语言调度器可以将多个协程调度到同一个线程中去执行，一个协程也可能切换到多个线程中去执行。</p>
-<h3 id="_2"><img alt="图片" src="https://static001.geekbang.org/resource/image/48/83/481df91319ef7bd18354dd3727debc83.jpg?wh=1920x894" title="上下文切换的速度" /></h3>
+<h3 id="_2"><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/48/83/481df91319ef7bd18354dd3727debc83.jpg?wh=1920x894" title="上下文切换的速度" /></h3>
 <p>协程上下文切换的速度要快于线程，因为切换协程不必同时切换用户态与操作系统内核态，而且在 Go 语言中切换协程只需要保留极少的状态和寄存器值（SP/BP/PC），而切换线程则会保留额外的寄存器值（例如浮点寄存器）。</p>
 <p>总的来说，线程切换的速度大约为1~2 微秒，Go 语言中协程切换的速度则比它快数倍，为0.2 微秒左右。不过上下文切换的速度受到诸多因素的影响，会根据实际情况有所波动。</p>
 <h3 id="_3">调度策略</h3>
@@ -15108,7 +15108,7 @@
 </code></pre></div>
 <p>结构体 m要与真实的操作系统线程绑定在一起，这就需要借助线程本地存储技术了。和普通的全局变量对程序中的所有线程可见不同，线程本地存储中的变量只对当前线程可见。因此，这种类型的变量可以看作是线程“私有”的。一般情况下，操作系统会使用FS/GS 段寄存器存储线程本地变量。</p>
 <p>在Go 语言中，并没有直接暴露线程本地存储的编程方式，但是Go 语言运行时使用线程本地存储，将具体操作系统的线程与运行时代表线程的m结构体绑定在了一起。线程本地存储的数据实际是结构体m中 m.tls 的地址，同时，m.tls[0]会存储当前线程正在运行的协程 g 的地址，因此在任意一个线程内部，通过线程本地存储，都可以在任意时刻获取绑定在当前线程上的协程g、结构体m、逻辑处理器P、特殊协程g0等的信息。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/42/3b/421745c5973ab84975f4e5ce0be9103b.jpg?wh=1920x894" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/42/3b/421745c5973ab84975f4e5ce0be9103b.jpg?wh=1920x894" /></p>
 <p>线程局部存储帮助我们实现了结构体m与实际线程的绑定，不过此外，我们还需要实现结构体m与某一个协程的绑定，这就要用到调度器了。在Go1.1之前的源码实现中，调度器还是用C语言实现的，无论是线程启动还是协程切换时，都会执行调度函数schedule，schedule再从全局队列中获取可运行的协程并予以执行。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>static void
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>schedule(G *gp)
@@ -15135,12 +15135,12 @@
 </code></pre></div>
 <p>这种方式有许多不足，其中最核心的问题就是，调度器每次获取可以运行的协程都需要加锁，随着CPU核心数量的增多，这种方式缺少扩展性的问题会越来越明显。 此外，当协程执行系统调用时，线程还会整个被堵塞住。</p>
 <p>为了解决上面的问题，Go团队对调度器进行了很大的优化，其中一个最重要的优化就是引入了逻辑处理器P。逻辑处理器P和唯一的线程M绑定，逻辑处理器P可以在本地存储协程的运行队列，同时也保留了全局的运行队列，稍后我们会看到它们之间的交互。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1d/0a/1daf3d619bff0a9b87d802f01ce37a0a.jpg?wh=1920x1666" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1d/0a/1daf3d619bff0a9b87d802f01ce37a0a.jpg?wh=1920x1666" /></p>
 <p>逻辑处理器P与M绑定的特性决定了，正常情况下有多少个P就会有对应数量的线程存在。</p>
 <p>假设现在有4个P，我们就知道有4个线程。我们通常会认为，这代表着能够并行执行的协程数量。默认情况下，Go运行时会读取CPU核心的数量，并让创建的逻辑处理器P的数量和机器CPU核心的数量相同。当然，我们也可以通过配置环境变量中的 GOMAXPROCS 来指定P的数量。我们后面会看到，为什么一些特殊的场景需要调整P的数量。</p>
 <p>另外，每一个M结构中都存储了一个特殊的协程g0，协程g0 运行在操作系统的线程栈上，它的主要作用是执行协程调度的一系列运行时代码，一般的协程则负责无差别地执行用户代码。</p>
 <p>很显然，执行用户代码的任何协程都不适合进行全局调度。当用户协程退出或者被抢占时，意味着需要重新执行协程调度，这时，我们需要从用户协程g切换到协程g0，这样才能完成协程的调度。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ea/bc/ea063d8e0a49628bd988c883f92c99bc.jpg?wh=1920x686" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ea/bc/ea063d8e0a49628bd988c883f92c99bc.jpg?wh=1920x686" /></p>
 <p>协程经历从g→g0→g 的过程之后，就完成了一次调度循环。和线程类似，协程切换的过程叫作协程的上下文切换。</p>
 <p>当某一个协程 g 执行上下文切换时，需要保存当前协程的执行现场，才能够在后续切换回 g 协程时正常执行。协程的执行现场存储在g.gobuf 结构体中，g.gobuf 结构体主要保存 CPU 中几个重要的寄存器值，分别是rsp、rip、rbp。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>type gobuf struct {
@@ -15160,7 +15160,7 @@
 <h2 id="_5">调度循环</h2>
 <p>从协程 g0 调度到协程g，经历了从schedule 函数到 execute 函数再到 gogo 函数的过程。其中，schedule 函数处理的是具体的调度策略，也就是选择下一个要执行的协程；execute 函数执行的是一些具体的状态转移、协程g 与结构体m 之间的绑定等操作；gogo函数是与操作系统有关的函数，用于完成栈的切换以及恢复 CPU 寄存器。执行完这一步之后，协程就会切换到协程 g 去执行，当协程 g 主动让渡、被抢占或退出后，又会切换到协程 g0 开始下一轮调度。</p>
 <p>在从协程g 切换回协程g0 时，mcall 函数会保存当前协程的执行现场，mcall 函数是和平台有关的汇编指令。协程切换到 g0 后，根据切换原因的不同，会执行不同的函数。例如，如果是用户调用 Gosched 函数主动让渡执行权，就会执行gosched_m 函数；如果协程已经退出，则执行 goexit 函数，将协程 g 放入 p 的freeg 队列，方便下次重用。执行完毕后，运行时再次调用schedule 函数开始新一轮的调度循环，从而形成一个完整的闭环，循环往复。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/fe/8b/feyy5d196c9b6364e1039909572e158b.jpg?wh=1920x894" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fe/8b/feyy5d196c9b6364e1039909572e158b.jpg?wh=1920x894" /></p>
 <h2 id="_6">调度器原理</h2>
 <p>前面我们看到了GMP是如何绑定在一起的，了解了调度循环的过程。接下来我们具体看一看调度器是如何对协程进行调度的。</p>
 <h3 id="_7">调度算法</h3>
@@ -15244,7 +15244,7 @@
 </code></pre></div>
 <p>为了解决这一问题，Go 1.14 之后引入了信号强制抢占的机制。这需要借助下图中的类UNIX 操作系统信号处理机制。</p>
 <p>信号是发送给进程的各种通知，它可以将各种重要的事件都通知给进程。运行时系统监控程序借助操作系统信号中断当前程序，保存程序的执行状态和寄存器值，并切换到内核态处理信号。在内核态处理完信号后，操作系统还会返回到用户态执行程序注册的信号处理函数，之后再回到内核恢复程序原始的栈和寄存器值，并切换到用户态继续执行程序。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/34/2d/3421099e7ccf401d8828616ee2bc852d.jpg?wh=1920x894" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/34/2d/3421099e7ccf401d8828616ee2bc852d.jpg?wh=1920x894" /></p>
 <p>在信号处理时，Go 语言借助用户态注册的信号处理程序完成了协程的上下文切换，最终实现了抢占调度。</p>
 <h3 id="_12">陷入到系统调用中的抢占调度</h3>
 <p>还有一类特殊的情况涉及到协程长时间堵塞在系统调用中的问题。这时，当前正在工作的线程会陷入等待状态，等待内核完成系统调用并返回。 如果当前局部运行队列中有等待运行的G，或者当前系统调用的时间过长，运行时系统监控程序会进行抢占调度。</p>
@@ -15383,8 +15383,6 @@ https:&#47;&#47;github.com&#47;panjf2000&#47;ants 这个是一个高性能协程
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

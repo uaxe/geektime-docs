@@ -7924,14 +7924,14 @@
 <p>而Consumer会不断处理Partition的数据，一旦某一段的数据被处理完了，对应这个Partition被处理到了哪个Offset的位置，也会被记录到ZooKeeper上。这样，即使我们的Consumer挂掉，由别的Consumer来接手后续的消息处理，它也可以知道从哪里做起。</p>
 <p>那么在这个机制下，一旦我们针对Broker或者Consumer进行增减，Kafka就会做一次数据“再平衡（Rebalance）”。所谓再平衡，就是<strong>把分区重新按照Consumer的数量进行分配，确保下游的负载是平均的</strong>。Kafka的算法也非常简单，就是每当有Broker或者Consumer的数量发生变化的时候，会再平均分配一次。</p>
 <p>如果我们有X个分区和Y个Consumer，那么Kafka会计算出 N=X/Y，然后把0到N-1的分区分配给第一个Consumer，N到2N-1的分配给第二个Consumer，依此类推。而因为之前Partition的数据处理到了哪个Offset是有记录的，所以新的Consumer很容易就能知道从哪里开始处理消息。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8f/b6/8f09e643c3491005ab3e6972208bf9b6.jpg?wh=1920x1480" title="Kafka的分区分配策略非常简单，就是简单的平均分配" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8f/b6/8f09e643c3491005ab3e6972208bf9b6.jpg?wh=1920x1480" title="Kafka的分区分配策略非常简单，就是简单的平均分配" /></p>
 <p>而和Storm一样，本质上，<strong>Kafka对于消息的处理也是“至少一次”的</strong>。如果消息成功处理完了，那么我们会通过更新ZooKeeper上记录的Offset，来确认这一点。而如果在消息处理的过程中，Consumer出现了任何故障，我们都需要从上一个Offset重新开始处理。这样，我们自然也就避免不了重复处理消息。</p>
 <p>如果你希望能够避免这一点，你需要在实际的消息体内，有类似message-id这样的字段，并且要通过其他的去重机制来解决，但是这并不容易做到。</p>
 <h3 id="_3">顺序保障机制</h3>
 <p>不过，Kafka虽然有很强的性能，也在发布之后很快提供了基于多副本的高可用机制。但是Kafka本身，其实也是有很多限制的。</p>
 <p>首先，是<strong>Kafka很难提供针对单条消息的事务机制</strong>。因为我们在ZooKeeper上保存的，是最新处理完的消息的一个Offset，而不是哪些消息被处理完了、哪些消息没有被处理完这样的message-id =&gt; status的映射关系。所以，Consumer没法说，我有一条新消息已经处理完了，但是还有一条旧消息还在处理中。而是只能按照消息在Partition中的偏移量，来顺序处理。</p>
 <p>其次，是<strong>Kafka里，对于消息是没有严格的“顺序”定义的</strong>。也就是我们无法保障，先从应用服务器发送出来的消息，会先被处理。因为下游是一个分布式的集群，所以先发送的消息X可能被负载均衡发送到Broker A，后发送的消息反而被负载均衡发送到Broker B。但是Broker B里的数据，可能会被下游的Consumer先处理，而Broker A里的数据后被处理。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a4/7c/a4603bb7458fc31ef14a1024784bef7c.jpg?wh=2000x640" title="因为分布式的存在，应用服务器发出的消息，在实际处理的时候，顺序可能会发生变化" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a4/7c/a4603bb7458fc31ef14a1024784bef7c.jpg?wh=2000x640" title="因为分布式的存在，应用服务器发出的消息，在实际处理的时候，顺序可能会发生变化" /></p>
 <p>不过，对于快速统计实时的搜索点击率这样的统计分析类的需求来说，这些问题都不是问题。而Kafka的应用场景也主要在这里，而不是用来作为传统的消息队列，完成业务系统之间的异步通信。</p>
 <h2 id="lambda">数据处理的Lambda架构</h2>
 <p>其实，有了Storm和Kafka这样的实时数据处理架构之后，另一个问题也就浮出了水面。<strong>既然我们已经可以获得分钟级别的统计数据，那我们还需要MapReduce这样的批处理程序吗？</strong></p>
@@ -7950,7 +7950,7 @@
 <p>这样的程序运行场景，对于大数据的批处理来说，压力并不大，但是对于流式数据处理，一样会有大量重放日志的工作量。</p>
 <h3 id="lambda_1">Lambda架构的基本思想</h3>
 <p>有鉴于此，Storm的作者南森·马茨（Nathan Marz）提出了<strong>Lamda架构，把大数据的批处理和实时数据结合在一起，变成一个统一的架构</strong>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2b/b4/2b50d4d41988ed98d2384800d3df64b4.jpg?wh=2000x1292" title="Lambda架构" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2b/b4/2b50d4d41988ed98d2384800d3df64b4.jpg?wh=2000x1292" title="Lambda架构" /></p>
 <p>Nathan的思路是这样的，我们先不去看具体数据是通过什么计算框架来处理的，而是把整个数据处理流程抽象成 <strong>View = Query(Data)</strong> 这样一个函数。我们所有的报表、看板、数据分析结果，都是来自对于原始日志的分析。</p>
 <p>所以，原始日志就是我们的主数据（Master Data），不管是MapReduce这样的大数据批处理，还是Storm这样的大数据流式处理，都是对于原始数据的一次查询（Query）。而这些计算结果，其实就是一个基于特定查询的视图（View）。</p>
 <p>当我们的程序有Bug，其实就是查询写错了，我们的主数据没有变，我们视图的含义也没有变，我们只需要重新写一个查询就好了。而如果我们有需求层面的变更，就是我们需要一个新的视图，以及对应的新的查询了。</p>
@@ -7971,7 +7971,7 @@
 <li>首先，所有的视图，既需要在实时处理层计算一次，又要在批处理层计算一次。<strong>即使我们没有修改任何程序，也需要双倍的计算资源。</strong></li>
 <li>其次，我们所有的数据处理的程序，也要撰写两遍。MapReduce的程序和Storm的程序虽然要计算的是同样的视图，但是因为底层的框架完全不同，代码我们就需要写两套。<strong>这样意味着，我们需要双倍的开发资源。</strong></li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f1/6f/f138a9yyaa662b82d6d1473fea34096f.jpg?wh=2000x1542" title="Kappa架构" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f1/6f/f138a9yyaa662b82d6d1473fea34096f.jpg?wh=2000x1542" title="Kappa架构" /></p>
 <p>而且，因为批处理层和实时处理层的代码不同，我们还不得不解决，两遍对于同样视图的理解不同，采用了不同的数据处理逻辑，引入新的Bug的问题。</p>
 <p>不过，在Kafka还没有成熟的时候，把数据分成批处理层和实时处理层是很难避免的。主要问题在于，我们<strong>重放实时处理层的日志是个开销很大的动作</strong>。通过Scribe这样的日志收集器，我们的Master Data最终是以一个个固定文件落地到HDFS的文件系统上。一旦我们想要重放日志，我们就需要把日志从HDFS上，分片拉到不同的服务器上，再搭建起多个Scribe的集群，去重放日志。</p>
 <p>但是，在有了Kafka之后，重放日志一下子变得简单了。因为我们所有的日志，都会在Kafka集群的本地硬盘上。而通过重放日志来重新进行数据计算，也只是设定一下新的分析程序在ZooKeeper上的Offset就好了。</p>
@@ -8110,8 +8110,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

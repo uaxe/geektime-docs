@@ -7383,17 +7383,17 @@
 <p>既然要处理海量数据，那选择哪个数据处理平台就是我们首先要解决的问题。如果我们随机采访几位推荐系统领域的程序员，问他们在公司用什么平台处理大数据，我想最少有一半以上会回答是Spark。作为业界主流的大数据处理利器，Spark的地位毋庸置疑。所以，今天我先带你了解一下Spark的特点，再一起来看怎么用Spark处理推荐系统的特征。</p>
 <p>Spark是一个分布式计算平台。所谓分布式，指的是计算节点之间不共享内存，需要通过网络通信的方式交换数据。Spark最典型的应用方式就是建立在大量廉价的计算节点上，这些节点可以是廉价主机，也可以是虚拟的Docker Container（Docker容器）。</p>
 <p>理解了Spark的基本概念，我们来看看它的架构。从下面Spark的架构图中我们可以看到，Spark程序由Manager Node（管理节点）进行调度组织，由Worker Node（工作节点）进行具体的计算任务执行，最终将结果返回给Drive Program（驱动程序）。在物理的Worker Node上，数据还会分为不同的partition（数据分片），可以说partition是Spark的基础数据单元。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4a/9b/4ae1153e4daee39985c357ed796eca9b.jpeg?wh=796%2A404" title="图1 Spark架构图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4a/9b/4ae1153e4daee39985c357ed796eca9b.jpeg?wh=796%2A404" title="图1 Spark架构图" /></p>
 <p>Spark计算集群能够比传统的单机高性能服务器具备更强大的计算能力，就是由这些成百上千，甚至达到万以上规模的工作节点并行工作带来的。</p>
 <p>那在执行一个具体任务的时候，<strong>Spark是怎么协同这么多的工作节点，通过并行计算得出最终的结果呢？</strong>这里我们用一个任务来解释一下Spark的工作过程。</p>
 <p>这个任务并不复杂，我们需要先从本地硬盘读取文件textFile，再从分布式文件系统HDFS读取文件hadoopFile，然后分别对它们进行处理，再把两个文件按照ID都join起来得到最终的结果。</p>
 <p>这里你没必要执着于任务的细节，只要清楚任务的大致流程就好。在Spark平台上处理这个任务的时候，会将这个任务拆解成一个子任务DAG（Directed Acyclic Graph，有向无环图），再根据DAG决定程序各步骤执行的方法。从图2中我们可以看到，这个Spark程序分别从textFile和hadoopFile读取文件，再经过一系列map、filter等操作后进行join，最终得到了处理结果。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/01/fd/01524cdf0ff7f64bcf86c656dd5470fd.jpeg?wh=960%2A316" title="图2 某Spark程序的任务有向无环图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/01/fd/01524cdf0ff7f64bcf86c656dd5470fd.jpeg?wh=960%2A316" title="图2 某Spark程序的任务有向无环图" /></p>
 <p>其中，最关键的过程是我们要理解哪些是可以纯并行处理的部分，哪些是必须shuffle（混洗）和reduce的部分。</p>
 <p>这里的shuffle指的是所有partition的数据必须进行洗牌后才能得到下一步的数据，最典型的操作就是图2中的groupByKey操作和join操作。以join操作为例，我们必须对textFile数据和hadoopFile数据做全量的匹配才可以得到join后的dataframe（Spark保存数据的结构）。而groupByKey操作则需要对数据中所有相同的key进行合并，也需要全局的shuffle才能完成。</p>
 <p>与之相比，map、filter等操作仅需要逐条地进行数据处理和转换，不需要进行数据间的操作，因此各partition之间可以完全并行处理。</p>
 <p>此外，在得到最终的计算结果之前，程序需要进行reduce的操作，从各partition上汇总统计结果，随着partition的数量逐渐减小，reduce操作的并行程度逐渐降低，直到将最终的计算结果汇总到master节点（主节点）上。可以说，shuffle和reduce操作的触发决定了纯并行处理阶段的边界。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6e/13/6e50b4010c27fac81acb0b230516e113.jpeg?wh=960%2A355" title="图3 被shuffle操作分割的DAG stages" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6e/13/6e50b4010c27fac81acb0b230516e113.jpeg?wh=960%2A355" title="图3 被shuffle操作分割的DAG stages" /></p>
 <p>最后，我还想强调的是，shuffle操作需要在不同计算节点之间进行数据交换，非常消耗计算、通信及存储资源，因此shuffle操作是spark程序应该尽量避免的。</p>
 <p>说了这么多，这里我们再用一句话总结Spark的计算过程：<strong>Stage内部数据高效并行计算，Stage边界处进行消耗资源的shuffle操作或者最终的reduce操作</strong>。</p>
 <p>清楚了Spark的原理，相信你已经摩拳擦掌期待将Spark应用在推荐系统的特征处理上了。下面，我们就进入实战阶段，用Spark处理我们的Sparrow Recsys项目的数据集。在开始学习之前，我希望你能带着2个问题，边学边思考： 经典的特征处理方法有什么？Spark是如何实现这些特征处理方法的？</p>
@@ -7401,7 +7401,7 @@
 <p>广义上来讲，所有的特征都可以分为两大类。第一类是<strong>类别、ID型特征（以下简称类别型特征）</strong>。拿电影推荐来说，电影的风格、ID、标签、导演演员等信息，用户看过的电影ID、用户的性别、地理位置信息、当前的季节、时间（上午，下午，晚上）、天气等等，这些无法用数字表示的信息全都可以被看作是类别、ID类特征。第二类是<strong>数值型特征</strong>，能用数字直接表示的特征就是数值型特征，典型的包括用户的年龄、收入、电影的播放时长、点击量、点击率等。</p>
 <p>我们进行特征处理的目的，是把所有的特征全部转换成一个数值型的特征向量，对于数值型特征，这个过程非常简单，直接把这个数值放到特征向量上相应的维度上就可以了。但是对于类别、ID类特征，我们应该怎么处理它们呢？</p>
 <p>这里我们就要用到One-hot编码（也被称为独热编码），它是将类别、ID型特征转换成数值向量的一种最典型的编码方式。它通过把所有其他维度置为0，单独将当前类别或者ID对应的维度置为1的方式生成特征向量。这怎么理解呢？我们举例来说，假设某样本有三个特征，分别是星期、性别和城市，我们用 [Weekday=Tuesday, Gender=Male, City=London] 来表示，用One-hot编码对其进行数值化的结果。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/94/15/94f78685d98671648638e330a461ab15.jpeg?wh=960%2A247" title="图4 One-hot编码特征向量" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/94/15/94f78685d98671648638e330a461ab15.jpeg?wh=960%2A247" title="图4 One-hot编码特征向量" /></p>
 <p>从图4中我们可以看到，Weekday这个特征域有7个维度，Tuesday对应第2个维度，所以我把对应维度置为1。而Gender分为Male和Female，所以对应的One-hot编码就有两个维度，City特征域同理。</p>
 <p>除了这些类别型特征外，ID型特征也经常使用One-hot编码。比如，在我们的SparrowRecsys中，用户U观看过电影M，这个行为是一个非常重要的用户特征，那我们应该如何向量化这个行为呢？其实也是使用One-hot编码。假设，我们的电影库中一共有1000部电影，电影M的ID是310（编号从0开始），那这个行为就可以用一个1000维的向量来表示，让第310维的元素为1，其他元素都为0。</p>
 <p>下面，我们就看看SparrowRecsys是如何利用Spark完成这一过程的。这里，我们使用Spark的机器学习库MLlib来完成One-hot特征的处理。</p>
@@ -7434,7 +7434,7 @@
 <p>特征的尺度问题不难理解，比如在电影推荐中有两个特征，一个是电影的评价次数fr，一个是电影的平均评分fs。评价次数其实是一个数值无上限的特征，在SparrowRecsys所用MovieLens数据集上，fr 的范围一般在[0,10000]之间。对于电影的平均评分来说，因为我们采用了5分为满分的评分，所以特征fs的取值范围在[0,5]之间。</p>
 <p>由于fr和fs 两个特征的尺度差距太大，如果我们把特征的原始数值直接输入推荐模型，就会导致这两个特征对于模型的影响程度有显著的区别。如果模型中未做特殊处理的话，fr这个特征由于波动范围高出fs几个量级，可能会完全掩盖fs作用，这当然是我们不愿意看到的。为此我们希望把两个特征的尺度拉平到一个区域内，通常是[0,1]范围，这就是所谓<strong>归一化</strong>。</p>
 <p>归一化虽然能够解决特征取值范围不统一的问题，但无法改变特征值的分布。比如图5就显示了Sparrow Recsys中编号在前1000的电影平均评分分布。你可以很明显地看到，由于人们打分有“中庸偏上”的倾向，因此评分大量集中在3.5的附近，而且越靠近3.5的密度越大。这对于模型学习来说也不是一个好的现象，因为特征的区分度并不高。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/56/4e/5675f0777bd9275b5cdd8aa166cebd4e.jpeg?wh=960%2A540" title="图5 电影的平均评分分布" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/56/4e/5675f0777bd9275b5cdd8aa166cebd4e.jpeg?wh=960%2A540" title="图5 电影的平均评分分布" /></p>
 <p>这该怎么办呢？我们经常会用分桶的方式来解决特征值分布极不均匀的问题。所谓“分桶（Bucketing）”，就是将样本按照某特征的值从高到低排序，然后按照桶的数量找到分位数，将样本分到各自的桶中，再用桶ID作为特征值。</p>
 <p>在Spark MLlib中，分别提供了两个转换器MinMaxScaler和QuantileDiscretizer，来进行归一化和分桶的特征处理。它们的使用方法和之前介绍的OneHotEncoderEstimator一样，都是先用fit函数进行数据预处理，再用transform函数完成特征转换。下面的代码就是SparrowRecSys利用这两个转换器完成特征归一化和分桶的过程。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>def ratingFeatures(samples:DataFrame): Unit ={
@@ -7478,14 +7478,14 @@
 <a id="__codelineno-1-39" name="__codelineno-1-39" href="#__codelineno-1-39"></a>_（参考 com.wzhe.sparrowrecsys.offline.spark.featureeng.FeatureEngineering中的ratingFeatures函数）_
 </code></pre></div>
 <p>当然，对于数值型特征的处理方法还远不止于此，在经典的YouTube深度推荐模型中，我们就可以看到一些很有意思的处理方法。比如，在处理观看时间间隔（time since last watch）和视频曝光量（#previous impressions）这两个特征的时，YouTube模型对它们进行归一化后，又将它们各自处理成了三个特征（图6中红框内的部分），分别是原特征值x，特征值的平方<code>x^2</code>，以及特征值的开方，这又是为什么呢？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/69/ae/69f2abc980b8d8448867b58468729eae.jpeg?wh=960%2A540" title="图6 YouTube推荐模型（来源：Deep Neural Networks for YouTube Recommendations）" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/69/ae/69f2abc980b8d8448867b58468729eae.jpeg?wh=960%2A540" title="图6 YouTube推荐模型（来源：Deep Neural Networks for YouTube Recommendations）" /></p>
 <p>其实，无论是平方还是开方操作，改变的还是这个特征值的分布，这些操作与分桶操作一样，都是希望通过改变特征的分布，让模型能够更好地学习到特征内包含的有价值信息。但由于我们没法通过人工的经验判断哪种特征处理方式更好，所以索性把它们都输入模型，让模型来做选择。</p>
 <p>这里其实自然而然地引出了我们进行特征处理的一个原则，就是<strong>特征处理并没有标准答案</strong>，不存在一种特征处理方式是一定好于另一种的。在实践中，我们需要多进行一些尝试，找到那个最能够提升模型效果的一种或一组处理方式。</p>
 <h2 id="_1">小结</h2>
 <p>这节课我们介绍了推荐系统中特征处理的主要方式，并利用Spark实践了类别型特征和数值型特征的主要处理方法，最后我们还总结出了特征处理的原则，“特征处理没有标准答案，需要根据模型效果实践出真知”。</p>
 <p>针对特征处理的方法，深度学习和传统机器学习的区别并不大，TensorFlow、PyTorch等深度学习平台也提供了类似的特征处理函数。在今后的推荐模型章节我们会进一步用到这些方法。</p>
 <p>最后，我把这节课的主要知识点总结成了一张表格，你可以利用它巩固今天的重点知识。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b3/7b/b3b8c959df72ce676ae04bd8dd987e7b.jpeg?wh=1609%2A660" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b3/7b/b3b8c959df72ce676ae04bd8dd987e7b.jpeg?wh=1609%2A660" /></p>
 <p>这节课是我们的第一堂实战课，对于还未进入到工业界的同学，相信通过这节课的实践，也能够一窥业界的大数据处理方法，增强自己的工程经验，让我们一起由此迈入工业级推荐系统的大门吧！</p>
 <h2 id="_2">课后思考</h2>
 <ol>
@@ -7748,8 +7748,6 @@ MinMaxScaler，是使用最大值和最小值进行归一化操作</p>2021-03-21
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

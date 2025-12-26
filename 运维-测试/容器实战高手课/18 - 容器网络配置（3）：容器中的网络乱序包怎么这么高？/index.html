@@ -6125,15 +6125,15 @@
 <h3 id="fast-retransmit">快速重传（fast retransmit）</h3>
 <p>在刚才的问题重现里，我们运行netstat命令后，统计了快速重传的次数。那什么是快速重传（fast retransmit）呢？这里我给你解释一下。</p>
 <p>我们都知道TCP协议里，发送端（sender）向接受端（receiver）发送一个数据包，接受端（receiver）都回应ACK。如果超过一个协议栈规定的时间（RTO），发送端没有收到ACK包，那么发送端就会重传（Retransmit）数据包，就像下面的示意图一样。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bc/4b/bc6a6059f49a5b61e95ba3705894b64b.jpeg?wh=3200%2A1800" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bc/4b/bc6a6059f49a5b61e95ba3705894b64b.jpeg?wh=3200%2A1800" /></p>
 <p>不过呢，这样等待一个超时之后再重传数据，对于实际应用来说太慢了，所以TCP协议又定义了快速重传 （fast retransmit）的概念。它的基本定义是这样的：<strong>如果发送端收到3个重复的ACK，那么发送端就可以立刻重新发送ACK对应的下一个数据包。</strong></p>
 <p>就像下面示意图里描述的那样，接受端没有收到Seq 2这个包，但是收到了Seq 3–5的数据包，那么接收端在回应Ack的时候，Ack的数值只能是2。这是因为按顺序来说收到Seq 1的包之后，后面Seq 2一直没有到，所以接收端就只能一直发送Ack 2。</p>
 <p>那么当发送端收到3个重复的Ack 2后，就可以马上重新发送 Seq 2这个数据包了，而不用再等到重传超时之后了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/21/5d/21935661dda5069f8dyy91e6cd5b295d.jpeg?wh=3200%2A1800" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/21/5d/21935661dda5069f8dyy91e6cd5b295d.jpeg?wh=3200%2A1800" /></p>
 <p>虽然TCP快速重传的标准定义是需要收到3个重复的Ack，不过你会发现在Linux中常常收到一个Dup Ack（重复的Ack）后，就马上重传数据了。这是什么原因呢？</p>
 <p>这里先需要提到 <strong>SACK</strong> 这个概念，SACK也就是选择性确认（Selective Acknowledgement）。其实跟普通的ACK相比呢，SACK会把接收端收到的所有包的序列信息，都反馈给发送端。</p>
 <p>你看看下面这张图，就能明白这是什么意思了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2d/55/2d61334e4066391ceeb90cac0bb25d55.jpeg?wh=3200%2A1800" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2d/55/2d61334e4066391ceeb90cac0bb25d55.jpeg?wh=3200%2A1800" /></p>
 <p>那有了SACK，对于发送端来说，在收到SACK之后就已经知道接收端收到了哪些数据，没有收到哪些数据。</p>
 <p>在Linux内核中会有个判断（你可以看看下面的这个函数），大概意思是这样的：如果在接收端收到的数据和还没有收到的数据之间，两者数据量差得太大的话（超过了reordering*mss_cache），也可以马上重传数据。</p>
 <p>这里你需要注意一下，<strong>这里的数据量差是根据bytes来计算的，而不是按照包的数目来计算的，所以你会看到即使只收到一个SACK，Linux也可以重发数据包。</strong></p>
@@ -6152,7 +6152,7 @@
 </code></pre></div>
 <p><strong>其实在云平台的这种网络环境里，网络包乱序+SACK之后，产生的数据包重传的量要远远高于网络丢包引起的重传。</strong></p>
 <p>比如说像下面这张图里展示的这样，Seq 2与Seq 3这两个包如果乱序的话，那么就会引起Seq 2的立刻重传。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a9/d6/a99709757a45279324600a45f7a44cd6.jpeg?wh=3200%2A1800" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a9/d6/a99709757a45279324600a45f7a44cd6.jpeg?wh=3200%2A1800" /></p>
 <h3 id="veth">Veth接口的数据包的发送</h3>
 <p>现在我们知道了网络包乱序会造成数据包的重传，接着我们再来看看容器的veth接口配置有没有可能会引起数据包的乱序。</p>
 <p>在上一讲里，我们讲过通过veth接口从容器向外发送数据包，会触发peer veth设备去接收数据包，这个接收的过程就是一个网络的softirq的处理过程。</p>
@@ -6195,7 +6195,7 @@
 <p>从上面的代码，我们可以看到，在缺省的状况下（也就是没有RPS的情况下），enqueue_to_backlog()把数据包放到了“当前运行的CPU”（get_cpu()）对应的数据队列中。如果是从容器里通过veth对外发送数据包，那么这个“当前运行的CPU”就是容器中发送数据的进程所在的CPU。</p>
 <p>对于多核的系统，这个发送数据的进程可以在多个CPU上切换运行。进程在不同的CPU上把数据放入队列并且raise softirq之后，因为每个CPU上处理softirq是个异步操作，所以两个CPU network softirq handler处理这个进程的数据包时，处理的先后顺序并不能保证。</p>
 <p>所以，veth对的这种发送数据方式增加了容器向外发送数据出现乱序的几率。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c1/3b/c11581ec8f390b13ebc89fdb4cc2043b.jpeg?wh=3200%2A1800" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c1/3b/c11581ec8f390b13ebc89fdb4cc2043b.jpeg?wh=3200%2A1800" /></p>
 <h3 id="rssrps">RSS和RPS</h3>
 <p>那么对于veth接口的这种发包方式，有办法减少一下乱序的几率吗？</p>
 <p>其实，我们在上面netif_rx_internal()那段代码中，有一段在"#ifdef CONFIG_RPS"中的代码。</p>
@@ -6205,11 +6205,11 @@
 <p>每个硬件中断可以由一个CPU来处理，那么对于多核的系统，多个CPU可以并行的接收网络包，这样就大大地提高了系统的网络数据的处理能力.</p>
 <p>同时，在网卡硬件中，可以根据数据包的4元组或者5元组信息来保证同一个数据流，比如一个TCP流的数据始终在一个RX队列中，这样也能保证同一流不会出现乱序的情况。</p>
 <p>下面这张图，大致描述了一下RSS是怎么工作的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ea/33/ea365c0d44625cf89c746d91799f9633.jpeg?wh=3200%2A1800" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ea/33/ea365c0d44625cf89c746d91799f9633.jpeg?wh=3200%2A1800" /></p>
 <p>RSS的实现在网卡硬件和驱动里面，而RPS（Receive Packet Steering）其实就是在软件层面实现类似的功能。它主要实现的代码框架就在上面的netif_rx_internal()代码里，原理也不难。</p>
 <p>就像下面的这张示意图里描述的这样：在硬件中断后，CPU2收到了数据包，再一次对数据包计算一次四元组的hash值，得到这个数据包与CPU1的映射关系。接着会把这个数据包放到CPU1对应的softnet_data数据队列中，同时向CPU1发送一个IPI的中断信号。</p>
 <p>这样一来，后面CPU1就会继续按照Netowrk softirq的方式来处理这个数据包了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e0/f9/e0413b74cbc1b5edcde5442fe94e11f9.jpeg?wh=3200%2A1800" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e0/f9/e0413b74cbc1b5edcde5442fe94e11f9.jpeg?wh=3200%2A1800" /></p>
 <p>RSS和RPS的目的都是把数据包分散到更多的CPU上进行处理，使得系统有更强的网络包处理能力。在把数据包分散到各个CPU时，保证了同一个数据流在一个CPU上，这样就可以减少包的乱序。</p>
 <p>明白了RPS的概念之后，我们再回头来看veth对外发送数据时候，在enqueue_to_backlog()的时候选择CPU的问题。显然，如果对应的veth接口上打开了RPS的配置以后，那么对于同一个数据流，就可以始终选择同一个CPU了。</p>
 <p>其实我们打开RPS的方法挺简单的，只要去/sys目录下，在网络接口设备接收队列中修改队列里的rps_cpus的值，这样就可以了。rps_cpus是一个16进制的数，每个bit代表一个CPU。</p>
@@ -6367,8 +6367,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

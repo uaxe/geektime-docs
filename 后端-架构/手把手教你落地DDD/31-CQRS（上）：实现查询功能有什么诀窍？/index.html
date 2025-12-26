@@ -14480,7 +14480,7 @@
 <p>在第三个迭代中，在工时管理上下文，增加了更多的查询和统计需求。</p>
 <p>我们先看一个简单的需求，给定一个工时项，要求查询出这个工时项下的所有工时记录，并显示在屏幕上。要求每条返回记录的字段包括“员工号”“员工姓名”“日期”“工时”和“备注”，并根据员工号和日期升序排序。为了简化问题，我们先不考虑“不在本级报工时”以及“父子工时项”的问题。</p>
 <p>我们回忆一下工时项管理的领域模型。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6a/66/6a7c2bd3bc372920b99f6e2a97cfbf66.jpg?wh=3118x2324" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6a/66/6a7c2bd3bc372920b99f6e2a97cfbf66.jpg?wh=3118x2324" /></p>
 <p>根据之前学习的数据库设计以及上下文映射的方法，假定我们选择的是在本地建立员工表，并从“基础信息管理”上下文映射<strong>员工</strong>信息的策略。那么本地数据库会有<strong>员工</strong>（emp）表和<strong>工时记录</strong>（effort_record）表。</p>
 <p>在没有学习DDD之前，其实这个需求很简单，只要一条SQL语句就可以搞定了。大概是后面这样。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">select</span><span class="w"> </span><span class="n">em</span><span class="p">.</span><span class="n">num</span><span class="p">,</span><span class="w"> </span><span class="n">em</span><span class="p">.</span><span class="n">name</span><span class="p">,</span><span class="w"> </span><span class="n">er</span><span class="p">.</span><span class="n">work_date</span><span class="p">,</span><span class="w"> </span><span class="n">er</span><span class="p">.</span><span class="n">effort</span><span class="p">,</span><span class="w"> </span><span class="n">er</span><span class="p">.</span><span class="n">notes</span>
@@ -14494,7 +14494,7 @@
 </code></pre></div>
 <p>这个查询是把 effort_record（工时记录表）和 emp（员工）表做了一个表连接，然后根据 effort_item_id （工时项ID）查出相应的数据。</p>
 <p>但是，现在学了 DDD，再要实现这个功能，你可能会觉得反而更麻烦了。因为这时候要经过领域模型得到这个查询结果。我把设计层面的类图画出来，来辅助我们的思考。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/06/96/06865f9634e4d935714dcdd1310f7896.jpg?wh=3600x3185" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/06/96/06865f9634e4d935714dcdd1310f7896.jpg?wh=3600x3185" /></p>
 <p>我们从 EffortRecordService（也就是工时记录服务）开始看。这个服务中的方法会接收一个EffortItemID（工时项ID），最后返回一个含有所需数据的列表。每一条数据记录封装在名为 EmpEffortRecordDto 的DTO里。</p>
 <p>具体包括三步。</p>
 <p>第一步，工时记录服务会调用 EffortRecordRepository，根据工时项ID取得一堆 EffortRecord （工时记录）实体。</p>
@@ -14515,7 +14515,7 @@
 <p>后来，业界对 CQRS 又形成了一些不太一样的理解。这是因为，CQRS 其实可从几个不同的层面来考虑，我们分别来看看。</p>
 <h2 id="_2">代码结构分离</h2>
 <p>第一个层面是代码结构的分离。为了说明这个问题，咱们先看图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/17/15/1781a13a29f5624e0e54c8e46e437d15.jpg?wh=3791x3584" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/17/15/1781a13a29f5624e0e54c8e46e437d15.jpg?wh=3791x3584" /></p>
 <p>在这个图里，代码首先分成了两个包，一个是 command processor（命令处理器），另一个是 query processor（查询处理器）。其中，命令处理器采用的就是之前基于领域模型的分层架构。</p>
 <p>关键看<strong>查询处理器</strong>，你会发现里面根本就没有领域层了，当然也就没有领域对象了。这里直接用 EmpEffortRecordDto 来表示数据。应用服务调用仓库，仓库里用 SQL 语句进行连表查询，得到的数据直接填到 DTO 里。应用服务可能还要对DTO再做少许加工，就可以直接返回了。</p>
 <p>由于 EmpEffortRecordDto 表示的是要查询的数据的结构，所以，也有人把由这些对象组成的模型称为“查询模型”（query model）或者“读模型”（read model）。在命名上，如果简洁一些，也可以不用 Dto 这个后缀。</p>
@@ -14528,7 +14528,7 @@
 <p>那怎么解决这种性能问题呢？</p>
 <p>一种解决思路是为查询单独创建一套表，其中采用“反规范化设计”，也就是引入冗余字段，使表结构和查询模型吻合，从而避免或减少表连接。</p>
 <p>我画出了这种设计的架构图，供你参考。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b7/6b/b7e1d8a47336ceafe40abe34913cb16b.jpg?wh=3600x3956" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b7/6b/b7e1d8a47336ceafe40abe34913cb16b.jpg?wh=3600x3956" /></p>
 <p>由于包内部的结构是类似的，所以这张图忽略了内部细节，只包含外层的包结构。</p>
 <p>数据库里的表分成了两套——命令模型（command model）和查询模型（query model），分别由命令处理器和查询处理器访问。其中命令模型中的表是根据领域模型设计的，查询模型部分的表就是根据查询需求进行了反规范化设计。</p>
 <p>命令处理器对命令模型里的表进行操作后，要把数据同步给查询模型。有多种同步方案可供选择，比如说，命令模型中的仓库，同时写两边的数据表，或者使用触发器，还可以用同步或异步的事件驱动机制。</p>
@@ -14536,10 +14536,10 @@
 <p>为了实现数据库结构分离，需要进行反规范化设计。为了帮你深入了解这一点，我给你</p>
 <p>举例说明一下反规范化的表结构设计。</p>
 <p>命令模型里的<strong>工时记录</strong>表是后面这样。
-<img alt="" src="https://static001.geekbang.org/resource/image/b0/00/b02654yy4bf7e1f64534a51c6d025800.jpg?wh=3600x2260" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b0/00/b02654yy4bf7e1f64534a51c6d025800.jpg?wh=3600x2260" /></p>
 <p>这个表我们在迭代一见过类似的，现在唯一的不同是原来的 project_id （项目ID）换成了现在的 effort_item_id（工时项ID）。这是因为最初的需求只是为项目报工时，而现在要为更广义的工时项报工时了。</p>
 <p>查询模型里的<strong>员工工时记录</strong>表是后面这样。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0f/a0/0f98102d7bffd82b823cea6b78d55ea0.jpg?wh=3600x2179" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0f/a0/0f98102d7bffd82b823cea6b78d55ea0.jpg?wh=3600x2179" /></p>
 <p>其实表设计的变化很简单，我们只是在表里增加了 emp_num（员工号）和 emp_name（员工姓名）两个字段。同时在原来的表名前面增加了 emp ，表示是员工表和工时记录表合并的表。</p>
 <p>为什么说这样就“反规范化”了呢？</p>
 <p>这是因为在这个表里，emp_num 和 emp_name 是可以由emp_id 唯一确定的。这种情况在数据库设计术语上叫做 “emp_num 和 emp_name 函数依赖于 emp_id”，简称 “emp_num 和 emp_name 依赖于 emp_id”。注意，这里说的数据库设计意义上的依赖，和 UML 里的依赖不是一个概念。</p>
@@ -14547,7 +14547,7 @@
 <p>至于第二范式是怎么回事，你有兴趣的话，找一本数据库设计的书看看就可以了。我这里只说一句，如果一个表里只有一个字段（例如 id）做主键，那么在原理上就是不可能违反第二范式的。</p>
 <p>在命令模型里，一般是不主张违反范式的，这是因为违反范式必然造成数据冗余，数据冗余就会造成潜在的数据不一致风险。而在查询模型中，不仅允许，甚至是鼓励反规范化设计。这是因为，对于查询模型，反规范化的风险是可控的。就算数据发生了不一致，总可以从命令模型里按正确的逻辑重新生成一遍。</p>
 <p>如果你不满足于仅仅在物理数据模型上表示出查询模型，还想在领域模型层面把命令模型和查询模型的关系表示得更清楚，可以把图画成这样。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c1/80/c151bbe9021c2ayy412c562c72ac5880.jpg?wh=3600x2179" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c1/80/c151bbe9021c2ayy412c562c72ac5880.jpg?wh=3600x2179" /></p>
 <p>在这个图里，<strong>工时记录</strong>和<strong>员工</strong>是原来领域模型里的实体，没有变化。而<strong>员工工时记录</strong>则是查询模型中的“查询实体”（我们姑且这么命名吧）。我们用自定义的&lt;&lt;query model&gt;&gt;衍型来表示这是一个查询模型里的查询实体。</p>
 <p><strong>员工工时记录</strong>中的数据是来源于<strong>工时记录</strong>和<strong>员工</strong>的，所以对这两个实体有依赖关系。另外，我们在依赖关系上加了&lt;&lt;trace&gt;&gt;。这是 UML 里的标准衍型，表示“追溯”的意思。这是因为，<strong>员工工时记录</strong>里的信息，总能追溯回<strong>工时记录</strong>和<strong>员工</strong>，从而知道数据的来源。</p>
 <p>顺便说一句，我们原来说过领域模型和设计模型的区别，如果你愿意的话，领域模型里的一个实体和设计模型里的对应实体，也可以用 &lt;&lt;trace&gt;&gt; 依赖来关联起来，表示两者之间的来源关系。</p>
@@ -14695,8 +14695,6 @@ cqrs没有领域层，会不会以后服务根据聚合拆分，改起来也比�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

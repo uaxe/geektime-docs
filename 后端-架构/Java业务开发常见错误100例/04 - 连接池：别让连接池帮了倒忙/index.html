@@ -14537,7 +14537,7 @@
 <p>你好，我是朱晔。今天，我们来聊聊使用连接池需要注意的问题。</p>
 <p>在上一讲，我们学习了使用线程池需要注意的问题。今天，我再与你说说另一种很重要的池化技术，即连接池。</p>
 <p>我先和你说说连接池的结构。连接池一般对外提供获得连接、归还连接的接口给客户端使用，并暴露最小空闲连接数、最大连接数等可配置参数，在内部则实现连接建立、连接心跳保持、连接管理、空闲连接回收、连接可用性检测等功能。连接池的结构示意图，如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/16/7e/1685d9db2602e1de8483de171af6fd7e.png?wh=1772%2A1058" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/16/7e/1685d9db2602e1de8483de171af6fd7e.png?wh=1772%2A1058" /></p>
 <p>业务项目中经常会用到的连接池，主要是数据库连接池、Redis连接池和HTTP连接池。所以，今天我就以这三种连接池为例，和你聊聊使用和配置连接池容易出错的地方。</p>
 <h2 id="sdk">注意鉴别客户端SDK是否基于连接池</h2>
 <p>在使用三方客户端进行网络通信时，我们首先要确定客户端SDK是否是基于连接池技术实现的。我们知道，TCP是面向连接的基于字节流的协议：</p>
@@ -14638,7 +14638,7 @@
 <a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>}
 </code></pre></div>
 <p>可以看到，Jedis继承了BinaryJedis，BinaryJedis中保存了单个Client的实例，Client最终继承了Connection，Connection中保存了单个Socket的实例，和Socket对应的两个读写流。因此，一个Jedis对应一个Socket连接。类图如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e7/0f/e72120b1f6daf4a951e75c05b9191a0f.png?wh=1326%2A1164" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e7/0f/e72120b1f6daf4a951e75c05b9191a0f.png?wh=1326%2A1164" /></p>
 <p>BinaryClient封装了各种Redis命令，其最终会调用基类Connection的方法，使用Protocol类发送命令。看一下Protocol类的sendCommand方法的源码，可以发现其发送命令时是直接操作RedisOutputStream写入字节。</p>
 <p>我们在多线程环境下复用Jedis对象，其实就是在复用RedisOutputStream。<strong>如果多个线程在执行操作，那么既无法确保整条命令以一个原子操作写入Socket，也无法确保写入后、读取前没有其他数据写到远端</strong>：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>private static void sendCommand(final RedisOutputStream os, final byte[] command,
@@ -14790,11 +14790,11 @@
 <a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>}
 </code></pre></div>
 <p>访问这个接口几次后查看应用线程情况，可以看到有大量叫作Connection evictor的线程，且这些线程不会销毁：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/33/10/33a2389c20653e97b8157897d06c1510.png?wh=2142%2A664" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/33/10/33a2389c20653e97b8157897d06c1510.png?wh=2142%2A664" /></p>
 <p>对这个接口进行几秒的压测（压测使用wrk，1个并发1个连接）可以看到，已经建立了三千多个TCP连接到45678端口（其中有1个是压测客户端到Tomcat的连接，大部分都是HttpClient到Tomcat的连接）：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/54/f2/54a71ee9a7bbbd5e121b12fe6289aff2.png?wh=592%2A122" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/54/f2/54a71ee9a7bbbd5e121b12fe6289aff2.png?wh=592%2A122" /></p>
 <p>好在有了空闲连接回收的策略，60秒之后连接处于CLOSE_WAIT状态，最终彻底关闭。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8e/77/8ea5f53e6510d76cf447c23fb15daa77.png?wh=1868%2A198" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8e/77/8ea5f53e6510d76cf447c23fb15daa77.png?wh=1868%2A198" /></p>
 <p>这2点证明，CloseableHttpClient属于第二种模式，即内部带有连接池的API，其背后是连接池，最佳实践一定是复用。</p>
 <p>复用方式很简单，你可以把CloseableHttpClient声明为static，只创建一次，并且在JVM关闭之前通过addShutdownHook钩子关闭连接池，在使用的时候直接使用CloseableHttpClient即可，无需每次都创建。</p>
 <p>首先，定义一个right接口来实现服务端接口调用：</p>
@@ -14835,15 +14835,15 @@
 <a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>}
 </code></pre></div>
 <p>使用wrk对wrong2和right两个接口分别压测60秒，可以看到两种使用方式性能上的差异，每次创建连接池的QPS是337，而复用连接池的QPS是2022：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b7/2d/b79fb99cf8a5c3a17e60b0850544472d.png?wh=1246%2A688" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b7/2d/b79fb99cf8a5c3a17e60b0850544472d.png?wh=1246%2A688" /></p>
 <p>如此大的性能差异显然是因为TCP连接的复用。你可能注意到了，刚才定义连接池时，我将最大连接数设置为1。所以，复用连接池方式复用的始终应该是同一个连接，而新建连接池方式应该是每次都会创建新的TCP连接。</p>
 <p>接下来，我们通过网络抓包工具Wireshark来证实这一点。</p>
 <p>如果调用wrong2接口每次创建新的连接池来发起HTTP请求，从Wireshark可以看到，每次请求服务端45678的客户端端口都是新的。这里我发起了三次请求，程序通过HttpClient访问服务端45678的客户端端口号，分别是51677、51679和51681：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7b/35/7b8f651755cef0c05ecb08727d315e35.png?wh=2196%2A1556" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7b/35/7b8f651755cef0c05ecb08727d315e35.png?wh=2196%2A1556" /></p>
 <p>也就是说，每次都是新的TCP连接，放开HTTP这个过滤条件也可以看到完整的TCP握手、挥手的过程：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/48/0d/4815c0edd21d5bf0cae8c0c3e578960d.png?wh=2146%2A1503" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/48/0d/4815c0edd21d5bf0cae8c0c3e578960d.png?wh=2146%2A1503" /></p>
 <p>而复用连接池方式的接口right的表现就完全不同了。可以看到，第二次HTTP请求#41的客户端端口61468和第一次连接#23的端口是一样的，Wireshark也提示了整个TCP会话中，当前#41请求是第二次请求，前一次是#23，后面一次是#75：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2c/2c/2cbada9be98ce33321b29d38adb09f2c.png?wh=1708%2A1560" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2c/2c/2cbada9be98ce33321b29d38adb09f2c.png?wh=1708%2A1560" /></p>
 <p>只有TCP连接闲置超过60秒后才会断开，连接池会新建连接。你可以尝试通过Wireshark观察这一过程。</p>
 <p>接下来，我们就继续聊聊连接池的配置问题。</p>
 <h2 id="_2">连接池的配置不是一成不变的</h2>
@@ -14869,9 +14869,9 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>spring.datasource.hikari.register-mbeans=true
 </code></pre></div>
 <p>启动程序并通过JConsole连接进程后，可以看到默认情况下最大连接数为10：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7b/94/7b8e5aff5a3ef6ade1d8027c20c92f94.png?wh=1846%2A996" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7b/94/7b8e5aff5a3ef6ade1d8027c20c92f94.png?wh=1846%2A996" /></p>
 <p>使用wrk对应用进行压测，可以看到连接数一下子从0到了10，有20个线程在等待获取连接：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b2/ef/b22169b8d8bbfabbb8b93ece11a1f9ef.png?wh=2310%2A1454" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b2/ef/b22169b8d8bbfabbb8b93ece11a1f9ef.png?wh=2310%2A1454" /></p>
 <p>不久就出现了无法获取数据库连接的异常，如下所示：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>[15:37:56.156] [http-nio-45678-exec-15] [ERROR] [.a.c.c.C.[.[.[/].[dispatcherServlet]:175 ] - Servlet.service() for servlet [dispatcherServlet] in context with path [] threw exception [Request processing failed; nested exception is org.springframework.dao.DataAccessResourceFailureException: unable to obtain isolated JDBC connection; nested exception is org.hibernate.exception.JDBCConnectionException: unable to obtain isolated JDBC connection] with root cause
 <a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>java.sql.SQLTransientConnectionException: HikariPool-1 - Connection is not available, request timed out after 30000ms.
@@ -14880,7 +14880,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>spring.datasource.hikari.maximum-pool-size=50
 </code></pre></div>
 <p>然后，再观察一下这个参数是否适合当前压力，满足需求的同时也不占用过多资源。从监控来看这个调整是合理的，有一半的富余资源，再也没有线程需要等待连接了：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d2/31/d24f23f05d49378a10a857cd8b9ef031.png?wh=2120%2A1466" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d2/31/d24f23f05d49378a10a857cd8b9ef031.png?wh=2120%2A1466" /></p>
 <p>在这个Demo里，我知道压测大概能对应使用25左右的并发连接，所以直接把连接池最大连接设置为了50。在真实情况下，只要数据库可以承受，你可以选择在遇到连接超限的时候先设置一个足够大的连接数，然后观察最终应用的并发，再按照实际并发数留出一半的余量来设置最终的最大连接。</p>
 <p>其实，看到错误日志后再调整已经有点儿晚了。更合适的做法是，<strong>对类似数据库连接池的重要资源进行持续检测，并设置一半的使用量作为报警阈值，出现预警后及时扩容</strong>。</p>
 <p>在这里我是为了演示，才通过JConsole查看参数配置后的效果，生产上需要把相关数据对接到指标监控体系中持续监测。</p>
@@ -15114,8 +15114,6 @@ at org.apache.http.impl.client.InternalHttpClient.doExecute(InternalHttpClient.j
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

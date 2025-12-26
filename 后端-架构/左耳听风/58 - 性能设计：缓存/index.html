@@ -16385,8 +16385,8 @@
 <li><strong>命中</strong>：应用程序从Cache中取数据，取到后返回。</li>
 <li><strong>更新</strong>：先把数据存到数据库中，成功后，再让缓存失效。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0a/d4/0a39fbce98c0d43e15b56b0ed09099d4.png?wh=625%2A195" /></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e0/94/e0ecbc94d474f7bd0c8eb53dfd8bde94.png?wh=625%2A191" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0a/d4/0a39fbce98c0d43e15b56b0ed09099d4.png?wh=625%2A195" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e0/94/e0ecbc94d474f7bd0c8eb53dfd8bde94.png?wh=625%2A191" /></p>
 <p>这是标准的设计模式，包括Facebook的论文《<a href="https://www.usenix.org/system/files/conference/nsdi13/nsdi13-final170_update.pdf">Scaling Memcache at Facebook</a>》中也使用了这个策略。为什么不是写完数据库后更新缓存？你可以看一下Quora上的这个问答《<a href="https://www.quora.com/Why-does-Facebook-use-delete-to-remove-the-key-value-pair-in-Memcached-instead-of-updating-the-Memcached-during-write-request-to-the-backend">Why does Facebook use delete to remove the key-value pair in Memcached instead of updating the Memcached during write request to the backend?</a>》，主要是怕两个并发的写操作导致脏数据。</p>
 <p>那么，是不是这个Cache Aside就不会有并发问题了？不是的。比如，一个是读操作，但是没有命中缓存，就会到数据库中取数据。而此时来了一个写操作，写完数据库后，让缓存失效，然后之前的那个读操作再把老的数据放进去，所以会造成脏数据。</p>
 <p>这个案例理论上会出现，但实际上出现的概率可能非常低，因为这个条件需要发生在读缓存时缓存失效，而且有一个并发的写操作。实际上数据库的写操作会比读操作慢得多，而且还要锁表，读操作必须在写操作前进入数据库操作，又要晚于写操作更新缓存，所有这些条件都具备的概率并不大。</p>
@@ -16398,14 +16398,14 @@
 <h2 id="write-through">Write Through</h2>
 <p>Write Through套路和Read Through相仿，不过是在更新数据时发生。当有数据更新的时候，如果没有命中缓存，直接更新数据库，然后返回。如果命中了缓存，则更新缓存，然后由Cache自己更新数据库（这是一个同步操作）。</p>
 <p>下图来自Wikipedia的Cache词条。其中的Memory，你可以理解为就是我们例子里的数据库。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/93/9a/933ed3ddb7d56735a0db5101f86d9a9a.png?wh=902%2A1216" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/93/9a/933ed3ddb7d56735a0db5101f86d9a9a.png?wh=902%2A1216" /></p>
 <h1 id="write-behind-caching">Write Behind Caching 更新模式</h1>
 <p>Write Behind又叫Write Back。一些了解Linux操作系统内核的同学对write back应该非常熟悉，这不就是Linux文件系统的page cache算法吗？是的，你看基础知识全都是相通的。所以，基础很重要，我已经说过不止一次了。</p>
 <p>Write Back套路就是，在更新数据的时候，只更新缓存，不更新数据库，而我们的缓存会异步地批量更新数据库。这个设计的好处就是让数据的I/O操作飞快无比（因为直接操作内存嘛）。因为异步，Write Back还可以合并对同一个数据的多次操作，所以性能的提高是相当可观的。</p>
 <p>但其带来的问题是，数据不是强一致性的，而且可能会丢失（我们知道Unix/Linux非正常关机会导致数据丢失，就是因为这个事）。在软件设计上，我们基本上不可能做出一个没有缺陷的设计，就像算法设计中的时间换空间、空间换时间一个道理。有时候，强一致性和高性能，高可用和高性能是有冲突的。软件设计从来都是trade-off（取舍）。</p>
 <p>另外，Write Back实现逻辑比较复杂，因为它需要track有哪些数据是被更新了的，需要刷到持久层上。操作系统的Write Back会在仅当这个Cache需要失效的时候，才会把它真正持久起来。比如，内存不够了，或是进程退出了等情况，这又叫lazy write。</p>
 <p>在Wikipedia上有一张Write Back的流程图，基本逻辑可以在下图中看到。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6f/fd/6f7a59b05ddcb343f75ae2069b2a7efd.png?wh=1014%2A1292" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6f/fd/6f7a59b05ddcb343f75ae2069b2a7efd.png?wh=1014%2A1292" /></p>
 <h1 id="_1">缓存设计的重点</h1>
 <p>缓存更新的模式基本如前面所说，不过这还没完，缓存已经成为高并发高性能架构的一个关键组件了。现在，很多公司都在用Redis来搭建他们的缓存系统。一方面是因为Redis的数据结构比较丰富。另一方面，我们不能在Service内放Local Cache，一是每台机器的内存不够大，二是我们的Service有多个实例，负载均衡器会把请求随机分布到不同的实例。缓存需要在所有的Service 实例上都建好，这让我们的Service有了状态，更难管理了。</p>
 <p>所以，在分布式架构下，一般都需要一个外部的缓存集群。关于这个缓存集群，你需要保证的是内存要足够大，网络带宽也要好，因为缓存本质上是个内存和IO密集型的应用。</p>
@@ -16597,8 +16597,6 @@ https:&#47;&#47;mp.weixin.qq.com&#47;s?__biz=MjM5ODYxMDA5OQ==&amp;mid=404202261&
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

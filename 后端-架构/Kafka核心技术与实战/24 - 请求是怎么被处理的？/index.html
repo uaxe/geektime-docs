@@ -14534,15 +14534,15 @@
 <p>谈到Reactor模式，大神Doug Lea的“<a href="http://gee.cs.oswego.edu/dl/cpjslides/nio.pdf">Scalable IO in Java</a>”应该算是最好的入门教材了。即使你没听说过Doug Lea，那你应该也用过ConcurrentHashMap吧？这个类就是这位大神写的。其实，整个java.util.concurrent包都是他的杰作！</p>
 <p>好了，我们说回Reactor模式。简单来说，<strong>Reactor模式是事件驱动架构的一种实现方式，特别适合应用于处理多个客户端并发向服务器端发送请求的场景</strong>。我借用Doug Lea的一页PPT来说明一下Reactor的架构，并借此引出Kafka的请求处理模型。</p>
 <p>Reactor模式的架构如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5b/3c/5bf8e3e8d35d1ac62yydb092700b683c.jpg?wh=3770%2A1801" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5b/3c/5bf8e3e8d35d1ac62yydb092700b683c.jpg?wh=3770%2A1801" /></p>
 <p>从这张图中，我们可以发现，多个客户端会发送请求给到Reactor。Reactor有个请求分发线程Dispatcher，也就是图中的Acceptor，它会将不同的请求下发到多个工作线程中处理。</p>
 <p>在这个架构中，Acceptor线程只是用于请求分发，不涉及具体的逻辑处理，非常得轻量级，因此有很高的吞吐量表现。而这些工作线程可以根据实际业务处理需要任意增减，从而动态调节系统负载能力。</p>
 <p>如果我们来为Kafka画一张类似的图的话，那它应该是这个样子的：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b3/81/b3yy7c6ca1c6244f3f9d2268209a9081.jpg?wh=3618%2A1716" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b3/81/b3yy7c6ca1c6244f3f9d2268209a9081.jpg?wh=3618%2A1716" /></p>
 <p>显然，这两张图长得差不多。Kafka的Broker端有个SocketServer组件，类似于Reactor模式中的Dispatcher，它也有对应的Acceptor线程和一个工作线程池，只不过在Kafka中，这个工作线程池有个专属的名字，叫网络线程池。Kafka提供了Broker端参数num.network.threads，用于调整该网络线程池的线程数。其<strong>默认值是3，表示每台Broker启动时会创建3个网络线程，专门处理客户端发送的请求</strong>。</p>
 <p>Acceptor线程采用轮询的方式将入站请求公平地发到所有网络线程中，因此，在实际使用过程中，这些线程通常都有相同的几率被分配到待处理请求。这种轮询策略编写简单，同时也避免了请求处理的倾斜，有利于实现较为公平的请求处理调度。</p>
 <p>好了，你现在了解了客户端发来的请求会被Broker端的Acceptor线程分发到任意一个网络线程中，由它们来进行处理。那么，当网络线程接收到请求后，它是怎么处理的呢？你可能会认为，它顺序处理不就好了吗？实际上，Kafka在这个环节又做了一层异步线程池的处理，我们一起来看一看下面这张图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/41/95/41e0a69ed649f9c5yyea390edcd79a95.jpg?wh=3537%2A2088" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/41/95/41e0a69ed649f9c5yyea390edcd79a95.jpg?wh=3537%2A2088" /></p>
 <p>当网络线程拿到请求后，它不是自己处理，而是将请求放入到一个共享请求队列中。Broker端还有个IO线程池，负责从该队列中取出请求，执行真正的处理。如果是PRODUCE生产请求，则将消息写入到底层的磁盘日志中；如果是FETCH请求，则从磁盘或页缓存中读取消息。</p>
 <p>IO线程池处中的线程才是执行请求逻辑的线程。Broker端参数<strong>num.io.threads</strong>控制了这个线程池中的线程数。<strong>目前该参数默认值是8，表示每台Broker启动后自动创建8个IO线程处理请求</strong>。你可以根据实际硬件条件设置此线程池的个数。</p>
 <p>比如，如果你的机器上CPU资源非常充裕，你完全可以调大该参数，允许更多的并发请求被同时处理。当IO线程处理完请求后，会将生成的响应发送到网络线程池的响应队列中，然后由对应的网络线程负责将Response返还给客户端。</p>
@@ -14691,8 +14691,6 @@ https:&#47;&#47;www.quora.com&#47;Why-did-Kafka-developers-prefer-to-implement-t
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

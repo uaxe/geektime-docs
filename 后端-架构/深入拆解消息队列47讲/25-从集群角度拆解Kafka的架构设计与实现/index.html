@@ -14752,7 +14752,7 @@
 <h2 id="_1">数据可靠性</h2>
 <p>我们知道，Kafka 集群维度的数据可靠性也是通过副本来实现的，而副本间数据一致性是通过Kafka ISR 协议来保证的。ISR 协议是现有一致性协议的变种，它是参考业界主流的一致性协议，设计出来的符合流消息场景的一致性协议。</p>
 <p><strong>ISR协议的核心思想是：</strong>通过副本拉取Leader数据、动态维护可用副本集合、控制Leader切换和数据截断3个方面，来提高性能和可用性。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7e/ed/7e4cf5f54694b1624f91b31f2a2c7ced.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7e/ed/7e4cf5f54694b1624f91b31f2a2c7ced.jpg?wh=10666x6000" /></p>
 <p>参考图示，这是一个包含1个Leader、2个Follower的分区。如果是基于Raft协议或者多数原则实现的一致性算法，那么当Leader接收到数据后，就会直接分发给部分或全部副本。我们在前面两节课说到的 RabbitMQ的镜像队列、仲裁队列和 RocketMQ 的 Master/Slave、Dledger 都是这么实现的。</p>
 <p>这种机制在流消息队列的大吞吐场景中主要有两个缺点：</p>
 <ol>
@@ -14761,10 +14761,10 @@
 </ol>
 <h3 id="leader"><strong>副本拉取Leader数据</strong></h3>
 <p>为了提高数据分发性能，主要的解决思路就是<strong>数据批量分发</strong>。所以在实现上看，Kakfa 是通过Follower 批量从Leader拉取数据来完成主从副本间的数据同步，并提高性能的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/68/fe/6818b32b368215f3451402b1ff7d79fe.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/68/fe/6818b32b368215f3451402b1ff7d79fe.jpg?wh=10666x6000" /></p>
 <p>如上图所示，Follower 会维护一批线程来从 Leader 拉取数据。此时，比如当 Leader 接收到1000 次数据，在 Leader 主动分发的场景中，就需要往两个 Follower 分别发起1000次请求。而在 ISR 模型下，假设 Follower 每批次拉取50条数据，此时每个Follower 和 Leader间的网络交互次数就减少到了20次，从而极大地提高了一致性的性能。</p>
 <p>这里你可能就会有一个疑问：<strong>如果是 Follower 来服务端拉取数据，那么当数据写入 Leader 后是直接告诉客户端写入成功吗？</strong>回答这个问题之前，我们先来看一张图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d0/f5/d0408914e4fa9961ea544b297ef5f7f5.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d0/f5/d0408914e4fa9961ea544b297ef5f7f5.jpg?wh=10666x6000" /></p>
 <p>从实现的角度看，当配置最终一致（ACK=1）或者强一致（ACK=-1）时，Leader接收到数据后不会立即告诉客户端写入成功。而是请求会进入一个本地的队列进行等待，等待 Follower 完成数据同步。当数据被副本同步后，Leader 才会告诉客户端写入成功。</p>
 <p>等待这个行为的技术实现的核心思想是Leader维护的定时器，<strong>时间轮</strong>。简单理解就是时间轮会定时检查数据是否被同步，是的话就返回成功，否的话就判断是否超时，超时就返回超时错误，否则就继续等待。时间轮的具体实现，我们后面会详细分析，敬请期待。</p>
 <h3 id="_2"><strong>动态维护可用副本集合</strong></h3>
@@ -14784,7 +14784,7 @@
 <p>当出现Leader切换，如果所有节点的数据是强一致的，则直接进行Leader切换，不需要任何其他的处理，也不会有数据丢失的问题。这种方式实现是最简单的，开发成本也最低，但是性能较差。比如RabbitMQ的镜像队列和RocketMQ的Master/Slave的同步双写就是这种方案。</p>
 <p>因为 Kafka ISR 协议是最终一致的，所以在某些极端的场景中会出现数据丢失和截断，所以我们需要在实现上做特殊的处理。</p>
 <p>那什么情况下会出现数据丢失和截断呢？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e5/dc/e5198a7def400ba3486d8365ebcf72dc.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e5/dc/e5198a7def400ba3486d8365ebcf72dc.jpg?wh=10666x6000" /></p>
 <p>如上图所示，按照最终一致和多数原则，如果有2个副本A和B写入成功后，就会告诉客户端数据写入成功。此时，如果这两台节点同时挂掉，<strong>就会有C节点成为Leader和C节点不成为 Leader两种场景。</strong></p>
 <p>如果是C节点不能成为Leader，此时就不会有丢数据或截断问题。开发实现也简单，只是问题发生时，服务就不可用。</p>
 <p>如果C节点可以成为Leader，此时就可能会出现数据截断。比如A、B有100条数据，C只有90条数据，此时A、B挂了，C 成为Leader 后重新接收数据。当 A 和 B 启动后，因为C这里也会有90～100之间的数据，如果要合并数据就会冲突。所以一般遇到这种情况，就会丢弃数据，然后就会有数据丢失。</p>
@@ -14840,7 +14840,7 @@
 <p>这个库的使用并不复杂，只需要引入包直接使用即可。如果你想在自己项目中使用这个库，可以参考<a href="https://www.javacodegeeks.com/2012/12/yammer-metrics-a-new-way-to-monitor-your-application.html">这个教程</a>。不过，如果是希望在自己的系统内注册统计指标，建议你使用OpenTelemetry Metrics或者Prometheus Metrics，这两种是近期在指标方面更常用的方案。</p>
 <p><strong>在指标暴露方面，Kakfa 只支持JMX方式的指标获取。</strong>即如果需要从 Kafka 进程采集指标，就需要先在 Broker 上开启JMX Server。然后客户端通过JMX Client 去 Broker 采集对应的指标。</p>
 <p>在实际运营中，主要有3种通过指标监控 Broker 的方式。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/be/70/beb3yy6f1cd58e453b8f5c7a6df99a70.jpg?wh=10666x4377" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/be/70/beb3yy6f1cd58e453b8f5c7a6df99a70.jpg?wh=10666x4377" /></p>
 <p>如上图所示，可以通过代码使用 JMX Client 直接去采集Broker中的指标数据，然后自定义处理。也可以通过 JMX Export 采集指标，然后和 Prometheus 集成展示。从实现来看，JMX Export 底层也是通过JMX Client 去Broker采集数据的。另外社区提供了Kafka Export 通过Kafka Protocol 去获取消费进度、Topic信息等相关信息，然后再和 Prometheus 集成展示。</p>
 <p>在日志方面，Kafka 也是基于 Log4j 库去打印日志，依赖 Log4j 库的强大，支持常见的日志功能，这里就不再细数。同时通过配置支持，将不同模块的日志打印到不同文件，如Controller、Coordinator、GC 等等，以便在运营过程中提高问题排查的效率。</p>
 <p>在消息轨迹方面，Kafka 并没有提供对消息轨迹功能的支持。如果需要支持，得改造内核。从技术上来看，即在客户端SDK 实现轨迹上报的功能，在服务端记录生产时收到的数据信息和消费时发送的数据信息。</p>
@@ -14981,8 +14981,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

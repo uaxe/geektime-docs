@@ -14562,7 +14562,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>./bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group test-consumer-group
 </code></pre></div>
 <p>结果如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/40/4b/404811b07db8edb4c1bb9f1cfc0bc94b.jpg?wh=1142%2A209" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/40/4b/404811b07db8edb4c1bb9f1cfc0bc94b.jpg?wh=1142%2A209" /></p>
 <ul>
 <li>图中的前两列是队列的基本信息，包括话题名和分区名；</li>
 <li>第三列是当前消费者的消费进度；</li>
@@ -14572,10 +14572,10 @@
 <p>通过这个命令你可以很方便地了解消费者的消费情况。</p>
 <p><strong>第二个工具是JMX。</strong></p>
 <p>Kafka通过JMX暴露了消息堆积的数据，我在本地启动了一个console consumer，然后使用jconsole连接consumer就可以看到consumer的堆积数据了（就是下图中红框里的数据）。这些数据你可以写代码来获取，这样也可以方便地输出到监控系统中，<strong>我比较推荐这种方式。</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/33/2c/3384d3fcb52f98815fac667e5b543e2c.jpg?wh=1142%2A911" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/33/2c/3384d3fcb52f98815fac667e5b543e2c.jpg?wh=1142%2A911" /></p>
 <p>除了使用消息队列提供的工具以外，你还可以通过生成监控消息的方式来监控消息的延迟。<strong>具体怎么做呢？</strong></p>
 <p>你先定义一种特殊的消息，然后启动一个监控程序将这个消息定时地循环写入到消息队列中，消息的内容可以是生成消息的时间戳并且也会作为队列的消费者消费数据。业务处理程序消费到这个消息时直接丢弃掉，而监控程序在消费到这个消息时就可以和这个消息的生成时间做比较，如果时间差达到某一个阈值就可以向我们报警。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/34/7f/34820c0b27e66af37fda116a1a98347f.jpg?wh=1142%2A376" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/34/7f/34820c0b27e66af37fda116a1a98347f.jpg?wh=1142%2A376" /></p>
 <p>这两种方式都可以监控消息的消费延迟情况，<strong>而从我的经验出发，我比较推荐两种方式结合来使用。</strong>比如在实际项目中，我会优先在监控程序中获取JMX中的队列堆积数据做到dashboard报表中，同时也会启动探测进程确认消息的延迟情况是怎样的。</p>
 <p>在我看来，消息的堆积是对于消息队列的基础监控，这是你无论如何都要做的。但是了解了消息的堆积情况并不能很直观地了解消息消费的延迟，你也只能利用经验来确定堆积的消息量到了多少才会影响到用户的体验；而第二种方式对于消费延迟的监控则更加直观，而且从时间的维度来做监控也比较容易确定报警阈值。</p>
 <p>了解了消息延迟的监控方式之后，我们再来看看如何提升消息的写入和消费性能，这样才会让异步的消息得到尽快的处理。</p>
@@ -14589,10 +14589,10 @@
 <p>不过第二种方式会受限于消息队列的实现。如果消息队列使用的是Kafka就无法通过增加消费者数量的方式来提升消息处理能力。</p>
 <p>因为在Kafka中，一个Topic（话题）可以配置多个Partition（分区），数据会被平均或者按照生产者指定的方式写入到多个分区中，那么在消费的时候，Kafka约定一个分区只能被一个消费者消费，为什么要这么设计呢？在我看来，如果有多个consumer（消费者）可以消费一个分区的数据，那么在操作这个消费进度的时候就需要加锁，可能会对性能有一定的影响。</p>
 <p>所以说，话题的分区数量决定了消费的并行度，增加多余的消费者也是没有用处的，你可以通过增加分区来提高消费者的处理能力。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cd/39/cdd960f49f982f8b96ab466d7e4b2739.jpg?wh=1142%2A495" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cd/39/cdd960f49f982f8b96ab466d7e4b2739.jpg?wh=1142%2A495" /></p>
 <p>那么，如何在不增加分区的前提下提升消费能力呢？</p>
 <p>虽然不能增加consumer，但你可以在一个consumer中提升处理消息的并行度，所以可以考虑使用多线程的方式来增加处理能力：你可以预先创建一个或者多个线程池，在接收到消息之后把消息丢到线程池中来异步地处理，这样，原本串行的消费消息的流程就变成了并行的消费，可以提高消息消费的吞吐量，在并行处理的前提下，我们就可以在一次和消息队列的交互中多拉取几条数据，然后分配给多个线程来处理。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2c/79/2c0eefd526eed3a1fe4df89f068daf79.jpg?wh=1142%2A325" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2c/79/2c0eefd526eed3a1fe4df89f068daf79.jpg?wh=1142%2A325" /></p>
 <p>另外，在消费队列中数据的时候还需要注意消费线程空转的问题。</p>
 <p><strong>我是在测试自己写的一个消息中间件的时候发现的。</strong>当时，我发现运行消费客户端的进程会偶发地出现CPU跑满的情况，于是打印了JVM线程堆栈，找到了那个跑满CPU的线程。这个时候才发现，原来是消息队列中有一段时间没有新的消息，于是消费客户端拉取不到新的消息就会不间断地轮询拉取消息，这个线程就把CPU跑满了。</p>
 <p>所以，你在写消费客户端的时候要考虑这种场景，拉取不到消息可以等待一段时间再来拉取，等待的时间不宜过长，否则会增加消息的延迟。我一般建议固定的10ms~100ms，也可以按照一定步长递增，比如第一次拉取不到消息等待10ms，第二次20ms，最长可以到100ms，直到拉取到消息再回到10ms。</p>
@@ -14608,9 +14608,9 @@
 2.系统调用将内核缓存区的数据拷贝到用户缓冲区；
 3.用户缓冲区的数据被写入到Socket缓冲区中；
 4.操作系统再将Socket缓冲区的数据拷贝到网卡的缓冲区中。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/52/8f/52c74ecac57e7a437442860029476d8f.jpg?wh=1142%2A383" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/52/8f/52c74ecac57e7a437442860029476d8f.jpg?wh=1142%2A383" /></p>
 <p>操作系统提供了Sendfile函数可以减少数据被拷贝的次数。使用了Sendfile之后，在内核缓冲区的数据不会被拷贝到用户缓冲区而是直接被拷贝到Socket缓冲区，节省了一次拷贝的过程提升了消息发送的性能。高级语言中对于Sendfile函数有封装，比如说在Java里面的java.nio.channels.FileChannel类就提供了transferTo方法提供了Sendfile的功能。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e3/ed/e38d36c7f077c6ce5b0b276efb8d4eed.jpg?wh=1142%2A488" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e3/ed/e38d36c7f077c6ce5b0b276efb8d4eed.jpg?wh=1142%2A488" /></p>
 <h2 id="_3">课程小结</h2>
 <p>本节课我带你了解了如何提升消息队列的性能来降低消息消费的延迟，这里我想让你明确的重点是：</p>
 <ul>
@@ -14769,8 +14769,6 @@ server接收到数据返回给队列ack，然后丢给线程池，数据还没�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -5207,15 +5207,15 @@
 <p>甚至由于某些发音在改变了频谱能量分布后，共振峰发生了较大改变，连原本想表达的语意都发生了变化。所以为了获得比较好的变声效果，我们需要实时对语音做动态的调整，而这使用传统算法显然是无法穷尽所有发音、语境的对应变化关系的。</p>
 <p>你可能已经发现了，如图1所示，如果我们可以做到语音转文字，文字也可以转语音，那么<strong>结合声纹识别（VPR）把人声的特性加入到TTS之中，是不是就可以实现变声的功能了？</strong></p>
 <p>先别急，接下来我们就基于AI模型的变声算法的角度，来整体认识一下这些常见AI算法背后的原理，以及它们是如何组合、搭配实现变声功能的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0d/87/0d8f714257c3fff2c621080a31b94c87.jpeg?wh=1920x562" title="图1 基于ASR、TTS、VPR的变声流程示意图" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0d/87/0d8f714257c3fff2c621080a31b94c87.jpeg?wh=1920x562" title="图1 基于ASR、TTS、VPR的变声流程示意图" /></p>
 <p>我们不妨先从ASR算法来看看我们是如何实现语音转文字的。</p>
 <h2 id="asr">ASR</h2>
 <p>结合图2，我们可以看一下ASR算法的基本原理。</p>
 <p>语音信号需要转换为频谱信号或者我们之前讲过的MFCC来作为语音特征序列。然后我们根据特征序列推断出对应的音素序列，音素在不同的语言中有很多不同的表达形式，比如中文可以用汉语拼音来表示。最后根据音素和文字的映射字典（lexicon）就可以得到语言对应的文本了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ed/71/ed7cb9dyy4f11e3e5f8f9e034f098271.jpeg?wh=1771x838" title="图2 ASR算法的基本原理" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ed/71/ed7cb9dyy4f11e3e5f8f9e034f098271.jpeg?wh=1771x838" title="图2 ASR算法的基本原理" /></p>
 <p><strong>ASR在音频领域的研究一直都是比较火热的方向。</strong>目前在工业界，使用的最多的是基于<a href="https://github.com/kaldi-asr/kaldi">Kaldi</a> 开源框架的算法，有兴趣的话可以通过链接了解一下。Kaldi模型以及其改进版本有很多，这里我主要介绍一下常见的ASR模型的构建方法。</p>
 <p>如图3所示，为了实现比较准确的ASR系统，我们需要构建两个主要的模型：<strong>声学模型（Acoustic Model）和语言模型（Language model）</strong>。然后通过语言解码器和搜索算法（Ligusitic Decoding and search algorithm），结合声学模型和语言模型的结果，综合选择出概率最大的文字序列作为识别的输出。其中声学模型主要是通过语音数据库训练得到，而语言模型则主要是通过文本数据库训练得到。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ea/4e/ea0e354a0e49c17eb4f9883b8432ee4e.jpeg?wh=1920x746" title="图3 ASR模型构建方法" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ea/4e/ea0e354a0e49c17eb4f9883b8432ee4e.jpeg?wh=1920x746" title="图3 ASR模型构建方法" /></p>
 <p>这里你可能会有疑问，为什么我们不能从音频的特征信息直接得到文字输出，而需要这么一套相对复杂的模型系统呢？</p>
 <p>这是因为同音字、同音词、谐音、连读等发音特性，可能导致很多容易混淆的结果，从而同一段语音可能会得到多个备选的文字方案。比如图2中根据音素序列可以得到“今天是几号”，也可能是“今天十几号”或者“晴天是几号”等。这时除了声学模型音素读取需要较高的准确性外，还需要语<strong>言模型根据上下文的语境来对ASR的结果进行修正</strong>。</p>
 <p>其实，最近这几年端到端的ASR的研究也有很多不错的进展。比如<a href="https://github.com/espnet/espnet">ESPNet开源项目</a>里就整合了许多基于CTC、Transformer等技术的端到端开源模型，有兴趣的同学可以通过链接自行了解一下。</p>
@@ -5226,10 +5226,10 @@
 <p>WaveNet的基本思想是利用因果空洞卷积这种自回归的AI模型，来逐点实现音频时域Wave信号的生成。用通俗一点的话来说就是，<strong>WaveNet是逐个采样点生成音频信号的</strong>，也就是说生成出的第k个点是第k+1个点的输入。这种算法极其消耗算力，比如生成一秒48kHz采样的音频，需要循环调用AI模型计算48000次才能完成，但这样做得到的音频的效果自然度还是很不错的。</p>
 <p>为了缩减算力，同时保持模型生成的计算速度，人们后续对其做了一系列的改进。于是就有了后来的Fast WaveNet、Parallel WaveNet、WaveRNN、WaveGlow和LPCNet等。</p>
 <p>如图4所示，Fraunhofer IIS和International Audio Laboratories Erlangen就曾联合发布过<a href="https://xueshu.baidu.com/usercenter/paper/show?paperid=3b94d755401ea9ace11884cf7bfeafbd">一篇回顾的论文</a>，主要分析了不同的Vocoder的MUSHRA评分。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c7/a5/c7ffbb97e54ec2e3b637e7cbdee2a0a5.png?wh=1446x714" title="图4 不同Vocoder的MUSHRA评分" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c7/a5/c7ffbb97e54ec2e3b637e7cbdee2a0a5.png?wh=1446x714" title="图4 不同Vocoder的MUSHRA评分" /></p>
 <p>在实际使用中，为了追求效果，可以使用WaveRNN或者WaveGLOW这样效果比较好的模型。但这些模型在服务器端部署还行，在移动端部署算力还是过大。移动端上LPCNet或者基于传统算法的World Vocoder是目前比较可行的TTS实现方式。</p>
 <p>好的，讲完声码器我们再看看<strong>多重声线语音合成的基本原理</strong>。如图5所示，要实现带有任意说话人音色的语音生成，需要依赖3个主要的模块，也就是 Speaker Encoder、Synthesizer和Vocoder这三个模块。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3e/a7/3e5bc072bd28ed0023b344b1d69c4fa7.png?wh=1255x267" title="图5 声纹识别到多重声线语音合成的迁移学习[br]图片来源 https://arxiv.org/abs/1806.04558" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3e/a7/3e5bc072bd28ed0023b344b1d69c4fa7.png?wh=1255x267" title="图5 声纹识别到多重声线语音合成的迁移学习[br]图片来源 https://arxiv.org/abs/1806.04558" /></p>
 <p>其中说话人的音色和发音习惯等声纹信息，可以通过一段事先准备好的说话人语料和一个Speaker Encoder（说话人编码器）来提取。说话人编码器其实就是我们之前说的VPR声纹识别技术，常见的VPR技术有I-vector、x-vector、GE2E、Deep Speaker、RawNet等。</p>
 <p><strong>VPR主要目的就是把说话人的声音特点编码成固定长度的向量（SpeakerEmbeding）</strong>。好比我们一般用指纹来验证身份，而VPR得到的声纹也可以用于身份识别。所以VPR技术其实除了可以用于TTS和变声，也可以用于实现身份鉴定、声纹锁等功能。</p>
 <p>Synthesizer（合成器）则是通过音素和声纹信息合成出声码器所需的语谱特征。由于图5中使用的是WaveNet系列的Vocoder，所以需要的是对数梅尔谱（log-mel spectrogram）作为声码器的输入。合成器也有一些现成的框架可以使用，比如Google的Tacotron、微软的Fastspeech等。其实合成器的原理都大致相同，就是<strong>利用AI模型对音素序列进行编码，然后和声纹特征融合在一起，再通过Decoder模型得到声码器需要的输入特征。</strong></p>
@@ -5372,8 +5372,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

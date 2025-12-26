@@ -6463,7 +6463,7 @@
 <li>ab这个客户端的耗时分布，也就是前面刚介绍过的各个百分位的耗时数值。</li>
 <li>服务端的性能指标，也就是在这个压力下面，服务端的CPU、内存、网络丢包率等的统计数值。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8c/9d/8ce9cb87baccc568020963321f3ff39d.jpg?wh=1575x445" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8c/9d/8ce9cb87baccc568020963321f3ff39d.jpg?wh=1575x445" /></p>
 <p>压测过程中，客户发现测试端的带宽用到400Mbps后，TPS就上不去了，无论把并发量或者总量的数值进行怎样的调整，TPS都会维持在一个稳定的数值。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Transfer<span class="w"> </span>rate:<span class="w">          </span><span class="m">52087</span>.82<span class="w"> </span><span class="o">[</span>Kbytes/sec<span class="o">]</span><span class="w"> </span>received
 </code></pre></div>
@@ -6473,23 +6473,23 @@
 <blockquote>
 <p>补充：抓包示例文件已经上传至<a href="https://gitee.com/steelvictor/network-analysis/tree/master/22">Gitee</a>，建议结合抓包文件和文稿一起学习。</p>
 </blockquote>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d6/00/d64b27b7a79ce3edcd702d0fcffdb900.jpg?wh=1822x592" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d6/00/d64b27b7a79ce3edcd702d0fcffdb900.jpg?wh=1822x592" /></p>
 <p>这次我就不做标记了，你自己先找找看，能否找到一些问题？</p>
 <p>你有没有发现，GET有1603次（倒数第三行），而RST有1982次（第三行），比GET这种HTTP请求的次数还更多。也就是说，平摊的话，每次GET请求对应了一次以上的RST。这个现象会不会跟TPS上不去的问题有关系呢？</p>
 <p>我们选一个RST来看一下情况。比如14031号报文：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/46/28/4610b0fd0352d03523f448480c256428.jpg?wh=1920x847" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/46/28/4610b0fd0352d03523f448480c256428.jpg?wh=1920x847" /></p>
 <p>然后Follow -&gt; TCP Stream，就来到了这条TCP流：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/fa/d0/fa6d59359e1044a4844b6a29c3a260d0.jpg?wh=1920x782" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fa/d0/fa6d59359e1044a4844b6a29c3a260d0.jpg?wh=1920x782" /></p>
 <p>在这里，你有没有发现两个重传报文？一个是6504号报文，一个是7340号报文。我们再进一步看一下这两个的重传的原因是什么。一般来说，判断一个报文是否是重传，最方便的就是借助Wireshark本身提供的提示，Wireshark说是Retransmission，那就是了。</p>
 <p>那么假设世界上还没有Wireshark，你又<strong>如何判断一个报文是否是重传呢？</strong>其实可以根据两个关键信息：<strong>序列号、载荷长度</strong>。</p>
 <p>我在之前的课程里提到过，序列号本身反映的就是字节位置，载荷的长度就表示这段报文的实际字节长度，这两个信息就确定了信息的<strong>起点和终点</strong>，也就是决定了一个报文是否是之前报文的重传。</p>
 <p>在上面的截图里，我们根据序列号（Sequence Number列）和载荷长度（TCP Seglen列），判断出下面两次重传：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/10/fa/10e8909974fd01608f6f7a976949b7fa.jpg?wh=1966x550" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/10/fa/10e8909974fd01608f6f7a976949b7fa.jpg?wh=1966x550" /></p>
 <p>可见，7340是3155报文的重传，因为它们的序列号都是9593，载荷长度都是1061。同样的道理，6504和3156也是一对重传关系。</p>
 <p>当然，我们也可以直接在Wireshark里选中7340号报文，它的基础报文也就是3155的<strong>前面会出现一个小圆点</strong>，就像下图这样：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e4/57/e460a19638fb3b633e1315cc02b07857.jpg?wh=1920x354" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e4/57/e460a19638fb3b633e1315cc02b07857.jpg?wh=1920x354" /></p>
 <p>总之，我们确认TCP传输中是有丢包和重传现象的，我们可以回头从专家信息那里得到证实，这里显示有184个Suprious重传和2274个（超时）重传。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/2d/9d/2d44ff9320c8bf3e72ff8e907a9eyy9d.jpg?wh=1794x78" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2d/9d/2d44ff9320c8bf3e72ff8e907a9eyy9d.jpg?wh=1794x78" /></p>
 <blockquote>
 <p>补充：而出现RST的原因，是客户端在已经没有了这个TCP连接的情况下，收到了服务端的ACK报文。从现象来看，客户端应该是做了TIME_WAIT优化的设置，我们后面的实验里也会带到。</p>
 </blockquote>
@@ -6505,7 +6505,7 @@
 </code></pre></div>
 <p>这些工具会按指定的时间间隔，运行指定的次数后再退出。这样我们就可以观察到这段时间内的多次输出了，很适合通过这种多次的观察，得到比较准确的性能数据趋势。</p>
 <p>这次我们也在被压测的服务端云主机上运行了 <code>sar -n DEV</code>，得到了以下的性能数据：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/55/be/5523ee0f7eba2cce7979620e4abccabe.jpg?wh=749x338" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/55/be/5523ee0f7eba2cce7979620e4abccabe.jpg?wh=749x338" /></p>
 <p>前面说的包量，就是体现在两个pck/s指标中，一个是 <strong>rxpck/s</strong>，就是接收方向的包量；一个是 <strong>txpck/s</strong>，就是发送方向的包量。显然，图中的数值已经在5万左右，这个正是当时我们云主机性能的上限。难怪服务端已经无法提供更高的TPS了，因为网络包的处理都来不及做了。</p>
 <p>那你可能会问了：“网络包也有大有小，这个包量指标说的是大包还是小包呢？”</p>
 <p>其实，一般的包量测试，不是随便什么大小的报文都可以测试，而是普遍使用64字节长度的IP报文。另外，我们也要认识到，包的大小对包量性能的影响也不是很大。这是因为，对于网络处理来说，主要的开销在包的头部的处理上，而载荷本身的处理是很快的。</p>
@@ -6517,19 +6517,19 @@
 <h2 id="2loadrunner">案例2：LoadRunner压测发现部分失败</h2>
 <p>这是另外一个客户，他们没有用ab这样的简单工具，而是用了LoadRunner这样一个企业级的测试软件。LoadRunner的厉害之处在于，不仅可以发起巨大的请求量，而且可以模拟用户的复杂行为，比如登录、浏览、加入购物车等等。这一系列事务有前后状态关系，这就不是简单的ab可以做到的了。</p>
 <p>但是测试结果中的小几十个Failed和Error引起了客户的疑虑。他们怀疑：是不是我们公有云的机器或者网络质量不行，所以才导致了这些失败呢？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/91/cb/9185cd1c33463aa7594bf290547fb1cb.jpg?wh=450x248" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/91/cb/9185cd1c33463aa7594bf290547fb1cb.jpg?wh=450x248" /></p>
 <p>我们就尝试复现这个压测场景，同时也对测试机上的TCP资源情况做检查，其中最主要的就是源端口了。</p>
 <p>为什么会想到这个呢？因为压测发起的请求，都是依托于TCP连接的。我们在<a href="https://time.geekbang.org/column/article/477510">第1讲</a>里就提到过：<strong>TCP连接是基于五元组的</strong>。那么对于客户端来说，源IP、目的IP、目的端口、协议，这四个元素都不会变化，<strong>唯一会变的就是自己的源端口</strong>了。那么我们来看看，当时测试机的源端口情况。</p>
 <p>这是一台Window机器，跟Linux类似，我们执行这条命令：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>netstat<span class="w"> </span>-ant
 </code></pre></div>
 <p>输出如下图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ce/a4/cee3b9c775369dba1cfd2aaa2c6d8fa4.jpg?wh=550x328" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ce/a4/cee3b9c775369dba1cfd2aaa2c6d8fa4.jpg?wh=550x328" /></p>
 <p>原来，确实有大量的TCP连接都在TIME_WAIT状态，尤其是源端口已经用到了<strong>65534</strong>。所以可以肯定，这次压测中出现失败的原因，就在于源端口耗尽。</p>
 <p>那要如何处理呢？显然我们也变不出更多的端口来。这个时候，我们可以<strong>调整压测软件的设置，比如从短连接改成长连接</strong>。这样就可以避免源端口耗尽的情况，因为所有的请求是在长连接里完成的，只要连接池本身设置合理，源端口就不会被用完。</p>
 <h2 id="3cannot-assign-requested-address">案例3：压测报cannot assign requested address错误</h2>
 <p>我们内部有一个团队在做业务压力测试，结果遇到了一个奇怪的报错：cannot assign requested address。这次的场景是这样的：这个团队从多台客户端机器向LB上的一个VIP，发送大量的请求，而LB的后面就是很多的服务器。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6d/fb/6d0449c9c02b508eaa5bc7956c0194fb.jpg?wh=1858x711" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6d/fb/6d0449c9c02b508eaa5bc7956c0194fb.jpg?wh=1858x711" /></p>
 <p>但是，还没等到这些服务器的负载跑起来，客户端那边提前报错了。这是一个Go语言的程序，具体的报错信息如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>https://test.vip/a&quot;: dial tcp 10.123.123.12:443: connect: cannot assign requested address
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>http post Post \&quot;https://test.vip/b&quot;: dial tcp 10.123.123.12:443: connect: cannot assign requested address retry 1 times
@@ -6558,9 +6558,9 @@
 <p>我们来看一个不一样的案例。</p>
 <h2 id="4connection-reset-by-peer">案例4：压测遇到connection reset by peer</h2>
 <p>这次的场景是一个应用团队用netty http client去调用一个VIP做压测。具体来说是9台客户端机器，向同一个LB VIP发起大量的请求。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c4/9e/c42770f906ab7yyf9b964757d120069e.jpg?wh=1866x711" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c4/9e/c42770f906ab7yyf9b964757d120069e.jpg?wh=1866x711" /></p>
 <p>结果遇到了connection reset by peer。蹊跷的是，这个报错是零零星星出现的。而像之前的例子，如果真的源端口用尽了，那么接下来一段时间内，这些请求都会因为本地没有源端口可用而宣告失败，也就是报错会是大面积出现，而不会零星出现。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a0/72/a086cf71e10b0c1f41f79978f6bd1a72.png?wh=1920x1120" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a0/72/a086cf71e10b0c1f41f79978f6bd1a72.png?wh=1920x1120" /></p>
 <p>从图上看，报错数量不超过50个，主要集中在11点20分到11点35分这个时间段，这正是压测的时段。因为报错只有50来个，这相比于这次压测发起的成千上万的请求来说，是很小的比例了。</p>
 <blockquote>
 <p>补充：Y轴就是报错的个数，最高值是10，我们把几个柱体的高度加起来，就是报错的总数量了。</p>
@@ -6575,14 +6575,14 @@
 <li>找到了相关连接，但收到的报文不符合TCP规范，那么接收端也可以发送RST。</li>
 <li>找到了相关连接，但传输状况恶劣，内核选择及时“止损”，发送RST。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/de/d6/de7ec3cb7ccdc5c7da395f271dc935d6.jpg?wh=1861x890" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/de/d6/de7ec3cb7ccdc5c7da395f271dc935d6.jpg?wh=1861x890" /></p>
 <p>而这次案例里面的情况，就符合第一种。这是因为：</p>
 <ul>
 <li>我们的LB上的VIP有一个idle timeout的设置，如果客户端在一定时限内不发任何报文，那么这条连接将被回收。这个时限是180秒，而且回收时不向客户端发送FIN或者RST报文。</li>
 <li>这次的压测客户端框架里，有一个设置值也是关于idle timeout的。不过这个值设置的是360秒。</li>
 </ul>
 <p>你有没有发现问题？这两个idle timeout值一边大一边小，配合不当，就会出现下面这样的问题：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/02/9d/02372ef7e9f63a76aa9f1c8e82957d9d.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/02/9d/02372ef7e9f63a76aa9f1c8e82957d9d.jpg?wh=2000x1125" /></p>
 <p>某条TCP连接中完成一次HTTP请求和响应之后，连接没有被关闭。过了180秒，LB这一侧的连接被回收了，但客户端那边还没到360秒，所以还认为这条连接是活着的，于是在180秒之后发起了一次请求。报文到达LB，后者在连接表里没有查到这条连接，于是回复了RST。</p>
 <p>根因清楚了，解决起来异常简单：把客户端的Idle timeout参数，从原先的360秒，改成比LB的180秒更低的值就好了。这次改到了120秒，RST就完全消失了。</p>
 <p>你看，虽然在案例2里，我们知道了压测最好使用长连接，这样可以避免源端口耗尽的问题。但是不等于你设置了长连接就一劳永逸了，还需要考虑idle timeout的问题。这次压测的关键在于：要确保长连接本身是真正有效的，你需要<strong>确保客户端的idle timeout小于服务端的idle timeout，这样才能避免连接失效导致的RST</strong>。</p>
@@ -6781,8 +6781,6 @@ window下可以通过修改注册表 HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

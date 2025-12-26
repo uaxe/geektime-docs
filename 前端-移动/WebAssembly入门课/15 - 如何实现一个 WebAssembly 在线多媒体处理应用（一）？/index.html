@@ -5321,12 +5321,12 @@
 <p>DIP 的全称为 “Digital Image Processing”，即“数字图像处理”。在我们将要构建的这个 Web 应用中，我们将会为在线播放的流媒体资源，去添加一个特定的实时“图像处理滤镜”，以改变视频本身的播放显示效果。</p>
 <p>由于添加实时滤镜需要在视频播放时，同步地对当前某一帧画面上的所有像素点，进行一定的像素值的数学处理变换，因此整个应用从某个角度来说，是一个“计算密集型”应用。</p>
 <p>首先，我们来看下这个应用在实际运行时的样子，你可以先看看下面给出的这张图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9b/24/9b5c89f8a3da6e12638e745db9b63624.gif?wh=600%2A532" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9b/24/9b5c89f8a3da6e12638e745db9b63624.gif?wh=600%2A532" /></p>
 <p>根据这张图，我们可以将整个应用的运行界面划分为三个部分。其中最为明显就是上方的视频显示区域。在这个矩形的区域中，我们将循环播放一段视频，并根据用户是否选择添加滤镜，来实时动态地改变这里的视频显示效果。</p>
 <p>紧接着视频下方的区域用来显示当前视频的实时播放帧率。通过显示播放帧率，我们将能够在应用运行时明显地看出，当在分别采用 JavaScript 以及 Wasm 为视频资源“添加”滤镜时，两者在计算性能上的差异。</p>
 <p>再往下的一部分，便是整个应用的控制区域。在这个区域中，我们可以控制是否选择为视频添加滤镜效果。以及是使用 JavaScript 还是 Wasm 来处理滤镜的添加过程。当我们选择好某一项设置后，可以直接点击下方的“确定”按钮，使当前设置立即生效。</p>
 <p>介绍完这个应用的 UI 布局之后，我们来总体看一看整个应用的结构图，如下所示。在后面的内容中，我们将会根据这个结构图，一步一步地来构建这个 Web 应用。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4e/17/4e5096725af5c0e8563c94b40d896517.png?wh=1094%2A584" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4e/17/4e5096725af5c0e8563c94b40d896517.png?wh=1094%2A584" /></p>
 <p>应用被划分为几个部分。首先，为了能够实时地处理视频数据，我们需要将 HTML <code>&lt;video&gt;</code>标签所承载视频的每一帧，都绘制在一个 Canvas 对象上，并通过 Web API — “requestAnimationFrame” 来让这些帧“动起来”。</p>
 <p>然后这些数据将会根据用户所选择的设置，分别传递给 Wasm 模块或 JavaScript 进行相应的滤镜处理。这里 JavaScript 还同时兼具控制整个应用 UI 交互的作用，比如处理“点击事件”，处理用户所选择的设置等等。</p>
 <h2 id="_1">滤镜的基本原理</h2>
@@ -5339,24 +5339,24 @@
 <li>重复上述步骤，直至图像中所有其他像素点均完成此计算过程。</li>
 </ul>
 <p>为了加深你对上面计算过程的理解，这里我们来举个例子。首先，我们给出一个 3 x 3 大小的卷积核矩阵：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/61/6a/612fb2ab1a5d301c3df54d27e9fb856a.jpg?wh=1267%2A195" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/61/6a/612fb2ab1a5d301c3df54d27e9fb856a.jpg?wh=1267%2A195" /></p>
 <p>按照步骤，第一步我们需要对该矩阵进行 180 度的旋转，但由于该矩阵是中心对称的，因此经过旋转后的矩阵与原矩阵相比，没有任何变化。接下来，我们给出如下一个 4 x 4 像素大小的图像，并使用上述卷积核来对此图像进行滤波操作。该图像中各像素点的 RGB 分量值如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3e/8d/3eb92fcc4117264579e9127bdbf58d8d.jpg?wh=1267%2A258" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3e/8d/3eb92fcc4117264579e9127bdbf58d8d.jpg?wh=1267%2A258" /></p>
 <p>按照规则，对于 3 x 3 大小的卷积核矩阵，我们可以直接忽略图像最外层像素的卷积处理。相应地，我们需要从第二行第二列的像素点开始进行卷积计算。</p>
 <p>首先，将之前翻转后的卷积核矩阵中心，与第二行第二列位置的这个像素点对齐，然后你会发现，卷积核矩阵中的各个单元，正好与图像左上角 3 x 3 范围内的像素一一对应。这就是我们可以忽略对图像最外一层像素进行卷积处理的原因。</p>
 <p>因为在对这些像素点进行卷积计算时，卷积核矩阵覆盖的像素范围会超过图像的边界。你可以参考文中下面这张图来帮助理解我们现在所进行的步骤。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0a/91/0aae0c53b99f9caceedba409557caf91.png?wh=770%2A706" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0a/91/0aae0c53b99f9caceedba409557caf91.png?wh=770%2A706" /></p>
 <p>接着，我们开始计算。计算过程很简单。首先，我们把卷积核矩阵对应的 9 个单元格内，各像素点的 RGB 分量值与对应单元内的数值相乘，然后将这九个值进行求和。得到的结果值就是在卷积核矩阵中心单元格内，所对应像素的 RGB 分量值的卷积结果值。对于其他分量的卷积计算过程可以以此类推。</p>
 <p>可能这么说，你还是有些不好理解。我以图像中第二行第二列的像素点为例，给你计算一下这个像素点 R 分量的卷积结果 <code>R(c)</code> ：</p>
 <p><code>R(c) = 2 x 0 + -1 x 0 + 2 x 0 + -1 x 0 + 2 x 10 + -1 x 255 + 2 x 0 + -1 x 0 + 2 x 100 = -35</code></p>
 <p>可以看到，这个分量值在经过卷积计算后的结果值为 -35。但别急，相信你已经发现了不对的地方。一个 RGB 分量的有效取值范围为 [0, 255]，而负数则明显是不正确的。</p>
 <p>因此，在实际的卷积计算过程中，我们还需增加另外一个规则，也就是：对于小于 0 的计算结果，用 0 代替，大于 255 的计算结果，则用 255 进行代替。按照这个规则，该像素值经过卷积计算后的实际结果值应该为 0。</p>
 <p>而在本次实践中，我们将会使用下面这个同样 3 x 3 大小的卷积核：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/07/a4/07f769cee3a36b9fbd67f72e6707f2a4.jpg?wh=1265%2A193" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/07/a4/07f769cee3a36b9fbd67f72e6707f2a4.jpg?wh=1265%2A193" /></p>
 <h2 id="emscripten">Emscripten 的基本用法</h2>
 <p>接下来，我们将讲解一下，本次实践所需要使用到的编译工具 — Emscripten<strong>（版本 1.39.19）</strong>。简单来说，Emscripten 是一个“源到源”语言编译器工具集，这个工具集可以将 C/C++ 代码编译成对应 JavaScript 代码。</p>
 <p>既然是工具集，它便不是由单一的二进制可执行文件组成的，除了最为重要的编译器组件 emcc 以外，Emscripten 还同时为我们提供了包含有特定功能宏定义的 C/C++ 头文件、一些 Python 脚本以及其他的附属命令行工具等。其中，emcc 的基本组成结构如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0b/24/0bfdd89a6d80d3dcbb88a40bb2f89c24.png?wh=1558%2A782" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0b/24/0bfdd89a6d80d3dcbb88a40bb2f89c24.png?wh=1558%2A782" /></p>
 <p>可以看到，emcc 能够将输入的 C/C++ 代码，编译成对应的 JavaScript 代码以及用于组成 Web 应用的 HTML 文件。</p>
 <p>起初，Emscripten 主要用于将 C/C++ 代码编译成对应的 ASM.js 代码，而随着后来 Wasm 的逐渐发展和流行，Emscripten 也开始支持将这些输入代码编译成 Wasm 二进制代码。这部分代码的转换功能，主要依赖于 LLVM 为支持 Wasm 而特意添加的编译器后端。</p>
 <p>因此，整个转换的大致流程可以简单归结为：C/C++ 源代码 -&gt; LLVM IR -&gt; Wasm。</p>
@@ -5428,11 +5428,11 @@
 <p>关于代码的实现细节，主要部分我都以注释的形式进行了标注。其中最为重要的一个地方就是对 “.wasm” 格式文件请求的处理。可以看到，这里当服务器收到一个对 “.wasm” 格式文件的 HTTP 请求时，会返回特殊的 MIME 类型 “application/wasm”。</p>
 <p>通过这种方式，我们可以明确告诉浏览器，这个文件是一个 Wasm 格式的文件，进而浏览器便可以允许应用使用针对 Wasm 文件的“流式编译”方式（也就是我们在之前文章中介绍的 WebAssembly.instantiateStreaming 这个 Web API），来加载和解析该文件，这种方式在加载的处理大体积 Wasm 文件时会有着非常明显的效率优势。</p>
 <p>接着，启动这个本地服务器后，我们便可以在浏览器中通过 8888 端口来访问刚刚由 Emscripten 编译生成的 main.html 文件。如果你顺利地到达了这里，那么恭喜，你将可以看到如下界面：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1b/8a/1b2067df16ae17d002dec5d2c0586f8a.png?wh=1584%2A970" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1b/8a/1b2067df16ae17d002dec5d2c0586f8a.png?wh=1584%2A970" /></p>
 <p>仔细观察，你会发现我们之前在 C/C++ 代码的 main 函数中，通过 std::cout 打印的，函数 add 的调用结果被显示在了下方的黑色区域中。</p>
 <p>我们都知道，在 C/C++ 代码中，可以通过标准库提供的一系列 API 来直接访问主机上的文件，甚至也可以通过调用本地主机的系统调用来使用多线程等功能。那么，这部分代码是如何被编译到 Wasm 里，并允许在 Web 浏览器中使用的呢？这一切，都要归功于 Emscripten 为我们提供的一个虚拟主机运行时环境。</p>
 <p>如下面这张图所示，通常一个完整的 Wasm Web 应用，都会由三部分组成，即：Wasm 模块代码、JavaScript 胶水代码以及一些对 Web API 的调用。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4f/15/4f7ba2b46c6f03658a478byydd416515.png?wh=896%2A346" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4f/15/4f7ba2b46c6f03658a478byydd416515.png?wh=896%2A346" /></p>
 <p>为了能够支持在 Web 浏览器中“使用”诸如 std::fopen 等 C/C++ 语言中，用于访问本机文件资源的标准库函数，Emscripten 会使用诸如 LocalStorage 之类的浏览器特性，来模拟完整的 POSIX 文件操作和相关的数据结构。当然，只不过这一切都是使用 JavaScript 来模拟实现的。</p>
 <p>同样，在我们这个例子中，对于发送到 stdout 的数据，Emscripten 会通过 JavaScript 直接映射并输出到页面上的指定的 textarea 区域中。类似的，对于多线程甚至 TCP 网络访问（POSIX Socket），Emscripten 也会相应地通过浏览器上的 Web Worker 以及 Web Socket 等方式来进行模拟。</p>
 <p>在上面的例子中，我们尝试了 Emscripten 最基本、最简单的，用于构建 Wasm Web 应用的一种方式。但该方法的弊端在于由 Emscripten 自动生成的“胶水代码”中，包含有通过 JavaScript 模拟出的 POSIX 运行时环境的完整代码，因此在某些情况下，应用整体的体积可能还是稍显过大。在极端网络环境的情况下，Web 应用可能会显得力不从心。</p>
@@ -5567,8 +5567,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

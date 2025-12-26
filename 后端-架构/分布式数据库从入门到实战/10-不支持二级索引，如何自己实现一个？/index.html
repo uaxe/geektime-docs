@@ -14056,28 +14056,28 @@
 <h2 id="_1">如何用行键实现组合索引？</h2>
 <p>在我们的例子中，如果用户ID在每次查询时都是必填项，那么有一个稍简单一些的方法，就是我们简单改变一下行键的组成，利用行键来实现一个类似关系型数据库的多字段组合索引。</p>
 <p>我们在设计HBase行键的时候，除了考虑怎样合适地划分分区外，还要把查询的条件字段尽可能地融入到行键里。如果例子中的所有场景都是基于用户ID加上手机号查询数据，那么行键设计可以是图片里的样子。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/29/a7/2942c3e8e02196bedef935a62554cfa7.png?wh=724x346" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/29/a7/2942c3e8e02196bedef935a62554cfa7.png?wh=724x346" /></p>
 <p>这样查询的时候，就可以根据用户ID和手机号精准地定位到某一条记录。</p>
 <p>但是，跟关系型数据库索引前缀匹配的原则一样，如果查询条件字段中不包含HBase行键的前缀字段，那就没法命中行键索引，就可能需要全表或者区间扫描了。比如根据姓名查询联系人但是不知道用户ID，就得全表扫描了。</p>
 <p>如果知道用户ID，那就满足前缀匹配，可以将全表扫描优化为区间扫描。也就是可以根据用户ID确定一个区间。下面这个图，描述了这样的一个区间。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e9/67/e9e5f252e5ab2b69cc5251c6b7e3a267.png?wh=1068x568" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e9/67/e9e5f252e5ab2b69cc5251c6b7e3a267.png?wh=1068x568" /></p>
 <p>你可以看到，区间的开始行键是用户ID逆序补齐后加上0，结束行键是用户ID逆序加上多个z，这也是因为字典序里面0最小，z最大。</p>
 <p>这里再给你一个建议，就是行键保持定长，这样方便从行键中提取信息。</p>
 <p>如果单纯依赖行键索引查询，满足不了需求。比如还是刚刚根据姓名查询联系人的需求，但是行键是用户ID加手机号。那该怎么办呢？接着往下看。</p>
 <h2 id="_2">如何实现一个二级索引</h2>
 <p>回顾一下，MySQL的主键索引其实是一个基于B+树的聚簇索引，用叶子节点存储了数据。一个用户基本信息表的主键索引就像下面这张图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0e/d6/0eb24dc1613a3943cf5e7e8c038dyyd6.png?wh=1390x922" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0e/d6/0eb24dc1613a3943cf5e7e8c038dyyd6.png?wh=1390x922" /></p>
 <p>如果我要创建一个基于用户姓名的索引，MySQL会为我们构建一棵通过姓名找到主键的B+树。像下面这个图一样。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3b/6f/3bd1f2d141721393bd153c2ccf37596f.png?wh=1326x910" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3b/6f/3bd1f2d141721393bd153c2ccf37596f.png?wh=1326x910" /></p>
 <p>这样根据姓名查询的时候，就可以根据这个索引找到对应的数据行主键，再找到实际的数据。</p>
 <p>类似的，我们也可以通过这种形式来实现一个HBase的二级索引。</p>
 <p>在前面的例子中，我们可以构建一个从姓名到用户联系人表行键的映射关系。这样就可以先通过姓名找到行键，再通过行键直接读取联系人数据。</p>
 <p>像下面这张图一样。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/87/ab/872165cd4449a3ff1735fc11b65016ab.jpg?wh=2764x766" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/87/ab/872165cd4449a3ff1735fc11b65016ab.jpg?wh=2764x766" /></p>
 <p>注意看，索引表的行键，我们组合了用户ID、姓名、序列号，这样一来，就做到行键的全局唯一性，避免与其他记录重复。</p>
 <p>看起来是不是很简单？但是难点就在于什么时候写入索引表，如何保证索引表的数据与数据表一致。Phoenix就使用了HBase协处理器来解决这个问题。</p>
 <h2 id="_3">什么是协处理器？</h2>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/83/53/8372da32fe96203ced718a9bf7a74f53.png?wh=14776x10388" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/83/53/8372da32fe96203ced718a9bf7a74f53.png?wh=14776x10388" /></p>
 <p>HBase有两类协处理器。</p>
 <p>第1类叫做<strong>观察者类型协处理器</strong>，即Observer。观察者类型协处理器提供了各种回调函数，在一些方法执行前后触发，类似于Spring里面的AOP切面或者数据库的触发器。比如，针对Master的MasterObserver，会在建表、删除表、表压缩、表拆分的时候触发执行。而针对分区的RegionObserver，会在分区flush、数据Put等操作的情况下触发执行。</p>
 <p>第2类叫做<strong>端点类型协处理器</strong>，类似存储过程。可以用来统计分析。它会在服务端完成统计分析之后，将结果传输到客户端。</p>
@@ -14173,7 +14173,7 @@
 </code></pre></div>
 <p>注意，动态加载协处理器的时候，我使用了jar包的一个本地路径，并指定了需要加载的协处理器的类全路径。加载的命令最后也带了两个参数，一个是协处理器的优先级，另外一个是用来传给协处理器程序的参数。</p>
 <p>输出结果如下所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/44/52/44916f4fbbf6ffba66e3201a73b0ba52.png?wh=1747x611" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/44/52/44916f4fbbf6ffba66e3201a73b0ba52.png?wh=1747x611" /></p>
 <p>从输出结果可以看到，在向s_contact表写入数据的同时，也向索引表i_contact_name写入了一行索引记录。行键为用户名，而s_contact表的行键作为列值。</p>
 <h2 id="_6">小结</h2>
 <p>设计行键的时候不单单要考虑如何更好地分区，同时也要考虑表数据的使用场景，将查询时用到的条件字段，尽可能多地融到行键里面，这样才能在查询时尽可能精准的定位到数据行。基于行键的单行读取最为高效，其次是基于一个小区间的扫描。</p>
@@ -14298,8 +14298,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -15046,7 +15046,7 @@
 </blockquote>
 <h4 id="_4">源自操作部分失败</h4>
 <p>这个是最难解决的。之前你在<a href="https://time.geekbang.org/column/article/678287">分布式事务</a>、<a href="https://time.geekbang.org/column/article/687062">消息丢失</a>两节课里面已经看到了类似的问题，也就是在分布式环境下，你很难保证多个操作要么都成功，要么都失败。而在更新数据的时候，即便是最简单的模型，也是要求你更新数据库和更新缓存要么都成功，要么都失败。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7d/03/7d7e7c7777c1207c9d4d1yye46236f03.png?wh=1920x808" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7d/03/7d7e7c7777c1207c9d4d1yye46236f03.png?wh=1920x808" /></p>
 <p>显然，这是一个分布式事务问题。那么通过前面的学习，你应该知道已有的分布式事务里面，追求的都是最终一致性。即便你认为 XA 事务能够解决一致性问题，但是缓存基本上没有支持 XA 事务的。</p>
 <p>好在缓存有点特殊。所以在这节课的后面我给出了一个结合本地事务和分布式锁的无限接近强一致性的方案。所以这里的结论就是，源自部分失败造成的数据不一致是不可避免的。</p>
 <blockquote>
@@ -15062,7 +15062,7 @@
 <blockquote>
 <p>另外一个导致数据不一致的原因是并发操作，比如说多个线程同时更新数据库和缓存，在这种情况下有可能先更新数据库的线程后更新缓存，导致数据不一致。</p>
 </blockquote>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/69/5b/695e31fdc36d9c9c1358a96a8b8f925b.png?wh=1920x920" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/69/5b/695e31fdc36d9c9c1358a96a8b8f925b.png?wh=1920x920" /></p>
 <p>然后你可以解释这个是可以解决的。</p>
 <blockquote>
 <p>并发操作的数据不一致问题，是可以解决的。比如说在缓存模式里面，Write Back 就可以，虽然它会丢数据。又或者使用分布式锁，也可以控制并发更新。</p>
@@ -15079,19 +15079,19 @@
 <h4 id="_7">消息队列</h4>
 <p>既然使用分布式锁是为了保证同一时刻只有一个线程在更新数据，那么为什么不让更新请求都跑到消息队列上排个队呢？</p>
 <p>思路也很简单，就是结合之前在有序消息里面讲到的方案，让针对同一个业务的更新请求保持有序。消费者挨个将消息取出来，然后更新数据库和缓存。这种做法一样能够保证在同一时刻对同一个数据只有一个线程在更新。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7e/3f/7efc4b73ac1f53fe9f417d6bfd3d4f3f.png?wh=1920x899" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7e/3f/7efc4b73ac1f53fe9f417d6bfd3d4f3f.png?wh=1920x899" /></p>
 <blockquote>
 <p>针对一些可以异步更新数据的场景，可以考虑将更新请求都发送到消息队列上。但是要注意的是，同一个业务的消息必须是有序的，不然更新数据会出错。消费者在取出消息之后，执行更新。而且消费者在更新失败之后，可以多次重试，对业务也没有什么影响。这个方案也是追求最终一致性的，强一致性还是用不了。</p>
 </blockquote>
 <p>这里有一个变种，就是先更新数据库，再发送消息到消息队列，让消费者去更新缓存。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/08/d2/08256646fff5ca822f214e03b1955fd2.png?wh=1920x857" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/08/d2/08256646fff5ca822f214e03b1955fd2.png?wh=1920x857" /></p>
 <p>但是如果消费者依赖消息中的数据来更新缓存，那么就会有并发问题，因为先更新数据库的不一定先发消息。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e6/ca/e6e03bf4c3e6e6b95ac98048227715ca.png?wh=1920x961" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e6/ca/e6e03bf4c3e6e6b95ac98048227715ca.png?wh=1920x961" /></p>
 <p>所以最多就是把消息当成一个触发器，收到消息就去更新缓存，但是是查询数据库中的数据来执行更新。但是我个人认为，既然要先更新数据库，为什么不用缓存模式中的 Refresh Ahead，引入 Canal 之类的来更新缓存呢，这样效果更好。</p>
 <h4 id="_8">版本号</h4>
 <p>版本号也能解决并发更新的问题。它的基本思路就是每一次更新版本号都要加一，然后低版本数据不能覆盖高版本的数据。</p>
 <p>在这种思路之下，前面在缓存模式里面出现过的很多数据不一致的场景，都能得到解决。比如说在 Cache Aside 里面，加上版本号之后，就不会出现不一致的问题了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d0/2e/d04a05caff1a016014e0c35c84e5b12e.png?wh=1920x1079" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d0/2e/d04a05caff1a016014e0c35c84e5b12e.png?wh=1920x1079" /></p>
 <blockquote>
 <p>另外一个思路是使用版本号来控制并发更新，每个数据都有一个对应的版本号，在更新的时候版本号都要加一。每一次在更新的时候都要比较版本号，版本号低的数据不能覆盖版本号高的数据。</p>
 </blockquote>
@@ -15102,7 +15102,7 @@
 <p>事实上，在正常的面试中，你能分析清楚数据不一致的两个根源，然后回答出消息队列和版本号两个方案，已经算是答得比较好的了。不过有一个问题，我觉得还是要进一步介绍一下，防止你在面试的时候被问住，那就是在多级缓存里面怎么更新的问题。</p>
 <h4 id="_9">多级缓存</h4>
 <p>多级缓存是指你在业务中使用了多个缓存，比如说本地缓存 + Redis + 数据库的架构。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/68/e5/68c5e318a4fe14cf9e3161ed772bace5.png?wh=1920x1079" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/68/e5/68c5e318a4fe14cf9e3161ed772bace5.png?wh=1920x1079" /></p>
 <p>在这种架构下，更新数据的时候，需要考虑更新本地缓存、Redis 和数据库的顺序。</p>
 <p>首先你可以明确的一点是，<strong>数据库是最准确的数据源，所以你肯定是优先更新数据库的</strong>。剩下的无非就是先更新本地缓存还是先更新 Redis 的事情了。</p>
 <p>坦白说，如果只是考虑数据一致性的问题，你随便更新哪个都会不一致。硬要矮个子里面挑高个的，我认为更新本地缓存应该先于Redis。</p>
@@ -15110,21 +15110,21 @@
 <p>在使用本地缓存和 Redis 缓存的时候，我的更新顺序是，先更新数据库，再更新本地缓存，最后更新 Redis。先更新数据库是因为数据库应该是最准确的数据源。</p>
 <p>其次更新本地缓存，理由有三个：一是更新本地缓存几乎不会失败；二是查询的时候是先查询本地缓存的，先更新本地缓存可以确保用户能够拿到最新的数据；三是即便后续 Redis 更新失败，因为本地缓存中数据是存在的，所以也不会查询到 Redis 中不一致的数据。</p>
 </blockquote>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/39/2c/39bafa4dcf17f387a33d431ee26d772c.png?wh=1920x909" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/39/2c/39bafa4dcf17f387a33d431ee26d772c.png?wh=1920x909" /></p>
 <p>从上面这个图你也可以看出来，引入了本地缓存和 Redis 缓存之后，数据不一致性的概率就更加大了，你可以按照前面几节课我分析各种不一致场景的思路去分析，我就不重复了。</p>
 <h2 id="_10">亮点方案</h2>
 <h3 id="_11">一致性哈希和缓存</h3>
 <p>这个亮点方案你在微服务部分已经见过了，这一次是进一步深入讨论。你先回顾一下一致性哈希负载均衡算法和本地缓存的方案。</p>
 <p>这个方案主要解决的是并发更新的问题，因为它通过哈希负载均衡算法做到某一个 key 只有一个服务端节点在处理。因此你将本地缓存换成 Redis 也一样可以。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0c/69/0c20410c8404feff2526a51e1f01f269.png?wh=1920x777" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0c/69/0c20410c8404feff2526a51e1f01f269.png?wh=1920x777" /></p>
 <p>你在面试缓存一致性的时候也不要忘记提起这个方案。但是我没有细说一个点，就是怎么更新数据？因为即便是同一个 key 的请求都落在同一个节点上，依旧存在并发更新的问题。这个时候你就需要使用到缓存模式中的 singleflight 模式了。你在介绍完基本方案之后，要注意提一下这个。</p>
 <blockquote>
 <p>在使用了这种负载均衡算法之后，更新缓存的时候要使用 singleflight 模式，那么就可以做到同一个 key 一定落在同一个节点上，并且这个节点上最多只有一个线程在更新数据。如果有多个更新请求，那么它们会轮流更新数据库和缓存。</p>
 </blockquote>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8d/44/8d9bebc62006bd1a76ebce701a172e44.png?wh=1920x754" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8d/44/8d9bebc62006bd1a76ebce701a172e44.png?wh=1920x754" /></p>
 <p>此外，当时我也提到一个问题，在节点上线或者下线的时候，就会引起不一致的问题，那么怎么解决呢？</p>
 <p>我们先来看节点下线。节点下线其实是最好处理的，因为下线之后，新的请求都会被打到另外一个节点上，也就是只有一个节点在处理某个 key 的请求。但是如果节点上线，也就是扩容的话，就会引起不一致的问题。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/90/f5/9000a7f4db4d9b8a7664059e994de7f5.png?wh=1920x773" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/90/f5/9000a7f4db4d9b8a7664059e994de7f5.png?wh=1920x773" /></p>
 <p>解决的思路其实也很简单，既然问题出在新节点加入之后的短时间内，有两个节点在处理写请求，那么停掉一个就可以了。所以你在介绍完基本想法以及可能存在数据不一致的问题之后，补充这个说明。</p>
 <blockquote>
 <p>解决这种数据不一致的思路也很简单，就是在新节点上线的一小段时间内，不要读写缓存，等待老节点上的请求自然返回。你可以预想一下，如果你们公司的响应时间是要求在 1s 以内，那么新节点上来的头 2s，就可以不用读写缓存。虽然这两秒的请求响应时间会很差，但是也能避开数据不一致的问题。</p>
@@ -15135,11 +15135,11 @@
 <p>分布式锁方案很多人用，但是很少有人给你解释清楚里面的弯弯绕绕。这里我先给你解释安全、性能不错，但是一致性比较差的思路，再给你介绍无限接近强一致性、但是隐患比较多的思路。</p>
 <h4 id="_13">思路一：先本地事务，后分布式锁</h4>
 <p>这个思路是先执行本地事务，然后加分布式锁，删除缓存，释放分布式锁。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/03/de/03d7d9e4a877e28408d3eddc16c984de.png?wh=1920x728" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/03/de/03d7d9e4a877e28408d3eddc16c984de.png?wh=1920x728" /></p>
 <p>显然，如果单纯这样做，肯定会有不一致的问题，你可以看一下示意图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/2c/64/2c5dyy2a8c7ef21cfe4243ebd2846164.png?wh=1920x1085" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2c/64/2c5dyy2a8c7ef21cfe4243ebd2846164.png?wh=1920x1085" /></p>
 <p>为了避免这个并发更新的问题，你需要在缓存未命中回查数据库的时候，加上分布式锁。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/02/36/022b7062d35d2d19ee90968fb76d3336.png?wh=2452x1380" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/02/36/022b7062d35d2d19ee90968fb76d3336.png?wh=2452x1380" /></p>
 <p>所以你抓住先本地事务，后分布式锁的顺序来回答。</p>
 <blockquote>
 <p>我之前用过分布式锁来尝试解决并发更新的问题，基本思路是先执行本地事务，在事务提交之后加分布式锁，然后删除缓存。而在读请求来了的时候，先读缓存。如果缓存未命中，再加分布式锁，然后从数据中加载数据回写缓存，再释放分布式锁。</p>
@@ -15148,21 +15148,21 @@
 <blockquote>
 <p>当然，这里也可以进一步优化，在读请求缓存未命中加上了分布式锁之后，再次读一下缓存，看看有没有别的线程已经加载好了数据。</p>
 </blockquote>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/10/3a/10c60f39cd700af1a1787ab42058bd3a.png?wh=1920x1080" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/10/3a/10c60f39cd700af1a1787ab42058bd3a.png?wh=1920x1080" /></p>
 <p>显然，这个只解决了并发更新的问题。你可能想到了，既然我有一个本地事务，那么我能不能在本地事务还没提交的时候，就把缓存删除？这也就是我们的第二个思路。</p>
 <h4 id="_14">思路二：先删除缓存，再提交事务</h4>
 <p>这一个思路的核心是把删除缓存的操作放在数据库事务里，你可以看一下基本思路图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/73/a7/73371860fc7353d155f1bc919639a6a7.png?wh=1920x1082" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/73/a7/73371860fc7353d155f1bc919639a6a7.png?wh=1920x1082" /></p>
 <p>你在面试的时候先简要介绍思路。</p>
 <blockquote>
 <p>另外一个思路是尝试在数据库提交事务之前就删除缓存。它的思路是先开启本地事务，执行事务操作。然后获取分布式锁，删除缓存。紧接着提交事务，释放分布式锁。当然，在缓存未命中回查的时候，还是要先加分布式锁，避免并发更新的问题。</p>
 </blockquote>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/00/55/0047d61a5743cb9f85e18d9669e6ce55.png?wh=1920x928" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/00/55/0047d61a5743cb9f85e18d9669e6ce55.png?wh=1920x928" /></p>
 <p>回答到这里，如果面试官反应灵敏，他就可能会追问你删除缓存和提交事务两个动作的失败问题，那么你就回答这两种情况。</p>
 <blockquote>
 <p>有两种主要失败场景。一是删除失败了，那么事务不会提交，数据是一致的。二是删除成功了，事务提交失败了，数据依旧是一致的，也就是多删了一次缓存而已。</p>
 </blockquote>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/54/33/547d665101d9199yy54befeb9b8c9233.png?wh=1920x1082" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/54/33/547d665101d9199yy54befeb9b8c9233.png?wh=1920x1082" /></p>
 <p>那么这个做法是不是强一致性的呢？答案是无限接近强一致性。</p>
 <blockquote>
 <p>这种解决思路已经非常非常接近强一致性了。不过这里有两个条件，如果满足了就可以认为是达成了强一致性的效果。</p>
@@ -15173,17 +15173,17 @@
 <blockquote>
 <p>这一个方案最大的缺点就是本地事务比较容易超时。比如说分布式锁被人抢占了，那么在等待分布式锁的时候，就可能超时。当然，如果本身网络不稳定导致一直无法删除缓存，也会引起本地事务超时。</p>
 </blockquote>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8c/96/8c961c73fbc8e18fc3efbf85c6d84296.png?wh=1920x1084" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8c/96/8c961c73fbc8e18fc3efbf85c6d84296.png?wh=1920x1084" /></p>
 <p>超时问题其实有方案来缓解。</p>
 <blockquote>
 <p>可以考虑先加分布式锁，再开启本地事务，然后删除缓存，提交事务，最后释放分布式锁。代价就是分布式锁的持有时间变长了。并且删除缓存本身依旧在本地事务里面，还是可能导致本地事务超时。</p>
 </blockquote>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d5/a6/d5a2d1a03916079e2ebb86baf4382aa6.png?wh=1920x806" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d5/a6/d5a2d1a03916079e2ebb86baf4382aa6.png?wh=1920x806" /></p>
 <p>整个方案里面，你几乎都是在围绕分布式锁来做文章，所以面试话题十有八九会被引导到分布式锁上，课程后面会有详细分析，你要结合在一起学习。</p>
 <h2 id="_15">面试思路总结</h2>
 <p>这一节课我们介绍了 double-check，然后在面试思路里面分析了引起不一致的两个根源：操作部分失败和并发操作。总的来说，并发操作容易解决，比如说使用缓存模式就很容易解决并发更新的问题，除此之外使用消息队列或者版本号也同样可以解决问题。</p>
 <p>然后我进一步讨论了负载均衡那一节课里引入的一致性哈希负载均衡算法和缓存结合使用的方案，重点讨论了使用分布式锁来解决一致性问题的两个思路。第一个思路比较中规中矩，先提交本地事务，再加分布式删除缓存。第二个思路能达成一种无限接近强一致性的效果，核心是先删除缓存，再提交事务，但是它严重依赖分布式锁的可靠性。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3e/e4/3e1db94cbba9828byya3bba4287e86e4.png?wh=2897x3251" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3e/e4/3e1db94cbba9828byya3bba4287e86e4.png?wh=2897x3251" /></p>
 <h2 id="_16">思考题</h2>
 <p>最后，请你来思考两个问题。</p>
 <ul>
@@ -15316,8 +15316,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

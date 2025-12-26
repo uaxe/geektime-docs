@@ -7292,18 +7292,18 @@
 <h2 id="ray">什么是Ray</h2>
 <p>Ray 是一个开源的分布式计算框架，旨在简化大规模机器学习和分布式应用程序的开发。它提供了高效的并行处理能力，支持数据预处理、分布式训练、超参数调优、模型服务和强化学习等任务。Ray 的核心概念包括任务（Tasks）、参与者（Actors）和对象（Objects），使得开发者能够轻松地在分布式环境中编写和执行并行代码。</p>
 <p>如下图所示，便是程序通过 Ray 的处理之后，在三个节点上分布式运行的一个简单示意图。Ray 会将程序拆分成多片，分布到多个节点去运行。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/53/50/53b90c2cyy4a05727e4c0b881c73b450.jpg?wh=1600x839" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/53/50/53b90c2cyy4a05727e4c0b881c73b450.jpg?wh=1600x839" /></p>
 <p>在之前的 Kubernetes 入门课中，我们讲过 K8s 作为云原生基础设施标准所具备的优势，比如弹性伸缩、资源调度等等。</p>
 <p>因此，由字节跳动技术团队牵头，联合 AnyScale、蚂蚁金服、微软等公司在 Ray 的基础上又开发了适配 Kubernetes 版本的 KubeRay。它采用了经典的 Operator 设计，提供了 RayCluster、RayJob 和 RayService 等自定义资源定义（CRD），使得在 Kubernetes 集群上部署和管理 Ray 集群变得更加简便。通过 KubeRay，用户可以高效地管理 Ray 集群的生命周期，实现弹性伸缩、资源调度和作业管理等功能。</p>
 <p>Ray-Operator 是 KubeRay 项目中的核心组件，负责在 Kubernetes 集群中创建和管理 Ray 集群。它通过监听 RayCluster、RayJob 和 RayService 等 CRD 的变化，自动化地处理 Ray 集群的部署、扩缩容和故障恢复等任务。Ray-Operator 使得用户能够以声明式的方式管理 Ray 集群，简化了集群的运维工作。</p>
 <p>下图是在 Kubernetes上通过 Ray-operator 创建 Ray 集群的示意图。用户通过向 Ray-operator 提交 CR 的方式，来创建 Ray-Cluster。Ray-Cluster 包括一个 Head 和多个 Worker，会分别分布在不同的 GPU 节点上。以图中所示为例，含有两个 GPU 节点，则会有一个 Head 和一个 Worker 分别在这两个节点上以 pod 形式创建。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/09/1e/09a6047330cc49ba68ceb5yy5e878e1e.jpg?wh=3429x2569" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/09/1e/09a6047330cc49ba68ceb5yy5e878e1e.jpg?wh=3429x2569" /></p>
 <p>OK，理论部分就讲到这，你只要知道什么是 Ray，以及 Ray-Cluster 的架构即可，我们把重点放在部署和使用上。</p>
 <h2 id="_1">部署过程</h2>
 <h3 id="_2">环境与模型准备</h3>
 <p>首先是准备 GPU 机器。上节课讲过，分布式推理有两种方案，一种是一个节点上有多张卡的情况，这种情况是通过使用 NVLink 技术，在卡之间建立高速通道，实现卡卡高速互联。第二种是多节点单（多）卡的情况，这种情况依赖节点间的高速网络。</p>
 <p>这节课我们来测试多节点的情况，因此我在联通云上开通了一台 GPU 版本的 K8s，包含三个非 GPU 的 master 节点，以及两个 GPU 节点，每个节点上有一张 A100 卡。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/16/d4/1693293866808ff351095a1804e96bd4.png?wh=1920x540" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/16/d4/1693293866808ff351095a1804e96bd4.png?wh=1920x540" /></p>
 <p>这台 K8s 会通过 NVIDIA 的 GPU-operator 部署好 NVIDIA 相关的驱动等，CUDA 版本选择 12.2。</p>
 <p>机器准备好后，接下来就是模型文件的准备。对于不能科学上网的同学，模型文件可以在魔搭社区下载，链接：<a href="https://www.modelscope.cn/models/deepseek-ai/DeepSeek-R1-Distill-Llama-70B/files">https://www.modelscope.cn/models/deepseek-ai/DeepSeek-R1-Distill-Llama-70B/files</a>。由于文件非常大，整个 repo 大概有 131G 左右，因此推荐你将模型下载到对象存储或者云硬盘，再通过 PV、PVC 的方式挂载。我采用的是对象存储的方式，PV、PVC 的 YAML 如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">apiVersion</span><span class="p">:</span> <span class="n">v1</span>
@@ -7501,7 +7501,7 @@
 <a id="__codelineno-8-24" name="__codelineno-8-24" href="#__codelineno-8-24"></a>(no resource demands)
 </code></pre></div>
 <p>可以看到有两个 Active 的节点，和两个没有使用的 GPU。Ray 集群自带了一个可视化 UI，可以直观地查看 CPU，内存，GPU 等的使用量以及任务执行情况等，因此可以通过 loadBalancer 或者 NodePort 将 UI 的端口暴露出去，即可在集群外部访问。我们在浏览器输入 <a href="http://xxxx:8265">http://xxxx:8265</a> 进入 Web UI查看。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/55/75/55381bebcbde46c5895a53a2a80e6775.png?wh=1920x492" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/55/75/55381bebcbde46c5895a53a2a80e6775.png?wh=1920x492" /></p>
 <p>这样 Ray 集群部分，我们就部署完了。</p>
 <p>PS：别忘了这时就可以下载模型文件了。</p>
 <h3 id="ray-vllm">在 Ray 中 部署 Vllm</h3>
@@ -7521,10 +7521,10 @@
 <a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>--max-model-len 8096
 </code></pre></div>
 <p>等待一段时间后，会有如下显示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/df/00/df9be8dcc098194bb440654a3616a500.png?wh=1920x685" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/df/00/df9be8dcc098194bb440654a3616a500.png?wh=1920x685" /></p>
 <p>此时就说明，模型加载成功，server 也启动了。</p>
 <p>这时我们再看一下 Ray 集群情况：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/57/23/579bb55923904f018d011bfa57b0a823.png?wh=1920x536" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/57/23/579bb55923904f018d011bfa57b0a823.png?wh=1920x536" /></p>
 <p>可以看到模型在两个 GPU 卡上各占了一半的显存，这也就意味着分布式部署成功了。</p>
 <p>我们可以用 curl 测试一下，命令如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>curl http://&lt;公网IP&gt;:8000/v1/chat/completions \
@@ -7536,12 +7536,12 @@
 <a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>]
 <a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>}&#39;
 </code></pre></div>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/41/ab/4152bd888d0fc619246463a80f4ea4ab.png?wh=1877x821" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/41/ab/4152bd888d0fc619246463a80f4ea4ab.png?wh=1877x821" /></p>
 <h2 id="_3">使用对话前端连接模型</h2>
 <p>在 <a href="https://time.geekbang.org/column/article/857432">Ollama 那节课</a>，我们讲过 LobeChat。通过 docker 一键拉起 LobeChat 后，点击设置，语言模型，在 OpenAI 模型中输入上文命令中的 Server 地址，点击获取模型列表，即可获取到可用模型。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/13/7f/13aca85b22449bcb35ae3524111f0b7f.png?wh=968x695" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/13/7f/13aca85b22449bcb35ae3524111f0b7f.png?wh=968x695" /></p>
 <p>然后便可以开始对话了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8d/bc/8db259617800be28c4ea1aa81efdc6bc.png?wh=1898x902" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8d/bc/8db259617800be28c4ea1aa81efdc6bc.png?wh=1898x902" /></p>
 <p>至此，我们就用分布式的方式成功部署了Deepseek-R1:70B 模型，。如果你机会去部署 671B 模型，可以使用这节课的套路来操作，两者之间在部署手法上一模一样，没有任何区别。</p>
 <h2 id="_4">总结</h2>
 <p>今天通过分布式部署非量化版 DeepSeek-R1 模型的实战，我们不仅深入了解了 Ray 这一强大的分布式计算框架，还掌握了如何在 Kubernetes 集群上高效部署和管理大规模机器学习模型。</p>
@@ -7676,8 +7676,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

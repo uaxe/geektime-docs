@@ -14589,9 +14589,9 @@
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>Query OK, 0 rows affected (0.00 sec)
 </code></pre></div>
 <p>订单在做幂等性校验时，先是通过订单号检查订单是否存在，如果不存在则新增订单记录。知道具体的逻辑之后，我们再来模拟创建产生死锁的运行SQL语句。首先，我们模拟新建两个订单，并按照以下顺序执行幂等性校验SQL语句（垂直方向代表执行的时间顺序）：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/49/a0/49198c13e2dfdff0a9492a1b58cd93a0.jpg?wh=1360%2A1072" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/49/a0/49198c13e2dfdff0a9492a1b58cd93a0.jpg?wh=1360%2A1072" /></p>
 <p>此时，我们会发现两个事务已经进入死锁状态。我们可以在information_schema数据库中查询到具体的死锁情况，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7d/47/7d6e8c42d082ac5b75882e3d171a8047.jpg?wh=2348%2A558" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7d/47/7d6e8c42d082ac5b75882e3d171a8047.jpg?wh=2348%2A558" /></p>
 <p>看到这，你可能会想，为什么SELECT要加for update排他锁，而不是使用共享锁呢？试想下，如果是两个订单号一样的请求同时进来，就有可能出现幻读。也就是说，一开始事务A中的查询没有该订单号，后来事务B新增了一个该订单号的记录，此时事务A再新增一条该订单号记录，就会创建重复的订单记录。面对这种情况，我们可以使用锁间隙算法来防止幻读。</p>
 <h2 id="_1">死锁是如何产生的？</h2>
 <p>上面我们说到了锁间隙，在<a href="https://time.geekbang.org/column/article/114194">第33讲</a>中，我已经讲过了并发事务中的锁机制以及行锁的具体实现算法，不妨回顾一下。</p>
@@ -14608,7 +14608,7 @@
 <p>INSERT INTO <code>demo</code>.<code>order_record</code>(<code>order_no</code>, <code>status</code>, <code>create_date</code>) VALUES (5, 1, ‘2019-07-13 10:57:03’);</p>
 </blockquote>
 <p>我们可以通过以下锁的兼容矩阵图，来查看锁的兼容性：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/58/e3/58b1567a4ff86460ececfd420eda80e3.jpg?wh=1358%2A404" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/58/e3/58b1567a4ff86460ececfd420eda80e3.jpg?wh=1358%2A404" /></p>
 <h2 id="_2">避免死锁的措施</h2>
 <p>知道了死锁问题源自哪儿，就可以找到合适的方法来避免它了。</p>
 <p>避免死锁最直观的方法就是在两个事务相互等待时，当一个事务的等待时间超过设置的某一阈值，就对这个事务进行回滚，另一个事务就可以继续执行了。这种方法简单有效，在InnoDB中，参数innodb_lock_wait_timeout是用来设置超时时间的。</p>
@@ -14620,9 +14620,9 @@
 <p>接下来，我们再来了解一个出现死锁的场景。</p>
 <p>我们讲过，InnoDB存储引擎的主键索引为聚簇索引，其它索引为辅助索引。如果我们之前使用辅助索引来更新数据库，就需要修改为使用聚簇索引来更新数据库。如果两个更新事务使用了不同的辅助索引，或一个使用了辅助索引，一个使用了聚簇索引，就都有可能导致锁资源的循环等待。由于本身两个事务是互斥，也就构成了以上死锁的四个必要条件了。</p>
 <p>我们还是以上面的这个订单记录表来重现下聚簇索引和辅助索引更新时，循环等待锁资源导致的死锁问题：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b6/e7/b685033798d1027dac3f2f6cb1c2c6e7.jpg?wh=1358%2A250" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b6/e7/b685033798d1027dac3f2f6cb1c2c6e7.jpg?wh=1358%2A250" /></p>
 <p>出现死锁的步骤：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e0/b4/e018d73c4a00de2bc3dc6932e0fa75b4.jpg?wh=1362%2A422" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e0/b4/e018d73c4a00de2bc3dc6932e0fa75b4.jpg?wh=1362%2A422" /></p>
 <p>综上可知，在更新操作时，我们应该尽量使用主键来更新表字段，这样可以有效避免一些不必要的死锁发生。</p>
 <h2 id="_3">总结</h2>
 <p>数据库发生死锁的概率并不是很大，一旦遇到了，就一定要彻查具体原因，尽快找出解决方案，老实说，过程不简单。我们只有先对MySQL的InnoDB存储引擎有足够的了解，才能剖析出造成死锁的具体原因。</p>
@@ -14770,8 +14770,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

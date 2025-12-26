@@ -14145,7 +14145,7 @@
 <p>这节课我会给你讲几个具体的规律和思路，帮助你快速判断当前的表结构是否适用于高并发场景，方便后续的系统升级和改造。</p>
 <h2 id="_1">精简数据会有更好的性能</h2>
 <p>为了方便讨论，我先对用户中心做一些简单介绍，如图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6b/d5/6bb44e4d9becb9c088a20f1ab73e87d5.jpg?wh=3900x2762" title="用户中心功能" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6b/d5/6bb44e4d9becb9c088a20f1ab73e87d5.jpg?wh=3900x2762" title="用户中心功能" /></p>
 <p>用户中心的主要功能是维护用户信息、用户权限和登录状态，它保存的数据大部分都属于<strong>读多写少的数据。</strong>用户中心常见的优化方式主要是将用户中心和业务彻底拆开，不再与业务耦合，并适当增加缓存来提高系统性能。</p>
 <p>我举一个简单的例子：当时整表内有接近2000万的账号信息，我对表的功能和字段进行了业务解耦和精简，让用户中心的账户表里只会保留用户登陆所需的账号、密码：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="o">`</span><span class="n">account</span><span class="o">`</span><span class="w"> </span><span class="p">(</span>
@@ -14166,10 +14166,10 @@
 <p>所以你看，有些查询往往会因为精简一两个字段就多查一次数据库，并且还要考虑缓存同步问题，实在是得不偿失，因此我们要在“更多的字段”和“更少的职能”之间找到平衡。</p>
 <h2 id="_2">数据的归类及深入整理</h2>
 <p>除了通过精简表的职能来提高表的性能和维护性外，我们还可以针对不同类型的表做不同方向的缓存优化，如下图用户中心表例子：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/36/9e/36083d93bc124396074021894dda0f9e.jpg?wh=1920x1360" title="一个用户中心的表关系" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/36/9e/36083d93bc124396074021894dda0f9e.jpg?wh=1920x1360" title="一个用户中心的表关系" /></p>
 <p>数据主要有四种：实体对象主表、辅助查询表、实体关系和历史数据，不同类型的数据所对应的缓存策略是不同的，如果我们将一些职能拆分不清楚的数据硬放在缓存中，使用的时候就会碰到很多烧脑的问题。</p>
 <p>我之前就碰到过这样的错误做法——将用户来访记录这种持续增长的操作历史放到缓存里，这个记录的用途是统计有多少好友来访、有多少陌生人来访，但它同时保存着和用户是否是好友的标志。这也就意味着，一旦用户关系发生变化，这些历史数据就需要同步更新，否则里面的好友关系就“过时”了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/33/16/3336e6c06ca0c331671354667b53e516.jpg?wh=3900x2762" title="来访记录" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/33/16/3336e6c06ca0c331671354667b53e516.jpg?wh=3900x2762" title="来访记录" /></p>
 <p>将历史记录和需要实时更新的好友状态混在一起，显然不合理。如果我们做归类梳理的话，应该拆分成三个职能表，分别进行管理：</p>
 <ul>
 <li>历史记录表，不做缓存，仅展示最近几条，极端情况临时缓存；</li>
@@ -14215,13 +14215,13 @@
 <p>这里补充一点，行业里也会用一些开源搜索引擎，辅助我们做类似的关系业务查询，比如用ElasticSearch做商品检索、用OpenSearch做文章检索等。这种可横向扩容的服务能大大降低数据库查询压力，但唯一缺点就是很难实现数据的强一致性，需要人工检测、核对两个系统的数据。</p>
 <h3 id="_5">实体关系表</h3>
 <p>接下来我们再谈谈实体之间的关系。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/03/ec/03fcyy8bd0db6be60bf58ca3044c64ec.jpg?wh=1920x975" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/03/ec/03fcyy8bd0db6be60bf58ca3044c64ec.jpg?wh=1920x975" /></p>
 <p>在关系类型数据中，我强烈建议额外用一个关系表来记录实体间m:n的关联关系，这样两个实体就不用因为相互依赖关系，导致难以维护。</p>
 <p>在对1:n或m:n关系的数据做缓存时，我们建议提前预估好可能参与的数据量，防止过大导致缓存缓慢。同时，通常保存这个关系在缓存中会把主体的ID作为key，在value内保存多个关联的ID来记录这两个数据的关联关系。而对于读取特别频繁的的业务缓存，才会考虑把数据先按关系组织好，然后整体缓存起来，来方便查询和使用。</p>
 <p>需要注意的是，这种关联数据很容易出现多级依赖，会导致我们整理起来十分麻烦。当相关表或条件更新的时候，我们需要及时同步这些数据在缓存中的变化。所以，这种多级依赖关系很难在并发高的系统中维护，很多时候我们会降低一致性要求来满足业务的高并发情况。</p>
 <p>总的来说，只有通过ID进行关联的数据的缓存是最容易管理的，其他的都需要特殊维护，我会在<a href="https://time.geekbang.org/column/article/596644">下节课</a>给你介绍怎么维护缓存的更新和一致性，这里就不展开说了。</p>
 <p>现在我们简单总结一下，到底什么样的数据适合做缓存。一般来说，根据ID能够精准匹配的数据实体很适合做缓存；而通过String、List或Set指令形成的有多条value的结构适合做（1:1、1:n、m:n）辅助或关系查询；最后还有一点要注意，虽然Hash结构很适合做实体表的属性和状态，但是Hgetall指令性能并不好，很容易让缓存卡顿，建议不要这样做。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/09/06/09471e6416c414f815ce4500679c6706.jpg?wh=1920x1180" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/09/06/09471e6416c414f815ce4500679c6706.jpg?wh=1920x1180" /></p>
 <h3 id="_6">动作历史表</h3>
 <p>介绍到这里，我们已经完成了大部分的整理，同时对于哪些数据可以做缓存，你也有了较深理解。为了加深你的印象，我再介绍一些反例。</p>
 <p>一般来说，动作历史数据表记录的是数据实体的动作或状态变化过程，比如用户登陆日志、用户积分消费获取记录等。这类数据会随着时间不断增长，它们一般用于记录、展示最近信息，不建议用在业务的实时统计计算上。</p>
@@ -14258,7 +14258,7 @@
 <li>通过组合条件筛选统计的数据，也可以放到临时缓存，但是更新有延迟；</li>
 <li>数据增长量大或者跟设计初衷不一样的表数据，这种不适合、也不建议去做做缓存。</li>
 </ul>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/40/ef/4016b016f88352742f917c163f0310ef.jpg?wh=1920x1360" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/40/ef/4016b016f88352742f917c163f0310ef.jpg?wh=1920x1360" /></p>
 <h2 id="_8">思考题</h2>
 <p>请你思考一下，用户邀请其他用户注册的记录，属于历史记录还是关系记录？</p>
 <p>欢迎你在留言区与我交流讨论，我们下节课见！</p>
@@ -14405,8 +14405,6 @@ Q2：亿级用户是分表吗？
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

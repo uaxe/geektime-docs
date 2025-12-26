@@ -6475,7 +6475,7 @@
 <p><strong>消息队列</strong>是Linux提供的一种进程间通信方法，<strong>它能让进程之间互相发送消息</strong>。这些消息的形式由进程自己决定，可以是文本，也可以是二进制的，格式可以随意，只要另一个进程认识就行。</p>
 <p>你可以把消息想象成一个数据记录，并且这个记录具有特定的格式以及特定的顺序。消息队列实质就是一个“收纳”消息的链表，消息会依次挂入这个叫做队列的链表中，一个链表节点就对应着一个消息。</p>
 <p>接下来的问题就是，谁有权操作这个消息队列？答案是对这个消息队列有写权限的进程可以向其中插入新的消息；对消息队列有读权限的进程，则可以从其中读出消息。逻辑结构如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a8/6c/a8817f5ce2b227894a784fb97c546b6c.jpg?wh=1920x782" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a8/6c/a8817f5ce2b227894a784fb97c546b6c.jpg?wh=1920x782" /></p>
 <p>Linux采用消息队列来实现消息传递，新的消息总是放在队列的末尾，但接收的时候通常是从队列头开始，也可以从中间抽取。发送消息的方式可以是同步的，也可以是异步的。在同步方式的情况下，发送方在消息队列为满时，要进入等待状态。接收方在消息队列为空时，也要进入等待状态；而异步方式中，发送方和接收方都不必等待，而是直接返回。</p>
 <p>Linux系统下进程间传输消息要分三步走：建立消息队列、发送消息、接收消息。</p>
 <p>我猜，聪明的你已经发现了，这三步正好就对应着三个接口函数， 代码如下所示：</p>
@@ -6584,7 +6584,7 @@
 </code></pre></div>
 <p>对照代码可以看到，发送代码的就是send_main函数，这个函数由主进程调用，它会在一个循环中设置消息类型后，获取用户输入的消息内容并放入msg消息结构体中。然后，调用msgsnd函数向mid标识的消息队列发送消息，消息来自于msg结构体变量，指定MSG_SIZE为消息大小，并且以同步方式发送消息。</p>
 <p>现在我们调试一下，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/fa/76/fac58c4379cfaf7cbe01634504ec8276.jpg?wh=1920x1042" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fa/76/fac58c4379cfaf7cbe01634504ec8276.jpg?wh=1920x1042" /></p>
 <p>你也可以动手验证一下，如果出现跟我截图中相同的结果，就说明调试成功。</p>
 <p>这就是Linux系统提供给消息队列机制，其作用就是方便进程之间通信，让我们轻松地实现一个简单的聊天软件。不过，聊天是一种特例，更多的时候是进程互相发送消息，通知对方记录数据或者要求对方完成某些工作。</p>
 <p>现在，我们已经明白了消息队列机制是怎么回事，Linux的进程间通信机制中还有共享内存这种机制，我们继续往下看。</p>
@@ -6594,7 +6594,7 @@
 <p>Linux内核提供了两种共享内存的实现，一种是基于物理内存映射，另一种是基于mmap文件映射，这个mmap函数我们在前面的课程中多次见过了，你可以回顾之前的课程。</p>
 <p>这里，我们仅仅讨论基于物理内存映射的实现，它与消息队列很像。Linux内核会建立一个shmid_kernel结构，通过ipc_namespace结构的全局变量init_ipc_ns结构，就能找到系统中所有的shmid_kernel结构。该shmid_kernel结构会关联到一组物理内存页面，最后这组物理内存页面，会映射到各自进程虚拟内存空间中的相关区域。</p>
 <p>基于物理内存映射的实现方式，大致逻辑如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d1/21/d1af46a7e78b83b516d8d40652e27321.jpg?wh=1920x706" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d1/21/d1af46a7e78b83b516d8d40652e27321.jpg?wh=1920x706" /></p>
 <p>Linux系统下进程间共享内存也分两步：分别是建立共享内存区和绑定进程内存区，然后就可以读写共享内存了。</p>
 <p>这两步对应两个接口函数，代码如下所示：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>//获取已经存在的共享内存，或者建立一个新的共享内存
@@ -6703,7 +6703,7 @@
 <p>对照代码可以看到，两个函数都是调用shmat函数，它们为各自进程绑定了一个虚拟内存地址，并基于该地址访问共享内存。</p>
 <p>在send_main函数中，先把共享的内存写入0xff。最后，设置 status 字段用来同步，因为Linux对共享不提供任何同步机制，所以需要我们自己处理。receive_main函数中会循环检查status 字段，如果是SHM_STATUS，就对addr-&gt;body中的数据进行一个个检查，并且记录检查结果。</p>
 <p>我们来看看执行结果，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b6/0e/b6d459bd163cc5d42cb7b4afb5e23a0e.jpg?wh=1920x1042" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b6/0e/b6d459bd163cc5d42cb7b4afb5e23a0e.jpg?wh=1920x1042" /></p>
 <p>上图中的结果证明了我们的设计和预期相符，我们只要往共享内存中写入数据，其它进程立马就感知到了，并且得到了数据。</p>
 <p>这就是共享内存的妙处，通过把物理内存页面映射到多个进程的虚拟内存中，使其访问相同的物理内存，数据不需要在各进程之间复制，这是一种性能非常高的进程间通信机制。</p>
 <h3 id="_3">重点回顾</h3>
@@ -6713,7 +6713,7 @@
 <p>共享内存的实现是把同一块物理内存页面，映射到不同进程的虚拟地址空间当中，进程之间直接通过修改各自虚拟地址空间当中的内容，就能完成数据的瞬间传送。一个进程写入修改了共享内存，另一个进程马上就可以感知到。</p>
 <p>不知道你是不是已经发现了一个问题，这些进程通信方式，只能用于本机进程间通信，不能用于远程通信，如果需要让计算机之间的进程远程通信，就需要使用套接字。套接字是一种网络通信编程接口，有兴趣的同学可以自己了解一下。</p>
 <p>这节课的导图如下，供你参考：
-<img alt="图片" src="https://static001.geekbang.org/resource/image/83/58/8333fca97e4accb11b4a91ca59804458.jpg?wh=1920x1687" /></p>
+<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/83/58/8333fca97e4accb11b4a91ca59804458.jpg?wh=1920x1687" /></p>
 <p>好，今天的课程讲完了，我们下一次再见。</p>
 <h3 id="_4">思考题</h3>
 <p>进程间通信哪些是同步的，哪些是异步的？</p>
@@ -6835,8 +6835,6 @@ Q1：消息类型和键的数值有什么含义？
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

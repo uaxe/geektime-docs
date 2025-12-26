@@ -6180,7 +6180,7 @@
 <p>再比如，a * 7可以用 a&lt;&lt;3 - a实现：首先移位3位，相当于乘8，然后再减去一次a，就相当于乘以7。虽然用了两条指令，但是，可能消耗的总的时钟周期更少。</p>
 <p><strong>在这里我想再次强调一下，</strong>无论是为了生成更简短的代码，还是从多种可能的指令中选择最优的，我们确实需要关注指令的选择。那么，我们做指令选择的思路是什么呢？目前最成熟的算法都是基于树覆盖的方法，我通过一个例子带你了解一下，<strong>什么是树覆盖算法。</strong></p>
 <p>a[i] = b这个表达式的意思是，给数组a的第i个元素赋值为b。假设a和b都是栈里的本地变量，i是放在寄存器ri中。这个表达式可以用一个AST表示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4f/a1/4f732f78dfe9cebb4265c26c5dc3ffa1.jpg?wh=1142%2A762" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4f/a1/4f732f78dfe9cebb4265c26c5dc3ffa1.jpg?wh=1142%2A762" /></p>
 <p>你可能觉得这棵树看着像AST，但又不大像，那是因为里面有mem节点（意思是存入内存）、mov节点、栈指针(fp)。<strong>它可以算作低级（low-level）AST，是一种IR的表达方式，有时被称为结构化IR。</strong>这个AST里面包含了丰富的运行时的细节信息，相当于把LLVM的IR用树结构来表示了。你可以把一个基本块的指令都画成这样的树状结构。</p>
 <p>基于这棵树，我们可以翻译成汇编代码：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>load M[fp+a], r1 //取出数组开头的地址，放入r1，fp是栈桢的指针，a是地址的偏移量
@@ -6191,16 +6191,16 @@
 <a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>store r2, M[r1]  //把r2写入地址为r1的内存
 </code></pre></div>
 <p>在这里，我用了一种假想的汇编代码，跟LLVM IR有点儿像，但更简化、易读：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/04/7f/04c989734ec56c979db6002144d6417f.jpg?wh=1142%2A591" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/04/7f/04c989734ec56c979db6002144d6417f.jpg?wh=1142%2A591" /></p>
 <p><strong>注意，</strong>我们生成的汇编代码还是比较精简的。如果采用比较幼稚的方法，逐个树节点进行翻译，代码会很多，你可以手工翻译试试看。</p>
 <p>用树覆盖的方法可以大大减少代码量，其中用橙色的线包围的部分被形象地叫做<strong>一个瓦片(tiling)，</strong>那些包含了操作符的瓦片，就可以转化成一条指令。每个瓦片可以覆盖多个节点，所以生成的指令比较少。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/82/09/826353008c1523120ae46439ca5b0f09.jpg?wh=1142%2A467" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/82/09/826353008c1523120ae46439ca5b0f09.jpg?wh=1142%2A467" /></p>
 <p>那我们是用什么来做瓦片的呢？原来，每条机器指令，都会对应IR的一些模式（Pattern），可以表示成一些小的树，而这些小树就可以当作瓦片：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8f/54/8fcf946ca8f73f351ff7c2050e71bc54.jpg?wh=1142%2A958" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8f/54/8fcf946ca8f73f351ff7c2050e71bc54.jpg?wh=1142%2A958" /></p>
 <p>我们的算法可以遍历AST，遇到上面的模式，就可以生成对应的指令。<strong>以load指令为例，它有几个模式：</strong>任意一个节点加上一个常量就行，这相当于汇编语言中的间接地址访问；或者mem下直接就是一个常量就行，这相当于是直接地址访问。最后，地址值还可以由下级子节点计算出来。</p>
 <p>所以，从一棵AST生成代码的过程，就是用上面这些小树去匹配一棵大树，并把整个大树覆盖的过程，所以叫做树覆盖算法。2、4、5、6、8、9这几个节点依次生成汇编代码。</p>
 <p>要注意的是，覆盖方式可能会有多个，比如下面这个覆盖方式，相比之前的结果，<strong>它在8和9两个瓦片上是有区别的：</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0d/25/0d631b14c3f3d4e15bfb373bb191bc25.jpg?wh=1142%2A736" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0d/25/0d631b14c3f3d4e15bfb373bb191bc25.jpg?wh=1142%2A736" /></p>
 <p>生成的汇编代码最后两句也不同：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>load M[fp+a], r1  //取出数组开头的地址，放入r1，fp是栈桢的指针，a是地址的偏移量
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>addi 4, r2        //把4加载到r2
@@ -6225,30 +6225,30 @@
 <p>现在既然要生成针对目标机器的代码，也就知道这些信息了，那么就要把原来的IR改写一下，以便使用寄存器时不超标。</p>
 <p>那么寄存器优化的原理是什么呢？<strong>我用一个例子带你了解一下。</strong></p>
 <p>下图左边的IR中，a、d、f这三个临时变量不会同时出现。假设a和d在这个代码块之后成了死变量，那么这三个变量可以共用同一个寄存器，就像右边显示的那样：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fa/6a/fa047ba1f0d83d048b06f94d9cdcb36a.jpg?wh=1142%2A384" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fa/6a/fa047ba1f0d83d048b06f94d9cdcb36a.jpg?wh=1142%2A384" /></p>
 <p>实际上，这三行代码是对“b + c + e + 10”这个表达式的翻译，所以a和d都是在转换为IR时引入的中间变量，用完就不用了。这和在23讲，我们把8个参数以及一个本地变量相加时，只用了一个寄存器来一直保存累加结果，是一样的。</p>
 <p>所以，通过这个例子，<strong>你可以直观地理解寄存器共享的原则：</strong>如果存在两个临时变量a和b，它们在整个程序执行过程中，最多只有一个变量是活跃的，那么这两个变量可以共享同一个寄存器。</p>
 <p>在<a href="https://time.geekbang.org/column/article/155338">27</a>和<a href="https://time.geekbang.org/column/article/156878">28讲</a>中，你已经学过了如何做变量的活跃性分析，所以你可以很容易分析出，在任何一个程序点，活跃变量的集合。然后，你再看一下，哪些变量从来没有出现在同一个集合中就行。<strong>看看下面的这个图：</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/81/13/8184b0120c4d1dba03301094e0ca1013.jpg?wh=1002x1247" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/81/13/8184b0120c4d1dba03301094e0ca1013.jpg?wh=1002x1247" /></p>
 <p>上图中，凡是出现在同一个花括号里的变量，都不能共享寄存器，因为它们在某个时刻是同时活跃的。那a到f，哪些变量从来没碰到过呢？我们再画一个图来寻找一下。</p>
 <p>下图中，每个临时变量作为一个节点，如果两个变量同时存在过，就画一条边。这样形成的图，叫做寄存器干扰图(Register Interference Graph, RIG)。在这张图里，凡是没有连线的两个变量，就可以分配到同一个寄存器，例如，a和b，b和d，a和d，b和e，a和e。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/45/47/4568f4898523c5cfbf03799ced3cbb47.jpg?wh=1142%2A743" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/45/47/4568f4898523c5cfbf03799ced3cbb47.jpg?wh=1142%2A743" /></p>
 <p><strong>那么问题来了：</strong>针对这个程序，我们一共需要几个寄存器？怎么分配呢？</p>
 <p><strong>一个比较常用的算法是图染色算法：</strong>只要两个节点之间有连线，节点就染成不同的颜色。最后所需要的最少颜色，就是所需要的寄存器的数量。我画了两个染色方案，都是需要4种颜色：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bc/b5/bc48864acb35432ba68b67918c9f33b5.jpg?wh=1142%2A461" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bc/b5/bc48864acb35432ba68b67918c9f33b5.jpg?wh=1142%2A461" /></p>
 <p>不过我们是手工染色的，那么如何用算法来染色呢？假如一共有4个寄存器，我们想用算法知道寄存器是否够用？<strong>应该如何染色？</strong></p>
 <p>染色算法很简单。如果想知道k个寄存器够不够用，你只需要找到一个少于k条边的节点，把它从图中去掉。接着再找下一个少于k条边的节点，再去掉。如果最后整个图都被删掉了，那么这个图一定可以用k种颜色来染色。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c7/18/c7e3d74bd9dfb74ef08e65a50a711f18.jpg?wh=1142%2A605" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c7/18/c7e3d74bd9dfb74ef08e65a50a711f18.jpg?wh=1142%2A605" /></p>
 <p><strong>为什么呢？</strong>因为如果一个图（蓝色边的）是能用k种颜色染色的，那么再加上一个节点，它的边的数量少于k个，比如是n，那么这个大一点儿的图（橙色边的）还是可以用k种颜色染色的。道理很简单，因为加进来的节点的边数少于k个，所以一定能找到一个颜色，与这个点的n个邻居都不相同。</p>
 <p>所以，我们把刚才一个个去掉节点的顺序反过来，把一个个节点依次加到图上，每加上一个，就找一个它的邻居没有用的颜色来染色就行了。整个方法简单易行。</p>
 <p>但是，如果所需要寄存器比实际寄存器的数量多，该怎么办呢？当然是用栈了。这个问题就是寄存器溢出（Register Spilling），溢出到栈里去，我在<a href="https://time.geekbang.org/column/article/146635">21讲</a>关于运行时机制时提到过，像本地变量、参数、返回值等，都尽量用寄存器，如果寄存器不够用，那就放到栈里。另外再说一下，无论放在寄存器里，还是栈里，都是活动记录的组成部分，所以活动记录这个概念比栈桢更广义。</p>
 <p><strong>还是拿上面的例子来说，</strong>如果只有3个寄存器，那么要计算一下3个寄存器够不够用。我们先把a和b从图中去掉：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d6/18/d69bb8a9362cc35bf4136fa015ab2c18.jpg?wh=1142%2A450" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d6/18/d69bb8a9362cc35bf4136fa015ab2c18.jpg?wh=1142%2A450" /></p>
 <p>这时你发现，剩下的4个节点，每个节点都有3个邻居。所以，3个寄存器肯定不够用，必须要溢出一个去。我们可以选择让f保存在栈里，把f去掉以后，剩下的c，d，e可以用3种颜色成功染色。</p>
 <p>这就结束了吗？当然没有。f虽然被保存到了栈里，但每次使用它的时候，都要load到一个临时变量，也就是寄存器中。每次保存f，也都要用一个临时变量写入到内存。所以，我们要把原来的代码修改一下，把每个使用f的地方，都加上一条load或save指令，以便在使用f的时候把f放到寄存器，用完后再写回内存。<strong>修改后的CFG如下：</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f7/cb/f7374940932e5fade63ac3632bed23cb.jpg?wh=1142%2A1408" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f7/cb/f7374940932e5fade63ac3632bed23cb.jpg?wh=1142%2A1408" /></p>
 <p>因为原来有4个地方用到了f，所以我们引入了f1到f4四个临时变量。这样的话，总的临时变量反而变多了，从6个到了9个。不过没关系，虽然临时变量更多了，但这几个临时变量的生存期都很短，图里带有f的活跃变量集合，比之前少多了。所以，即使有9个临时变量，也能用三种颜色染色，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c0/2a/c03659bb2d1e989d8bf6a4b00c86e02a.jpg?wh=1142%2A742" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c0/2a/c03659bb2d1e989d8bf6a4b00c86e02a.jpg?wh=1142%2A742" /></p>
 <p>最后，在选择把哪个变量溢出的时候，你实际上是要有所选择的。你最好选择使用次数最少的变量。在程序内循环中的变量，就最好不要溢出，因为每次循环都会用到它们，还是放在寄存器里性能更高。</p>
 <p>目前为止，代码生成中的第二项重要工作，分配寄存器就概要地讲完了。我留给你一段时间消化本节课的内容，在下一讲，我会接着讲指令重排序和LLVM的实现。</p>
 <h2 id="_3">课程小结</h2>
@@ -6377,8 +6377,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -14517,7 +14517,7 @@
 <p>实际上，在你的业务代码与系统内核间，往往有两层内存池容易被忽略，尤其是其中的C库内存池。</p>
 <p>当代码申请内存时，首先会到达应用层内存池，如果应用层内存池有足够的可用内存，就会直接返回给业务代码，否则，它会向更底层的C库内存池申请内存。比如，如果你在Apache、Nginx等服务之上做模块开发，这些服务中就有独立的内存池。当然，Java中也有内存池，当通过启动参数Xmx指定JVM的堆内存为8GB时，就设定了JVM堆内存池的大小。</p>
 <p>你可能听说过Google的TCMalloc和FaceBook的JEMalloc，它们也是C库内存池。当C库内存池无法满足内存申请时，才会向操作系统内核申请分配内存。如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/89/6a/893edd82d03c628fae83b95bd4fbba6a.jpg?wh=2089%2A1745" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/89/6a/893edd82d03c628fae83b95bd4fbba6a.jpg?wh=2089%2A1745" /></p>
 <p>回到文章开头的问题，Java已经有了应用层内存池，为什么还会受到C库内存池的影响呢？这是因为，除了JVM负责管理的堆内存外，Java还拥有一些堆外内存，由于它不使用JVM的垃圾回收机制，所以更稳定、持久，处理IO的速度也更快。这些堆外内存就会由C库内存池负责分配，这是Java受到C库内存池影响的原因。</p>
 <p>其实不只是Java，几乎所有程序都在使用C库内存池分配出的内存。C库内存池影响着系统下依赖它的所有进程。我们就以Linux系统的默认C库内存池Ptmalloc2来具体分析，看看它到底对性能发挥着怎样的作用。</p>
 <p>C库内存池工作时，会预分配比你申请的字节数更大的空间作为内存池。比如说，当主进程下申请1字节的内存时，Ptmalloc2会预分配132K字节的内存（Ptmalloc2中叫Main Arena），应用代码再申请内存时，会从这已经申请到的132KB中继续分配。</p>
@@ -14540,7 +14540,7 @@
 <p>因此，每次分配内存，Ptmalloc2一定要加锁，才能解决共享资源的互斥问题。然而，加锁的消耗并不小。如果你监控分配速度的话，会发现单线程服务调整为100个线程，Ptmalloc2申请内存的速度会变慢10倍。TCMalloc针对小内存做了很多优化，每个线程独立分配内存，无须加锁，所以速度更快！</p>
 <p>而且，<strong>线程数越多，Ptmalloc2出现锁竞争的概率就越高。</strong>比如我们用40个线程做同样的测试，TCMalloc只是从10纳秒上升到25纳秒，只增长了1.5倍，而Ptmalloc2则从32纳秒上升到137纳秒，增长了3倍以上。</p>
 <p>下图是TCMalloc作者给出的性能测试数据，可以看到线程数越多，二者的速度差距越大。所以，<strong>当应用场景涉及大量的并发线程时，换成TCMalloc库也更有优势！</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/56/37/56c77fdf3a130fce4c98943f494c9237.png?wh=448%2A336" title="图片来源：TCMalloc : Thread-Caching Malloc" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/56/37/56c77fdf3a130fce4c98943f494c9237.png?wh=448%2A336" title="图片来源：TCMalloc : Thread-Caching Malloc" /></p>
 <p>那么，为什么GlibC不把默认的Ptmalloc2内存池换成TCMalloc呢？<strong>因为Ptmalloc2更擅长大内存的分配。</strong></p>
 <p>比如，单线程下分配257K字节的内存，Ptmalloc2的耗时不变仍然是32纳秒，但TCMalloc就由10纳秒上升到64纳秒，增长了5倍以上！<strong>现在TCMalloc反过来比Ptmalloc2慢了1倍！</strong>这是因为TCMalloc特意针对小内存做了优化。</p>
 <p>多少字节叫小内存呢？TCMalloc把内存分为3个档次，小于等于256KB的称为小内存，从256KB到1M称为中等内存，大于1MB的叫做大内存。TCMalloc对中等内存、大内存的分配速度很慢，比如我们用单线程分配2M的内存，Ptmalloc2耗时仍然稳定在32纳秒，但TCMalloc已经上升到86纳秒，增长了7倍以上。</p>
@@ -14715,8 +14715,6 @@ printf(&quot;分配了8MB内存\n&quot;);</p>2020-04-28</li><br/><li><span>烟�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

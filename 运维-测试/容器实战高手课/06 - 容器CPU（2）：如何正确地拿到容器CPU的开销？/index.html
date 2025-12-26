@@ -6100,7 +6100,7 @@
 <p>这是因为我们在容器中运行top命令，虽然可以看到容器中每个进程的CPU使用率，但是top中"%Cpu(s)"那一行中显示的数值，并不是这个容器的CPU整体使用率，而是容器宿主机的CPU使用率。</p>
 <p>就像下面的这个例子，我们在一个12个CPU的宿主机上，启动一个容器，然后在容器里运行top命令。</p>
 <p>这时我们可以看到，容器里有两个进程threads-cpu，总共消耗了200%的CPU（2 CPU Usage），而"%Cpu(s)"那一行的"us cpu"是58.5%。对于12CPU的系统来说，12 * 58.5%=7.02，也就是说这里显示总共消耗了7个CPU，远远大于容器中2个CPU的消耗。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/by/fb/byy517a2ee2e041c5ce0ae4a30753cfb.png?wh=1686%2A568" title="运行top的示意图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/by/fb/byy517a2ee2e041c5ce0ae4a30753cfb.png?wh=1686%2A568" title="运行top的示意图" /></p>
 <p>这个例子说明，top这个工具虽然在物理机或者虚拟机上看得到系统CPU开销，但是如果是放在容器环境下，运行top就无法得到容器中总的CPU使用率。那么，我们还有什么其他的办法吗？</p>
 <h2 id="cpucpu">进程CPU使用率和系统CPU使用率</h2>
 <p>通过问题重现，我们发现top工具主要显示了宿主机系统整体的CPU使用率，以及单个进程的CPU使用率。既然没有现成的工具可以得到容器CPU开销，那我们需要自己开发一个工具来解决问题了。</p>
@@ -6114,7 +6114,7 @@
 <p>这个stat文件就是 <code>/proc/[pid]/stat</code> ， <code>[pid]</code> 就是替换成具体一个进程的PID值。比如PID值为1的进程，这个文件就是 <code>/proc/1/stat</code> ，那么这个 <code>/proc/[pid]/stat</code> 文件里有什么信息呢？</p>
 <p>其实这个stat文件实时输出了进程的状态信息，比如进程的运行态（Running还是 Sleeping）、父进程PID、进程优先级、进程使用的内存等等总共50多项。</p>
 <p>完整的stat文件内容和格式在proc文件系统的 <a href="https://man7.org/linux/man-pages/man5/proc.5.html">Linux programmer’s manual</a> 里定义了。在这里，我们只需要重点关注这两项数值，stat文件中的第14项utime和第15项stime。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/53/b1/53c409d607942e8189f73636aafe3cb1.png?wh=790%2A333" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/53/b1/53c409d607942e8189f73636aafe3cb1.png?wh=790%2A333" /></p>
 <p>那么这两项数值utime和stime是什么含义呢？utime是表示进程的用户态部分在Linux调度中获得CPU的ticks，stime是表示进程的内核态部分在Linux调度中获得CPU的ticks。</p>
 <p>看到这个解释，你可能又冒出一个新问题，疑惑ticks是什么?这个ticks就是Linux操作系统中的一个时间单位，你可以理解成类似秒，毫秒的概念。</p>
 <p>在Linux中有个自己的时钟，它会周期性地产生中断。每次中断都会触发Linux内核去做一次进程调度，而这一次中断就是一个tick。因为是周期性的中断，比如1秒钟100次中断，那么一个tick作为一个时间单位看的话，也就是1/100秒。</p>
@@ -6138,9 +6138,9 @@
 <p>进程的CPU使用率=（进程的ticks/单个CPU总ticks）*100.0</p>
 <p>知道了这个公式，就需要上手来验证一下这个方法对不对，怎么验证呢？我们可以启动一个消耗CPU的小程序，然后读取一下进程对应的/proc/[pid]/stat中的utime和stime，然后用这个方法来计算一下进程使用率这个百分比值，并且和top的输出对比一下，看看是否一致。</p>
 <p>先启动一个消耗200%的小程序，它的PID是10021，CPU使用率是200%。
-<img alt="" src="https://static001.geekbang.org/resource/image/yy/f9/yy5f601a16cd9c5f8b01157daea0d4f9.png?wh=1644%2A364" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/yy/f9/yy5f601a16cd9c5f8b01157daea0d4f9.png?wh=1644%2A364" /></p>
 <p>然后，我们查看这个进程对应的stat文件/proc/10021/stat，间隔1秒钟输出第二次，因为stat文件内容很多，我们知道utime和stime第14和15项，所以我们这里只截取了前15项的输出。这里可以看到，utime_1 = 399，stime_1=0，utime_2=600，stime_2=0。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/29/b0/29609d255bfd22eab6697f6ccd4923b0.png?wh=1556%2A102" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/29/b0/29609d255bfd22eab6697f6ccd4923b0.png?wh=1556%2A102" /></p>
 <p>根据前面的公式，我们计算一下进程threads-cpu的CPU使用率。套用前面的公式，计算的过程是：</p>
 <p>((600 – 399) + (0 – 0)) * 100.0 / (100 * 1 * 1) =201，也就是201%。你会发现这个值和我们运行top里的值是一样的。同时，我们也就验证了这个公式是没问题的。</p>
 <h3 id="cpu_1">系统CPU使用率</h3>
@@ -6148,11 +6148,11 @@
 <p>其实知道了如何计算单个进程的CPU使用率之后，要理解系统整体的CPU使用率计算方法就简单多了。</p>
 <p>同样，我们要计算CPU使用率，首先需要拿到数据，数据源也同样可以从proc文件系统里得到，对于整个系统的CPU使用率，这个文件就是/proc/stat。</p>
 <p>在/proc/stat 文件的 <code>cpu</code> 这行有10列数据，同样我们可以在proc文件系统的 <a href="https://man7.org/linux/man-pages/man5/proc.5.html"></a><a href="https://man7.org/linux/man-pages/man5/proc.5.html">Linux programmer’s manual</a> 里，找到每一列数据的定义，而前8列数据正好对应top输出中"%Cpu(s)"那一行里的8项数据，也就是在上一讲中，我们介绍过的user/system/nice/idle/iowait/irq/softirq/steal 这8项。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7d/9d/7da412b1b9e4f4b235e5dae6c997859d.png?wh=1748%2A62" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7d/9d/7da412b1b9e4f4b235e5dae6c997859d.png?wh=1748%2A62" /></p>
 <p>而在/proc/stat里的每一项的数值，就是系统自启动开始的ticks。那么要计算出“瞬时”的CPU使用率，首先就要算出这个“瞬时”的ticks，比如1秒钟的“瞬时”，我们可以记录开始时刻T1的ticks, 然后再记录1秒钟后T2时刻的ticks，再把这两者相减，就可以得到这1秒钟的ticks了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fa/60/fa59040d49cb20d808619957ae1e2760.png?wh=1452%2A140" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fa/60/fa59040d49cb20d808619957ae1e2760.png?wh=1452%2A140" /></p>
 <p>这里我们可以得到，在这1秒钟里每个CPU使用率的ticks：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f5/bd/f550d24358e7cc909ff337f4840512bd.jpeg?wh=3200%2A1800" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f5/bd/f550d24358e7cc909ff337f4840512bd.jpeg?wh=3200%2A1800" /></p>
 <p>我们想要计算每一种CPU使用率的百分比，其实也很简单。我们只需要把所有在这1秒里的ticks相加得到一个总值，然后拿某一项的ticks值，除以这个总值。比如说计算idle CPU的使用率就是：</p>
 <p>1203 /（ 0 + 0 + 0 + 1203 + 0 + 0 + 0 + 0）=100%</p>
 <p>好了，我们现在来整体梳理一下，我们通过Linux里的工具，要怎样计算进程的CPU使用率和系统的CPU使用率。</p>
@@ -6168,7 +6168,7 @@
 <p>CPU使用率=((utime_2 – utime_1) + (stime_2 – stime_1)) * 100.0 / (HZ * et * 1 )</p>
 <p>我们还是以问题重现中的例子说明，也就是最开始启动容器里的那两个容器threads-cpu进程。</p>
 <p>就像下图显示的这样，整个容器的CPU使用率的百分比就是 ( (174021 - 173820) + (4 – 4)) * 100.0 / (100 * 1 * 1) = 201, 也就是201%。<strong>所以，我们从每个容器的CPU Cgroup控制组里的cpuacct.stat的统计值中，</strong>可以比较快地得到整个容器的CPU使用率。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fd/95/fdcfd5yy6e593cccea1bed7bfe4e5095.png?wh=1920%2A321" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fd/95/fdcfd5yy6e593cccea1bed7bfe4e5095.png?wh=1920%2A321" /></p>
 <h2 id="_3">重点总结</h2>
 <p>Linux里获取CPU使用率的工具，比如top，都是通过读取proc文件系统下的stat文件来得到CPU使用了多少ticks。而这里的ticks，是Linux操作系统里的一个时间单位，可以理解成类似秒，毫秒的概念。</p>
 <p>对于每个进程来说，它的stat文件是/proc/[pid]/stat，里面包含了进程用户态和内核态的ticks数目；对于整个节点，它的stat文件是 /proc/stat，里面包含了user/system/nice/idle/iowait等不同CPU开销类型的ticks。</p>
@@ -6316,8 +6316,6 @@ echo &quot;${cpus}%&quot;
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

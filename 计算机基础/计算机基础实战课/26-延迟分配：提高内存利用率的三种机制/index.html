@@ -6521,18 +6521,18 @@
 </code></pre></div>
 <p>正如其名字一样，fork代表分叉。这里fork以应用A为蓝本，复制出应用B。因为当fork返回之前，系统中已经存在应用A和应用B了，所以应用A会从fork返回，应用B也会从fork返回。对于应用A，fork返回的是应用B的ID；对于应用B，fork返回的是0，系统通过修改应用B的CPU上下文数据，就能做到这一点。而getpid返回的是调用它的应用的ID。</p>
 <p>下面我们运行这段程序，运行结果如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c5/80/c5c61cdb1f7b85b8ec9a98ebda0dce80.jpg?wh=1920x1038" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c5/80/c5c61cdb1f7b85b8ec9a98ebda0dce80.jpg?wh=1920x1038" /></p>
 <p>图中绿色部分是应用A和应用B都会运行的代码片段。我们看一下运行结果：应用A调用fork返回的pid与应用B调用getpid返回的pid，是完全一样的。这验证了我们之前对fork的描述。</p>
 <p>只不过第一个printf函数来自于应用A的运行，而第二个printf函数来自应用B的运行，为什么会出现这种情况呢？</p>
 <p>这就是fork的妙处了，fork会复制应用A的很多关键数据，但不会复制应用A对应的物理内存页面，而是要监测这些物理内存的读写，只有这样才能让应用A和应用B正常运行。</p>
 <p>我画幅图表示一下这个过程，你看后就更清楚了：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1b/0d/1b34e45ea4b5f4a69cyy51aa62f9220d.jpg?wh=1920x1884" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1b/0d/1b34e45ea4b5f4a69cyy51aa62f9220d.jpg?wh=1920x1884" /></p>
 <p>上面的图里，fork把应用A的重要数据结构复制了一份，就生成了应用B。有一点很重要，那就是应用A与应用B的页表<strong>指向了相同的物理内存页</strong>，并对其页表都设置为<strong>只读属性</strong>。</p>
 <p>讲到这里，你可能会想：“这不是相当于内存共享吗？”这样想对也不对，我们得分成应用写入数据和读取数据这两个情况来讨论。</p>
 <p>先看看写入数据会发生什么样的故事。这时无论是应用A还是应用B去写入数据，这里我们假定应用B向它的栈区、数据区、指令区等虚拟内存空间写入数据，结果一定是产生MMU转换地址失败。</p>
 <p>这是因为对应的页表是只读的，即不允许写入。此时MMU就会继续通知CPU产生缺页异常中断，进而引起Linux内核缺页处理程序运行起来。然后，缺页处理程序执行完相应的检查，发现问题出在COW机制上，这时候才会把一页物理内存也分配给相关应用，解除页表的只读属性，并且把应用A对应的物理内存页的数据，复制到新分配的物理内存页中。</p>
 <p>这个过程，你可以结合后面的示意图来加深理解，这张图描述了COW机制的过程：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d1/50/d1604ayy3545abdec753563bbe466b50.jpg?wh=1920x1894" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d1/50/d1604ayy3545abdec753563bbe466b50.jpg?wh=1920x1894" /></p>
 <p>观察上图，我给你总结一下写时复制的机制。COW的机制保证了应用最终真正写入数据的时候，才能分配到宝贵的物理内存资源，只要不是写入数据，系统坚决不分配新的内存。</p>
 <p>而前面你理解的共享内存，更符合这个情况的是读取数据，比如上图中的应用A与应用B的指令区，这大大节约了物理内存。由于不是完全复制所有的内存页面，所以fork的执行很快，最终效果就是Linux创建进程的性能非常高。</p>
 <h2 id="_2">请求调页</h2>
@@ -6560,7 +6560,7 @@
 <p>上述代码主要是用malloc函数分配了1024个页面的内存。这1024个页面的内存空间是虚拟内存空间，而waitforkeyc函数的作用是让应用程序不要急着退出。好，让我们通过“sudo cat /proc/55285/smaps &gt; main.smap”命令，观察相应的统计数据。</p>
 <p>这个命令是不是有点眼熟？在<a href="https://time.geekbang.org/column/article/572830">上一节课</a>我们介绍过它，不过这次是读取smaps文件，其中的信息更为详细。</p>
 <p>现在我们还是运行一下这段代码，看看结果如何。我把我的运行结果截图如下所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/53/ef/538e9e73f8aec155fa81522d93c9dbef.jpg?wh=1920x1038" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/53/ef/538e9e73f8aec155fa81522d93c9dbef.jpg?wh=1920x1038" /></p>
 <p>上图绿色方框里就是malloc分配的虚拟内存空间。可以看到，这次malloc没有在堆中分配，它选择了在映射区分配这个内存空间。绿色方框中size为4100KB，这正是我们分配内存的大小（多出的大小是为了存放管理信息和对齐）。</p>
 <p>我们需要重点关注的是其中的RSS，它代表的是实际分配的物理内存，这部分物理内存现在已经分配好了，因此使用过程不会产生缺页中断。</p>
 <p>同时，RSS也包含了应用的私有内存和共享内存。我们看到这里已经分配了4KB，即一个页面。按常理应该分配1024个物理内存页面，可是这里才分配了一个页面，这是为什么呢？</p>
@@ -6585,7 +6585,7 @@
 </code></pre></div>
 <p>我们在代码中加入memset函数，用于把malloc函数分配的空间全部写入为0xaf。</p>
 <p>我们运行上述程序后，就会得到如下图所示的结果：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/92/d5/922220836e2a80beb0f74e414f477dd5.jpg?wh=1920x1038" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/92/d5/922220836e2a80beb0f74e414f477dd5.jpg?wh=1920x1038" /></p>
 <p>我们看到绿色方框中的有些数据发生了变化。RSS代表的应用占用的物理内存，现在变成了4100KB，而Private_Dirty代表应用的脏内存（即写入数据的内存）的大小，也是4100KB，转换成页面刚好是1025个页面。1025个页，减去malloc分配时写入的1个页，刚好和我们分配的1024页面是相等的。</p>
 <p>现在我们知道了，请求调页是虚拟内存下的一个优化机制。在分配虚拟内存空间时，并不会直接分配相应的物理内存页面，而是由访问虚拟内存引起缺页异常，驱动操作系统分配物理内存页面，将物理内存分配推迟到使用的最后一刻，这就是请求调页。</p>
 <h2 id="_3">映射文件</h2>
@@ -6607,7 +6607,7 @@
 <p>然后，调用文件对象的 mmap 接口就会对 vm_area_struct 结构的 vm_ops 成员进行初始化。接着，vm_ops成员会初始化具体文件系统的相关函数。</p>
 <p>这里，我们不需要深入到文件系统，只要明白后面这个逻辑就行：当应用访问这个vm_area_struct 结构表示的虚拟内存地址时，会产生缺页异常。随即在这个缺页异常的驱动下，最终会调用vm_ops中的相关函数，读取文件数据到物理内存页中并进行映射。</p>
 <p>我们用一幅图来展示这一过程，如下所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/2d/70/2da3a251ce7fed772dc1a54cf828ab70.jpg?wh=1920x1486" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2d/70/2da3a251ce7fed772dc1a54cf828ab70.jpg?wh=1920x1486" /></p>
 <p>Linux内核在调用open函数打开文件时，会在内存中建立诸如file、dentry、inode、address_space等数据结构实例，用来表示一个文件及其文件数据。这些结构的细节现在你不必了解，只需要了解它们之间的关系就足够了。</p>
 <p>有了open返回的fd文件句柄，mmap就可以工作了。mmap调用首先会建立一个vm_area_struct结构，表示文件映射的虚拟内存。然后，根据参数fd文件句柄，找到打开的文件，即file结构，并且让它们关联起来。</p>
 <p>最后，应用访问mmap函数返回的一个地址，应用程序访问这个地址就会导致缺页异常。在缺页异常处理程序的驱动下，CPU会找到这个地址对应的vm_operations_struct结构，这个结构中封装了大量的虚拟内存操作 。</p>
@@ -6642,7 +6642,7 @@
 </code></pre></div>
 <p>上述代码中先调用open函数，这个函数带有O_CREAT标志，表示打开一个testmmap.bin文件，若文件不存在，就会新建一个名为testmmap.bin的文件。接着会调用mmap函数建立文件映射，虚拟内存区间由操作系统自动选择，长度为4KB，该区间可以读写，而且是私有的，从文件头开始映射。请注意<strong>，</strong>这里我们没有对文件映射区进行任何操作。</p>
 <p>现在我们运行一下这个应用，并查看一下对应进程的smaps文件信息，如下所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/68/23/6881dd1483a19423367f57cae7c03023.jpg?wh=1920x1038" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/68/23/6881dd1483a19423367f57cae7c03023.jpg?wh=1920x1038" /></p>
 <p>如上图所示，mmap返回的地址是0x7f3fa9aaf000，大小为4KB。对照右边绿色方框中的信息，刚好吻合。其中RSS为0，说明此时没有分配物理内存，因为我们没有这个虚拟内存区间做任何操作。</p>
 <p>下一步，我们往这个虚拟内存区间写入数据，代码如下所示：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>int main()
@@ -6676,7 +6676,7 @@
 </code></pre></div>
 <p>和前面代码相比，这里我们只是增加了扩展文件大小的功能，接着mmap文件，最后调用memset函数文件映射区的虚拟内存地址buf处，写入0x1000个0xff。</p>
 <p>我们运行一下这段代码，结果如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1e/a0/1ec498be7a9995abe4ee5c9c512039a0.jpg?wh=1920x1038" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1e/a0/1ec498be7a9995abe4ee5c9c512039a0.jpg?wh=1920x1038" /></p>
 <p>对比前一张图，我们可以看出绿色方框的RSS中，Private_Dirty的数据有所变化。这是因为memset函数写入数据导致缺页异常，从而分配物理内存页并关联到testmmap.bin文件。当close函数被调用时，物理内存页中的数据就会同步到硬盘中。我们可以打开testmmap.bin文件查看一下，即上图中蓝色方框中的数据。</p>
 <p>讲到这里，我们就清楚了mmap函数的底层原理就是对请求调页的扩展。这种方式在处理超大文件的随机读写过程中，性能相当不错。当只有文件中一部分被读写的时候，就不必读取整个文件，占用大量内存了。</p>
 <p>对内存资源“精打细算”的操作系统通过文件映射的机制，让物理内存页的分配管理更加精细了，等到应用实际要用到文件的哪一部分，系统才会去分配真正的物理内存。文件映射的内容到这里就告一段落了，其实在Windows、Mac OSX 也有这种函数，只是名字和参数有所区别而已，感兴趣的话你可以课后自行探索一下。</p>
@@ -6687,7 +6687,7 @@
 <p>请求调页的核心思路就是将内存推迟到使用时才分配。由于应用程序的局部性原理，使得应用总是会访问常用的页面，而不是在一定时间内顺序访问所有的页面。请求调页的思路就是等到应用产生了缺页异常，才为其分配一个物理内存页，这大大提高物理内存的整体利用率。</p>
 <p>最后，我们学习了文件映射，其作用是让开发人员能把操作内存的动作反映到相应的文件中。但是底层核心却是<strong>请求调页的扩展应用</strong>，它将映射到应用程序的虚拟内存区间。访问这个虚拟内存区间就会产生缺页异常，在其异常的驱动下，一次分配一个物理内存页，将文件内容加载到内存页，或者将其中的内容写入到文件中。</p>
 <p>我把这节课的要点梳理成了后面这张导图，你可以做个参考。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e1/29/e1d582ef5034812aca94ca30665e8129.jpg?wh=1920x1455" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e1/29/e1d582ef5034812aca94ca30665e8129.jpg?wh=1920x1455" /></p>
 <h2 id="_5">思考题</h2>
 <p>请简单说一下写时复制和请求调页的区别。</p>
 <p>期待在留言区看到你的“随堂笔记”或者疑问，也可以试试回答别人的问题。如果觉得这节课还不错，别忘了分享给身边更多朋友。</p>
@@ -6819,8 +6819,6 @@ Q3：fork后，B应用有写入采摘后会分配物理内存，同时还把A应
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

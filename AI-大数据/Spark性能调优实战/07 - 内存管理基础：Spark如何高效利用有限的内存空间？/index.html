@@ -7192,7 +7192,7 @@
 <h2 id="_1">内存的管理模式</h2>
 <p>在管理方式上，Spark会区分<strong>堆内内存</strong>（On-heap Memory）和<strong>堆外内存</strong>（Off-heap Memory）。这里的“堆”指的是JVM Heap，因此堆内内存实际上就是Executor JVM的堆内存；堆外内存指的是通过Java Unsafe API，像C++那样直接从操作系统中申请和释放内存空间。</p>
 <p><strong>其中，堆内内存的申请与释放统一由JVM代劳。</strong>比如说，Spark需要内存来实例化对象，JVM负责从堆内分配空间并创建对象，然后把对象的引用返回，最后由Spark保存引用，同时记录内存消耗。反过来也是一样，Spark申请删除对象会同时记录可用内存，JVM负责把这样的对象标记为“待删除”，然后再通过垃圾回收（Garbage Collection，GC）机制将对象清除并真正释放内存。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6b/ca/6b7c27e8b2e02e2698a031ff871313ca.jpg?wh=2889%2A883" title="JVM堆内内存的申请与释放" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6b/ca/6b7c27e8b2e02e2698a031ff871313ca.jpg?wh=2889%2A883" title="JVM堆内内存的申请与释放" /></p>
 <p>在这样的管理模式下，Spark对内存的释放是有延迟的，因此，当Spark尝试估算当前可用内存时，很有可能会高估堆内的可用内存空间。</p>
 <p><strong>堆外内存则不同，Spark通过调用Unsafe的allocateMemory和freeMemory方法直接在操作系统内存中申请、释放内存空间</strong>，这听上去是不是和C++管理内存的方式很像呢？这样的内存管理方式自然不再需要垃圾回收机制，也就免去了它带来的频繁扫描和回收引入的性能开销。更重要的是，空间的申请与释放可以精确计算，因此Spark对堆外可用内存的估算会更精确，对内存的利用率也更有把握。</p>
 <p>为了帮助你更轻松地理解这个过程，我来给你讲一个小故事。</p>
@@ -7201,17 +7201,17 @@
 <p>黄四郎虽然好吃懒做，但在管理上还是相当有一套的，他把田地划分为两块，一块叫“托管田”，另一块叫“自管田”。</p>
 <p>我们知道，庄稼<strong>丰收之后，田地需要翻土、整平、晾晒</strong>，来年才能种下一茬庄稼。那么，托管田指的就是丰收之后，由黄四郎派专人帮你搞定翻土、整平这些琐事，不用你操心。相应的，自管田的意思就是庄稼你自己种，秋收之后的田地也得你自己收拾。</p>
 <p><strong>毫无疑问，对租户来说托管田更省心一些，自管田更麻烦。</strong>当然了，相比自管田，托管田的租金自然更高。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b1/31/b1a5fbe3701051126cb4e92yyfaeea31.jpg?wh=1626%2A1178" title="托管田与自管田" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b1/31/b1a5fbe3701051126cb4e92yyfaeea31.jpg?wh=1626%2A1178" title="托管田与自管田" /></p>
 <p>那么，这个故事中黄四郎的托管田就是内存管理中的堆内内存，自管田类比的则是堆外内存，田地的翻土、整平这些操作实际上就是JVM中的GC。这样类比起来是不是更好理解了呢？</p>
 <h2 id="_3">内存区域的划分</h2>
 <p>故事先讲到这儿，让我们暂时先回到Spark的内存管理上。现在，我们知道了Spark内存管理有堆内和堆外两种模式，那Spark又是怎么划分内存区域的呢？</p>
 <p>我们先来说说堆外内存。Spark把堆外内存划分为两块区域：一块用于执行分布式任务，如Shuffle、Sort和Aggregate等操作，这部分内存叫做<strong>Execution Memory</strong>；一块用于缓存RDD和广播变量等数据，它被称为<strong>Storage Memory</strong>。</p>
 <p>堆内内存的划分方式和堆外差不多，Spark也会划分出用于执行和缓存的两份内存空间。不仅如此，Spark在堆内还会划分出一片叫做<strong>User Memory</strong>的内存空间，它用于存储开发者自定义数据结构。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a4/8c/a4b793f305410ee12964740a4958ba8c.jpg?wh=2943%2A912" title="不同内存区域的划分" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a4/8c/a4b793f305410ee12964740a4958ba8c.jpg?wh=2943%2A912" title="不同内存区域的划分" /></p>
 <p>除此之外，Spark在堆内还会预留出一小部分内存空间，叫做<strong>Reserved Memory</strong>，它被用来存储各种Spark内部对象，例如存储系统中的BlockManager、DiskBlockManager等等。</p>
 <p>对于性能调优来说，我们在前三块内存的利用率上有比较大的发挥空间，因为业务应用主要消耗的就是它们，也即Execution memory、Storage memory和User memory。而预留内存我们却动不得，因为这块内存仅服务于Spark内部对象，业务应用不会染指。</p>
 <p>好了，不同内存区域的划分与计算，我也把它们总结到了下面的表格中，方便你随时查阅。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/19/87/19aae02eb53ba1ec3f4141cb662b7d87.jpeg?wh=1879%2A866" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/19/87/19aae02eb53ba1ec3f4141cb662b7d87.jpeg?wh=1879%2A866" /></p>
 <h3 id="_4">执行与缓存内存</h3>
 <p>在所有的内存区域中，最重要的无疑是缓存内存和执行内存，而内存计算的两层含义也就是数据集缓存和Stage内的流水线计算，对应的就是Storage Memory和Execution Memory。</p>
 <p>在Spark 1.6版本之前，Execution Memory和Storage Memory内存区域的空间划分是静态的，一旦空间划分完毕，不同内存区域的用途就固定了。也就是说，即便你没有缓存任何RDD或是广播变量，Storage Memory区域的空闲内存也不能用来执行Shuffle中的映射、排序或聚合等操作，因此宝贵的内存资源就被这么白白地浪费掉了。</p>
@@ -7230,7 +7230,7 @@
 <p>黄四郎接着说：“<strong>很简单，把实线改为虚线，多劳者多得</strong>。原本呢，你们应该在分界线划定的那片田地里各自劳作。不过呢，你们二人的进度各不相同嘛，所以，<strong>勤奋的人，自己的田地种满了之后，可以跨过分界线，去占用对方还在空着的田地</strong>。”</p>
 <p>黄小乙不解地问：“四舅，这不是比谁种得快吗？也没对我特殊照顾啊！”张麻子眉间也拧了个疙瘩：“如果种得慢的人后来居上，想要把被占的田地收回去，到时候该怎么办呢？”</p>
 <p>黄四郎得意道：“刚才说了，咱们多多照顾小乙。所以<strong>如果麻子勤快、干活也快，先占了小乙的地，种上了小麦、玉米，小乙后来居上，想要收回自己的地，那么没说的，麻子得把多占的地让出来。不管庄稼熟没熟，麻子都得把地铲平，还给人家小乙种棉花、咖啡</strong>”。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/92/cc/92a3a3b0d69935a9f9770675ed6428cc.jpg?wh=1858%2A1208" title="黄小乙与张麻子的占地协议" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/92/cc/92a3a3b0d69935a9f9770675ed6428cc.jpg?wh=1858%2A1208" title="黄小乙与张麻子的占地协议" /></p>
 <p>黄四郎偷眼看了看两人的反应，继续说：“<strong>反过来，如果小乙更勤快，先占了麻子的地，麻子后来居上，想要收回，这个时候，咱们就得多照顾照顾小乙。小乙有权继续占用麻子的地，直到地上种的棉花、咖啡都丰收了，再把多占的地让出来</strong>。你们二位看怎么样？”</p>
 <p>黄小乙听了大喜。张麻子虽然心里不爽，但也清楚黄四郎和黄小乙之间的亲戚关系，也不好再多说什么，心想：“反正我勤快些，先把地种满也就是了”。于是，三方击掌为誓，就此达成协议。</p>
 <p>好啦，地主招租的故事到这里就讲完了。不难发现，黄小乙的地类比的是Execution Memory，张麻子的地其实就是Storage Memory。他们之间的协议其实就是Execution Memory和Storage Memory之间的抢占规则，一共可以总结为3条：</p>
@@ -7240,7 +7240,7 @@
 <li><strong>对于分布式计算任务抢占的Storage Memory内存空间，即便RDD缓存任务有收回内存的需要，也要等到任务执行完毕才能释放。</strong></li>
 </ul>
 <p>同时，我也把这个例子中的关键内容和Spark之间的对应关系总结在了下面，希望能帮助你加深印象。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/69/21/692d78990aa9481b56bcc28522e9df21.jpg?wh=7824%2A2126" title="地主招租与Spark的类比关系" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/69/21/692d78990aa9481b56bcc28522e9df21.jpg?wh=7824%2A2126" title="地主招租与Spark的类比关系" /></p>
 <h2 id="_6">从代码看内存消耗</h2>
 <p>说完了理论，接下来，咱们再从实战出发，用一个小例子来直观地感受一下，应用中代码的不同部分都消耗了哪些内存区域。</p>
 <p>示例代码很简单，目的是读取words.csv文件，然后对其中指定的单词进行统计计数。</p>
@@ -7255,7 +7255,7 @@
 <p>首先，第一行定义了dict字典，这个字典在Driver端生成，它在后续的RDD调用中会随着任务一起分发到Executor端。第二行读取words.csv文件并生成RDD words。<strong>第三行很关键，用dict字典对words进行过滤，此时dict已分发到Executor端，Executor将其存储在堆内存中，用于对words数据分片中的字符串进行过滤。Dict字典属于开发者自定义数据结构，因此，Executor将其存储在User Memory区域。</strong></p>
 <p>接着，第四行和第五行用cache和count对keywords RDD进行缓存，以备后续频繁访问，分布式数据集的缓存占用的正是Storage Memory内存区域。在最后一行代码中，我们在keywords上调用reduceByKey对单词分别计数。我们知道，reduceByKey算子会引入Shuffle，而Shuffle过程中所涉及的内部数据结构，如映射、排序、聚合等操作所仰仗的Buffer、Array和HashMap，都会消耗Execution Memory区域中的内存。</p>
 <p>不同代码与其消耗的内存区域，我都整理到了下面的表格中，方便你查看。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a0/ff/a05f77a27aaaf21d9d064aa1ca1be3ff.jpeg?wh=1920%2A735" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a0/ff/a05f77a27aaaf21d9d064aa1ca1be3ff.jpeg?wh=1920%2A735" /></p>
 <h2 id="_7">小结</h2>
 <p>深入理解内存管理的机制，有助于我们充分利用应用的内存，提升其执行性能。今天，我们重点学习了内存管理的基础知识。</p>
 <p><strong>首先是内存的管理方式。</strong>Spark区分堆内内存和堆外内存：对于堆外内存来说，Spark通过调用Java Unsafe的allocateMemory和freeMemory方法，直接在操作系统内存中申请、释放内存空间，管理成本较高；对于堆内内存来说，无需Spark亲自操刀而是由JVM代理。但频繁的JVM GC对执行性能来说是一大隐患。另外，Spark对堆内内存占用的预估往往不够精确，高估可用内存往往会为OOM埋下隐患。</p>
@@ -7273,7 +7273,7 @@
 <li>相比堆内内存，为什么在堆外内存中，Spark对于内存占用量的预估更准确？</li>
 <li>结合我在下面给定的配置参数，你能分别计算不同内存区域（Reserved、User、Execution、Storage）的具体大小吗？</li>
 </ol>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fd/66/fdb2fb17120e4d047d5ccd28d1434b66.jpeg?wh=1851%2A692" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fd/66/fdb2fb17120e4d047d5ccd28d1434b66.jpeg?wh=1851%2A692" /></p>
 <p>期待在留言区看到你的思考和答案，我们下一讲见！</p>
 <div><strong>精选留言（15）</strong></div>
 <ul>
@@ -7431,8 +7431,6 @@ Storage：4GB</p>2021-03-30</li><br/>
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

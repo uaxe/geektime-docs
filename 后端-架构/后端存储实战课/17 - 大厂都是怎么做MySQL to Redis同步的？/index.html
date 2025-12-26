@@ -14018,19 +14018,19 @@
 <p>在Redis中缓存全量的数据，又引发了一个新的问题，那就是，如何来更新缓存中的数据呢？因为我们取消了缓存穿透的机制，这种情况下，从缓存读到数据可以直接返回，如果没读到数据，那就只能返回错误了！所以，当系统更新数据库的数据之后，必须及时去更新缓存。</p>
 <p>说到这儿，又绕回到那个老问题上了：怎么保证Redis中的数据和数据库中的数据同步更新？我们之前讲过用分布式事务来解决数据一致性的问题，但是这些方法都不太适合用来更新缓存，<strong>因为分布式事务，对数据更新服务有很强的侵入性</strong>。我们拿下单服务来说，如果为了更新缓存增加一个分布式事务，无论我们用哪种分布式事务，或多或少都会影响下单服务的性能。还有一个问题是，如果Redis本身出现故障，写入数据失败，还会导致下单失败，等于是降低了下单服务性能和可用性，这样肯定不行。</p>
 <p><strong>对于像订单服务这类核心的业务，一个可行的方法是，我们启动一个更新订单缓存的服务，接收订单变更的MQ消息，然后更新Redis中缓存的订单数据。</strong>因为这类核心的业务数据，使用方非常多，本来就需要发消息，增加一个消费订阅基本没什么成本，订单服务本身也不需要做任何更改。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7c/8e/7cec502808318409dbc719c0b1cbbc8e.jpg?wh=1142%2A658" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7c/8e/7cec502808318409dbc719c0b1cbbc8e.jpg?wh=1142%2A658" /></p>
 <p>唯一需要担心的一个问题是，如果丢消息了怎么办？因为现在消息是缓存数据的唯一来源，一旦出现丢消息，缓存里缺失的那条数据永远不会被补上。所以，必须保证整个消息链条的可靠性，不过好在现在的MQ集群，比如像Kafka或者RocketMQ，它都有高可用和高可靠的保证机制，只要你正确配置好，是可以满足数据可靠性要求的。</p>
 <p>像订单服务这样，本来就有现成的数据变更消息可以订阅，这样更新缓存还是一个不错的选择，因为实现起来很简单，对系统的其他模块完全没有侵入。</p>
 <h2 id="binlogredis">使用Binlog实时更新Redis缓存</h2>
 <p>如果我们要缓存的数据，本来没有一份数据更新的MQ消息可以订阅怎么办？很多大厂都采用的，也是更通用的解决方案是这样的。</p>
 <p>数据更新服务只负责处理业务逻辑，更新MySQL，完全不用管如何去更新缓存。负责更新缓存的服务，把自己伪装成一个MySQL的从节点，从MySQL接收Binlog，解析Binlog之后，可以得到实时的数据变更信息，然后根据这个变更信息去更新Redis缓存。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/91/12/918380c0e43de2f4ef7ad5e8e9d5d212.jpg?wh=1142%2A639" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/91/12/918380c0e43de2f4ef7ad5e8e9d5d212.jpg?wh=1142%2A639" /></p>
 <p>这种收Binlog更新缓存的方案，和刚刚我们讲到的，收MQ消息更新缓存的方案，其实它们的实现思路是一样的，都是异步订阅实时数据变更信息，去更新Redis。只不过，直接读取Binlog这种方式，它的通用性更强。不要求订单服务再发订单消息了，订单更新服务也不用费劲去解决“发消息失败怎么办？”这种数据一致性问题了。</p>
 <p>而且，在整个缓存更新链路上，减少了一个收发MQ的环节，从MySQL更新到Redis更新的时延更短，出现故障的可能性也更低，所以很多大厂更青睐于这种方案。</p>
 <p>这个方案唯一的缺点是，实现订单缓存更新服务有点儿复杂，毕竟不像收消息，拿到的直接就是订单数据，解析Binlog还是挺麻烦的。</p>
 <p>有很多开源的项目就提供了订阅和解析MySQL Binlog的功能，下面我们以比较常用的开源项目<a href="https://github.com/alibaba/canal">Canal</a>为例，来演示一下如何实时接收Binlog更新Redis缓存。</p>
 <p>Canal模拟MySQL 主从复制的交互协议，把自己伪装成一个MySQL的从节点，向MySQL主节点发送dump请求，MySQL收到请求后，就会开始推送Binlog给Canal，Canal解析Binlog字节流之后，转换为便于读取的结构化数据，供下游程序订阅使用。下图是Canal的工作原理：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/45/e4/452211795717190e55c5b0ff2ab208e4.jpg?wh=1142%2A546" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/45/e4/452211795717190e55c5b0ff2ab208e4.jpg?wh=1142%2A546" /></p>
 <p>在我们这个示例中，MySQL和Redis都运行在本地的默认端口上，MySQL的端口为3306，Redis的端口为6379。为了便于大家操作，我们还是以《<a href="https://time.geekbang.org/column/article/206544">04 | 事务：账户余额总是对不上账，怎么办？</a>》这节课中的账户余额表account_balance作为演示数据。</p>
 <p>首先，下载并解压Canal 最新的1.1.4版本到本地：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>wget https://github.com/alibaba/canal/releases/download/canal-1.1.4/canal.deployer-1.1.4.tar.gz
@@ -14048,7 +14048,7 @@
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>FLUSH PRIVILEGES;
 </code></pre></div>
 <p>重启一下MySQL，确保所有的配置生效。重启后检查一下当前的Binlog文件和位置：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/01/8f/01293d0ccc372418f3e01c785e204b8f.png?wh=1436%2A310" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/01/8f/01293d0ccc372418f3e01c785e204b8f.png?wh=1436%2A310" /></p>
 <p>记录下File和Position两列的值，然后我们来配置Canal。编辑Canal的实例配置文件canal/conf/example/instance.properties，以便让Canal连接到我们的MySQL上。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>canal.instance.gtidon=false
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
@@ -14248,8 +14248,6 @@ HDFS集群的构成，和我们之前讲解的几个分布式存储集群是类�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

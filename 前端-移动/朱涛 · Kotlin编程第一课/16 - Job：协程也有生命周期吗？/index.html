@@ -6217,7 +6217,7 @@
 <p>根据以上代码的运行结果，可以发现，当我们使用CoroutineStart.LAZY作为启动模式的时候，协程任务被launch以后，并不会立即执行，即使我们在代码中delay了500毫秒，launch内部的<code>"Coroutine start!"</code>也仍然没有输出。这是典型的<strong>懒加载</strong>行为模式。</p>
 <p>当我们在外部调用了job.start()以后，job的状态才变成了Active活跃。而当调用了cancel以后，job的状态才变成isCancelled、isCompleted。</p>
 <p>到这里，我们基本上就可以想象出Job整个的生命周期了。请参考下面这张图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c1/52/c1d2515fcb7c3fa4130fcf85e9dd2852.jpg?wh=2000x846" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c1/52/c1d2515fcb7c3fa4130fcf85e9dd2852.jpg?wh=2000x846" /></p>
 <p>从图中，我们可以看到，对于协程的Job来说，它有两种初始状态，如果Job是以<strong>懒加载</strong>的方式创建的，那么它的初始状态将会是New；而如果一个协程是以<strong>非懒加载</strong>的方式创建的，那么它的初始状态就会是Active。</p>
 <p>另外如果你仔细分析了上面代码的输出结果，你会发现，当调用cancel以后，会出现一个奇怪的现象：isCancelled = true、isCompleted = true。也就是说，当协程任务被取消以后，isCancelled和isCompleted同时都是true。但这跟上面的流程图并不一致啊！这是为什么呢？</p>
 <p>这是因为，协程认为由于某种原因取消的协程，也仍然是一种“<strong>结束状态</strong>”，这其实也就对应了流程图中的“最终状态”。</p>
@@ -6485,7 +6485,7 @@
 <p>可以看到，await()这个方法其实是一个挂起函数，这也就意味着，这个方法拥有挂起和恢复的能力。如果当前的Deferred任务还没执行完毕，那么，await()就会挂起当前的协程执行流程，等待Deferred任务执行完毕，再恢复执行后面剩下的代码。</p>
 <p>看到这里，也许你会觉得奇怪，<strong>挂起函数不是非阻塞的吗？怎么这里又出现了阻塞？</strong>注意，这里其实只是看起来像是阻塞了，但它实际上是将剩下的代码存了起来，留在后面才执行了。</p>
 <p>为了让你更加透彻地理解await()挂起函数背后的细节，我进一步完善了之前<a href="https://time.geekbang.org/column/article/485632">协程思维模型</a>的动图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e3/37/e30c901b79682faaa00fd0d978521b37.gif?wh=1080x517" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e3/37/e30c901b79682faaa00fd0d978521b37.gif?wh=1080x517" /></p>
 <p>所以，这里await()后面的代码，虽然看起来是阻塞了，但它只是执行流程被挂起和恢复的一种表现。而且如果你仔细思考的话，你会发现上面这个动图，同样也描述了之前job.join()的行为模式，在协程执行完毕之前，后面的协程代码都被暂时挂起了，等到协程执行完毕，才有机会继续执行。</p>
 <p>所以，总的来说，Deferred只是比Job多了一个await()挂起函数而已，通过这个挂起函数，我们可以等待协程执行完毕的同时，还可以直接拿到协程的执行结果。</p>
 <p>至此，我们就已经把Job和Deferred的生命周期讲清楚了。对于Job，我们了解了<strong>监测生命周期状态</strong>、<strong>操控生命周期状态</strong>；对于Deferred，我们也明白了如何拿到它的<strong>执行结果</strong>。</p>
@@ -6562,10 +6562,10 @@
 </code></pre></div>
 <p>可以看到，每个Job对象，都会有一个children属性，它的类型是Sequence，它是一个惰性的集合，我们可以对它进行遍历。而attachChild()则是一个协程内部的API，用于绑定ChildJob的，这个我们到源码篇的时候再深入了解。</p>
 <p>所以，我们其实可以用一个简单的结构图来描述上面4个Job之间的关系：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b0/4c/b03c8e45f00bf7276c988e7038fcc44c.png?wh=1436x776" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b0/4c/b03c8e45f00bf7276c988e7038fcc44c.png?wh=1436x776" /></p>
 <p>那么，这样的父子关系到底意味着什么呢？如果你实际运行这里的代码，你就会注意到：“parentJob.join()”这行代码会被挂起大约5秒钟。</p>
 <p>注意了，我们调用的是parentJob的join()方法，但是，它会等待其内部的job1、job2、job3全部执行完毕，才会恢复执行。换句话说，只有当job1、job2、job3全部执行完毕，parentJob才算是执行完毕了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/83/a0/838728245b22e99c7900ba50968dcba0.gif?wh=1080x608" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/83/a0/838728245b22e99c7900ba50968dcba0.gif?wh=1080x608" /></p>
 <p>所以到这里，也许你就已经可以理解前面的那句话了：<strong>结构化并发就是带有结构和层级的并发。</strong></p>
 <p>实际上，协程不像我们之前学过的线程，线程之间是不存在父子关系的，但协程之间是会存在父子关系的。不过要命的是，协程的这种父子关系并不明显，如果我们不深入Job的源码，就无法意识到这一点。这也是很多人无法理解协程运行模式的原因所在。</p>
 <p>毕竟，如果你将上面的4个launch都割裂来看，那么无论如何，你都无法理解上面代码的运行顺序，可是一旦你建立了协程Job父子关系的思维模型，你就可以轻而易举地理解以上的代码。</p>
@@ -6638,7 +6638,7 @@
 </code></pre></div>
 <p>这段代码，最大的改变就在于我们将“parentJob.join”改为了“parentJob.cancel()”。从运行结果中我们可以看到，即使我们调用的只是parentJob的cancel()方法，并没有碰过job1、job2、job3，但是它们内部的协程任务也全都被取消了。</p>
 <p>这里，我们也可以用一个简单的动图来描述它们之间的关系：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/26/7a/269a6130578ed243e436469ac75c4d7a.gif?wh=1080x484" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/26/7a/269a6130578ed243e436469ac75c4d7a.gif?wh=1080x484" /></p>
 <p>所以，当我们以<strong>结构化</strong>的方式构建协程以后，我们的join()、cancel()等操作，也会以结构化的模式来执行。</p>
 <h2 id="_1">思考与实战</h2>
 <p>在学完Job和Deferred以后，也许你已经可以非常明确地判断出什么场景该用launch，什么场景该用async了。那么，这是不是就意味着你已经完成了学习的目标呢？</p>
@@ -6735,7 +6735,7 @@
 <li>另外，<strong>协程是结构化的并发</strong>，这是它的第二大优势。通过分析Job的源码，我们发现，一个Job可以拥有多个ChildJob；对应的，协程也可拥有多个“子协程”。</li>
 <li>那么结构化并发带来的最大优势就在于，我们可以实现只控制“父协程”，从而达到控制一堆子协程的目的。在前面的例子中，parentJob.join()不仅仅只会等待它自身执行完毕，还会等待它内部的job1、job2、job3执行完毕。parentJob.cancel()同理。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5b/50/5bb335f24e87237067ed78a67ee2eb50.jpg?wh=2000x1240" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5b/50/5bb335f24e87237067ed78a67ee2eb50.jpg?wh=2000x1240" /></p>
 <p>最后呢，我也想跟你分享一下我学习协程的一些方法论。</p>
 <p>其实，人学习新知识最快的方式，就是<strong>与旧的知识建立关联</strong>。举个例子，第一门计算机语言往往是最难学的，因为这是一个无中生有的过程；但当你掌握C、C++以后，再去学习Java、Python就会简单很多，因为你可以用脑子里的旧知识与其建立关联。</p>
 <p>所以，虽然我在学习协程的时候也走了很多弯路，但总的来说，我做对了以下几件事，这里我也把经验分享给你。</p>
@@ -6966,8 +6966,6 @@ log(&quot;Process end!&quot;)
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

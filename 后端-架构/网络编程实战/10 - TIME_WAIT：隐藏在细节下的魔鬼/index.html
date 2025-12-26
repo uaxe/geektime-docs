@@ -14441,7 +14441,7 @@
 <p>经过层层剖析后，我们发现罪魁祸首就是TIME_WAIT。为什么呢？我们这个应用服务需要通过发起TCP连接对外提供服务。每个连接会占用一个本地端口，当在高并发的情况下，TIME_WAIT状态的连接过多，多到把本机可用的端口耗尽，应用服务对外表现的症状，就是不能正常工作了。当过了一段时间之后，处于TIME_WAIT的连接被系统回收并关闭后，释放出本地端口可供使用，应用服务对外表现为，可以正常工作。这样周而复始，便会出现了一会儿不可以，过一两分钟又可以正常工作的现象。</p>
 <p>那么为什么会产生这么多的TIME_WAIT连接呢？</p>
 <p>这要从TCP的四次挥手说起。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f3/e1/f34823ce42a49e4eadaf642a75d14de1.png?wh=874%2A556" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f3/e1/f34823ce42a49e4eadaf642a75d14de1.png?wh=874%2A556" />
 TCP连接终止时，主机1先发送FIN报文，主机2进入CLOSE_WAIT状态，并发送一个ACK应答，同时，主机2通过read调用获得EOF，并将此结果通知应用程序进行主动关闭操作，发送FIN报文。主机1在接收到FIN报文后发送ACK应答，此时主机1进入TIME_WAIT状态。</p>
 <p>主机1在TIME_WAIT停留持续时间是固定的，是最长分节生命期MSL（maximum segment lifetime）的两倍，一般称之为2MSL。和大多数BSD派生的系统一样，Linux系统里有一个硬编码的字段，名称为<code>TCP_TIMEWAIT_LEN</code>，其值为60秒。也就是说，<strong>Linux系统停留在TIME_WAIT的时间为固定的60秒。</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>#define TCP_TIMEWAIT_LEN (60*HZ) /* how long to wait to destroy TIME-        WAIT state, about 60 seconds   */
@@ -14458,7 +14458,7 @@ TCP连接终止时，主机1先发送FIN报文，主机2进入CLOSE_WAIT状态�
 <p>第二个理由和连接“化身”和报文迷走有关系，为了让旧连接的重复分节在网络中自然消失。</p>
 <p>我们知道，在网络中，经常会发生报文经过一段时间才能到达目的地的情况，产生的原因是多种多样的，如路由器重启，链路突然出现故障等。如果迷走报文到达时，发现TCP连接四元组（源IP，源端口，目的IP，目的端口）所代表的连接不复存在，那么很简单，这个报文自然丢弃。</p>
 <p>我们考虑这样一个场景，在原连接中断后，又重新创建了一个原连接的“化身”，说是化身其实是因为这个连接和原先的连接四元组完全相同，如果迷失报文经过一段时间也到达，那么这个报文会被误认为是连接“化身”的一个TCP分节，这样就会对TCP通信产生影响。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/94/5f/945c60ae06d282dcc22ad3b868f1175f.png?wh=856%2A580" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/94/5f/945c60ae06d282dcc22ad3b868f1175f.png?wh=856%2A580" />
 所以，TCP就设计出了这么一个机制，经过2MSL这个时间，足以让两个方向上的分组都被丢弃，使得原来连接的分组在网络中都自然消失，再出现的分组一定都是新化身所产生的。</p>
 <p>划重点，2MSL的时间是<strong>从主机1接收到FIN后发送ACK开始计时的</strong>；如果在TIME_WAIT时间内，因为主机1的ACK没有传输到主机2，主机1又接收到了主机2重发的FIN报文，那么2MSL时间将重新计时。道理很简单，因为2MSL的时间，目的是为了让旧连接的所有报文都能自然消亡，现在主机1重新发送了ACK报文，自然需要重新计时，以便防止这个ACK报文对新可能的连接化身造成干扰。</p>
 <h2 id="time_wait_2">TIME_WAIT的危害</h2>
@@ -14650,8 +14650,6 @@ TIME_WAIT的危害：
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

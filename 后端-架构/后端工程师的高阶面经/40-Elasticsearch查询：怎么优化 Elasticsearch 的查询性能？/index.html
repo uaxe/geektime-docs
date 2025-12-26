@@ -14901,14 +14901,14 @@
 <p>我们先来看 Elasticsearch 的索引机制，它是我们理解 Elasticsearch 原理的关键。</p>
 <h2 id="elasticsearch">Elasticsearch 的索引机制</h2>
 <p>Elasticsearch 的索引和之前你已经学习过的数据库索引比起来，还是有很大不同的，它使用的是倒排索引。所谓的倒排索引是相对于“正排”索引而言的。在一般的文件系统中，索引是文档映射到关键字，而倒排索引正相反，是从关键字映射到了文档。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/db/cd/db5821d3c177ba83963442c6c8fd56cd.png?wh=1920x659" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/db/cd/db5821d3c177ba83963442c6c8fd56cd.png?wh=1920x659" /></p>
 <p>所以你可以想到，假如说没有倒排索引，你想要找到包含关键字“Elasticsearch”的文档，那么你需要遍历所有的文档，然后筛选出包含了“Elasticsearch”关键字的文档。而有了倒排索引，你就可以直接从关键字出发，找到“Elasticsearch”关键字对应的文档。</p>
 <p>Elasticsearch 依赖于 Lucene 来维护索引，它的基本原理也很简单。</p>
 <ul>
 <li>每当写入一个新的文档的时候，根据文档的每一个字段，Elasticsearch 会使用分词器，把每个字段的值切割成一个个关键词，每一个关键词也叫做 Term。</li>
 <li>切割之后，Elasticsearch 会统计每一个关键词出现的频率，构建一个关键词到文档 ID、出现频率、位置的映射，这个也叫做 posting list。</li>
 </ul>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/78/a1/783b9379ce3343539e47538931f74da1.png?wh=1920x1078" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/78/a1/783b9379ce3343539e47538931f74da1.png?wh=1920x1078" /></p>
 <p>从图片里你可以看出来几个关键点。</p>
 <ul>
 <li>每个字段其实是分散统计的。</li>
@@ -14916,16 +14916,16 @@
 </ul>
 <p>你可以想到，存在 Elasticsearch 里的文档数不胜数，那么就意味着一个字段会有非常多的关键词。比如说图片里的 desc 字段，如果你的系统有一亿用户，每个人写的内容都不一样，关键词就会非常多。</p>
 <p>假如说你要查询的是 desc 里包含 Hello 这个关键字的文档，你首先就要在关键词表格里面找到 Hello 这一条。如果关键词都是随机的，那么肯定很难找。如果让你来设计，你肯定会让 Elasticsearch 把这些关键词排序，比如说按照字母来排序。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8f/17/8fdf66553bd000487331a9af23f25417.png?wh=1920x719" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8f/17/8fdf66553bd000487331a9af23f25417.png?wh=1920x719" /></p>
 <p>当然，Elasticsearch 的设计者明显要高明很多。这种类似于查找单词的东西，在业界早就有成熟的方案，那就是前缀树（Trie Tree），也叫做字典树，而这个“关键词表格”在 Elasticsearch 里面叫做 Term Dictionary。它们的目标是尽可能地把全部关键词组成的索引整个装进内存里。之所以是尽可能，而不是一定，是因为部分字段的关键词会非常多，确实装不进去。所以连前缀树都觉得这样的空间开销受不了。</p>
 <p>而Elastiscearch 更进一步，用了一个优化，就是所谓的 FST（Finite State Transducers）。这个 FST 的核心思想是连公共前缀、后缀也一并压缩了。真正的 FST 原理还是相当复杂的，但是我能给你一个非常直观的例子，让你秒懂它最基本的概念。</p>
 <p>假如说你现在有两个关键词 cat 和 ct，两种数据结构看起来是这样的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/dd/3c/dd4539e68e797fb64908b8874a56c63c.png?wh=1920x1076" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dd/3c/dd4539e68e797fb64908b8874a56c63c.png?wh=1920x1076" /></p>
 <p>这个图更加接近真实数据结构的定义，所以有点难以理解。你可以认为当你找到 3 的时候，如果是经过 0-1-3，那么你知道前缀是 ct，并且你能够得到 ct 在 Term Dictionary 的位置。</p>
 <p>这个位置，就是这个 ct 所在的 Block。但是你也可以想到，可能还有别的关键词 cta、ctb 等等，都是使用这个前缀的。如果几千个关键词都共享某个前缀，在一个 Block 内部怎么找？</p>
 <p>其实 Elasticsearch 会在 Block 内部有很多的关键词的时候，进一步切割成所谓的 Floor Block。每个 Floor Block 使用第一个关键词的首字母来加快查找。</p>
 <p>而在 Block 或者 Floor Block 内部，都是通过遍历来查找对应的关键词的。因此整个结构看起来是下面这样的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1a/25/1aea13d83dbe83f5798ff822bfcdcd25.png?wh=1920x1076" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1a/25/1aea13d83dbe83f5798ff822bfcdcd25.png?wh=1920x1076" /></p>
 <p>因此你可以把这个查找关键词的过程理解成两步。</p>
 <ol>
 <li>根据 FST 找到 Block。</li>
@@ -14972,7 +14972,7 @@
 <p>早期我有一个业务，就是把数据库里的数据同步到 Elasticsearch。最开始的时候是每次用户更新了数据，就直接更新 Elasticsearch。但是这样效果很不好，因为用户基本上都是一条条数据更新。</p>
 <p>后来我考虑到这个业务对数据一致性的要求不是很高，我就把实时同步修改成了异步同步，也就是定时扫描数据库中发生变化的数据，然后批量提交变更数据到 Elasticsearch。这个异步任务我设置的是每秒钟同步一次，和原来每一次写请求都要操作 Elasticsearch 比起来，压力小多了。同时业务方的响应时间也下降了 50%。</p>
 </blockquote>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d5/1a/d577326d07bef64d0d4fd9e987ef4a1a.png?wh=1920x1076" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d5/1a/d577326d07bef64d0d4fd9e987ef4a1a.png?wh=1920x1076" /></p>
 <p>这种单个转批次的方案还可以用在 Kafka 和 Elasticsearch 结合使用的方案中。也就是有些公司的架构把数据写入到 Elasticsearch 的时候，并不是直接写入的，而是统一写入到 Kafka，然后再由一些消费者把 Kafka 里的数据写入到 Elasticsearch。</p>
 <p>那么这里你就可以给出一个利用批量提交来解决消息积压问题的方案。</p>
 <blockquote>
@@ -14985,7 +14985,7 @@
 <p>我们公司的日志都是要利用 Logstash 直接同步到 Elasticsearch 的。那么在业务繁忙的时候，日志就有可能同步得很慢，或者 Elasticsearch 压力很大。在这种情况下，我把日志同步到 Elasticsearch 的批次调大了一些，显著降低了 Elasticsearch 的负载。</p>
 <p>而且，我还引入了一个降级机制。正常我们公司的日志是全量同步的，但是如果发现 Elasticsearch 有问题，就会触发降级，触发降级的时候就会先丢弃 INFO 级别的日志。运行一段时间之后，如果 Elasticsearch 还是没能恢复正常，就把WARN 级别的也丢弃。</p>
 </blockquote>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f1/1a/f1b6e3daa4c0dda7a4f8935db2dd591a.png?wh=1920x1076" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f1/1a/f1b6e3daa4c0dda7a4f8935db2dd591a.png?wh=1920x1076" /></p>
 <p>这一个方案亮点在于你把调整批次和降级结合在一起，能体现你综合运用各种手段解决实际问题的能力。</p>
 <h3 id="_6">优化不必要字段</h3>
 <p>有些时候，最开始设计索引的人可能没有注意，就把一些根本不会搜索到的字段也存储到了 Elasticsearch。更加可怕的是还使用了动态的 mapping，这可能无意间索引了很多新字段。</p>
@@ -14995,7 +14995,7 @@
 <p>我在梳理了业务之后发现其实不用全部同步过去的，因为要被搜索的字段只是其中的一小部分，而另外一些字段同步过去只是白白加重了 Elasticsearch 的负担。所以我后面就修改了同步的过程，那一部分数据就直接传入 null 了。查询过程就相当于在 Elasticsearch 上根据各种输入查到业务的主键，如果还需要 Elasticsearch 中没有的字段，就回数据库再次查询。</p>
 <p>当然，这样做的代价就是有一些查询需要再次查询数据库。但是我评估过这个，受影响的请求不足 10%，所以这个结果还是可以接受的。</p>
 </blockquote>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a7/6b/a74b74de9162b9896ab98efb7022ce6b.png?wh=1920x1076" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a7/6b/a74b74de9162b9896ab98efb7022ce6b.png?wh=1920x1076" /></p>
 <p>少同步一些数据，就意味着你的索引所需的内存、磁盘更少，所以查询速度也会更快。紧接着补充一个 reindex 的改进计划。</p>
 <blockquote>
 <p>不过后续我也在考虑重新创建一个索引，现在这种有字段但是不同步数据的方式不太优雅。</p>
@@ -15013,7 +15013,7 @@
 <p>基本的思路是整个 Elasticsearch 的节点分成冷热两类，数据最开始都是写入到热节点上。等过一段时间之后，数据已经不热了，就迁移到冷节点上。</p>
 <p>这部分我们是借助了新出来的索引生命周期特性来实现的。比如说我们的日志，就是三天内的数据都在热节点上，三天之后就是迁移到了冷节点上。这个过程都是自动的，不需要人工介入。</p>
 </blockquote>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/54/99/54593b79e7134bcf8a12bd3d58191599.png?wh=1920x908" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/54/99/54593b79e7134bcf8a12bd3d58191599.png?wh=1920x908" /></p>
 <p>利用生命周期管理功能实现冷热数据分离操作起来还是很简单的，你可以考虑通过 Kibana 来直接在界面傻瓜式操作。而且一些云服务厂商也提供了这种功能，使用起来都很便捷。</p>
 <p>我建议你在实践中操作一下再出去面试，最好是根据自己的业务来定制。比如说我在前面的回答里面用的是日志的例子，那么你可以把它替换成你的业务数据。</p>
 <p>这种冷热分离的思路不仅仅可以在 Elasticsearch 中使用，我在微服务治理、缓存中也多次提到过类似的思路，所以如果你有机会，可以尝试引导话题。</p>
@@ -15052,7 +15052,7 @@
 <li>优化操作系统：目前你接触到的大多数中间件应该都是对内存、网络 IO 和磁盘 IO 有很强依赖，那么优化也就是调整跟这三个方面有关的参数。</li>
 </ul>
 <p>如果你的工作经历里面出现了这个课程里没有讨论过的中间件，你也可以按照类似的思路去准备面试用的性能优化方案。当然，要是你所在公司的运维团队非常强，你就直接问他们是如何优化性能的就可以，在面试中你同样用得上。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a7/78/a78d02695d35a674daf4a75874d2de78.jpg?wh=2176x2059" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a7/78/a78d02695d35a674daf4a75874d2de78.jpg?wh=2176x2059" /></p>
 <h2 id="_12">思考题</h2>
 <p>最后请你来思考两个问题。</p>
 <ul>
@@ -15181,8 +15181,6 @@ Q2：ES的源码是否值得研究？复杂吗？</p>2023-09-24</li><br/><li><sp
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

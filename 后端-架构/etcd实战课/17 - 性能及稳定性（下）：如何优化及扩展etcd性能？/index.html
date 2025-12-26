@@ -14191,18 +14191,18 @@
 <h2 id="_1">性能分析链路</h2>
 <p>为什么你写入大量key-value数据的时候，会遇到Too Many Request限速错误呢？ 是写流程中的哪些环节出现了瓶颈？</p>
 <p>和读请求类似，我为你总结了一个开启鉴权场景的写性能瓶颈及稳定性分析链路图，并在每个核心步骤数字旁边标识了影响性能、稳定性的关键因素。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/14/0a/14ac1e7f1936f2def67b7fa24914070a.png?wh=1920%2A1167" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/14/0a/14ac1e7f1936f2def67b7fa24914070a.png?wh=1920%2A1167" /></p>
 <p>下面我将按照这个写请求链路分析图，和你深入分析影响etcd写性能的核心因素和最佳优化实践。</p>
 <h2 id="db-quota">db quota</h2>
 <p>首先是流程一。在etcd v3.4.9版本中，client会通过clientv3库的Round-robin负载均衡算法，从endpoint列表中轮询选择一个endpoint访问，发起gRPC调用。</p>
 <p>然后进入流程二。etcd收到gRPC写请求后，首先经过的是Quota模块，它会影响写请求的稳定性，若db大小超过配额就无法写入。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/89/e8/89c9ccbf210861836cc3b5929b7ebae8.png?wh=1920%2A1227" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/89/e8/89c9ccbf210861836cc3b5929b7ebae8.png?wh=1920%2A1227" /></p>
 <p>etcd是个小型的元数据存储，默认db quota大小是2G，超过2G就只读无法写入。因此你需要根据你的业务场景，适当调整db quota大小，并配置的合适的压缩策略。</p>
 <p>正如我在<a href="https://time.geekbang.org/column/article/342891">11</a>里和你介绍的，etcd支持按时间周期性压缩、按版本号压缩两种策略，建议压缩策略不要配置得过于频繁。比如如果按时间周期压缩，一般情况下5分钟以上压缩一次比较合适，因为压缩过程中会加一系列锁和删除boltdb数据，过于频繁的压缩会对性能有一定的影响。</p>
 <p>一般情况下db大小尽量不要超过8G，过大的db文件和数据量对集群稳定性各方面都会有一定的影响，详细你可以参考<a href="https://time.geekbang.org/column/article/343245">13</a>。</p>
 <h2 id="_2">限速</h2>
 <p>通过流程二的Quota模块后，请求就进入流程三KVServer模块。在KVServer模块里，影响写性能的核心因素是限速。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/78/14/78062ff5b8c5863d8802bdfacf32yy14.png?wh=1920%2A1233" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/78/14/78062ff5b8c5863d8802bdfacf32yy14.png?wh=1920%2A1233" /></p>
 <p>KVServer模块的写请求在提交到Raft模块前，会进行限速判断。如果Raft模块已提交的日志索引（committed index）比已应用到状态机的日志索引（applied index）超过了5000，那么它就返回一个"etcdserver: too many requests"错误给client。</p>
 <p>那么哪些情况可能会导致committed Index远大于applied index呢?</p>
 <p>首先是long expensive read request导致写阻塞。比如etcd 3.4版本之前长读事务会持有较长时间的buffer读锁，而写事务又需要升级锁更新buffer，因此出现写阻塞乃至超时。最终导致etcd server应用已提交的Raft日志命令到状态机缓慢。堆积过多时，则会触发限速。</p>
@@ -14210,7 +14210,7 @@
 <p>最后执行defrag等运维操作时，也会导致写阻塞，它们会持有相关锁，导致写性能下降。</p>
 <h2 id="_3">心跳及选举参数优化</h2>
 <p>写请求经过KVServer模块后，则会提交到流程四的Raft模块。我们知道etcd写请求需要转发给Leader处理，因此影响此模块性能和稳定性的核心因素之一是集群Leader的稳定性。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/66/2c/660a03c960cd56610e3c43e15c14182c.png?wh=1920%2A1247" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/66/2c/660a03c960cd56610e3c43e15c14182c.png?wh=1920%2A1247" /></p>
 <p>那如何判断Leader的稳定性呢?</p>
 <p>答案是日志和metrics。</p>
 <p>一方面，在你使用etcd过程中，你很可能见过如下Leader发送心跳超时的警告日志，你可以通过此日志判断集群是否有频繁切换Leader的风险。</p>
@@ -14231,7 +14231,7 @@
 <p>我们假设收到写请求的节点就是Leader，写请求通过Propose接口提交到Raft模块后，Raft模块会输出一系列消息。</p>
 <p>etcd server的raftNode goroutine通过Raft模块的输出接口Ready，获取到待发送给Follower的日志条目追加消息和待持久化的日志条目。</p>
 <p>raftNode goroutine首先通过HTTP协议将日志条目追加消息广播给各个Follower节点，也就是流程五。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8d/eb/8dd9d414eb4ef3ba9a7603fayy991aeb.png?wh=1920%2A1254" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8d/eb/8dd9d414eb4ef3ba9a7603fayy991aeb.png?wh=1920%2A1254" /></p>
 <p>流程五涉及到各个节点之间网络通信，因此节点之间RTT延时对其性能有较大影响。跨可用区、跨地域部署时性能会出现一定程度下降，建议你结合实际网络环境使用benchmark工具测试一下。etcd Raft网络模块在实现上，也会通过流式发送和pipeline等技术优化来降低延时、提高网络性能。</p>
 <p>同时，raftNode goroutine也会将待持久化的日志条目追加到WAL中，它可以防止进程crash后数据丢失，也就是流程六。注意此过程需要同步等待数据落地，因此磁盘顺序写性能决定着性能优异。</p>
 <p>为了提升写吞吐量，etcd会将一批日志条目批量持久化到磁盘。etcd是个对磁盘IO延时非常敏感的服务，如果服务对性能、稳定性有较大要求，建议你使用SSD盘。</p>
@@ -14241,13 +14241,13 @@
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>put --key-size=8 --sequential-keys --total=10000000 --
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>val-size=256
 </code></pre></div>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/91/14/913e9875ef32df415426a3e5e7cff814.png?wh=1424%2A1364" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/91/14/913e9875ef32df415426a3e5e7cff814.png?wh=1424%2A1364" /></p>
 <p>下面是非SSD盘集群，执行同样benchmark命令的压测结果，写QPS 35255，平均延时279ms。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/17/2f/1758a57804be463228e6431a388c552f.png?wh=1432%2A1354" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/17/2f/1758a57804be463228e6431a388c552f.png?wh=1432%2A1354" /></p>
 <h2 id="_4">快照参数优化</h2>
 <p>在Raft模块中，正常情况下，Leader可快速地将我们的key-value写请求同步给其他Follower节点。但是某Follower节点若数据落后太多，Leader内存中的Raft日志已经被compact了，那么Leader只能发送一个快照给Follower节点重建恢复。</p>
 <p>在快照较大的时候，发送快照可能会消耗大量的CPU、Memory、网络资源，那么它就会影响我们的读写性能，也就是我们图中的流程七。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1a/38/1ab7a084e61d84f44b893a0fbbdc0138.png?wh=1920%2A1262" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1a/38/1ab7a084e61d84f44b893a0fbbdc0138.png?wh=1920%2A1262" /></p>
 <p>一方面， etcd Raft模块引入了流控机制，来解决日志同步过程中可能出现的大量资源开销、导致集群不稳定的问题。</p>
 <p>另一方面，我们可以通过快照参数优化，去降低Follower节点通过Leader快照重建的概率，使其尽量能通过增量的日志同步保持集群的一致性。</p>
 <p>etcd提供了一个名为--snapshot-count的参数来控制快照行为。它是指收到多少个写请求后就触发生成一次快照，并对Raft日志条目进行压缩。为了帮助slower Follower赶上Leader进度，etcd在生成快照，压缩日志条目的时候也会至少保留5000条日志条目在内存中。</p>
@@ -14257,7 +14257,7 @@
 <h2 id="value">大value</h2>
 <p>当写请求对应的日志条目被集群多数节点确认后，就可以提交到状态机执行了。etcd的raftNode goroutine就可通过Raft模块的输出接口Ready，获取到已提交的日志条目，然后提交到Apply模块的FIFO待执行队列。因为它是串行应用执行命令，任意请求在应用到状态机时阻塞都会导致写性能下降。</p>
 <p>当Raft日志条目命令从FIFO队列取出执行后，它会首先通过授权模块校验是否有权限执行对应的写操作，对应图中的流程八。影响其性能因素是RBAC规则数和锁。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/53/f6/5303f1b003480d2ddfe7dbd56b05b3f6.png?wh=1920%2A1179" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/53/f6/5303f1b003480d2ddfe7dbd56b05b3f6.png?wh=1920%2A1179" /></p>
 <p>然后通过权限检查后，写事务则会从treeIndex模块中查找key、更新的key版本号等信息，对应图中的流程九，影响其性能因素是key数和锁。</p>
 <p>更新完索引后，我们就可以把新版本号作为boltdb key， 把用户key/value、版本号等信息组合成一个value，写入到boltdb，对应图中的流程十，影响其性能因素是大value、锁。</p>
 <p>如果你在应用中保存1Mb的value，这会给etcd稳定性带来哪些风险呢？</p>
@@ -14268,9 +14268,9 @@
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>put --key-size=8 --sequential-keys --total=500 --val-
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>size=1024000
 </code></pre></div>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0c/bb/0c2635d617245f5d4084fbe48820e4bb.png?wh=1007%2A157" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0c/bb/0c2635d617245f5d4084fbe48820e4bb.png?wh=1007%2A157" /></p>
 <p>因此只能将写入的key-value大小调整为100KB。执行后得到如下结果，写入QPS 仅为1119/S，平均延时高达324ms。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a7/63/a745af37d76208c08be147ac46018463.png?wh=1302%2A1324" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a7/63/a745af37d76208c08be147ac46018463.png?wh=1302%2A1324" /></p>
 <p>其次etcd底层使用的boltdb存储，它是个基于COW(Copy-on-write)机制实现的嵌入式key-value数据库。较大的value频繁更新，因为boltdb的COW机制，会导致boltdb大小不断膨胀，很容易超过默认db quota值，导致无法写入。</p>
 <p>那如何优化呢？</p>
 <p>首先，如果业务已经使用了大key，拆分、改造存在一定客观的困难，那我们就从问题的根源之一的写入对症下药，尽量不要频繁更新大key，这样etcd db大小就不会快速膨胀。</p>
@@ -14290,7 +14290,7 @@
 <p>最重要的是，写事务也不再因为expensive read request长时间阻塞，有效的降低了写请求的延时，详细测试结果你可以参考<a href="https://github.com/etcd-io/etcd/pull/10523">并发读特性实现PR</a>，因篇幅关系就不再详细描述。</p>
 <h2 id="_5">扩展性能</h2>
 <p>当然有不少业务场景你即便用最高配的硬件配置，etcd可能还是无法解决你所面临的性能问题。etcd社区也考虑到此问题，提供了一个名为<a href="https://etcd.io/docs/v3.4.0/op-guide/grpc_proxy/">gRPC proxy</a>的组件，帮助你扩展读、扩展watch、扩展Lease性能的机制，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4a/b1/4a13ec9a4f93931e6e0656c600c2d3b1.png?wh=1920%2A1042" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4a/b1/4a13ec9a4f93931e6e0656c600c2d3b1.png?wh=1920%2A1042" /></p>
 <h3 id="_6">扩展读</h3>
 <p>如果你的client比较多，etcd集群节点连接数大于2万，或者你想平行扩展串行读的性能，那么gRPC proxy就是良好一个解决方案。它是个无状态节点，为你提供高性能的读缓存的能力。你可以根据业务场景需要水平扩容若干节点，同时通过连接复用，降低服务端连接数、负载。</p>
 <p>它也提供了故障探测和自动切换能力，当后端etcd某节点失效后，会自动切换到其他正常节点，业务client可对此无感知。</p>
@@ -14309,7 +14309,7 @@
 <li>扩展性能，基于gRPC proxy扩展读、Watch、Lease的性能。</li>
 </ul>
 <p>希望你通过这节课的学习，以后在遇到etcd性能问题时，能分别从请求执行链路和分层的视角去分析、优化瓶颈，让业务和etcd跑得更稳、更快。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/92/87/928a4f1e66200531f5ee73aab000ce87.png?wh=1920%2A1091" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/92/87/928a4f1e66200531f5ee73aab000ce87.png?wh=1920%2A1091" /></p>
 <h2 id="_8">思考题</h2>
 <p>最后，我还给你留了一个思考题。</p>
 <p>watcher较多的情况下，会不会对读写请求性能有影响呢？如果会，是在什么场景呢？gRPC proxy能安全的解决watcher较多场景下的扩展性问题吗？</p>
@@ -14435,8 +14435,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

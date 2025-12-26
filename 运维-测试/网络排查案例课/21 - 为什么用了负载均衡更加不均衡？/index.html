@@ -6470,29 +6470,29 @@
 <p>所以接下来的两节课，我会集中<strong>围绕系统</strong>方面的案例展开分析，希望可以帮助你构造这方面的能力。等以后你遇到网络和系统扯不清的问题时，也不会发怵，而是可以准确定位，高效推进了。</p>
 <h2 id="1">案例1：高负载和不均衡</h2>
 <p>这也是我在公有云工作的时候处理的真实案例。当时一个客户是做垂直电商的，他们的体量还不大，所以并没有自建机房，而是放到公有云上运行。他们的架构大致是这样的：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b9/01/b9956d177cdd2034011bfb13f0d97e01.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b9/01/b9956d177cdd2034011bfb13f0d97e01.jpg?wh=2000x1125" /></p>
 <p>LB运行在第四层，设置的负载均衡策略是round robin（轮询），也就是新到达LB的请求，<strong>依次派发</strong>给后端3个Nginx服务器，使得每台机器获得的请求数相同。Nginx运行在第七层，它作为Web服务器接收HTTP请求，然后通过<a href="https://en.wikipedia.org/wiki/FastCGI">FastCGI</a>接口传递给本机的<a href="https://en.wikipedia.org/wiki/PHP#PHPFPM">php-fpm</a>进程，进行应用层面的处理。</p>
 <p>应该说，这就是一个非常典型的负载均衡架构，平时运行也正常。不过有一天，客户忽然报告系统出问题了，网站访问越来越慢，甚至经常会抛出HTTP 504错误。如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/92/d9/92114f6352e90fd60f49a4c5f647f1d9.jpg?wh=1341x435" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/92/d9/92114f6352e90fd60f49a4c5f647f1d9.jpg?wh=1341x435" /></p>
 <p>我们借助浏览器开发者工具可以看到，这个响应耗时长达60秒，然后抛出了504错误。事实上，一般人浏览一个网站的时候，等个十来秒肯定就没耐心了，所以这次的问题确实很严重。</p>
 <h3 id="_1">初步检查</h3>
 <p>这三台Nginx服务器的配置都是8核CPU。从服务端的监控来看，它们的系统负载，也就是CPU load出现了严重的不均衡。其中一台的负载值在7左右，一台在20左右，最后一台居然高达40左右，远远超过它们的CPU核的数量。</p>
 <p>我们知道，<strong>uptime或者top命令输出里的CPU load值，表示的是待运行的任务队列的长度</strong>。比如8核的机器，load到8，那就是8CPU核处理8个任务，全部用满了。不过，能到用满的程度，实际已经对应用的性能产生明显的影响了，所以一般建议 <strong>load值不超过核数*0.7</strong>。也就是8核的机器，建议在load达到5.6的时候，就需要重点关注了。</p>
 <p>回到这三台Nginx机器，我们看看具体的load。</p>
 <p>Nginx 1的load大致在10到20之间：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/87/24/87f416165a50b2bcdc208e79167c2f24.png?wh=429x94" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/87/24/87f416165a50b2bcdc208e79167c2f24.png?wh=429x94" /></p>
 <p>Nginx 2的load在7左右：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/fc/74/fcc6ab2ac1a532e9bb471f9c65f3c374.png?wh=399x95" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fc/74/fcc6ab2ac1a532e9bb471f9c65f3c374.png?wh=399x95" /></p>
 <p>Nginx 3就很高了，在40以上：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3b/dc/3ba65448537696061a24a0d908ec3ddc.png?wh=431x65" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3b/dc/3ba65448537696061a24a0d908ec3ddc.png?wh=431x65" /></p>
 <p>联系前面我们提到的负载均衡，你大概也明白为什么客户找过来了：因为3台机器的负载不均衡啊，难道不是你们的LB工作不正常导致的吗？</p>
 <p>这确实是一个形式上讲得通的逻辑，我们开工吧。</p>
 <h3 id="lb">排查LB</h3>
 <p>首先需要检查网络状况。我们做了抓包分析，发现传输本身一切正常，没有丢包也没有特殊的延迟。</p>
 <p>然后，我们需要确认LB工作是否正常。从直观上看，处于LB后端的3台机器的load不均，似乎也意味着LB分发请求时做得不均衡，要不然为啥后端这些机器的负载各不相同呢？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/66/e3/669c1f73717b9d027e4f1c048c479ae3.jpg?wh=1595x909" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/66/e3/669c1f73717b9d027e4f1c048c479ae3.jpg?wh=1595x909" /></p>
 <p>不过，这个load不均的问题，也可能只是表象，因为会影响到load的因素是比较多的。我们回到最初，既然要证明LB工作是否正常，最直接的方式，还是<strong>查证LB是否做到了round robin，也就是分发的请求数量是否均等</strong>。于是我们去查LB上的日志，看看这三台后端机器分得的请求数量。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/71/c3/717817cfcbb61fb9f78552ec84cf37c3.jpg?wh=300x62" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/71/c3/717817cfcbb61fb9f78552ec84cf37c3.jpg?wh=300x62" /></p>
 <p>以上就是LB上的统计，红框圈出来的那一列是请求数，3台Nginx对应这3行，可见请求数都是1364，这就说明LB的round robin机制运行正常。</p>
 <p>接着，跟之前课程里的很多案例类似，我们做了一个简单的排除性测试：我们绕过LB，直接访问Nginx机器。结果发现：</p>
 <ul>
@@ -6507,7 +6507,7 @@
 <li>通过LB，耗时60秒的时候收到HTTP 504。</li>
 <li>绕过LB，虽然收到了HTTP 200，但是耗时长达70多秒。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/38/d5/38d479ec737cccd491fe62582383a7d5.jpg?wh=2000x902" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/38/d5/38d479ec737cccd491fe62582383a7d5.jpg?wh=2000x902" /></p>
 <p>其实这两个场景的根本问题是一致的，都是后端服务器特别慢。这就再一次排除了LB本身的嫌疑。于是，问题就变成了“<strong>为什么机器的负载变高了？</strong>”</p>
 <h3 id="_2">排查主机</h3>
 <p>那么，到了系统排查这一步，我们就没办法再用tcpdump结合Wireshark去排查了，因为问题跟网络报文没有关系。具体点说，我们要做下面这些事情：</p>
@@ -6516,7 +6516,7 @@
 <li>分析进程细节，找到是什么Bug导致该进程变成了问题进程。</li>
 </ul>
 <p>针对第一个问题，最常用的工具就是 <strong>top命令</strong>。通过top，我们很快就找到了消耗CPU资源最多的进程，发现是php-fpm进程。客户的电商程序框架本身是基于PHP开发的，所以需要PHP解释器来运行程序。又因为Nginx本身不能处理PHP，所以需要结合php-fpm才能正常工作。也就是下图这样：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cb/a3/cbb81908b9a50b951a22f1f6c7dc03a3.jpg?wh=1358x623" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cb/a3/cbb81908b9a50b951a22f1f6c7dc03a3.jpg?wh=1358x623" /></p>
 <p>既然确定了问题进程，接下来就是要排查进程导致load高的原因。排查这个问题，大致也有两个思路。</p>
 <ul>
 <li><strong>白盒检查</strong>：检查代码本身，找到根因。</li>
@@ -6533,10 +6533,10 @@
 <h4 id="_5">内核态和用户态</h4>
 <p>实际上，从更底层的视角来说，操作系统必须要提供系统调用的另一个原因，是计算机体系结构本身的设计。为了避免前面例子里那种不合理的操作，以及让不同安全等级的程序使用不同权限的指令集，大部分现代CPU架构都做了保护环（Protection Ring）的设计。</p>
 <p>比如，x86 CPU实现了4个级别的保护环，也就是ring 0到ring 3，其中ring 0权限最大，ring 3最小。就拿Linux来说，它的内核态就运行在ring 0，只有内核态可以操作CPU的所有指令。Linux的用户态运行在ring 3，它就没办法操作很多核心指令。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/49/b1/4987376b66aa6ee0cf56a911952073b1.jpg?wh=1455x757" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/49/b1/4987376b66aa6ee0cf56a911952073b1.jpg?wh=1455x757" /></p>
 <p>那么处于ring 3的应用程序也想要运行ring 0的指令的话，该怎么办到呢？就是让内核去间接地帮忙。而这个“忙”，其实就是通过<strong>系统调用</strong>来“帮”的。</p>
 <p>这样的话，用户空间程序就可以借系统调用之手，完成它原本没有权限完成的指令（进入内核态）。下面这张示意图就展示了用户空间、系统调用、内核空间这三者之间的关系：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fe/e4/fe8161ea9f07ec7c8b8ba87d412b47e4.jpg?wh=2000x760" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fe/e4/fe8161ea9f07ec7c8b8ba87d412b47e4.jpg?wh=2000x760" /></p>
 <p>既然，系统调用要给用户空间的应用程序提供丰富而全面的接口，无论是文件和网络等IO操作，还是像申请内存等更加核心的操作，都需要通过系统调用来完成，那么系统调用的数量肯定是不少的。比如Linux的系统调用数量大约在300多个，有的操作系统则会达到500个以上。</p>
 <h4 id="strace">strace</h4>
 <p>了解了系统调用，我们再来认识下strace。strace这个工具的s，指的就是sycall，所以strace就是对 <strong>s</strong>yscall的trace。通过这个命令，我们可以观测到一个进程访问的所有系统调用、给这些系统调用传入的参数，以及系统调用的输出。可想而知，这样充足的信息就给系统排查工作提供了极大的帮助。</p>
@@ -6549,26 +6549,26 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>strace<span class="w"> </span>-p<span class="w"> </span>进程号
 </code></pre></div>
 <p>果然发现一个非常奇怪的现象：整屏刷的都是gettimeofday()这个系统调用：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c9/9b/c934deec032f2442114da949d05eb89b.png?wh=338x439" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c9/9b/c934deec032f2442114da949d05eb89b.png?wh=338x439" /></p>
 <p>看起来好像只有这个调用了，那有没有别的调用呢？</p>
 <p>我们可以对strace命令加上 <strong>-c参数</strong>，这样可以统计每个系统调用消耗的时间和次数，看看这个奇怪的gettimeofday()系统调用，占用了多少比例。我们在strace前面加上timeout 5，就可以收集5秒钟的数据了，命令如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>timeout<span class="w"> </span><span class="m">5</span><span class="w"> </span>strace<span class="w"> </span>-cp<span class="w"> </span>进程号
 </code></pre></div>
 <p>命令输出如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/60/be/604c6160855df236940b31b6c8dff7be.png?wh=470x498" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/60/be/604c6160855df236940b31b6c8dff7be.png?wh=470x498" /></p>
 <p>可见，gettimeofday()占用了这个进程高达97.91%的运行时间。在短短的5秒之内，gettimeofday()调用次数达到了2万多次，而其他正常的系统调用，比如poll()、read()等，只有几十上百次。也就是说，<strong>非业务操作的耗时是业务操作耗时的50倍</strong>（<code>98%:2%</code>）。难怪进程这么卡，原来全都花在执行getimeofday()，也就是收集系统时间数据上了。</p>
 <p>那么，为什么会有这么多gettimeofday()的调用呢？这里的php-fpm有什么特殊性吗？我们按这个方向去搜索，发现有不少人也遇到了同样的问题，比如Stack Overflow上这个人的<a href="https://stackoverflow.com/questions/23454686/high-cpu-usage-in-php-fpm">“遭遇”</a>。简而言之，原因多半是启用了某些性能监控软件。</p>
 <p>我们把这个情况告诉了客户，对方忽然想起来，最近他们的国外团队确实有做一些性能监控的事情，用的软件好像叫New Relic。果然，我们在客户服务器上找到了这个New Relic。看下图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/17/09/17d0791794e05ae3a7bd242797a5dc09.png?wh=1038x92" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/17/09/17d0791794e05ae3a7bd242797a5dc09.png?wh=1038x92" /></p>
 <p>原来，问题的根因就是他们的国外团队部署了New Relic，而这个软件发起了极为频繁的gettimeofday()系统调用。这些调用抢走了大部分的CPU时间，这就导致业务代码基本没有机会被执行。因为LB有个60秒超时的机制，所以它眼看着收不到后端Nginx服务器的返回，就不得不返回HTTP 504了。也就是下面这样：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/19/70/19b070a7e8070a5a2ff14246ec37fc70.jpg?wh=2000x609" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/19/70/19b070a7e8070a5a2ff14246ec37fc70.jpg?wh=2000x609" /></p>
 <p>这个根因有点令人哭笑不得，不过对见怪不怪的技术支持团队来说，心里早已云淡风轻了。接下来就是客户卸载New Relic，应用立刻恢复正常。用strace再次检查，显示系统调用也恢复正常：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/05/0e/05496c48587de3f23eb542d5a3c0630e.png?wh=479x496" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/05/0e/05496c48587de3f23eb542d5a3c0630e.png?wh=479x496" /></p>
 <p>可以看到，read()和poll()系统调用，上升到进程CPU时间的60%以上，而gettimeofday()降低到不足1%，所以已经彻底解决问题了。</p>
 <h2 id="2lb">案例2：LB特性和不均衡</h2>
 <p>我再给你讲一个案例。还有一个电商客户，也遇到了一次负载不均衡的问题。这是在双十一期间，客户发起了促销活动，随之而来的访问压力的上升也十分明显，而他们的后端服务器也出现了负载不均的现象，有时候访问十分卡顿，于是我们再次介入排查。</p>
 <p>这次的架构是一台LB后面接了两台服务器，其中一台的CPU load高达50以上，也是远远超过了8个的CPU核数。另外一台情况要好一些，load在10左右，当请求被分配到这台服务器上的时候，还算勉强可以访问。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/07/c7/07602837e2c1a6c6a203762b5b37d0c7.jpg?wh=1672x513" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/07/c7/07602837e2c1a6c6a203762b5b37d0c7.jpg?wh=1672x513" /></p>
 <p>因为CPU load在两台机器上有比较大的差异，从访问速度来说，大约是一半请求会非常慢，一半请求略快一些，所以客户就怀疑：LB的请求分配做得不均衡，导致其中一台处理不过来。</p>
 <p>真的是这样吗？我们检查了LB的访问日志，发现一个有意思的现象：</p>
 <ul>
@@ -6576,10 +6576,10 @@
 <li>按HTTP请求的源IP来分开统计，某些IP的访问量远远大于其他IP。</li>
 </ul>
 <p>我们来看一下根据源IP分开统计的访问次数：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/de/aa/de51fda7a8yye48963e4bc200290ceaa.jpg?wh=500x250" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/de/aa/de51fda7a8yye48963e4bc200290ceaa.jpg?wh=500x250" /></p>
 <p>很明显，图中第一行的源IP，对/api.php这个URL有3470次访问，而其他源IP的访问量比它低了一个数量级，只有小几百。那么，这跟问题有什么关系呢？</p>
 <p>我们通过对LB日志做进一步的分析后发现，同样是源IP的请求，要么去了Nginx 1，要么去了Nginx 2。再次检查了这台LB的配置后，我们发现客户在LB上开启了“<strong>会话保持</strong>”（Session Persistence）。这就造成了下面这种分布不均的现象：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/09/b2/09c280d1644b4b9b87571c953ba767b2.jpg?wh=1625x507" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/09/b2/09c280d1644b4b9b87571c953ba767b2.jpg?wh=1625x507" /></p>
 <p>你可能也知道，会话保持是LB的常见功能，它主要是起到了维持会话状态的作用。在开启了会话保持功能后，LB会维护一张映射表，供每次分发请求之前做匹配。如果LB查到某个请求属于之前的某个会话，就会把这个请求转发给上一次会话所选择的后端服务器；否则就按默认的负载均衡算法，来选择一个后端服务器。</p>
 <p>那么，LB怎么确定一个请求属于之前的会话呢？这就要说到会话保持的类型了。我们用的LB是HAProxy，它的会话保持有两种。</p>
 <ul>
@@ -6781,8 +6781,6 @@ strace -p真是香，可以追踪系统调用，查看调用栈，可以定位�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

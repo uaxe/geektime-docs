@@ -6345,17 +6345,17 @@
 <p><strong>这类程序中稍微有点难的地方，是保证对象之间正确的引用关系</strong>。比如，函数引用了变量和类型，而高级的类型之间也是互相有引用关系的，比如子类型的关系等等，这样就构成了一张网状的数据结构，相互之间有引用。</p>
 <p>当你写入文件的时候，要注意，这个网的每个节点只能写一次，不能因为两个函数的返回值都引用了某个类型，就把这个类型写了两次。在读的时候呢，则要重新建立起对象之间正确的引用关系。</p>
 <p>好了，了解了实现思路以后，再阅读相应的示例代码就很容易了。在TypeScript中，我用BCModuleWriter把斐波那契数列程序的字节码写成了文件，然后用hexdump命令来显示一下看看：
-<img alt="" src="https://static001.geekbang.org/resource/image/d2/69/d2ff1d5709a2f55d8f3663ebe1580669.jpg?wh=2236x861" />
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d2/69/d2ff1d5709a2f55d8f3663ebe1580669.jpg?wh=2236x861" />
 乍一看，这个跟Java的字节码文件还挺像的，不过我们用的是自己的简单格式。我在图中做了标注，标明了字节是什么含义。其中_main函数和fibonacci函数的字节码指令，我也标了出来。</p>
 <p>之后，我可以用BCModuleReader把这个字节码文件再读入内存，重建BCModule，包括里面的符号信息。如果基于这个新的BCModule，程序同样可以顺畅地运行，那就说明我们的字节码文件里面确实包含了足够的运行信息。</p>
 <p>好了，现在我们的字节码文件以及相应的读写机制已经设计成功，也用TypeScript做完了所有的设计验证。在这个基础上，重新用C语言实现一个虚拟机，就是一个比较简单的事情了。你可以发现，虽然我们的语言换了，但虚拟机的实现机制没有变。</p>
 <p>接下来，我们就需要用C语言把字节码文件读到内存，并在内存重建BCModule相关的各种对象结构。</p>
 <h2 id="c">用C语言读入字节码文件</h2>
 <p>关于C语言版本的字节码读取程序，你可以参考一下readBCModule函数的代码。在读取了字节码文件以后，我还写了一个dumpBCModule的函数，可以在控制台显示BCModule的信息，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/74/c5/747504b30c7c85ce648f647bf77ca1c5.png?wh=1726x1249" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/74/c5/747504b30c7c85ce648f647bf77ca1c5.png?wh=1726x1249" /></p>
 <p>你可能会注意到，我们最后的模型里的类型信息和函数都比字节码文件里的要多。不要担心，多出来的其实是系统内置的类型（比如number类型）和内置函数（比如println），它们不需要被保存在字节码文件里，但是会被我们的程序引用到，所以我们要在内存的数据结构中体现。</p>
 <p>在这里，我重新梳理一下内存里的对象模型，这个对象模型就是我们运行时所需要的所有信息。我们读取了字节码文件以后，会在内存里形成这个结构化的对象模型，来代表一个程序的信息。
-<img alt="" src="https://static001.geekbang.org/resource/image/7e/1b/7e8abe4d347ac8b9264619078213e01b.jpg?wh=2248x1300" />
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7e/1b/7e8abe4d347ac8b9264619078213e01b.jpg?wh=2248x1300" />
 这里我再讲一个小技术点，看着上面的类图，你可能会问：C语言不是不支持面向对象吗？你为什么还能用面向对象的方式来保存这些信息？</p>
 <p>其实，用C语言也能模拟类似面向对象的机制。以符号为例，我们是这样声明Symbol和FunctionSymbol的，让FunctionSymbol包含基类Symbol中的数据：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>typedef struct _Symbol{
@@ -6373,13 +6373,13 @@
 <a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>} FunctionSymbol;
 </code></pre></div>
 <p>在内存里，FunctionSymbol最前面的字段，就是Symbol的字段，因此你可以把FunctionSymbol的指针强制转换成Symbol的指针，从而访问Symbol的字段。这种编程方式在一些用C语言编写的系统软件里非常普遍，包括其他作者写的一些编译器的代码，以及Linux操作系统内核中的代码中都有体现。
-<img alt="" src="https://static001.geekbang.org/resource/image/9c/f9/9c931084500bff407ef9c764755987f9.jpg?wh=2248x1305" />
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9c/f9/9c931084500bff407ef9c764755987f9.jpg?wh=2248x1305" />
 好了，现在我们已经成功地读入了字节码文件，接下来就让我们运行它吧！</p>
 <h2 id="c_1">用C语言实现栈机</h2>
 <p>现在，我们要用C语言再重新实现一遍栈机，这也很快，因为机理我们前面都梳理清楚了。实际上，整个C语言版本的虚拟机的代码，我就用了一个周末，就从TypeScript版本中移植到了C语言中。我也鼓励你用自己熟悉的语言多做几次移植的工作，每做一遍，你对虚拟机的内在机制的理解就会更加深入。</p>
 <p>好，我来描述一下这个移植过程中的重点工作。</p>
 <p><strong>首先，你仍然可以建立一个枚举数据，来描述我们所使用的指令集，也让程序更容易阅读：</strong></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6d/cc/6d88b6af53a1cdb0c858fb86281343cc.png?wh=816x1992" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6d/cc/6d88b6af53a1cdb0c858fb86281343cc.png?wh=816x1992" /></p>
 <p><strong>第二，设计运行栈的数据结构。</strong>我用了一个链表来把各个栈桢链接在一起：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>typedef struct _StackFrame{
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>//本栈桢对应的函数，用来找到代码
@@ -6395,7 +6395,7 @@
 <a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>}StackFrame;
 </code></pre></div>
 <p>在运行的时候，我们只要保持一个指向栈顶的指针就能访问栈桢中的数据。
-<img alt="" src="https://static001.geekbang.org/resource/image/85/68/85a95efce93297783e335a48bb3a5068.jpg?wh=2248x664" />
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/85/68/85a95efce93297783e335a48bb3a5068.jpg?wh=2248x664" />
 <strong>第三，设计操作数栈。</strong>在栈桢中，你会看到有一个操作数栈，我们用一个数组来表示操作数栈就可以了，然后用一个字段指向当前的栈顶。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>/**
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>* 操作数栈
@@ -6413,9 +6413,9 @@
 <p>其实，我在一开头，是期望新版虚拟机的性能是能够马上碾压前两个运行时的，也就是AST解释器和TypeScript栈机。可是实际运行结果却出乎我的预料：<strong>新版虚拟机的性能，只有TypeScript栈机的一半，甚至连AST解释器的性能也比不上</strong>。</p>
 <p>你可能不相信，这怎么可能呢？不过，性能测试的数字是不会说谎的，你自己也可以去运行一下测试用例试试看。</p>
 <p>在测试用例中，我打印了n从30到36的斐波那契数列，对比了各个解释器的性能：
-<img alt="" src="https://static001.geekbang.org/resource/image/1a/10/1abdb8f9f595ddbc3b6836c861d52210.jpg?wh=2248x1202" />
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1a/10/1abdb8f9f595ddbc3b6836c861d52210.jpg?wh=2248x1202" />
 我还绘制成了图表，这样能够让性能比较看上去更直观：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/32/5e/326553a6cee67528570538f7c2691f5e.png?wh=1418x756" />
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/32/5e/326553a6cee67528570538f7c2691f5e.png?wh=1418x756" />
 你在前一节已经看过了AST解释器和TypeScript版栈机的性能对比曲线了。现在加上了C语言版栈机的数据，它的曲线竟然是在最上面的，也就是最慢的。</p>
 <p><strong>接下来的问题来了：如何评价这个评测结果呢？难道用C语言编写，性能还不如JavaScript吗？你能帮我思考一下原因吗？</strong></p>
 <p>对于这个问题的分析和解决，我想放到下一节课。在分析和解决这个问题的过程中，你也会对虚拟机设计上的一些重要因素产生更深入的了解。</p>
@@ -6547,8 +6547,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

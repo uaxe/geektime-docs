@@ -13796,7 +13796,7 @@
 <p>可以说，临界区就是一个被共享的资源，或者说是一个整体的一组共享资源，比如对数据库的访问、对某一个共享数据结构的操作、对一个 I/O 设备的使用、对一个连接池中的连接的调用，等等。</p>
 <p>如果很多线程同步访问临界区，就会造成访问或操作错误，这当然不是我们希望看到的结果。所以，我们可以<strong>使用互斥锁，限定临界区只能同时由一个线程持有</strong>。</p>
 <p>当临界区由一个线程持有的时候，其它线程如果想进入这个临界区，就会返回失败，或者是等待。直到持有的线程退出临界区，这些等待线程中的某一个才有机会接着持有这个临界区。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/44/b8/44c08abdd0aff633ca932fc89386ebb8.jpg?wh=3747%2A1972" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/44/b8/44c08abdd0aff633ca932fc89386ebb8.jpg?wh=3747%2A1972" /></p>
 <p>你看，互斥锁就很好地解决了资源竞争问题，有人也把互斥锁叫做排它锁。那在Go 标准库中，它提供了 Mutex 来实现互斥锁这个功能。</p>
 <p>根据2019年第一篇全面分析Go并发Bug的论文<a href="https://songlh.github.io/paper/go-study.pdf">Understanding Real-World Concurrency Bugs in Go</a>，<strong>Mutex是使用最广泛的同步原语</strong>（Synchronization primitives，有人也叫做<strong>并发原语</strong>。我们在这个课程中根据英文直译优先用同步原语，但是并发原语的指代范围更大，还可以包括任务编排的类型，所以后面我们讲Channel或者扩展类型时也会用并发原语）。关于同步原语，并没有一个严格的定义，你可以把它看作解决并发问题的一个基础的数据结构。</p>
 <p>在这门课的前两个模块，我会和你讲互斥锁Mutex、读写锁RWMutex、并发编排WaitGroup、条件变量Cond、Channel等同步原语。所以，在这里，我先和你说一下同步原语的适用场景。</p>
@@ -13852,7 +13852,7 @@
 </code></pre></div>
 <p>在这段代码中，我们使用sync.WaitGroup来等待所有的goroutine执行完毕后，再输出最终的结果。sync.WaitGroup这个同步原语我会在后面的课程中具体介绍，现在你只需要知道，我们使用它来控制等待一组goroutine全部做完任务。</p>
 <p>但是，每次运行，你都可能得到不同的结果，基本上不会得到理想中的一百万的结果。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/60/e2/6080fdf493e047917aa099ea33279de2.png?wh=427%2A137" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/60/e2/6080fdf493e047917aa099ea33279de2.png?wh=427%2A137" /></p>
 <p>这是为什么呢？</p>
 <p>其实，这是因为，<strong>count++</strong> 不是一个原子操作，它至少包含几个步骤，比如读取变量count的当前值，对这个值加1，把结果再保存到count中。因为不是原子操作，就可能有并发的问题。</p>
 <p>比如，10个goroutine同时读取到count的值为9527，接着各自按照自己的逻辑加1，值变成了9528，然后把这个结果再写回到count变量。但是，实际上，此时我们增加的总数应该是10才对，这里却只增加了1，好多计数都被“吞”掉了。这是并发访问共享数据的常见错误。</p>
@@ -13867,7 +13867,7 @@
 <p>这个技术在Google内部帮了大忙，探测出了Chromium等代码的大量并发问题。Go 1.1中就引入了这种技术，并且一下子就发现了标准库中的42个并发问题。现在，race detector已经成了Go持续集成过程中的一部分。</p>
 <p>我们来看看这个工具怎么用。</p>
 <p>在编译（compile）、测试（test）或者运行（run）Go代码的时候，加上<strong>race</strong>参数，就有可能发现并发问题。比如在上面的例子中，我们可以加上race参数运行，检测一下是不是有并发问题。如果你go run -race counter.go，就会输出警告信息。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f5/ff/f5eec2d6458e4bddc882ebb213f05aff.png?wh=792%2A359" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f5/ff/f5eec2d6458e4bddc882ebb213f05aff.png?wh=792%2A359" /></p>
 <p>这个警告不但会告诉你有并发问题，而且还会告诉你哪个goroutine在哪一行对哪个变量有写操作，同时，哪个goroutine在哪一行对哪个变量有读操作，就是这些并发的读写访问，引起了data race。</p>
 <p>例子中的goroutine 10对内存地址0x00c000126010有读的操作（counter.go文件第16行），同时，goroutine 7对内存地址0x00c000126010有写的操作（counter.go文件第16行）。而且还可能有多个goroutine在同时进行读写，所以，警告信息可能会很长。</p>
 <p>虽然这个工具使用起来很方便，但是，因为它的实现方式，只能通过真正对实际地址进行读写访问的时候才能探测，所以它并不能在编译的时候发现data race的问题。而且，在运行的时候，只有在触发了data race之后，才能检测到，如果碰巧没有触发（比如一个data race问题只能在2月14号零点或者11月11号零点才出现），是检测不出来的。</p>
@@ -13936,7 +13936,7 @@
 <a id="__codelineno-5-34" name="__codelineno-5-34" href="#__codelineno-5-34"></a>}
 </code></pre></div>
 <p>如果你再运行一下程序，就会发现，data race警告没有了，系统干脆地输出了1000000：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d3/8e/d3c577aec0322488e349acf17789a08e.png?wh=457%2A73" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d3/8e/d3c577aec0322488e349acf17789a08e.png?wh=457%2A73" /></p>
 <p>怎么样，使用Mutex是不是非常高效？效果很惊喜。</p>
 <p>这里有一点需要注意：Mutex的零值是还没有goroutine等待的未加锁的状态，所以你不需要额外的初始化，直接声明变量（如 var mu sync.Mutex）即可。</p>
 <p>那Mutex还有哪些用法呢？</p>
@@ -14175,8 +14175,6 @@ Counter.go:5:2: could not import sync (file not found)这个什么原因呀</p>2
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

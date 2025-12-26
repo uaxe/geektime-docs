@@ -7824,7 +7824,7 @@
 <h2 id="-">成本-混合编排的需求起源</h2>
 <p>但是，当我们采购了很多服务器，搭建起了一系列的大数据系统，我们又会发现这些服务器在很多时候负载不高，显得非常浪费。因为我们在采购服务器的时候，需要根据平时的峰值流量来确定服务器数量。比如，像Kafka这样的消息队列，肯定是在早晚高峰，和中午用户比较多的时候，流量比较大，到了半夜流量就比较小。如果我们高峰时间的CPU占用要有60%，那么在低谷时刻，可能只有10%。</p>
 <p>如果就只是采购服务器的硬件成本，那还好，毕竟服务器我们已经采购完了。但是，对于一个数据中心来说，硬件成本只是一小部分，最大的一头在电力成本。根据艾瑞发表的<a href="https://pdf.dfcfw.com/pdf/H3_AP202012161440695500_1.pdf">「2020年中国数据中心行业研究报告」</a>，数据中心的运营成本，有超过50%是电力成本。所以，能不能尽量少用一点服务器，就变成一个很有价值的问题了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/68/d6/68047fd52574f0fee7ebfde6284cb7d6.png?wh=1670x738" title="上面的研究报告中，引用自Bloomberg的数据，数据中心的成本大头来自于电费" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/68/d6/68047fd52574f0fee7ebfde6284cb7d6.png?wh=1670x738" title="上面的研究报告中，引用自Bloomberg的数据，数据中心的成本大头来自于电费" /></p>
 <p>一个很自然的想法，就是对我们服务器的使用进行“削峰填谷”，我们让原本在高峰时间运行的一些任务，挪到半夜这样的低谷时段去。这个思路，对于离线进行数据分析的任务，当然很容易做到，所以一般来说，我们的Hadoop或者Spark集群的CPU整体利用率往往很高。</p>
 <p>但是对于Kafka、Dataflow这样提供近实时服务的数据系统，我们是没办法把峰值时段的任务，也挪到第二天半夜才计算的。所以，一个新的想法自然也就冒出来了，那就是，我们是不是可以把MapReduce这样的离线分析任务，也放到Dataflow的集群上运行呢？在半夜Dataflow没有什么流量的时候，我们完全可以把这部分服务器的资源用起来。</p>
 <p><strong>所以，我们需要有一个办法，能够让我们的各种大数据系统混合编排在同一批服务器上。</strong></p>
@@ -7851,7 +7851,7 @@
 <p>而Borg，需要对于各个应用的开发人员，做到隐藏所有的资源管理细节，让应用不需要关心它们具体会被部署在什么样的硬件配置上。而且，即使当前部署的硬件故障了，Borg也需要能够立刻快速恢复，把对应的容器另外寻找一台服务器，部署上去。</p>
 <p>当然，在Borg里，部署的并不是一个裸的CGroup，而是一个个的<strong>Tasks</strong>。用户会向Borg提交一个个的Job。这些Job里，既有像长期驻留的服务，也有一次性运行批处理任务。<strong>一个Job其实就是一个二进制的程序</strong>，这个Job程序会被部署到一台或者多台服务器上。每个服务器上实际运行的进程就叫做Tasks。</p>
 <p>这个其实我们在<a href="https://time.geekbang.org/column/article/423598">MapReduce的论文</a>讲解里就看到过了。提交的MapReduce的Job，就是先提交给了Borg，然后Job对应的Map和Reduce的Tasks，其实就是由Borg分配到不同的服务器上，实际执行的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f3/5f/f3c38c8717958769051a947f8666725f.png?wh=881x641" title="MapReduce的系统架构图[br]其实你可以把worker看成是alloc，Job还是MapReduce的Job，map和reduce的Task就是Borg里的Task" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f3/5f/f3c38c8717958769051a947f8666725f.png?wh=881x641" title="MapReduce的系统架构图[br]其实你可以把worker看成是alloc，Job还是MapReduce的Job，map和reduce的Task就是Borg里的Task" /></p>
 <p>那么，在这1万台机器的集群里的Tasks，有的是提供在线服务的，对于服务的响应延时有要求；有的只是一个离线任务，只要能够执行完成就好。而我们为了尽可能充分利用硬件资源，就会遇到某一个时间点，很多Tasks都想要使用资源但是资源不够用了的情况。</p>
 <p>针对这个问题，Borg采用了<strong>配额和优先级的机制</strong>。</p>
 <p>和我们操作系统里的进程类似，Borg里的Job都有一个优先级，从高到低分别是监控（Monitoring），生产（Production），批处理（Batch）和尽最大努力（Best Effort）这四种，同一种类的优先级下，还能根据一个整数的priority参数，来区分不同任务的优先级大小。Job提交之后部署到具体的服务器上，就会变成一个个Task，这些个Task也就继承了Job上的优先级的属性。</p>
@@ -7869,7 +7869,7 @@
 <p><strong>Slave服务器，就是我们实际负责去运行Task的服务器</strong>。每个Slave服务器上，都会有一个叫做Borglet的进程。Master并不会直接和每个Slave服务器上的Task进程通信，而只是和Borglet进程通信。</p>
 <p>Borglet进程会负责启动和停止Task，如果Task失败了就重启。因为Borg的单个集群，要有1万台服务器，所以，并不是由Master一台台机器来主动拉Slave里的信息的。而是由Borglet上报对应的信息，Master只会<strong>定期轮询</strong>Borglet，获取这些Slave服务器的状态。</p>
 <p>而因为有1万台之多的服务器，Master集群里虽然选出了一个master（本质上是leader），Borg还是会把所有的Slave机器分片，然后让每一个master的副本，都负责一部分Borglet的通信。然后，这个副本会把Borglet上报的最新信息，和Master已经知道信息的差（Diff），交给Master里的master，以减少这一台特定机器的负载。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0a/98/0a7891439a757e6ede6d00583e78dd98.jpg?wh=2000x1542" title="论文中的图1，Borg的整体架构" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0a/98/0a7891439a757e6ede6d00583e78dd98.jpg?wh=2000x1542" title="论文中的图1，Borg的整体架构" /></p>
 <p>可以看到，从整个集群的架构来说，Borg并没有什么特殊之处。Master-Slave的架构我们在MapReduce/Bigtable里都已经见过。对外提供命令行、Web的一系列的UI，我们在Hive里面也见过。每个Slave服务器里，通过一个Borglet进程来管理，我们在Megastore的Coordinator里还是见过。</p>
 <p>其实，<strong>分布式系统的架构设计都是大同小异的</strong>。不过，对于Borg来说，最有挑战的一点，还是在于如何去分配和调度一个个的Task，以及如何衡量一个混合部署了成百上千个Job的系统的性能。而这些问题，我们会在下节课里进行解答。</p>
 <h2 id="_1">小结</h2>
@@ -7998,8 +7998,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

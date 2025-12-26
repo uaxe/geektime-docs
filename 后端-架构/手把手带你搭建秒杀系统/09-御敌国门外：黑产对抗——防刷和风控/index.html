@@ -13726,71 +13726,71 @@
 <h2 id="nginx">防刷：Nginx有条件限流</h2>
 <p>在上节课中我已经介绍过Nginx限流的语法了，现在咱们就直接来实践。这里呢，我们是根据用户ID来做限流防刷的。</p>
 <p>首先我们新建一个通用配置文件common.conf，用来定义限流规则以及后续一些其他的通用配置，所在位置如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/de/79/de62316555d371852a5b3dd6899c4c79.png?wh=1722x1512" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/de/79/de62316555d371852a5b3dd6899c4c79.png?wh=1722x1512" /></p>
 <p>同时，不要忘记在nginx.conf文件中将该配置文件引入进去，和引入upstream.conf一样，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/28/65/28d8044ef9bd4d5bdf155774824b5e65.png?wh=1920x799" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/28/65/28d8044ef9bd4d5bdf155774824b5e65.png?wh=1920x799" /></p>
 <p>然后，我们在common.conf中定义限流规则如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a0/99/a09ec76448014de730b6c26c9e776a99.png?wh=1920x337" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a0/99/a09ec76448014de730b6c26c9e776a99.png?wh=1920x337" /></p>
 <p>意为定义了一个名为 limit_by_user的限流规则，根据用户ID来做限流，限流的速率为同一个用户1秒内只允许1个请求通过，且为该规则申请的内存大小为10M。</p>
 <p>这里的10M大概是什么概念呢？可以简单粗略地算下，假如一个user_id占用的内存大小为16字节，那么10M的内存大概可以处理单机 10*1024*1024/16=655360个请求。</p>
 <p>规则配置完毕后，接下来就在我们需要限流的接口引用该规则，这里依然以活动查询接口为例，配置如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c5/fa/c5fb44759735fe82a9691b7f7ee830fa.png?wh=1920x984" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c5/fa/c5fb44759735fe82a9691b7f7ee830fa.png?wh=1920x984" /></p>
 <p>其中nodelay是被限流后的策略，意为不等待，直接返回。</p>
 <p>配置好之后，我们启动Nginx，通过URL进入到商详页（要在活动进行中时）。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0c/34/0ca228e08dce27d3ba9654410fd46134.png?wh=1920x1655" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0c/34/0ca228e08dce27d3ba9654410fd46134.png?wh=1920x1655" /></p>
 <p>这时，我们通过鼠标快速地刷新两次页面（点击浏览器中的刷新图标，在1秒内完成），来模拟外部的请求，然后看下对应的access和error日志，结果如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a5/a7/a59a1f7160c60ccc00aaac45523790a7.png?wh=1920x307" /></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/eb/da/eb25a30c92d99d295b1a7232a14cfdda.png?wh=1920x302" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a5/a7/a59a1f7160c60ccc00aaac45523790a7.png?wh=1920x307" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/eb/da/eb25a30c92d99d295b1a7232a14cfdda.png?wh=1920x302" /></p>
 <p>通过domain-access.log日志可以看到，两次请求，第一次正常返回，第二次返回给客户端503的状态码，原因通过domain-error.log可以看到，是触发了根据用户ID的限流规则，这样我们的限流防刷功能就实现了。</p>
 <p>以上通过限流的方式来防刷，是非常简单且直接的一种方式，<strong>这种方式可以有效解决黑产流量对单个接口的高频请求</strong>，但要想防止刷子不经过前置流程直接提单，还需要引入一个流程编排的Token机制。</p>
 <h2 id="token">防刷：Token机制</h2>
 <p>Token我想你是知道的，一般都是用来做鉴权的。放到秒杀的业务场景就是，对于有先后顺序的接口调用，我们要求进入下个接口之前，要在上个接口获得令牌，不然就认定为非法请求。同时这种方式也可以防止多端操作对数据的篡改，如果我们在Nginx层做Token的生成与校验，可以做到对业务流程主数据的无侵入。</p>
 <p>在Token机制下，前端与demo-nginx中的接口交互时序图如下所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a6/4d/a6b84a677fe6d411319becd71a5d6e4d.jpg?wh=1710x1083" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a6/4d/a6b84a677fe6d411319becd71a5d6e4d.jpg?wh=1710x1083" /></p>
 <p>现在我们就按照对应的时序，依次给4个接口增加上Token相关的生成与校验功能。</p>
 <p>在这之前，我们为了更真实地获取用户ID，需要在demo-web中新增加个登录功能，模拟将user_id放到cookie，这样之后的每次请求，我们就直接从cookie中获取user_id即可。</p>
 <p>同时根据我们的设计，有几个主要参数是每次接口请求都必须要校验的，那就是用户ID、产品编号，还有新的Token，所以我们就定义了一个统一的解析方法，其中用户ID从cookie中解析，产品编号和st从请求的URL中解析，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7f/9f/7f90b174bf698a7c9561a4eb9bfc059f.png?wh=1920x652" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7f/9f/7f90b174bf698a7c9561a4eb9bfc059f.png?wh=1920x652" /></p>
 <p>set_common_var.lua主要就是负责参数的解析，并给对应的变量做赋值，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/fa/81/fa2dedd40b8c881ebfe0e5ddaff04781.png?wh=1920x907" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fa/81/fa2dedd40b8c881ebfe0e5ddaff04781.png?wh=1920x907" /></p>
 <p>做完之后，我们开始改造活动数据查询接口，改造后如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/be/bd/bef17a652c670eacfe5e53940bee08bd.png?wh=1920x1170" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/be/bd/bef17a652c670eacfe5e53940bee08bd.png?wh=1920x1170" /></p>
 <p>这里通过header_filter_by_lua_block指令，在返回的header里增加流程Token。这里st的生成只是简单地将用户ID+步骤编号做了MD5，生产上需要更严格一些，需要加入商品编号、活动开始时间、自定义加密key等，这样前端通过解析请求响应header，就可以拿到st了，然后将其拼在请求结算页H5的URL后即可。</p>
 <p>然后再对结算页H5的location做改造，改造后如下图所示（当然这里可以将rewrite_by_lua的内容放到file，看起来会更整洁一些）：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/af/c0/af04f483483a6a5d1d93ed4810c052c0.png?wh=1920x1225" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/af/c0/af04f483483a6a5d1d93ed4810c052c0.png?wh=1920x1225" /></p>
 <p>结算页H5的改造点，就是将之前的一个location拆成了2个了，增加了/settlement/prePage，这样点击立即抢购时就可以直接调用这个接口。</p>
 <p>这里你可能会有疑问，<strong>这里为什么没有选择将st放在header中返回呢？</strong>因为和活动数据查询接口不同的是，这个接口返回的是HTML，上个接口返回的是JSON，所以选择了重定向的方式，这样浏览器就可以获得到新的st了，具体代码如上，在rewrite_by_lua_block配置中使用ngx.redirect()方法来实现重定向。</p>
 <p>同时这里再给你介绍下，如果业务校验不通过，想终止整个请求流程，可以通过ngx.exit（状态码）来实现，这样就可以将对应状态码返回给前端了。但如果想要做得更友好些，当系统内部异常或者是后端服务器异常时，我们可以指定返回的内容。这就需要通过error_page指令来实现，意为出现不同的错误码，我们会转到不同的location去做处理。如果是H5请求，那就返回对应的错误提示页，如果是JSON请求，也可以返回自定义的JSON数据，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/5b/12/5b355812fda489dddd72c8d79206f612.png?wh=1920x614" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5b/12/5b355812fda489dddd72c8d79206f612.png?wh=1920x614" /></p>
 <p>上图就是配置了两个异常处理location，其中html_fail.html的位置和内容如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/aa/52/aaab5c80b3eb5a8ac0dc4e1404860752.png?wh=1920x661" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/aa/52/aaab5c80b3eb5a8ac0dc4e1404860752.png?wh=1920x661" /></p>
 <p>那么做完了上面那么多工作，现在我们就来验证下针对活动数据查询接口和结算页H5接口的顺序编排是否生效。</p>
 <p>我们启动Nginx，并且进入到商详页，点击立即抢购，正常流程是可以进入到结算页的，这里就不展示了，那如果我们不经过商详页，直接通过URL访问结算页H5接口（不带st或者带错误的st），效果会如何呢？看下图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b0/7a/b07e6bc5c350c28bf7d81ba44e59e97a.png?wh=1519x1487" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b0/7a/b07e6bc5c350c28bf7d81ba44e59e97a.png?wh=1519x1487" /></p>
 <p>出现了我们配置的错误提示页，同时日志中出现了st校验不通过的提示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b8/78/b85b9ba8b675fb63bc64e51d27148578.png?wh=1920x394" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b8/78/b85b9ba8b675fb63bc64e51d27148578.png?wh=1920x394" /></p>
 <p>那么使用同样的机制，我们可以把剩下的接口功能给补上，因为做法一样，这里就不多说了，直接上最终改造后的代码，如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/2f/60/2fe31a8064e6ba9ab3702cfaab9e6860.png?wh=1824x1483" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2f/60/2fe31a8064e6ba9ab3702cfaab9e6860.png?wh=1824x1483" /></p>
 <p>到这，防刷的Token机制就介绍完了，<strong>这种机制可以有效防止黑产流量跳过中间接口，直接调用下单接口</strong>。通过该机制+Nginx有条件限流机制，可以有效拦截大部分场景下的刷子流量。但如果我们还想再严格一些，对于黑产不仅仅是想拦截过多的非法请求，而是想全部拦截，那有没有什么办法呢？有，咱们继续学习下黑名单机制。</p>
 <h2 id="_1">防刷：黑名单机制</h2>
 <p>黑名单机制分为本地黑名单和集群黑名单两种，接下来我们会重点介绍本地黑名单。该机制顾名思义，就是通过黑名单的方式来拦截非法请求的，但我们的核心问题是黑名单从哪里来呢？</p>
 <p>总体来说，有两个来源：一个是从外部导入，可以是风控，也可以是别的渠道；而另一个就是自力更生，自己生成自己用。</p>
 <p>前面介绍了Nginx有条件限流会过滤掉超过阈值的流量，但不能完全拦截，所以索性就不限流，直接全部放进来。然后我们自己实现一套“逮捕机制”，即利用Lua的共享缓存功能，去统计1秒内这个用户或者IP的请求频率，如果达到了我们设定的阈值，我们就认定其为黑产，然后将其放入到本地缓存黑名单。黑名单可以被所有接口共享，这样用户一旦被认定为黑产，其针对所有接口的请求，都将直接被全部拦截，实现刷子流量的0通过。</p>
 <p><strong>这里以提单做逮捕入口示例，大致流程如下：</strong></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/cc/e5/cc6f4yy4b5d3bdda647013ef5c1373e5.jpg?wh=1756x1224" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cc/e5/cc6f4yy4b5d3bdda647013ef5c1373e5.jpg?wh=1756x1224" /></p>
 <p>其中红线表示黑名单的校验与生成路径，蓝线表示普通接口的黑名单校验路径。那么下面我们就根据这个设计思路，去具体实现它。</p>
 <p>首先新建两个Lua文件，一个叫submit_access.lua，另一个叫black_user_cache.lua。然后修改提单接口的access_by_lua_*指令，将其替换成access_by_lua_file，并引用submit_access.lua，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3a/ef/3aaf11580b694beaf485363f7ce3ecef.png?wh=1920x488" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3a/ef/3aaf11580b694beaf485363f7ce3ecef.png?wh=1920x488" /></p>
 <p>其中black_user_cache.lua主要用来写和黑名单相关的本地缓存逻辑，包括黑名单的检查以及黑名单的过滤生成。其中黑名单的过滤方法是核心逻辑，这里主要是根据传入的key，利用Lua缓存的自动失效机制，来统计一段时间内的请求数，在达到了我们设定的阈值后，便将其放到本地缓存中，并提供针对key的查询功能，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/4e/68/4eba9144f2e22e040eab4e42a7e81f68.png?wh=1616x1483" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4e/68/4eba9144f2e22e040eab4e42a7e81f68.png?wh=1616x1483" /></p>
 <p>这里引入了Lua本地缓存的概念，所以在使用前我们需要先申请一个内存块。我们将申请的地方放在了common.conf中，其中black_hole就是我们申请的内存名称，大小为50M，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c3/90/c3147fb3e977898e69b28fff7633b490.png?wh=1920x717" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c3/90/c3147fb3e977898e69b28fff7633b490.png?wh=1920x717" /></p>
 <p>底层方法写好后，我们在submit_access.lua中引入black_user_cache.lua，实现黑名单的判断、过滤以及前面的st校验功能：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0a/c5/0a72e5454803f3ea0cecb6571e9ef4c5.png?wh=1590x1483" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0a/c5/0a72e5454803f3ea0cecb6571e9ef4c5.png?wh=1590x1483" /></p>
 <p>一切完成后，我们来测试一下，看是否生效。我们可以直接在浏览器访问提单功能，然后模拟1秒内请求提单接口超过两次的场景，但在看效果前，我们可以根据上面的逻辑实现，先设想下可能会出现的场景。</p>
 <p>首先肯定是每次请求都会返回错误提示，第一次错误是因为我们没有st；第二次错误是因为我们触发了黑名单规则，然后被加进了黑名单；第三次及以后的请求，错误都是因为已经在黑名单，被直接拦截了。</p>
 <p>好的，那么下面就让我们看下页面效果以及access和error日志是否达到了预期：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/41/80/41bf19530eebb76d100f8f0bfc306780.png?wh=1920x379" /><img alt="图片" src="https://static001.geekbang.org/resource/image/13/6e/1368cb64779554b36bf1aeffddd7fd6e.png?wh=1920x341" /><img alt="图片" src="https://static001.geekbang.org/resource/image/99/13/9954e2fc526141bf98f968b56bdb5613.png?wh=1920x437" /></p>
+<p><img alt="图片" src="https://static001.geekbang.org/resource/image/41/80/41bf19530eebb76d100f8f0bfc306780.png?wh=1920x379" /><img alt="图片" src="https://static001.geekbang.org/resource/image/13/6e/1368cb64779554b36bf1aeffddd7fd6e.png?wh=1920x341" /><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/99/13/9954e2fc526141bf98f968b56bdb5613.png?wh=1920x437" />}{:referrerpolicy="no-referrer"}{:referrerpolicy="no-referrer"</p>
 <p>可以看到，1秒内有4次请求进来，且响应结果都与我们预期的一样。上面的逻辑中，比如统计的频率，统计的key，黑产被加入黑名单的有效期等，都可以根据实际业务灵活变化。</p>
 <p>本地黑名单机制的优点就是简单、高效。但也正因为基于单机，如果黑产将请求频率控制在1*Nginx机器数以内，按请求理想散落的情况下，那么就不会被我们抓到，所以真要想通过频率来严格限制刷子请求，是可以借助Redis来实现集群黑名单的。</p>
 <p>实现思路和单机的基本一致，就是使用的内存由本地变为了Redis，当然这也必然会影响接口的响应性能，所以这里我只给出了一个进一步收紧校验的思路，就不做具体教学了，感兴趣的话可以自己尝试下。</p>
@@ -13926,8 +13926,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

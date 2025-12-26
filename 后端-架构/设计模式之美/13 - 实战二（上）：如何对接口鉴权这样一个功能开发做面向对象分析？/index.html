@@ -16535,13 +16535,13 @@
 <p>不过，这样的验证方式，每次都要明文传输密码。密码很容易被截获，是不安全的。那如果我们借助加密算法（比如SHA），对密码进行加密之后，再传递到微服务端验证，是不是就可以了呢？实际上，这样也是不安全的，因为加密之后的密码及AppID，照样可以被未认证系统（或者说黑客）截获，未认证系统可以携带这个加密之后的密码以及对应的AppID，伪装成已认证系统来访问我们的接口。这就是典型的“<a href="https://zh.wikipedia.org/wiki/%E9%87%8D%E6%94%BE%E6%94%BB%E5%87%BB">重放攻击</a>”。</p>
 <p>提出问题，然后再解决问题，是一个非常好的迭代优化方法。对于刚刚这个问题，我们可以借助OAuth的验证思路来解决。调用方将请求接口的URL跟AppID、密码拼接在一起，然后进行加密，生成一个token。调用方在进行接口请求的的时候，将这个token及AppID，随URL一块传递给微服务端。微服务端接收到这些数据之后，根据AppID从数据库中取出对应的密码，并通过同样的token生成算法，生成另外一个token。用这个新生成的token跟调用方传递过来的token对比。如果一致，则允许接口调用请求；否则，就拒绝接口调用请求。</p>
 <p>这个方案稍微有点复杂，我画了一张示例图，来帮你理解整个流程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/07/d7/0704c4806f9d6c01bb20884d05ee54d7.jpg?wh=1748%2A1583" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/07/d7/0704c4806f9d6c01bb20884d05ee54d7.jpg?wh=1748%2A1583" /></p>
 <h3 id="3">3.第三轮分析优化</h3>
 <p>不过，这样的设计仍然存在重放攻击的风险，还是不够安全。每个URL拼接上AppID、密码生成的token都是固定的。未认证系统截获URL、token和AppID之后，还是可以通过重放攻击的方式，伪装成认证系统，调用这个URL对应的接口。</p>
 <p>为了解决这个问题，我们可以进一步优化token生成算法，引入一个随机变量，让每次接口请求生成的token都不一样。我们可以选择时间戳作为随机变量。原来的token是对URL、AppID、密码三者进行加密生成的，现在我们将URL、AppID、密码、时间戳四者进行加密来生成token。调用方在进行接口请求的时候，将token、AppID、时间戳，随URL一并传递给微服务端。</p>
 <p>微服务端在收到这些数据之后，会验证当前时间戳跟传递过来的时间戳，是否在一定的时间窗口内（比如一分钟）。如果超过一分钟，则判定token过期，拒绝接口请求。如果没有超过一分钟，则说明token没有过期，就再通过同样的token生成算法，在服务端生成新的token，与调用方传递过来的token比对，看是否一致。如果一致，则允许接口调用请求；否则，就拒绝接口调用请求。</p>
 <p>优化之后的认证流程如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bd/60/bde932c73c6636ad85380e4801dbfb60.jpg?wh=2093%2A1733" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bd/60/bde932c73c6636ad85380e4801dbfb60.jpg?wh=2093%2A1733" /></p>
 <h3 id="4">4.第四轮分析优化</h3>
 <p>不过，你可能会说，这样还是不够安全啊。未认证系统还是可以在这一分钟的token失效窗口内，通过截获请求、重放请求，来调用我们的接口啊！</p>
 <p>你说得没错。不过，攻与防之间，本来就没有绝对的安全。我们能做的就是，尽量提高攻击的成本。这个方案虽然还有漏洞，但是实现起来足够简单，而且不会过度影响接口本身的性能（比如响应时间）。所以，权衡安全性、开发成本、对系统性能的影响，这个方案算是比较折中、比较合理的了。</p>
@@ -16693,8 +16693,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -6165,14 +6165,14 @@
 <h2 id="_1">定向监控分析</h2>
 <h3 id="_2">定向分析第二阶段</h3>
 <p>当场景继续运行的时候，我看到了这样的数据：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/eb/8f/eb84fbb4e1105ce58dd9e45f849b768f.png?wh=1813%2A652" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/eb/8f/eb84fbb4e1105ce58dd9e45f849b768f.png?wh=1813%2A652" /></p>
 <p>从图中我们可以很明显地看到，在场景持续运行的过程中，TPS掉下来了，响应时间则是蹭蹭往上涨。</p>
 <p>我们看一下这时候的总业务累积量：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c9/92/c9855e4f7cdb3b0d18d222f44bf50692.png?wh=269%2A126" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c9/92/c9855e4f7cdb3b0d18d222f44bf50692.png?wh=269%2A126" /></p>
 <p>也就是说，多了20多万的业务累积量。</p>
 <p>见到问题，不分析总是觉得不那么舒服，那我们就来分析一下。</p>
 <p>还是按照性能分析决策树，我们把计数器一个一个查过去。在我查看MySQL的Pod日志时，发现它一直在被删掉重建：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/75/43/75aa8e663d3a3a8959d4443de60ba043.png?wh=1920%2A914" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/75/43/75aa8e663d3a3a8959d4443de60ba043.png?wh=1920%2A914" /></p>
 <p>请注意，我们这是一个示例系统，为了方便重建，我把MySQL放到Pod中了。如果是在真实的环境中，我建议你最好根据生产的实际配置来做数据库的配置。</p>
 <p>讲到这里，我稍微回应一下行业里的一种声音：数据库不应该放到Kubernetes的Pod中去。我不清楚持这样观点的人，只是在感觉上认为不安全，还是真正遇到了问题。在我的经验中，很多系统对数据库的性能要求其实并不高，业务量也不大。而用容器来管理便于迁移和重建，并且性能上也完全跟得上。所以，在这种场景下用Pod也没有关系。</p>
 <p>当然，也有一些系统用数据库比较狠，为了保障更高的性能，会在物理机上直接部署。如果你面对的系统，确实需要用到物理机来创建数据库，那就选择物理机。如果Pod可以满足需求，我觉得不用纠结，直接用Pod就可以了。</p>
@@ -6256,10 +6256,10 @@
 <p>不过，我们高兴得有些早了，正当我把这次的稳定性场景接着跑起来的时候，结果还没出来，又出现了新问题！于是，我们只得来到定向分析的第三阶段。</p>
 <h3 id="_3">定向分析第三阶段</h3>
 <p>在上一阶段中，我们发现了MySQL的Pod被删掉重建。于是，当场景再次运行起来时，我就直接查看了所有namespace中的Pod状态，结果看到了下面的信息：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/90/67/9056513807ceb171d0d4691cb817ca67.png?wh=1385%2A245" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/90/67/9056513807ceb171d0d4691cb817ca67.png?wh=1385%2A245" /></p>
 <p>不知道什么原因，Order容器一直在被驱逐。</p>
 <p>通过查看日志，我发现了这样的信息：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/54/bb/544055c6ef899aa5d76123382a7e87bb.png?wh=1901%2A87" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/54/bb/544055c6ef899aa5d76123382a7e87bb.png?wh=1901%2A87" /></p>
 <p>DiskPressure！这就是说Order服务所在的worker上的存储被用完了呗。在Order应用的虚拟机中，我通过查看Kubernetes日志，发现了这样的错误信息：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>kubelet: W0222 14:31:35.507991    1084 eviction_manager.go:344] eviction manager: attempting to reclaim ephemeral-storage
 </code></pre></div>
@@ -6291,19 +6291,19 @@
 </code></pre></div>
 <p>这个错误日志提示说，操作系统的文件有可能出现了问题，建议重启操作系统。既然系统有建议，那咱就重启一下吧。</p>
 <p>然而，世事无常，处处是坑，我们在重启操作系统时看到了这个界面：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/93/05/9356af3cdae223212b55e4e33b1e0305.png?wh=766%2A271" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/93/05/9356af3cdae223212b55e4e33b1e0305.png?wh=766%2A271" /></p>
 <p>想哭对吧？现在居然连磁盘都找不着了……</p>
 <p>回想刚才对磁盘的操作，我们在增加磁盘空间时，直接用的是这个命令：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>qumu-img resize imagename +100G
 </code></pre></div>
 <p>我在查看了官方资料之后发现，这个命令虽然能扩容，但是要先关闭虚拟机，不然磁盘会出问题。而我们当时并没有关虚拟机。没办法，我们只有把虚拟机重建一下了。</p>
 <p>经过一翻折腾，我们再次把数据库启动，等应用都正常连上之后，再次把稳定性场景运行起来，看到了这样的结果：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b2/ff/b28a7b6c3e9948eaf03aefcdd2e4a7ff.png?wh=1818%2A656" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b2/ff/b28a7b6c3e9948eaf03aefcdd2e4a7ff.png?wh=1818%2A656" /></p>
 <p>此时的业务累积量为：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/25/66/2580844435055e892f4c6e5db3ae4866.png?wh=216%2A134" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/25/66/2580844435055e892f4c6e5db3ae4866.png?wh=216%2A134" /></p>
 <p>从场景数据来看，TPS有所下降，这是因为我们在压力过程中，所有的数据一直都是累加的。累加得越多，数据库中的操作就会越慢，我们看一下worker-1中，数据库的资源使用量就可以知道：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b8/f7/b8b5d3331422990a63811c8b006204f7.png?wh=1819%2A755" /></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/25/97/255a568b72bb370fd48f2398b6ed2697.png?wh=1819%2A795" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b8/f7/b8b5d3331422990a63811c8b006204f7.png?wh=1819%2A755" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/25/97/255a568b72bb370fd48f2398b6ed2697.png?wh=1819%2A795" /></p>
 <p>你看，这里面的系统负载和IO吞吐，都因稳定性运行时间越来越长、数据量越来越多受到了影响。我们后续的优化思路也就非常明确了，那就是保证当前表的数据量级，像分库分表、定期归档这样的手段就可以上了，这些操作都是常规操作。</p>
 <p>在我们当前这个场景中，由于稳定性目标已经达到，就不再接着往下整了。毕竟，性能优化是没有止境的。</p>
 <h2 id="_4">总结</h2>
@@ -6457,8 +6457,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

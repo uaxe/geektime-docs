@@ -14035,11 +14035,11 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>go test -bench=BenchmarkNoPool -benchmem -cpuprofile=&#39;cpu.pprof&#39;
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>go tool pprof -http :8889 cpu.pprof
 </code></pre></div>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/78/ea/78017a9d53272b585e1fc06862bc1fea.jpg?wh=4092x1346" title="图1 频繁分配临时对象 CPU 火焰图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/78/ea/78017a9d53272b585e1fc06862bc1fea.jpg?wh=4092x1346" title="图1 频繁分配临时对象 CPU 火焰图" /></p>
 <p>从火焰图里我们能发现，在 WriteBufferNoPool 函数的调用栈里，消耗 CPU 资源最多的是 mallocgc 函数，这个函数就是专门负责堆内存分配的。不仅如此，火焰图里有不少以 gc 开头的函数，这些函数就是 Golang 在运行垃圾收集的时候调用的。所以呢，通过火焰图我们就可以知道，频繁创建临时对象，真的会在内存分配和 GC 方面产生很大的开销。</p>
 <p>那问题就来了，有没有啥办法能减少因为频繁创建临时对象而产生的内存分配和 GC 开销呢？</p>
 <p>由于我们每次申请的都是同一种类型的对象，也就是 bytes.Buffer。既然这样，像下面的图一样，我们可以在每次用完这个临时对象之后，把它放到一个池子里。等下次要用的时候，就直接从池子里取出来用。这样一来，就不用每次都从堆里重新分配，而且 GC 需要扫描的临时对象也会减少，这就是对象池的思想。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c9/1a/c96fee10508347b637ed982453b14d1a.jpg?wh=2366x458" title="图2 对象池" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c9/1a/c96fee10508347b637ed982453b14d1a.jpg?wh=2366x458" title="图2 对象池" /></p>
 <p>对于对象池，Golang 里有个 sync.Pool 类型来支持它。那这个 sync.Pool 是怎么用的呢？</p>
 <p>首先，就像下面这段代码显示的那样，我们得定义一个 New 函数。为啥要定义这个呢？因为当我们从对象池里取对象的时候，如果池子里没有对象，就需要调用这个 New 函数来创建。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kd">var</span><span class="w"> </span><span class="nx">objectPool</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nx">sync</span><span class="p">.</span><span class="nx">Pool</span><span class="p">{</span>
@@ -14174,12 +14174,12 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>go<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-bench<span class="o">=</span>BenchmarkGo<span class="w"> </span>-benchmem<span class="w"> </span>-cpuprofile<span class="o">=</span><span class="s1">&#39;cpu.pprof&#39;</span>
 <a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>go<span class="w"> </span>tool<span class="w"> </span>pprof<span class="w"> </span>-http<span class="w"> </span>:8889<span class="w"> </span>cpu.pprof
 </code></pre></div>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/38/ac/3835d127444f886d0f5c40abe788e0ac.jpg?wh=2886x660" title="图3 协程创建 CPU 火焰图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/38/ac/3835d127444f886d0f5c40abe788e0ac.jpg?wh=2886x660" title="图3 协程创建 CPU 火焰图" /></p>
 <p>从图里我们能发现，除了 handler 这个业务逻辑方法外，runtime.newproc 和 runtime.schedule 这两个函数也占用了一部分 CPU 资源。而这两个函数就是Go协程创建和调度逻辑。所以呢，通过火焰图我们就可以知道，要是频繁地创建协程，就会产生协程创建方面的开销。而且如果协程数量太多了，那协程调度产生的开销也会很大。</p>
 <p>那我们有没有办法减少协程创建和调度开销呢？</p>
 <p>和前面的对象池思路类似，咱们可以创建一个协程池。</p>
 <p>就像后面图里展示的这样，不同的请求需要使用协程运行任务时，不用重新创建协程，而是将自己的任务加到任务通道中，协程池中的协程从通道中获取任务运行，这样就实现了协程共用，避免频繁创建协程。同时，对于协程池中协程的数目，咱们也可以限制一下，避免同时处于就绪态的协程数目过多，导致需要频繁地进行协程调度。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a1/c4/a16ac0a5731b19660681c7b13e2245c4.jpg?wh=3175x1585" title="图4 协程池工作原理" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a1/c4/a16ac0a5731b19660681c7b13e2245c4.jpg?wh=3175x1585" title="图4 协程池工作原理" /></p>
 <p>这么说可能有点抽象。接下来，我们结合一个简单的协程池代码直观感受一下。</p>
 <p>首先，就像下面这段代码展示的那样，我们可以创建一个叫做 WorkerPool 的协程池结构体。在这个结构体的构造函数里，启动一定数量的协程。这些协程会一直从任务通道 tasks 里获取任务来运行。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kd">type</span><span class="w"> </span><span class="nx">handlerFunc</span><span class="w"> </span><span class="kd">func</span><span class="p">()</span>
@@ -14434,8 +14434,6 @@ IO 操作的缓冲，使用 bufio 包中的 Reader 和 Writer，它们可以缓�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

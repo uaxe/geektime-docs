@@ -7798,7 +7798,7 @@
 <h2 id="_1">一个简单的流式数据处理系统</h2>
 <p>我们先来看一看，在有了Kafka和Storm之后，一个实际的流式数据处理系统是怎么样的。</p>
 <p>最简单的，我们就采用一个进行广告点击率计算和计费的数据处理需求。我们的日志会是这样的格式：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/cc/30/ccd655415f2e0b74b70dde3f1c2b7530.jpg?wh=1920x594" title="广告系统日志的简单示例" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cc/30/ccd655415f2e0b74b70dde3f1c2b7530.jpg?wh=1920x594" title="广告系统日志的简单示例" /></p>
 <ul>
 <li>每一条日志，都表示一次广告相关的日志。其中，广告位ID+广告客户ID+广告ID标明了是哪一个广告，展示在了哪一个广告位置上。比如，可口可乐的新年促销广告，展示在了某视频网站的开屏页，就可以通过这三个字段分辨出来。</li>
 <li>事件类型这个字段，用来标注这条日志是表示一次广告的展示，还是一次广告的点击。</li>
@@ -7824,7 +7824,7 @@
 <li>ClientSpentBolt的逻辑也很简单，就是它可以以更高的频率，比如每秒，甚至每次接收到一次广告点击，就对应更新一次HBase里的广告花费数据。</li>
 </ul>
 <p>最后，整个Storm的Topology，是开启了AckerBolt的，也就是我们会确保所有的消息能够至少被处理一次。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8d/70/8d56d6afeddf056642f2143b22ab3c70.jpg?wh=1920x1480" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8d/70/8d56d6afeddf056642f2143b22ab3c70.jpg?wh=1920x1480" /></p>
 <h2 id="_2">“正好一次”的正确性</h2>
 <p>这样，一切看起来都很完美，我们简单地通过Kafka+Storm，就有了一条可以实时计算广告花费和广告点击率的数据流水线。当然，如果我们的系统非常稳定，没有任何软硬件故障的时候，事情也许是这样的。不过，<strong>在大数据领域，我们始终面临“出错”这个问题</strong>。而一旦出错，我们的麻烦就来了。</p>
 <p>首先就是这个“至少一次”数据处理的特性，其实已经满足不了我们实际的业务需要了。随着时间的推移，我们已经把“广告计费”这样对于准确性要求很高的应用，也放到流式处理系统里来。</p>
@@ -7832,14 +7832,14 @@
 <p>而如果说，单条日志重发计费，可能对于最终计费的影响还很小。那么如果Storm的某一个KafkaSpout出现了硬件故障，挂掉了，我们就可能有一大批消息会重复计费了。</p>
 <p>因为为了性能考虑，我们从Kafka拉取数据，不会是拉一条、处理一条，然后更新一次ZooKeeper上的偏移量。特别是ZooKeeper会受不了这么大的负载，<strong>它和Chubby一样，是用于实现一个粗粒度的分布式锁</strong>，而不是一个高性能的KV存储。所以，KafkaSpout会从Kafka拉一小批数据，然后发送出去，等到这一小批数据发送完了，并且下游都处理完了，才会变更一次ZooKeeper上的偏移量。</p>
 <p>但是，只要其中有一条消息在下游还没有处理完的时候，KafkaSpout所在的服务器挂掉了，对应的偏移量没有更新。那么在容错机制下，重新启动在另一台服务器上的KafkaSpout，会重新再发送一遍这一批数据。而这个时候，我们就不只是重新对一条日志重复计费，而是需要对一大批日志重复计费。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/fb/5f/fbeff4e04byy5f155a48bff9de0yy85f.jpg?wh=1920x1177" title="在Kafka+Storm的组合下，我们也不是每条消息都去更新Offset，而是一个Batch一个Batch地更新[br]在这个过程中如果Spout挂了，那么整个Batch的数据都会重新再发送一遍" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fb/5f/fbeff4e04byy5f155a48bff9de0yy85f.jpg?wh=1920x1177" title="在Kafka+Storm的组合下，我们也不是每条消息都去更新Offset，而是一个Batch一个Batch地更新[br]在这个过程中如果Spout挂了，那么整个Batch的数据都会重新再发送一遍" /></p>
 <p>要解决这个问题，一个很直观的思路，自然是<strong>对重复发送的日志或者消息进行去重</strong>。最简单的方式，就是在每一个Bolt里，我们维护一个这个Bolt已经处理完成的，所有的message-id的集合。那么，任何一条新的消息发送过来的时候，我们都去这个集合里看一看，这条消息是否已经处理过了，就能解决这个问题了。</p>
 <p>不过，让每个Bolt都保留所有处理过的message-id的集合，显然会<strong>占用太多的内存</strong>了。因为在流式系统里，随着时间的推移，系统处理过的日志量在不断地增加，message-id的集合只会越来越大。所以，在工程实践上，我们可以做两个优化：</p>
 <ul>
 <li>第一个，是<strong>使用BloomFilter进行去重，来代替原始的数据集合</strong>。我们把所有已经处理过的message-id放到一个BloomFilter里去，这样可以大大压缩我们需要的内存空间。不过，使用BloomFilter会带来的副作用是，我们可能会有很小的概率误算，使得不是重复的消息也会被认为是重复的。</li>
 <li>第二个，是<strong>把数据按照时间窗口，切分成多个BloomFilter</strong>。比如，我们可以设定有30个BloomFilter，每个BloomFilter都只存放某一分钟的message-id。而每过一分钟，我们都把30分钟前的那个BloomFilter清空。这样，我们可以通过一个固定大小的内存空间，确保只要是30分钟内的重复数据，就不会被多次处理。因为一般来说，简单的重发，不太可能超过30分钟。我们可以根据系统的实际情况，来设定这个对应的时间窗口。</li>
 </ul>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/28/28/28f55f2610673982c2a47752dd9f4328.jpg?wh=1920x1006" title="通过按照时间范围，切分多个BloomFilter，在时间过期之后，回收BloomFilter供新的时间分片使用" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/28/28/28f55f2610673982c2a47752dd9f4328.jpg?wh=1920x1006" title="通过按照时间范围，切分多个BloomFilter，在时间过期之后，回收BloomFilter供新的时间分片使用" /></p>
 <p><strong>真正做到“正好一次”的数据处理，是现代流式数据处理的第一个目标。</strong></p>
 <h2 id="_3">计算节点迁移的容错问题</h2>
 <p>BloomFilter的引入，使得我们用于计算的Bolt节点，其实有了“状态”。也就是说，它自身已经不是一个纯粹的函数了。事实上，不仅是为了做到“正好一次”的消息处理需要状态，我们本身的数据处理需求就需要状态。</p>
@@ -7854,7 +7854,7 @@
 </ul>
 <p>Bolt会被拆分和迁移，并且在迁移的过程中，我们需要能够保留状态信息，这意味着我们的状态需要能够<strong>持久化</strong>下来。我们需要能够把这些状态，也更新到一个稳定的外部存储中去。当我们的节点挂掉，在其他服务器上恢复计算能力的时候，需要把这些状态信息重新读取回来。</p>
 <p>并且，这个能力，也使得我们去调度计算变得更容易了，我们可以动态地在线上增加系统的并行度。而不是采用部署一个新系统再把老系统下线，这样运维成本更高的模式。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c5/48/c5b4cf72067c1ce8dc8ab66b68f17a48.jpg?wh=1920x1480" title="为了确保系统的真正容错，我们需要把Bolt这样的计算单元的状态信息持久化到外部存储中去" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c5/48/c5b4cf72067c1ce8dc8ab66b68f17a48.jpg?wh=1920x1480" title="为了确保系统的真正容错，我们需要把Bolt这样的计算单元的状态信息持久化到外部存储中去" /></p>
 <p><strong>通过把各个计算节点的中间状态持久化，使得系统在容错情况下，仍然能够做到“正好一次”的数据处理，并且能够在线上动态扩容、调度计算，是现代流式数据处理的第二个目标。</strong></p>
 <h2 id="_4">处理消息的时间窗口</h2>
 <p>除了重复发送的消息去重，Bolt的中间状态需要持久化之外，其实我们前面的Topology还有一个问题没有解决好，这个问题就是“时间问题”。</p>
@@ -7863,7 +7863,7 @@
 <p>而且，这个差异情况，在很多场景下我们是无法容忍的。</p>
 <p><strong>一种情况是和业务需求相关</strong>，比如我们的广告客户，设置了广告预算都在11月份花完。那么，在11月30日晚上11点59分59秒发生的广告点击，实际被处理的时候很有可能已经是12月1日了。这样，我们的广告客户会看到，他并没有在12月份分配任何广告预算，但是我们的系统却让他在12月1日有了花费，这显然会引起客户的不满。</p>
 <p><strong>另一种情况，则是和我们对于日志的重放相关</strong>。无论是系统故障，还是我们修改了数据分析逻辑，当我们要通过重放Kafka里的日志，重新计算统计数据的时候，现在的逻辑会造成更大的麻烦。因为所有的日志都是在短时间内重放，所以我们会把过去几小时，甚至是几天的数据，都统计在最近几分钟内，我们的统计数据不是有一些小小的误差，而是完全错误的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/47/01/47202337789a13ba846c817731d75801.jpg?wh=1920x1480" title="在实际的流式数据处理中，从事件发生，到消息被处理会有一定的延时[br]而且消息并不一定会按照它们发生的时间顺序被处理[br]在该图里，事件E1比E2早发生，但是要晚上好几分钟才被处理" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/47/01/47202337789a13ba846c817731d75801.jpg?wh=1920x1480" title="在实际的流式数据处理中，从事件发生，到消息被处理会有一定的延时[br]而且消息并不一定会按照它们发生的时间顺序被处理[br]在该图里，事件E1比E2早发生，但是要晚上好几分钟才被处理" /></p>
 <p>当然，批量重放日志，不是一个常见的情况。但是，在硬件故障的情况下，部分前端应用服务器的日志没有及时进入Kafka，或者某些Kafka的Broker的部分日志，没有及时进入我们的Topology则是一个常见的情况。在这样的场景下，我们仍然会有大量的日志，出现少则数十秒，多则一两个小时的延误。这样计算出来的错误的统计数据，我们仍然接受不了。</p>
 <p>一个合理的解决方案，就是我们需要使用实际的事件发生的时间（即Event Time），来进行相应的数据统计。但是这样一来，我们就面临两个新的问题。</p>
 <p><strong>第一个问题</strong>，是我们不能简单地维护 <code>广告ID=&gt;(展示次数，点击次数，广告花费)</code> 这样一个映射关系了，而是需要一个 <code>时间窗口=&gt;[广告ID1=&gt;(展示次数，点击次数，广告花费)，广告ID2=&gt;(展示次数，点击次数，广告花费) , ……]</code> 这样一个三维多层的映射关系了。</p>
@@ -8013,8 +8013,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -6374,11 +6374,11 @@
 <a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>.cfi_endproc
 </code></pre></div>
 <p>从汇编代码中，你能看出来，这个函数的栈桢特别简单。在factorial函数中，n和total两个参数是保存在寄存器中的，在栈桢里只保存了rbp寄存器的旧值和返回地址。如果递归函数复杂一点，或者我们采用的是比较简单的寄存器分配算法，那么栈桢里可能会保存一些其他信息，比如溢出的变量等。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a5/62/a55b3dc800a963af5c7311f497c5b062.png?wh=732x602" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a5/62/a55b3dc800a963af5c7311f497c5b062.png?wh=732x602" /></p>
 <p>然后，每次的递归调用，都会创建一个栈桢。递归嵌套多少层，就需要建立多少级的栈桢。如果说我们要计算10000的阶乘，那就需要10000个栈桢。</p>
 <p>这样说的话，到目前为止，我们的编译器所生成的程序，是完全合乎规则的，似乎没啥问题啊？</p>
 <p>不过，如果你细看一下，就会发现一个现象：<strong>在每一级调用结束之后，我们都会返回到上一级函数。而且上一级函数也会立即结束，继续返回上一级。这个过程会一直持续下去，直到退出最上面一级的factorial函数。</strong></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7b/bf/7bd9ae1bbc1b91396bd2efc983424bbf.png?wh=762x602" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7b/bf/7bd9ae1bbc1b91396bd2efc983424bbf.png?wh=762x602" /></p>
 <p>在逐级返回的过程中，其实程序再也没有访问n和total这两个本地变量，只有%eax寄存器是有用的，因为这里面保存了返回值。</p>
 <p>这样看起来，这些一层层的上级栈桢，都是没有什么用的，这里的内存空间，完全是浪费的。也就是说，在计算10000的阶乘的时候，前9999个栈桢其实都是没有用的。另外，寄存器里保存的变量的值，也已经结束了生存期。所以，我们在调用下一级函数的时候，根本没有必要去保护它们原来的值。</p>
 <p>既然如此，那我们能不能做一些优化，提高程序的性能呢？</p>
@@ -6387,7 +6387,7 @@
 <p>这要怎么优化呢？总的思路是这样的：<strong>既然旧函数的栈桢没有用，那么我们就没有必要为递归调用产生一个新的栈桢，而是复用当前栈桢就行了</strong>。</p>
 <p>那怎么实现这一点呢？我先直接说答案吧。我们的解决思路，就是把call语句改成一个jmp指令，跳到程序的开头重新执行。</p>
 <p>这个时候，参数1和参数2的值已经分别被更新成了n-1和n * total。所以，当我们跳到程序开头再一次执行的时候，就相当于调用factorial(n-1, n * total)，从而取得了和尾递归调用相同的计算结果，你可以看看下面这个截图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f5/2b/f5b811dff17ee6199cd4395c454b912b.png?wh=1428x1056" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f5/2b/f5b811dff17ee6199cd4395c454b912b.png?wh=1428x1056" /></p>
 <p>这里我稍微岔开一个小话题，在上面的图中，你会看到我还把callq后面的两条指令打了叉，去掉了。这个原因也很简单，这两条语句其实是做了无用功。第一条指令把eax中的值拷贝到edx，第二条又从edx拷贝回了eax，作为返回值的eax其实并没有变化。</p>
 <p>你还记不记得，在上一节课的思考题中，我让你去检查，我们目前生成的汇编代码还有哪些地方需要优化，这里就是其中一个例子。不过，具体如何去完善这些代码，我们以后再说。</p>
 <p>我们还是回到尾递归的话题上来。对着上面的汇编代码，你可能会发现，这不就是一个循环语句的结构吗？每次循环，就把n减1。也就是说，上面的汇编代码其实相当于下面的高级语言代码：</p>
@@ -6404,11 +6404,11 @@
 <p><strong>那么，我们应该如何升级PlayScript，来实现尾递归的优化呢？</strong></p>
 <p>首先，我们必须能够分析出来什么样的函数调用属于尾递归。这个判断起来也比较简单，如果一个return语句中的表达式，只有一个递归调用，那么这个递归调用就是尾递归。</p>
 <p>我们看看它的AST有什么特点。你用node play example_fact.ts -v 命令，可以打印出程序的AST信息。你会发现，ReturnStatement节点只有一个FunctionCall子节点，并且FunctionCall所调用的函数正是factorial自身，是一个递归调用。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/44/50/44e9f4ae8cda660c1e06db4b051e9350.png?wh=1552x976" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/44/50/44e9f4ae8cda660c1e06db4b051e9350.png?wh=1552x976" /></p>
 <p>掌握了AST的这个特点后，我们很容易就可以写一个分析程序，识别出哪个函数调用是尾递归，从而改变后面生成汇编代码的逻辑，这里具体代码你可以参考代码库里的<a href="https://gitee.com/richard-gong/craft-a-language/blob/master/21/tail.ts#L13">TailAnalyzer</a>。</p>
 <p>TailAnalyzer的运行结果，是一个<a href="https://gitee.com/richard-gong/craft-a-language/blob/master/21/tail.ts#L90">TailAnalysisResult</a>对象。这个对象里保存了所有尾递归的FunctionCall节点。这样，在生成Asm的时候，我们就可以针对尾递归专门生成不同的代码了。</p>
 <p>接下来，我们再使用这节课的PlayScript版本，再次执行make example_fact，就会生成针对尾递归优化后的汇编代码和可执行程序。我们看一下新版本的汇编代码：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9d/8b/9d99c1a27d29b80c4c287ef4f683ae8b.png?wh=1188x990" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9d/8b/9d99c1a27d29b80c4c287ef4f683ae8b.png?wh=1188x990" /></p>
 <p>在新版本生成的汇编代码里，你会看到我们新加了一个基本块，作为跳转指令的目标。而原来的callq指令，则变成跳转到这个基本块的一个jmp指令。</p>
 <p>你可以运行一下新版本的程序，你会发现两个版本的运行结果是相同的，也就是说它们的功能是完全等价的。如果你有兴趣的话还可以做一个测试程序，测一下优化前后的性能差异到底有多大。</p>
 <p>你可以把阶乘的例子变成一个累加的例子来测试，也就是f(n) = n+f(n-1)。为什么呢？因为阶乘的值增加得太快了，很快就会超过整数的范围，比如16的阶乘就超出了一个32位整数的表达能力。</p>
@@ -6556,8 +6556,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

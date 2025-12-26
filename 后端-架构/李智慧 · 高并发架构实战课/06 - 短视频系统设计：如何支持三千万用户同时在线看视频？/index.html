@@ -14022,15 +14022,15 @@
 <p>因此，我们需要设计的短视频应用是一个每秒上传550个视频文件、11万次播放、新增165GB存储以及88Tb总带宽的<strong>高并发</strong>应用系统。这个系统呢需要是<strong>高性能的</strong>，能迅速响应用户的上传和播放操作，也需要是<strong>高可用</strong>的，能面向全球用户提供7 * 24小时稳定的服务。</p>
 <h2 id="_2">概要设计</h2>
 <p>QuickTok的核心部署模型如下图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3b/12/3b3b87yy124ce2f5123c93e8c33aa012.jpg?wh=1920x953" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3b/12/3b3b87yy124ce2f5123c93e8c33aa012.jpg?wh=1920x953" /></p>
 <p>用户上传视频时，上传请求会通过负载均衡服务器和网关服务器，到达视频上传微服务。视频上传微服务需要做两件事：一是把上传文件数据流写入视频文件暂存服务器；二是把用户名、上传时间、视频时长、视频标题等视频元数据写入分布式MySQL数据库。</p>
 <p>视频文件上传完成后，视频上传微服务会生成一个视频上传完成消息，并将其写入到消息队列服务器。视频内容处理器将消费这个上传完成消息，并根据消息内容，从视频文件暂存服务器获取视频文件数据，进行处理。</p>
 <p><strong>视频内容处理器</strong>是一个由责任链模式构建起来的管道。在这个管道中，视频将会被顺序进行内容合规性审查、内容重复性及质量审查、内容标签生成、视频缩略图生成、统一视频转码处理等操作，如下图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/be/e3/be480eb368059b4075e9e1c0cdbab7e3.jpg?wh=1920x507" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/be/e3/be480eb368059b4075e9e1c0cdbab7e3.jpg?wh=1920x507" /></p>
 <p>合规且非重复的视频会经过统一转码，最终被写入分布式文件存储和CDN。这样视频上传处理就完成了，具体时序图如下。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9c/a5/9c8d6b3089338f9efeba76b83a6386a5.jpg?wh=1920x755" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9c/a5/9c8d6b3089338f9efeba76b83a6386a5.jpg?wh=1920x755" /></p>
 <p>以上就是对视频上传环节的设计，接下来我们将讨论对视频搜索及播放部分的设计，即核心部署模型图中标红的部分，如下。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/05/da/052fbf549b92bf2a9d01f243173ef6da.jpg?wh=1920x953" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/05/da/052fbf549b92bf2a9d01f243173ef6da.jpg?wh=1920x953" /></p>
 <p><strong>视频搜索引擎</strong>会根据用户提交的视频标题、上传用户等元数据，以及视频内容处理器生成的内容标签构建<strong>倒排索引</strong>。当用户搜索视频时，系统会根据倒排索引来检索符合条件的视频，并返回结果列表。结果列表在App端向用户呈现时，会将此前视频内容处理器生成的缩略图展现给用户，使用户对视频内容有个初步而直观的感受。</p>
 <p>当用户点击缩略图时，App开始播放视频。App并不需要下载完整个视频文件才开始播放，而是<strong>以流的方式一边下载视频数据，一边播放</strong>，使用户尽量减少等待，获得良好的观看体验。QuickTok使用MPEG–DASH流媒体传输协议进行视频流传输，因为这个协议具有自适应能力，而且支持HTTP，可以应对QuickTok的视频播放需求。</p>
 <h2 id="_3">详细设计</h2>
@@ -14040,7 +14040,7 @@
 <p>由需求分析可知，QuickTok每年新增5200PB的存储。因此，“如何存储海量视频文件”就是QuickTok设计的重要挑战之一。对此，我们可以尝试与<a href="https://time.geekbang.org/column/article/489820">网盘</a>相同的存储技术方案，将视频文件拆分成若干block，使用对象存储服务进行存储。</p>
 <p>但QuickTok最终采用了另一种存储方案，即使用<strong>Hadoop分布式文件系统HDFS</strong>进行存储。HDFS适合大文件存储的一次写入多次读取的场景，满足视频一次上传多次播放的需求；同时，它还可以自动进行数据备份（缺省配置下，每个文件存储三份），也满足我们关于数据存储高可用的需求。</p>
 <p>HDFS适合存储大文件，大文件减少磁盘碎片，更有利于存储空间的利用，同时HDFS NameNode的访问压力也更小，所以我们需要把若干个视频文件合并成一个HDFS文件进行存储，并将存储相关的细节记录到HBase中。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/87/3b/87d4eb962fbda5d3c03eec6d11027e3b.jpg?wh=1920x513" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/87/3b/87d4eb962fbda5d3c03eec6d11027e3b.jpg?wh=1920x513" /></p>
 <p>举个例子，当用户上传一个视频文件，系统会自动生成一个视频ID，这里假设这个ID是123。视频内容处理器先对视频进行一系列处理，再调用视频文件存储服务来进行存储。</p>
 <p>存储服务首先通过HDFS创建一个文件，比如/data/videos/clust0/p0/000000001，然后将视频文件数据顺序写入到HDFS中。写完后，存储服务就可以得到这个HDFS文件的全路径名(/data/videos/clust0/p0/000000001)、视频文件在HDFS中的偏移量0、文件大小99,000,000B。</p>
 <p>然后，视频文件存储服务再将这些信息记录到HBase中，主键就是视频ID&lt;123&gt;，value就是&lt;path:/data/videos/clust0/p0/000000001, offset:0, size:99,000,000&gt;。</p>
@@ -14052,7 +14052,7 @@
 <p>如果用户的大部分请求都可以通过CDN返回，那么一方面可以极大<strong>加快用户请求的响应速度</strong>，另一方面又可以较大<strong>缓解数据中心的网络和硬盘负载压力</strong>，进一步提升应用整体的性能。</p>
 <p>通常的CDN设计，是在CDN中没有用户请求的数据时，进行回源，即由CDN请求数据中心返回需要的数据，然后缓存在CDN本地。</p>
 <p>但QuickTok考虑到了短视频的特点：大V、网红们发布的短视频会被更快速、更广泛地播放。因此针对粉丝量超过10万的用户，系统将采用主动推送CDN的方法，以提高CDN的命中率，优化用户体验，如图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8e/92/8e33465e29736426d7848a6a373b9d92.jpg?wh=1920x544" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8e/92/8e33465e29736426d7848a6a373b9d92.jpg?wh=1920x544" /></p>
 <p>从图中可以看出，视频内容处理器进行完视频处理后，一方面会将视频存储到前面说过的视频存储系统中，另一方面又会调用CDN推送服务。然后，CDN推送服务将调用大数据平台，获取视频上传者的活跃粉丝数、粉丝分布区域等数据。如果是10万粉丝以上的用户发布了短视频，CDN推送服务会根据其粉丝活跃的区域，将视频推送到对应区域的CDN服务器上。</p>
 <p>短视频的完播率通常不足30%，所以QuickTok也不需要将完整视频推送到CDN，只需要根据视频发布者的历史播放记录，计算其完播率和播放期望进度，然后将短视频切分成若干chunk，将部分chunk推送到CDN即可。</p>
 <p>业界一般共识，<strong>视频应用CDN处理的带宽大约占总带宽的95%以上</strong>，也就是说，通过合理使用CDN，QuickTok数据中心需要处理的带宽压力大约4Tb。</p>
@@ -14060,7 +14060,7 @@
 <p>用户可以通过App主页、搜索结果页、视频推荐页等页面看到视频列表，其中每个视频都需要有个缩略图。用户点击缩略图，就开始播放视频。</p>
 <p>缩略图通常是由视频的某一帧画面缩略而生成的。事实上，缩略图的选择会极大地影响用户点击、播放视频的意愿。一个10分钟的视频大约包含3万帧画面，选择哪一帧画面，才能使用户点击视频的可能性最大？以及，针对不同的用户分类，是否选择不同的缩略图会产生更高的点击率？</p>
 <p>我们需要通过<strong>大数据平台的机器学习引擎</strong>来完成缩略图的生成和推荐，如下图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/31/fe/31ef2215b819f1588fe3fa5277d537fe.jpg?wh=1920x1233" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/31/fe/31ef2215b819f1588fe3fa5277d537fe.jpg?wh=1920x1233" /></p>
 <p>缩略图的生成和推荐可以分为两个具体过程：</p>
 <ul>
 <li>实时在线的缩略图推荐过程a；</li>
@@ -14230,8 +14230,6 @@ Q7：本例子的成本大约多少？
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

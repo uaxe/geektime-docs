@@ -6294,7 +6294,7 @@
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>;
 </code></pre></div>
 <p>这个也是不行的，因为这样会导致运算的结合性出错。如果执意按照这个语法解析，解析2+3+4这个表达式所形成的AST会是右结合的：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/80/f1/8073e5cbae54c025db36a0ca7f6593f1.jpg?wh=1920x883" title="图1：基于右递归语法会生成右结合的AST" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/80/f1/8073e5cbae54c025db36a0ca7f6593f1.jpg?wh=1920x883" title="图1：基于右递归语法会生成右结合的AST" /></p>
 <p>你会看到，基于使用右递归文法生成的AST，实际是先计算3+4，再跟2相加。这违背了加法运算的结合性的规定。正确的运算顺序，应该是先计算2+3，然后再加上4，是左结合，对应的AST应该是右边的那个。这种结合性的错误，看上去对于加法影响不大，但如果换成减法或者除法，那计算结果就完全错误了。</p>
 <p>好了，现在你已经理解了左递归问题了。那我们要如何解决这个问题呢？一个可行的解决方法就是改写文法，并且要在解析算法上做一些特殊的处理，你可以参考《编译原理之美》课程<a href="https://time.geekbang.org/column/article/120388">04讲</a>。除了改写文法的方法以外，还有一些研究者提出了其他一些算法，也能解决左递归问题。</p>
 <p>不过，针对二元表达式的解析，今天我要采用的是被实际编译器广泛采用的<strong>运算符优先级算法</strong>。</p>
@@ -6304,23 +6304,23 @@
 <p>首先我们来看2+3+4这个表达式，如果我们用自底向上归纳的思路做语法分析是怎么样一个思考过程呢？</p>
 <p>第1步，首先看到2。你心里想，这里有一个整数了，那它是不是一个算术表达式的组成部分呀？是一个加法表达式的，还是乘法表达式的一部分呢？我们再往下看一看就知道。</p>
 <p>第2步，看到一个+号。噢，你说，原来是一个加法表达式呀。这时候，我们知道，2肯定是要参与加法运算的，所以是加法的左子树。但加法后面可以跟很多东西的，比如另一个整数，或者是一个乘法表达式什么的，都有可能。那我们继续向下看。
-<img alt="图片" src="https://static001.geekbang.org/resource/image/ed/e8/edb3bb5ee38d31ace0e8b261e48c35e8.jpg?wh=1309x889" title="图2：第2步时，2是肯定与+号结合的" />
+<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ed/e8/edb3bb5ee38d31ace0e8b261e48c35e8.jpg?wh=1309x889" title="图2：第2步时，2是肯定与+号结合的" />
 第3步，看到整数3。奥，你心里想，原来是2+3呀。那我现在根据这三个Token是不是可以先凑出一棵AST的子树来呢？先等一等，我们现在还不知道3后面跟的是什么。</p>
 <p>如果3后面跟的是+号或者-号，那没问题，3是先参与前面这个+号的计算，再把2+3的结果一起，去参与后面的计算的。</p>
 <p>但如果3后面遇到的是 * 号呢？那么3就要先参与乘法运算，计算完的才参与前面的加法的。这两个不同的计算顺序，导致AST的结构是不一样的，<strong>而影响AST结构的，其实就是3前后的两个运算符的优先级。</strong>
-<img alt="图片" src="https://static001.geekbang.org/resource/image/b0/38/b060918091c30e02e59057810564b238.jpg?wh=1920x1049" title="图3：根据第4个Token的优先级，3会与不同的运算符结合" />
+<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b0/38/b060918091c30e02e59057810564b238.jpg?wh=1920x1049" title="图3：根据第4个Token的优先级，3会与不同的运算符结合" />
 第4步，看到第2个+号。这个时候，你心里知道了，原来3后面的运算符的优先级跟前面的是一样的呀，那么按照结合性的规定，应该先算前面的加法，再算后面的加法，所以3应该跟前面的2和+号一起凑成一个AST子树。并且，这棵子树会作为一个稳定的单元，参与后面的AST的构建。
-<img alt="图片" src="https://static001.geekbang.org/resource/image/3b/7d/3b7711c5539fb426c4862a7d59d45d7d.jpg?wh=1653x956" title="图4：2+3对应的AST子树已经稳定，不会被拆散了" />
+<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3b/7d/3b7711c5539fb426c4862a7d59d45d7d.jpg?wh=1653x956" title="图4：2+3对应的AST子树已经稳定，不会被拆散了" />
 第5步，看到整数4。现在的情况跟第3步是一样的，我们不知道4后面跟着的是什么。如果4后面跟着一个 * 号，那么4还要先参与后面的计算，然后再跟前面这一堆做加法。如果4后面也是一个加法运算符，那4就要先参与前面的计算，4在AST中的位置也就会变得确定。
-<img alt="图片" src="https://static001.geekbang.org/resource/image/15/cd/15c1yyb8bc281591f4ff3c218b8e09cd.jpg?wh=1920x1080" title="图5：根据第6个Token的运算符的优先级，AST结构会不同" />
+<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/15/cd/15c1yyb8bc281591f4ff3c218b8e09cd.jpg?wh=1920x1080" title="图5：根据第6个Token的运算符的优先级，AST结构会不同" />
 第6步，再往下看，发现后面的Token既不是+号，也不是 * 号，而是EOF，也就是Token串的结尾。这样的话，整个AST就可以确定下来了。
-<img alt="图片" src="https://static001.geekbang.org/resource/image/75/3e/75824d0b58d460b6a3f725166635703e.jpg?wh=1529x806" title="图6：遇到EOF后，解析结束" />
+<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/75/3e/75824d0b58d460b6a3f725166635703e.jpg?wh=1529x806" title="图6：遇到EOF后，解析结束" />
 好了，这是一个比较简单的算法运行的场景。你可以多读几遍，借此找找自底向上分析的直观感觉。</p>
 <p>接下来，我们再换一个任务，分析一下2+3*5。你会发现，跟前一个例子相比，一直到第5步的时候，也就是读入了5以后，仍然没有形成一棵稳定的AST子树：
-<img alt="图片" src="https://static001.geekbang.org/resource/image/34/83/34d19dac3da05f25c6061657be0c3683.jpg?wh=1398x846" title="图7：第5步时的AST结构" />
+<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/34/83/34d19dac3da05f25c6061657be0c3683.jpg?wh=1398x846" title="图7：第5步时的AST结构" />
 这是为什么呢？</p>
 <p>因为根据5后面读入的Token的不同，形成的AST的结构会有很大的区别。这里我们展示3种情形：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6e/98/6ecc0002a5fe5d76d95153eb6c642298.jpg?wh=1920x1080" title="图8：AST的结构取决于第6个Token的运算符优先级" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6e/98/6ecc0002a5fe5d76d95153eb6c642298.jpg?wh=1920x1080" title="图8：AST的结构取决于第6个Token的运算符优先级" /></p>
 <p><strong>情形1，第6个Token是+号</strong>：它的优先级不高于最后一个运算符 * 号，所以3 * 5这棵子树的结构就是确定的；进一步看，它也不高于第一个运算符的优先级，所以整个2+3 * 5这棵子树的结构都可以确定下来，并且肯定是最后一个+号的左子树。</p>
 <p><strong>情形2，第6个Token是 * 号</strong>：这时候它的优先级仍然不高于最后一个运算符 * 号，所以3 * 5这棵子树的结构也可以确定下来，并成为新的 * 号的左子树。</p>
 <p><strong>情形3，如果第6个Token是 ** 号</strong>：也就是做幂运算，那么5就会首先参与幂运算，而不是参与前面的乘法运算。</p>
@@ -6511,8 +6511,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

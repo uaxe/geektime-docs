@@ -14415,7 +14415,7 @@
 <p>正常情况下，只要主库执行更新生成的所有binlog，都可以传到备库并被正确地执行，备库就能达到跟主库一致的状态，这就是最终一致性。</p>
 <p>但是，MySQL要提供高可用能力，只有最终一致性是不够的。为什么这么说呢？今天我就着重和你分析一下。</p>
 <p>这里，我再放一次上一篇文章中讲到的双M结构的主备切换流程图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/89/cc/89290bbcf454ff9a3dc5de42a85a69cc.png?wh=1142%2A880" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/89/cc/89290bbcf454ff9a3dc5de42a85a69cc.png?wh=1142%2A880" /></p>
 <p>图 1 MySQL主备切换流程--双M结构</p>
 <h1 id="_1">主备延迟</h1>
 <p>主备切换可能是一个主动运维动作，比如软件升级、主库所在机器按计划下线等，也可能是被动操作，比如主库所在机器掉电。</p>
@@ -14477,7 +14477,7 @@
 <li>把业务请求切到备库B。</li>
 </ol>
 <p>这个切换流程，一般是由专门的HA系统来完成的，我们暂时称之为可靠性优先流程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/54/4a/54f4c7c31e6f0f807c2ab77f78c8844a.png?wh=1142%2A880" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/54/4a/54f4c7c31e6f0f807c2ab77f78c8844a.png?wh=1142%2A880" /></p>
 <p>图2 MySQL可靠性优先主备切换流程</p>
 <p>备注：图中的SBM，是seconds_behind_master参数的简写。</p>
 <p>可以看到，这个切换流程中是有不可用时间的。因为在步骤2之后，主库A和备库B都处于readonly状态，也就是说这时系统处于不可写状态，直到步骤5完成后才能恢复。</p>
@@ -14502,7 +14502,7 @@
 </code></pre></div>
 <p>假设，现在主库上其他的数据表有大量的更新，导致主备延迟达到5秒。在插入一条c=4的语句后，发起了主备切换。</p>
 <p>图3是<strong>可用性优先策略，且binlog_format=mixed</strong>时的切换流程和数据结果。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/37/3a/3786bd6ad37faa34aca25bf1a1d8af3a.png?wh=1142%2A880" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/37/3a/3786bd6ad37faa34aca25bf1a1d8af3a.png?wh=1142%2A880" /></p>
 <p>图3 可用性优先策略，且binlog_format=mixed</p>
 <p>现在，我们一起分析下这个切换流程：</p>
 <ol>
@@ -14515,7 +14515,7 @@
 <p>那么，如果我还是用<strong>可用性优先策略，但设置binlog_format=row</strong>，情况又会怎样呢？</p>
 <p>因为row格式在记录binlog的时候，会记录新插入的行的所有字段值，所以最后只会有一行不一致。而且，两边的主备同步的应用线程会报错duplicate key error并停止。也就是说，这种情况下，备库B的(5,4)和主库A的(5,5)这两行数据，都不会被对方执行。</p>
 <p>图4中我画出了详细过程，你可以自己再分析一下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b8/43/b8d2229b2b40dd087fd3b111d1bdda43.png?wh=1142%2A880" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b8/43/b8d2229b2b40dd087fd3b111d1bdda43.png?wh=1142%2A880" /></p>
 <p>图4 可用性优先策略，且binlog_format=row</p>
 <p>从上面的分析中，你可以看到一些结论：</p>
 <ol>
@@ -14534,7 +14534,7 @@
 <p>这样的话，这种场景就又可以使用可靠性优先策略了。</p>
 <p>接下来我们再看看，<strong>按照可靠性优先的思路，异常切换会是什么效果？</strong></p>
 <p>假设，主库A和备库B间的主备延迟是30分钟，这时候主库A掉电了，HA系统要切换B作为主库。我们在主动切换的时候，可以等到主备延迟小于5秒的时候再启动切换，但这时候已经别无选择了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/55/8b/553b7fc2d0dce3ec78bb595e1806eb8b.png?wh=1142%2A880" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/55/8b/553b7fc2d0dce3ec78bb595e1806eb8b.png?wh=1142%2A880" /></p>
 <p>图5 可靠性优先策略，主库不可用</p>
 <p>采用可靠性优先策略的话，你就必须得等到备库B的seconds_behind_master=0之后，才能切换。但现在的情况比刚刚更严重，并不是系统只读、不可写的问题了，而是系统处于完全不可用的状态。因为，主库A掉电后，我们的连接还没有切到备库B。</p>
 <p>你可能会问，那能不能直接切换到备库B，但是保持B只读呢？</p>
@@ -14549,14 +14549,14 @@
 <p>最后，我给你留下一个思考题吧。</p>
 <p>一般现在的数据库运维系统都有备库延迟监控，其实就是在备库上执行 show slave status，采集seconds_behind_master的值。</p>
 <p>假设，现在你看到你维护的一个备库，它的延迟监控的图像类似图6，是一个45°斜向上的线段，你觉得可能是什么原因导致呢？你又会怎么去确认这个原因呢？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cf/71/cf5ea52aa3b26ef56c567125197fa171.png?wh=1142%2A880" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cf/71/cf5ea52aa3b26ef56c567125197fa171.png?wh=1142%2A880" /></p>
 <p>图6 备库延迟</p>
 <p>你可以把你的分析写在评论区，我会在下一篇文章的末尾跟你讨论这个问题。感谢你的收听，也欢迎你把这篇文章分享给更多的朋友一起阅读。</p>
 <h1 id="_6">上期问题时间</h1>
 <p>上期我留给你的问题是，什么情况下双M结构会出现循环复制。</p>
 <p>一种场景是，在一个主库更新事务后，用命令set global server_id=x修改了server_id。等日志再传回来的时候，发现server_id跟自己的server_id不同，就只能执行了。</p>
 <p>另一种场景是，有三个节点的时候，如图7所示，trx1是在节点 B执行的，因此binlog上的server_id就是B，binlog传给节点 A，然后A和A’搭建了双M结构，就会出现循环复制。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f9/71/f968192ce2f436c939dd702b8f409771.png?wh=1142%2A880" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f9/71/f968192ce2f436c939dd702b8f409771.png?wh=1142%2A880" /></p>
 <p>图7 三节点循环复制</p>
 <p>这种三节点复制的场景，做数据库迁移的时候会出现。</p>
 <p>如果出现了循环复制，可以在A或者A’上，执行如下命令：</p>
@@ -14766,8 +14766,6 @@ Last checkpoint at  3893705803837
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

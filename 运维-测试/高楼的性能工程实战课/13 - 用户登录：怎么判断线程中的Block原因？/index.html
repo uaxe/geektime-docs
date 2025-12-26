@@ -6263,14 +6263,14 @@
 <p>你看，登录功能实际上会涉及到很多的业务，它其实一点也不简单。所以，这节课我会带着你好好分析用户登录功能，并带你了解在压力过程中业务逻辑链路和整体TPS之间的关系。同时，也希望你能学会判断线程中的BLOCKED原因。</p>
 <h2 id="_1">修改加密算法</h2>
 <p>还记得在<a href="https://time.geekbang.org/column/article/362010">第10讲</a>中，我们在基准场景中对登录业务的测试结果吗？在10个压力线程下，TPS达到了100左右。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e4/28/e487d4cc5eb67d58b6afc9e11eba7b28.png?wh=1208%2A255" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e4/28/e487d4cc5eb67d58b6afc9e11eba7b28.png?wh=1208%2A255" /></p>
 <p>同时，在<a href="https://time.geekbang.org/column/article/362010">第10</a><a href="https://time.geekbang.org/column/article/362010">讲</a>中，我们发现了加密算法BCrypt效率低之后，讨论了两种优化方式：一种是用更快的加密方式，另一种是去掉这个加密算法。当时，我选择把加密算法BCrypt直接去掉。在这节课中，我们来试试第一种方式，把它改为MD5，具体有两个动作：</p>
 <ul>
 <li>更改加密算法。之前的BCrypt加密算法虽然安全性高，但性能差，所以建议改成MD5。</li>
 <li>加载所有用户到Redis中。</li>
 </ul>
 <p>我们再跑一遍压力场景。注意，在跑这一遍之前，我们只是更改了加密算法，并没有执行加载缓存的动作。我希望一次只做一个动作来判断结果（但是上面两个动作我们都要做哦，请你接着看下去），结果如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e0/88/e0e107c341982ddc65e9792a35893688.png?wh=1828%2A527" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e0/88/e0e107c341982ddc65e9792a35893688.png?wh=1828%2A527" /></p>
 <p>从上面的结果来看，性能有些上升了，但是还没达到我想要的样子。我希望性能有突飞猛进的增加，而不是现在这样不温不火的样子，看着就来气。所以，我们还是要继续“收拾收拾”这个接口，使用缓存，看下效果如何。</p>
 <h2 id="_2">检验缓存的效果</h2>
 <p>为了确定缓存对后续的性能优化产生了效果，我们可以用两个手段来检验效果：</p>
@@ -6279,50 +6279,50 @@
 <li>直接加载全部缓存。</li>
 </ul>
 <p>我们得到这样的结果：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ac/e9/ac4a9bf86a2242d7bb378823721203e9.png?wh=1819%2A529" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ac/e9/ac4a9bf86a2242d7bb378823721203e9.png?wh=1819%2A529" /></p>
 <p>从曲线上看，登录接口能达到300TPS左右了。但是，我还是觉得不够好，因为从硬件资源上来看，再根据我以往的经验，它应该还能达到更高才对。</p>
 <p>而在分析的过程中，再也没有<a href="https://time.geekbang.org/column/article/362940">第11</a><a href="https://time.geekbang.org/column/article/362940">讲</a>和<a href="https://time.geekbang.org/column/article/363736">第</a><a href="https://time.geekbang.org/column/article/363736">12讲</a>中提到的硬件资源的问题，但是在这里我们通过查看全局监控数据，看到的是us cpu高，说明确实都是业务逻辑在消耗CPU资源了。所以，我们就只有从登陆逻辑入手，来优化这个问题了。</p>
 <h2 id="_3">修改登录的逻辑</h2>
 <p>通过阅读源代码，我整理了这个系统的原登录逻辑：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1b/e7/1b3425fb8788236b6a812f78ac8bd8e7.jpg?wh=2000%2A1042" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1b/e7/1b3425fb8788236b6a812f78ac8bd8e7.jpg?wh=2000%2A1042" /></p>
 <p>这个逻辑看着比较啰嗦，其中Member服务调auth服务，倒还能理解。可是，Auth服务为什么还要到Member里取用户名呢？自己直接查缓存或DB不香吗？从架构设计的角度来看，为了避免共享数据库，这样的设计似乎也没啥。只是在我们的优化过程中，需要根据实际环境来做判断。</p>
 <p>在我们这个环境中，需要把DB共用，这样Auth服务就可以直接使用数据库，而不用再从Member绕一圈。所以，我们先改成下面这种新的登录逻辑，这样就可以减少一次调用。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6f/41/6fe6e7694555c0f7a400a20ae35d4f41.jpg?wh=2000%2A1180" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6f/41/6fe6e7694555c0f7a400a20ae35d4f41.jpg?wh=2000%2A1180" /></p>
 <p>修改之后，登录TPS如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/af/49/affc3890ee5817d45a7ff67f11d96f49.png?wh=1806%2A657" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/af/49/affc3890ee5817d45a7ff67f11d96f49.png?wh=1806%2A657" /></p>
 <p>从结果上来看，TPS确实有增加，已经到700以上了。很好。</p>
 <p>这时候是不是就可以结束分析了呢？不是，我们还需要知道当前的瓶颈点在哪，因为根据我的性能理念，每个业务都会有瓶颈点，不管优化到什么程度，除非一直把硬件资源耗光。所以，我们继续接着分析。</p>
 <h2 id="_4">看架构图</h2>
 <p>还是一样，在分析性能瓶颈之前，我们先来看架构图，了解用户登录接口会涉及到哪些服务和技术组件。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fe/80/fe3783b643a5c121eba4b64a2b123880.png?wh=1089%2A655" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fe/80/fe3783b643a5c121eba4b64a2b123880.png?wh=1089%2A655" /></p>
 <p>从这个架构图中可以看到，登录操作跨了Gateway/Member/Auth三个服务，连接了Redis/MySQL两个组件。图中的MongoDB虽然看上去有线，但实际上登录并没有用上。</p>
 <p>了解这些信息之后，我们按照分析逻辑，一步步来分析问题。</p>
 <h2 id="_5">拆分时间</h2>
 <p>我们前面提到，修改登录逻辑后的TPS如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/78/32/7857609f9d0432fdf3a5c66a15480f32.png?wh=1806%2A657" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/78/32/7857609f9d0432fdf3a5c66a15480f32.png?wh=1806%2A657" /></p>
 <p>可以看到，响应时间已经上升到了100ms左右，所以，我们现在要找出这个时间消耗在了哪里。你可能已经注意到，图中的用户增加到了150。这是为了把响应时间拉大，便于我们分析。下面我们把这个响应时间拆分一下，看看问题出在哪里。</p>
 <ul>
 <li><strong>Gateway服务上的时间</strong></li>
 </ul>
 <!--THE END-->
 
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9f/bd/9f25bb77c2c5b7f72bc05b2f1eyyabbd.png?wh=336%2A223" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9f/bd/9f25bb77c2c5b7f72bc05b2f1eyyabbd.png?wh=336%2A223" /></p>
 <ul>
 <li><strong>Member服务上的时间</strong></li>
 </ul>
 <!--THE END-->
 
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b5/d7/b578360e3dec474700b631753f78aed7.png?wh=335%2A224" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b5/d7/b578360e3dec474700b631753f78aed7.png?wh=335%2A224" /></p>
 <ul>
 <li><strong>Auth服务上的时间</strong></li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/dc/c7/dc8d2yy46b0671ffb593f5d6d022bfc7.png?wh=329%2A227" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dc/c7/dc8d2yy46b0671ffb593f5d6d022bfc7.png?wh=329%2A227" /></p>
 <p>我们看到，Member服务上的时间消耗是150ms左右，Auth服务上的时间消耗有60ms左右。Member服务是我们要着重分析的，因为它的响应时间更长。而Auth上虽然时间不太长，但是也达到了60ms左右，从经验上来说，我觉得还是有点稍长了，最好平均能到50ms以下，所以我们也要稍微关心一下。</p>
 <h2 id="_6">全局监控</h2>
 <p>我们的分析逻辑雷打不动，依旧是<strong>先看全局监控，后看定向监控</strong>。从下面这张全局监控图的数据来看，worker-7和worker-8的CPU使用率比其他的要高。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c1/50/c124a94a6b5529561e50546b552b1750.png?wh=1822%2A484" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c1/50/c124a94a6b5529561e50546b552b1750.png?wh=1822%2A484" /></p>
 <p>既然worker-7/8的CPU使用率要高一点，那我们就要查一下这两个节点上跑着什么样的服务。所以我们来看一下POD的分布，大概看一下每个POD在哪个worker节点上，以便后面分析POD相互之间的影响：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e5/d9/e54ea48b51f6cb68a291ed759624ded9.png?wh=1374%2A217" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e5/d9/e54ea48b51f6cb68a291ed759624ded9.png?wh=1374%2A217" /></p>
 <p>原来，在worker-7和worker-8上，分别运行着响应时间稍高的Auth服务和Member服务。对于这两个服务，我们都要分析，只是得一个一个来，那我们就从auth服务开始。</p>
 <p>你可能会问：为什么要先从Auth服务下手呢？没啥原因，就是看它的CPU更红一点。你还可能奇怪：图中其他地方也红了，为什么不关注呢？我来逐一给你分析一下。</p>
 <ul>
@@ -6334,12 +6334,12 @@
 <p>既然Auth服务在worker-7上，member服务在worker-8上，就像前面说的，我们不如就从Auth服务开始。</p>
 <h2 id="auth">Auth服务定向分析</h2>
 <p>对于Auth服务，我们从哪里开始分析呢？其实，我们可以按部就班。既然是Auth服务导致worker-7的CPU使用率偏高，那我们就可以走下面这个证据链：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/20/6a/20f64daa0f9fc17fd4c82bec3756756a.jpg?wh=2000%2A1429" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/20/6a/20f64daa0f9fc17fd4c82bec3756756a.jpg?wh=2000%2A1429" /></p>
 <p>按照这个证据链，我们应该先看进程。不过，仗着傻小子火气壮（俗称：艺高人胆大），我直接就去看线程状态了，想看看能不能凭经验蒙对一把。于是，我打开了Spring Boot Admin的线程页面：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8b/c6/8b7e968fa5343d494a46ce460cc487c6.png?wh=1655%2A872" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8b/c6/8b7e968fa5343d494a46ce460cc487c6.png?wh=1655%2A872" /></p>
 <p>有没有满目疮痍的感觉？人生就是这样，到处都有惊吓。</p>
 <p>在我颤抖着手点开一些红色的地方之后，看到了类似这样的信息：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/28/08/288524e6f68225b08d4425e121c49308.png?wh=807%2A315" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/28/08/288524e6f68225b08d4425e121c49308.png?wh=807%2A315" /></p>
 <p>可以看到，阻塞数非常大，达到了842。此外，锁拥有者ID是86676，锁拥有者名称是线程823。</p>
 <p>我们抓两段栈出来看一下，找一下锁之间的关系：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>-- 第一处：
@@ -6385,11 +6385,11 @@
 <p>所以，对于前面遇到的锁问题，我们首先要做的就是到容器中的jstack里打印一下栈，把它下载下来，然后祭出工具打开看一眼。</p>
 <p>你可能会问，为什么不用Arthas之类的工具直接在容器里看？主要是因为Arthas的Dashboard在Thread比较多的时候，看起来真心累。</p>
 <p>下面这张图就是jstack打印出来的栈，在下载之后用工具打开的效果。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4b/7a/4bd559def066b9319b080f8183c4a77a.png?wh=832%2A440" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4b/7a/4bd559def066b9319b080f8183c4a77a.png?wh=832%2A440" /></p>
 <p>是不是有种买彩票的感觉？看起来有那么多的BLOCKED状态的线程（多达842个），居然一个都没蒙到！我本来想抓BLOCKED状态的线程，并且线程描述是“Waiting on monitor”，但是，从上面的线程描述统计来看，一个也没见。哼，真生气。</p>
 <p>这时候，身为一个做性能分析的人，我们一定要记得倒杯茶，静静心，默默地把jstack连续再执行几遍。我在这里就连续执行了10遍，然后再找每个栈的状态。</p>
 <p>终于，Waiting on monitor来了：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ac/bd/ac6bd08f67a8979e6d9e66yy038526bd.png?wh=406%2A291" /><img alt="" src="https://static001.geekbang.org/resource/image/9f/38/9ff82b785d0f1f5f46113f0bf5eca938.png?wh=401%2A288" /></p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/ac/bd/ac6bd08f67a8979e6d9e66yy038526bd.png?wh=406%2A291" /><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9f/38/9ff82b785d0f1f5f46113f0bf5eca938.png?wh=401%2A288" />}{:referrerpolicy="no-referrer"</p>
 <p>看起来有得玩了！接下来让我们看看究竟是谁阻塞住了上面的线程。</p>
 <p>我们先在相应的栈里，找到对应的持有锁的栈。下面是栈中的阻塞关系。</p>
 <ul>
@@ -6397,11 +6397,11 @@
 </ul>
 <!--THE END-->
 
-<p><img alt="" src="https://static001.geekbang.org/resource/image/93/02/9396a601d0bb81678bec5958eca75b02.png?wh=1920%2A1057" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/93/02/9396a601d0bb81678bec5958eca75b02.png?wh=1920%2A1057" /></p>
 <ul>
 <li><strong>第二个栈</strong></li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8c/34/8c47a54d11800d8bd7a016315ae83534.png?wh=1920%2A1057" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8c/34/8c47a54d11800d8bd7a016315ae83534.png?wh=1920%2A1057" /></p>
 <p>你要注意，这是两个栈文件。所以，我们要分别从这两个栈文件里找到各自的对应等待关系。下面这段代码就对应了上面的Waiting线程。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>-- 第一处
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>&quot;http-nio-8401-exec-890&quot; #86930 daemon prio=5 os_prio=0 tid=0x00007f28680a5800 nid=0x561d waiting for monitor entry [0x00007f2800263000]
@@ -6521,17 +6521,17 @@
 </ul>
 <!--THE END-->
 
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ea/ea/ea227a75847cbbbdc5918449fd0ecbea.png?wh=320%2A215" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ea/ea/ea227a75847cbbbdc5918449fd0ecbea.png?wh=320%2A215" /></p>
 <ul>
 <li><strong>Member上的响应时间</strong></li>
 </ul>
 <!--THE END-->
 
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5e/3f/5ed1408625eec5ef5beb6772b42f463f.png?wh=322%2A206" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5e/3f/5ed1408625eec5ef5beb6772b42f463f.png?wh=322%2A206" /></p>
 <ul>
 <li><strong>Auth上的响应时间</strong></li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d1/71/d15560e97228f70db9fd7d31a4c56971.png?wh=331%2A208" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d1/71/d15560e97228f70db9fd7d31a4c56971.png?wh=331%2A208" /></p>
 <p>从上面的信息来看，这几段都有不同的时间消耗：Member服务上有80毫秒左右，Auth服务上已经有60毫秒左右，明显是有点高了。</p>
 <p>我们登录到Member这个服务中，先看整体的资源使用情况。这里我用了最经典传统的top命令：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>%Cpu0  : 63.8 us, 12.4 sy,  0.0 ni,  9.2 id,  0.0 wa,  0.0 hi, 14.2 si,  0.4 st
@@ -6675,8 +6675,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

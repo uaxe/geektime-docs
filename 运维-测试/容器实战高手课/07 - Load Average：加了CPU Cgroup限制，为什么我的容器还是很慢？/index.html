@@ -6043,7 +6043,7 @@
 <p>这么说有些抽象，我们一起动手再现一下这个情况，这样你就能更好地理解这个问题了。</p>
 <p>比如说下面的top输出，第三行可以显示当前的CPU使用情况，我们可以看到整个机器的CPU Usage几乎为0，因为"id"显示99.9%，这说明CPU是处于空闲状态的。</p>
 <p>但是请你注意，这里1分钟的"load average"的值却高达9.09，这里的数值9几乎就意味着使用了9个CPU了，这样CPU Usage和Load Average的数值看上去就很矛盾了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/50/be/507d6732efd350d47161174bc0a8e9be.png?wh=1858%2A278" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/50/be/507d6732efd350d47161174bc0a8e9be.png?wh=1858%2A278" /></p>
 <p>那问题来了，我们在看一个系统里CPU使用情况时，到底是看CPU Usage还是Load Average呢？</p>
 <p>这里就涉及到今天要解决的两大问题：</p>
 <ol>
@@ -6075,11 +6075,11 @@
 <p>这时候，Load Average里第一项（也就是前1分钟的数值）为1.98，近似于2。这个值和我们一直运行的200%CPU Usage相对应，也验证了我们之前归纳的第二点——<strong>CPU Usage可以反映到Load Average上。</strong></p>
 <p>因为运行的时间不够，前5分钟，前15分钟的Load Average还没有到2，而且后面我们的例子程序一般都只会运行几分钟，所以这里我们只看前1分钟的Load Average值就行。</p>
 <p>另外，Linux内核中不使用浮点计算，这导致Load Average里的1分钟，5分钟，15分钟的时间值并不精确，但这不影响我们查看Load Average的数值，所以先不用管这个时间的准确性。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/11/52/110f67d3b31a62d3d7f27bb4a28aa552.png?wh=1606%2A420" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/11/52/110f67d3b31a62d3d7f27bb4a28aa552.png?wh=1606%2A420" />
 那我们再来跑第二个例子，同样在这个4个CPU的计算机节点上，如果我们执行CPU Usage模拟程序threads-cpu，设置参数为6，让这个进程建出6个线程，这样每个线程都会尽量去抢占CPU，但是计算机总共只有4个CPU，所以这6个线程的CPU Usage加起来只是400%。</p>
 <p>显然这时候4个CPU都被占满了，我们可以看到整个节点的idle（id）也已经是0.0%了。</p>
 <p>但这个时候，我们看看前1分钟的Load Average，数值不是4而是5.93接近6，我们正好模拟了6个高CPU需求的线程。这也告诉我们，Load Average表示的是一段时间里运行队列中需要被调度的进程/线程平均数目。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3c/26/3caf637cb3bc20yy5610b3d0bf59bd26.png?wh=1628%2A614" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3c/26/3caf637cb3bc20yy5610b3d0bf59bd26.png?wh=1628%2A614" /></p>
 <p>讲到这里，我们是不是就可以认定Load Average就代表一段时间里运行队列中需要被调度的进程或者线程平均数目了呢? 或许对其他的Unix系统来说，这个理解已经够了，但是对于Linux系统还不能这么认定。</p>
 <p>为什么这么说呢？故事还要从Linux早期的历史说起，那时开发者Matthias有这么一个发现，比如把快速的磁盘换成了慢速的磁盘，运行同样的负载，系统的性能是下降的，但是Load Average却没有反映出来。</p>
 <p>他发现这是因为Load Average只考虑运行态的进程数目，而没有考虑等待I/O的进程。所以，他认为Load Average如果只是考虑进程运行队列中需要被调度的进程或线程平均数目是不够的，因为对于处于I/O资源等待的进程都是处于TASK_UNINTERRUPTIBLE状态的。</p>
@@ -6121,7 +6121,7 @@
 <p>我们发现程序跑了几分钟之后，前1分钟的Load Average差不多从0增加到了2.16，节点上CPU Usage几乎为0，idle为99.8%。</p>
 <p>可以看到，可运行队列（Running Queue）中的进程数目是0，只有休眠队列（Sleeping Queue）中有两个进程，并且这两个进程显示为D state进程，这个D state进程也就是我们模拟出来的TASK_UNINTERRUPTIBLE状态的进程。</p>
 <p>这个例子证明了Linux将TASK_UNINTERRUPTIBLE状态的进程数目计入了Load Average中，所以即使CPU上不做任何的计算，Load Average仍然会升高。如果TASK_UNINTERRUPTIBLE状态的进程数目有几百几千个，那么Load Average的数值也可以达到几百几千。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e0/a9/e031338191bcec89b7fb02c19af843a9.png?wh=1622%2A438" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e0/a9/e031338191bcec89b7fb02c19af843a9.png?wh=1622%2A438" /></p>
 <p>好了，到这里我们就可以准确定义Linux系统里的Load Average了，其实也很简单，你只需要记住，平均负载统计了这两种情况的进程：</p>
 <p>第一种是Linux进程调度器中可运行队列（Running Queue）一段时间（1分钟，5分钟，15分钟）的进程平均数。</p>
 <p>第二种是Linux进程调度器中休眠队列（Sleeping Queue）里的一段时间的TASK_UNINTERRUPTIBLE状态下的进程平均数。</p>
@@ -6143,7 +6143,7 @@
 <p>这一讲我们从CPU Usage和Load Average差异这个现象讲起，最主要的目的是讲清楚Linux下的Load Average这个概念。</p>
 <p>在其他Unix操作系统里Load Average只考虑CPU部分，Load Average计算的是进程调度器中可运行队列（Running Queue）里的一段时间（1分钟，5分钟，15分钟）的平均进程数目，而Linux在这个基础上，又加上了进程调度器中休眠队列（Sleeping Queue）里的一段时间的TASK_UNINTERRUPTIBLE状态的平均进程数目。</p>
 <p>这里你需要重点掌握Load Average的计算公式，如下图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e6/4e/e672a6a35248420d623e55d7f7ddf34e.jpeg?wh=3200%2A1800" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e6/4e/e672a6a35248420d623e55d7f7ddf34e.jpeg?wh=3200%2A1800" /></p>
 <p>因为TASK_UNINTERRUPTIBLE状态的进程同样也会竞争系统资源，所以它会影响到应用程序的性能。我们可以在容器宿主机的节点对D状态进程做监控，定向分析解决。</p>
 <p>最后，我还想强调一下，这一讲中提到的对D状态进程进行监控也很重要，因为这是通用系统性能的监控方法。</p>
 <h2 id="_3">思考题</h2>
@@ -6318,8 +6318,6 @@ LoadAvg     Load average over 1, 5, and 15 minutes.  The load average is the ave
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

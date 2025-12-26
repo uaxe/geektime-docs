@@ -6437,13 +6437,13 @@
 <p>通常为了提高查找速度，我们都会设计一种特殊的数据结构，在内存中如此，在磁盘中也不例外。我们需要设计一种<strong>适合磁盘场景的数据结构，对业务数据进行某种有序性的维护，在磁盘读写次数不多的情况下，结合内存，就能快速找到需要查询的记录在磁盘中所在的位置。这就是我们常说的“索引”</strong>。</p>
 <p>那索引一般是用什么样的数据结构实现的呢？</p>
 <p>其实在之前<a href="https://time.geekbang.org/column/article/473255">学习Kafka</a>的时候，我们学过线性稀疏的索引，适用于 append only 的存储模式，利用有序性带来的二分搜索，帮助我们加速查找指定offset的日志内容，你可以再回顾一下理解索引背后用空间换时间的思想。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/37/68/37906ed9a9b8c062a7b2edd5a45e7568.jpg?wh=1920x1385" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/37/68/37906ed9a9b8c062a7b2edd5a45e7568.jpg?wh=1920x1385" /></p>
 <p>但是kafka的索引，在数据库的场景下并不好用，因为数据库中，我们随时可能需要删除或者修改某个字段的值，<strong>如果要保持索引的线性有序性的要求，就要不断调整索引文件的前后顺序，在磁盘上，这个代价是非常高的</strong>。</p>
 <p>所以，为了能适配需要随机修改插入的数据库场景，我们的索引结构不能是线性的了。</p>
 <h3 id="_2">树状索引</h3>
 <p>如果你熟悉第一章的内容，估计很快就会想到<a href="https://time.geekbang.org/column/article/471434">红黑树这样的结构</a>。</p>
 <p>在内存中，红黑树任意字段的查询可以做到logN的复杂度，而且相比于二分搜索所需具备的有序性，在红黑树上做元素的调整和增删效率要高得多。我们之前也提到了，对于百万量级的存储场景，红黑树也只需要20层这个数量级的高度就可以容纳全部元素。查询效率当然是很有保证的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e3/84/e366b0ed2775a57ca6d73261fa3cd284.jpg?wh=1920x1178" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e3/84/e366b0ed2775a57ca6d73261fa3cd284.jpg?wh=1920x1178" /></p>
 <p>那可不可以在数据库的索引中采用红黑树呢？</p>
 <p>因为在数据库中，不同于内存的场景，磁盘读写比内存慢的多，所以相比于查询的计算成本，IO成本可能要显著的多。</p>
 <p>数据库里存储的数据比较多，如果我们采用二叉树来存储的话，层数必然不会很少，且层和层之间的数据在物理上基本上是不连续的，即使前几层的元素可以被预加载至内存中，我们仍然可能需要在树上进行10余次的跳转查询，也就对应着10余次的磁盘IO，这是不可接受的。</p>
@@ -6460,14 +6460,14 @@
 <li>根节点在不为叶子节点的时候至少有两个子节点。</li>
 </ol>
 <p>下图就是一个典型3阶B-树的例子，可以看出，2-3树是一种特殊的B-树。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/09/c3/09c877a350e60b5b74d83525404ac7c3.jpg?wh=1920x961" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/09/c3/09c877a350e60b5b74d83525404ac7c3.jpg?wh=1920x961" /></p>
 <p>在数据库场景下，毫无疑问，我们会把建立索引的字段作为key，每个key后面也会跟上对应记录的指针。</p>
 <p>为什么磁盘上的B-树会比对应的二叉平衡树快很多呢？主要就是利用了磁盘访问的局部性原理。</p>
 <p>之前讲LRU的时候也提到了相关概念，计算机在读取磁盘的时候，往往是以页为单位读取的，读取某一页中的部分内容和读取该中的全部内容，所花费的代价其实是一样的。<strong>如果我们把B-树的每个节点中存储的大小设成一个页的大小，利用磁盘预读的能力，就可以做到仅通过一次IO就将整个节点的全部内容加载到内存中</strong>。</p>
 <p>一个页的大小通常是4K～16K，能包含的键数可以高达几千条。以InnoDB通常采用的16K大小的页为例，如果我们的索引字段和指针域大小为8B，B-树上的每个节点能包含的键数高达2048个，这就意味着用4层的高度，就可以存储接近10亿级别的记录，在索引字段大小更大的时候，我们通常也只需要5层以内，就可以构造大部分表的索引。</p>
 <p>这就是多叉的B树的主要优点了，利用磁盘的预读能力和树状结构，我们通过3～5次磁盘IO就可以在10亿级的数据表中进行快速检索了。</p>
 <p>检索过程的伪代码如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/87/e1/87a72ec29225e2b8ac47b62d9b2498e1.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/87/e1/87a72ec29225e2b8ac47b62d9b2498e1.jpg?wh=1920x1145" /></p>
 <p>基本上和2-3树或者普通二叉树的检索思路是一致的：从根节点出发进行遍历，如果在某个节点中查到了目标键，直接返回；如果查到的目标值在两个键之间，就进入两键之间的链所指向的节点进行下一层的查找。</p>
 <p><strong>因为每个节点中的键是有序存储的，当我们加载到内存中后，通常也会直接采用二分搜索，整个搜索过程仍然是logN这样非常低的复杂度</strong>。所以主要耗时还是花费在IO中。</p>
 <h3 id="b">B+树</h3>
@@ -6476,7 +6476,7 @@
 <li>B+树的所有的叶子节点之间会通过双向指针串联在一起，构成一个双向链表；</li>
 <li>B+树的中间节点不会存储数据指针，而只有叶子节点才会存储，中间节点只用于存储到叶子节点的路由信息。</li>
 </ol>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3a/c5/3a31972c700bed70736e7f6aa45e34c5.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3a/c5/3a31972c700bed70736e7f6aa45e34c5.jpg?wh=1920x1145" /></p>
 <p>这个图就是一个典型的3阶B+树了。可以看到，红色的非叶子节点和绿色的叶子结点的键会有一定的重合，这就是因为非叶子结点不再存储实际的数据信息，所以叶子结点实际上需要存储整张表的信息，但因为树状结构的特性，两者的层数预期仍然都是logN。</p>
 <p>同时，因为非叶子节点中不再需要存储数据本身相关的信息，每个节点能存储的键的数量也会有所增加，所以B-树和B+树的层数期望是差不多的，在大部分业务场景下，3～5次的IO查询就可以让我们查询到任意目标值。</p>
 <p>那为什么要引入这样额外的指针和约束呢？主要原因在于<strong>在数据库中我们经常需要范围查询</strong>，比如这样的查询语句，查询所有年龄小于20的学生：</p>
@@ -6489,12 +6489,12 @@
 <p>为了方便演示和讨论，我们用比较简单的3阶B+树来讲解，和2-3树的过程非常相似我们重点看如何通过节点的合并和分裂操作，应对树结构的变化。</p>
 <p>假设我们的树一开始只有 1、2 两个键，此时键的数量没有超过单节点能容纳的范围，我们用一个叶子结点就可以表示。</p>
 <p><strong>接下来要加入一个3节点，和2-3树一样，我们就需要对原来的叶子节点做分裂操作，因为3阶B+树，每个节点最多能承载的元素就是2个</strong>。现在多出来一个键，我们就需要把节点中键的中位数取出来，提高到上一层，然后分成左右两个部分，每个部分都包括 m/2 个节点。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/98/c7/98fbfc7ae2f2df35e94859fb0d6620c7.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/98/c7/98fbfc7ae2f2df35e94859fb0d6620c7.jpg?wh=1920x1145" /></p>
 <p>这里，对于3阶B+树而言，左子节点就分到一个键，右子节点则分到两个键。叶子节点间，我们同样需要用双链表的方式进行串联。</p>
 <p>我们尝试继续添加键，现在添加键4到树里，首先要做的就是进行前面提到的B树的查询，我们会查询到最右侧的叶子结点，从而试图将键4放入(2,3)构成的节点中，但同样由于每个节点最多存放2个键，所以我们需要把3提高到上一层，把原来的节点拆成2和(3,4)两个节点。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/da/2c/daedc8ea501e4203a3abc1af2b0dac2c.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/da/2c/daedc8ea501e4203a3abc1af2b0dac2c.jpg?wh=1920x1145" /></p>
 <p>后面的添加就是类似的过程，如果继续添加键5，同样会先放入(3,4)节点中，把4提高到根节点，而根节点也已经“满载”了，所以会把中间值3提到更上一层，此时我们就得到了一个三层的树。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a8/45/a86d01145bbae4cdd2a03274ff46b045.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a8/45/a86d01145bbae4cdd2a03274ff46b045.jpg?wh=1920x1145" /></p>
 <p>整个分裂节点的过程自底向上递归进行，可以注意到所有叶子节点的高度其实是始终不变的。</p>
 <h2 id="_4">删除操作</h2>
 <p>删除操作看起来要稍微复杂一点，不能简单理解成插入过程的逆过程。我们用刚才构造出的树来演示几种不同的删除操作。</p>
@@ -6504,10 +6504,10 @@
 <li>另一种则需要让父节点下移，并合并子节点。</li>
 </ul>
 <p>在这个例子中，左侧存放key1的节点也只有一个键，所以不满足可以借用的情况，我们只能考虑让父节点3下沉，和4节点合并。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/66/34/66a40c093bd161c2601c3e09e310b834.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/66/34/66a40c093bd161c2601c3e09e310b834.jpg?wh=1920x1145" /></p>
 <p>这样我们就可以重新得到一颗平衡的B+树了。每次让父节点下沉，也可能重新破坏父节点的约束条件，我们同样要递归地找左侧兄弟节点借用键或者考虑让更上层的父亲节点下沉，直到整颗树满足约束为止。</p>
 <p>第二种我们继续在这棵树上删除键5，这个情况比较简单，可以直接删除键5，并不会破坏原来的约束。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/39/5d/39a738ed62521ed1922866eb3bd4e05d.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/39/5d/39a738ed62521ed1922866eb3bd4e05d.jpg?wh=1920x1145" /></p>
 <p>在数据库中数据有插入或者删除的时候，我们就可以及时地调整索引内部的结构了。当然可以想见这其中会有很多并发的问题，比较复杂，通常需要加锁解决，也是研究的热点之一，这次就不展开讨论了。</p>
 <h2 id="_5">总结</h2>
 <p>今天我们一起学习了非常经典的索引实现方式，利用空间换时间的思路，通过为数据表建立额外的有序索引结构，做到大大加速查询的效果。</p>
@@ -6634,8 +6634,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

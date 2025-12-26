@@ -5314,7 +5314,7 @@
 非稳态噪声按照是否连续又可以再分为<strong>连续性非稳态噪声和瞬态噪声</strong>，比如持续性的背景人声就是连续的噪声，而一些敲击声只会出现极其短暂的时间则为瞬态噪声。</li>
 </ul>
 <p>稳态噪声和非稳态噪声的时域图和频域图如图1所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/90/34/9021752f8c9e48e1110df0db0ecbc334.png?wh=864x547" title="图1 稳态噪声（左），非稳态噪声（右）" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/90/34/9021752f8c9e48e1110df0db0ecbc334.png?wh=864x547" title="图1 稳态噪声（左），非稳态噪声（右）" /></p>
 <p>很显然，稳态噪声由于在时间维度上没有变化，我们很容易通过对之前出现过的噪声进行建模，然后用相同的模型来对以后出现的噪声来进行抑制。而非稳态噪声尤其是瞬态噪声，则需要更多的依靠来区分其和正常语音之间的差异。如果更像是语音，则将其保留，反之则将其抑制。</p>
 <p>值得注意的是，这些噪声往往不是单独存在的，可能你的手机底噪是一直存在的，同时你又在人声鼎沸的地铁站，那这时候稳态和瞬态噪声就都会存在。</p>
 <h2 id="_2">如何降噪</h2>
@@ -5333,14 +5333,14 @@
 <p>维纳滤波是根据最小均方误差MMSE准则（滤波器的输出信号与需要信号之差的均方值最小）设计的线性滤波器。我们这里用到的是实时频域维纳滤波器，目标就是求出当前帧每个频点的能量有多少占比是语音，即语音的先验信噪比（SNR）。我们把当前帧的含噪信号与噪声的信噪比叫做后验信噪比，而纯净语音信号与噪声的信噪比叫先验信噪比。</p>
 <p>因为在实时处理时没有纯净的参考信号，所以先验信噪比通常为后验信噪比结合判决引导的方法来估算。那么根据维纳滤波的原理降噪的步骤也就变成了从动态平滑的噪声模型得到噪声信号，然后根据含噪信号和噪声模型经过维纳滤波器进行降噪。</p>
 <p>WebRTC中的降噪流程如图2所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/47/c4/4752d19a0e784yya8724028f77ec7cc4.jpg?wh=1280x720" title="图2 WebRTC 中分位数噪声估计和维纳滤波的降噪算法处理流程" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/47/c4/4752d19a0e784yya8724028f77ec7cc4.jpg?wh=1280x720" title="图2 WebRTC 中分位数噪声估计和维纳滤波的降噪算法处理流程" /></p>
 <p>首先，做短时傅里叶变换（STFT），即对带噪信号加窗。接着，做快速傅里叶变换（FFT）再求模得到带噪信号的功率谱。然后，利用功率谱进行分位数噪声估计(Quantile Noise Estimation)、语音存在概率（Speech Presence Probability）估计、噪声更新（Noise Update）以及噪声抑制系数计算（Spectral Gain Computation）。最后，把得到的每个频点的抑制系数乘以带噪信号的频率谱得到降噪后的频率谱。再做逆短时傅里叶变换（ISTFT）即可得到降噪后的时域信号。</p>
 <p>这里就不一一展开了，内容很多，具体每一步怎么做你可以参考Google的<a href="https://patentimages.storage.googleapis.com/a4/d9/d6/f3e557a291b982/WO2012158156A1.pdf">WIPO</a> 专利（Noise Suppression Method and Apparatus Using Multiple Feature Modeling for Speech/noise Likelihood），里面和WebRTC开源库中的代码基本可以一一对应。</p>
 <p>我们这里主要讲一下使用分位数噪声估计和维纳滤波的降噪算法逻辑背后的思考。</p>
 <p>基于统计的降噪最主要的是对噪声进行实时建模，这个建模基于假设一，也就是说只对稳态的噪声进行建模。噪声模型迭代不能太快，比如这里WebRTC所用的分位数噪声估计都是在时频域上进行更新，且其更新周期大概为700ms左右。从听感上来说，如果噪声发生了变化，比如突然变大了，模型可能需要约500ms～4s来收敛到新的噪声模型，在这期间我们可能会听到一些噪声的残余。</p>
 <p>这里降噪的理念和我们之前讲的谱减法有些类似，就是利用无人声段进行噪声的估计。这样在实时处理中就需要在无人声段进行噪声模型的迭代。即更新噪声模型以适应非稳态噪声的时变性。</p>
 <p>那么为了区分人声和非人声就需要做一个人声判别也就是我们常说的VAD（Voice Activity Detection）。这里的VAD就是利用几个人工提取的特征来进行统计得出的语音存在概率来判断的。这几个特征包括：频谱平坦度（Spectral Flatness ）， 频谱差异度（Spectral Difference），以及根据先验、后验信噪比的差异得出的似然因子LR（Likelihood Ratio）Factor。具体如图3所示：
-<img alt="" src="https://static001.geekbang.org/resource/image/31/d4/313b8d2b66ff2b14c99b7b2251ac54d4.jpg?wh=1280x528" title="图3 Speech Probability的计算流程" />
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/31/d4/313b8d2b66ff2b14c99b7b2251ac54d4.jpg?wh=1280x528" title="图3 Speech Probability的计算流程" />
 似然因子在频域计算log均值得到indicator 0，而根据频谱平坦度和差异度则可以分别得到indicator 1 和 2。语音概率值就是根据这几个指标的加权平均（对应图中的combination）和当前帧的似然因子来更新的。在实际计算中，当这个概率比较大时，也就是语音存在的可能性比较大，噪声模型的更新就很缓慢，反之则更新速度比较快。</p>
 <p>噪声模型则是通过分位数噪声估计来得到。“Quantile”是英文中1/4的意思。这里也就是通过一个经验假设在噪声能量谱中，里面能量最小的1/4是稳态噪声。我们应该用这个部分来迭代更新初始噪声模型。</p>
 <p>利用初始噪声模型以及含噪语音就可以得到频谱平坦度、频谱差异度，以及对数似然比特征，进而得到语音存在概率。有了语音存在概率，就可以更新噪声模型。有了噪声模型和含噪信号，那么根据加性假设，干净的语谱则是含噪信号减去噪声信号或者说含噪频谱乘以频谱增益。</p>
@@ -5355,22 +5355,22 @@
 <p>它是由Israel Cohen提出的音频降噪算法。OMLSA是对人声进行估计，通过先验无声概率及先验信噪比SNR的估计来得到有声条件概率，从而实现了对人声谱的估计。IMCRA则是通过信号的最小值跟踪，得到先验无声概率估计和先验信噪比估计，来计算得到条件有声概率，进而获取噪声谱的估计。</p>
 <p>将OMLSA同IMCRA相结合最后相当于是功率谱中最小点的追踪。这样藏在谐波之间的音乐噪声的能量由于明显小于谐波的能量就可以被去除了，这也是为什么这一算法可以有效减少音乐噪声。</p>
 <p>关于WebRTC原生降噪和OMLSA&amp;IMCRA降噪的对比如图4所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a9/6e/a9b5558f3b69875ec2f4f0d5c76b576e.png?wh=2264x820" title="图4 WebRTC原生降噪和OMLSA&amp;IMCRA降噪对比" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a9/6e/a9b5558f3b69875ec2f4f0d5c76b576e.png?wh=2264x820" title="图4 WebRTC原生降噪和OMLSA&amp;IMCRA降噪对比" /></p>
 <p>从上图可以看出通过OMLSA&amp;IMCRA降噪比WebRTC原生降噪得到的语谱更干净，残留噪声更少。</p>
 <h3 id="_6">降噪算法第四招：子空间算法</h3>
 <p>子空间算法主要是针对一些已知噪声类型，量身定做一个降噪算法。其思想就是把噪声和人声投影到一个高纬度的空间，让本来不容易分离的信号变成在高纬度占据一个可分的子空间，从而可分的信号。这类算法包括非负矩阵分解和字典法建模等。</p>
 <p>什么时候会用到这种算法呢？比如你只是要去除风噪这一种噪声，你可以用非负矩阵分解的方式单独为风噪建模，从而模型会自动消除音频中的风噪。这个在去风噪的场景下效果也是不错的。但这类方法缺点也很明显，每一种噪声都得单独建模，在噪声类型不定的情况下就很难穷尽达到好的效果。这里我们可以看一下基于非负矩阵分解的降噪。如图5所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/36/13/36d76c0d07ce5f654e5b36676b243113.png?wh=1922x824" />
-<img alt="" src="https://static001.geekbang.org/resource/image/52/88/52014aeb4334dc5cbb21775a41ba6788.png?wh=1612x672" />
-<img alt="" src="https://static001.geekbang.org/resource/image/9d/62/9d2732c2873110bfc610160c8045e962.png?wh=1140x484" title="图5 非负矩阵分解消除鼠标声（从上到下依次为：含噪信号、非负矩阵分解降噪之后的信号和原始语音信号，Mohammadiha, Nasser, and Simon Dodo，2014.)" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/36/13/36d76c0d07ce5f654e5b36676b243113.png?wh=1922x824" />
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/52/88/52014aeb4334dc5cbb21775a41ba6788.png?wh=1612x672" />
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9d/62/9d2732c2873110bfc610160c8045e962.png?wh=1140x484" title="图5 非负矩阵分解消除鼠标声（从上到下依次为：含噪信号、非负矩阵分解降噪之后的信号和原始语音信号，Mohammadiha, Nasser, and Simon Dodo，2014.)" /></p>
 <p>从上图可以看出通过非负矩阵分解来消除鼠标声，降噪之后的那些鼠标点击产生的黑色竖条就被消除了。</p>
 <h3 id="_7">降噪算法第五招：基于机器学习的降噪</h3>
 <p>这块最近还是比较火热的。它是通过数据训练的方式，训练人工神经网络来进行降噪。特点是噪声鲁棒性好，能兼顾稳态、非稳态甚至是瞬态噪声。比如图6中咖啡馆的噪声属于混合类型的噪声，传统降噪算法对语谱的损伤就很大，很多高频信息都丢失了，而使用AI算法在保留语谱的同时又起到了比较好的降噪效果。这块我会在下节课带你详细了解一番。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cf/3b/cf46b397df3cbdfc00b0be7463985d3b.png?wh=1564x776" title="图6 传统的降噪（WebRTC）与深度学习的降噪频谱对比（咖啡馆噪声）" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cf/3b/cf46b397df3cbdfc00b0be7463985d3b.png?wh=1564x776" title="图6 传统的降噪（WebRTC）与深度学习的降噪频谱对比（咖啡馆噪声）" /></p>
 <p>这里讲了很多噪声的类型以及如何消灭它们的方法。其实如果宏观地从整条音频链路的角度上来说，我们在实时音频中大部分采集的音频就是单通道了，这里介绍的算法也都是单通道降噪算法。如果采集的时候可以用多个麦克风或者麦克风阵列，则可以使用波束形成的方法先锁定声源方向来收音，比如选择说话人的方向来收音。这样采集来的信号，信噪比就比较高了，再通过单通道降噪就可以事半功倍。</p>
 <h2 id="_8">小结</h2>
 <p>这里我们用图7来总结一下噪声分类和5种降噪算法及其适用范围：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/05/80/055445d8682246b12348052d24ddea80.png?wh=1455x552" title="图7 课程总结" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/05/80/055445d8682246b12348052d24ddea80.png?wh=1455x552" title="图7 课程总结" />
 你可以针对不同的噪声类型选择合适的降噪算法。在实际使用的时候还必须结合应用场景的需要来权衡算法的复杂度来解决主要矛盾。比如，现在很多TWS耳机都是自带降噪算法的，但是耳机上的DSP芯片的算力有限，可能就用单个子空间算法来解决一下耳机常见的风噪就可以了。</p>
 <p>还有一些音乐场景我们可能需要牺牲一些降噪性能对降噪的幅度做限制。比如，每个频点最多只能降3dB，这样来保证音乐信号不会被削弱。所以你在实际的使用中可以从全局出发多问问自己：我应用的场景是什么？我最关心的效果是哪些？</p>
 <h2 id="_9">思考题</h2>
@@ -5494,8 +5494,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

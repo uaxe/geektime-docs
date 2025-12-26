@@ -14241,10 +14241,10 @@
 <p>这节课，我们将会学习整机组件化的架构设计，看看如何来解决上节课提到的耦合问题。接着针对这些耦合问题，探讨具体有哪些针对性的解耦策略。</p>
 <h2 id="_1">整机组件化</h2>
 <p>通过上节课的学习，我们知道了Android的架构设计本身就是采用了分层组件化的方式，只是由于厂商在定制的过程中，没有遵循架构设计来扩展，才出现了腐化。典型的问题包括应用间的耦合、应用与框架的耦合以及框架与框架间的耦合，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4e/20/4eb94098fa466064d2d1d6e274f1d120.jpg?wh=2692x1968" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4e/20/4eb94098fa466064d2d1d6e274f1d120.jpg?wh=2692x1968" /></p>
 <p>但是定制就意味着增加代码，所以关键问题是<strong>如何管理扩展的代码，才能把对原生代码的侵入降到最低，同时又要让系统更独立地演进。</strong></p>
 <p>其实解决方法也很简单，就是沿用 <strong>Android系统的架构，让我们自己扩展的代码也形成组件，能够在Android原生系统之上灵活插拔</strong>，你可以对照下图来理解。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/76/bf/762705dc7d9161eddd328d736ff186bf.jpg?wh=2637x1968" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/76/bf/762705dc7d9161eddd328d736ff186bf.jpg?wh=2637x1968" /></p>
 <p>可以看出，厂商主要定制的代码分布在应用、框架与内核层。我们分别从这几层来看看组件化改造的思路。</p>
 <h3 id="_2">应用层</h3>
 <p>第一个是应用层。应用层其实分2种类型，第一种是完全自己定制的应用，第二种是扩展AOSP中原有的应用（例如桌面、电话本、短信等）。</p>
@@ -14264,17 +14264,17 @@
 <p>前面我们讨论了整机组件化整体的设计思路，接下来我们再一起看看具体的解耦方法。</p>
 <h3 id="_5">应用与应用解耦</h3>
 <p>首先来看应用与应用间的解耦。<strong>应用间的解耦重点是约定好双方的交互协议以及保证API的稳定及兼容性</strong>，你可以参考后面的示意图来理解。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/76/54/76a534fcd208fd245837b7d780988854.jpg?wh=2637x1298" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/76/54/76a534fcd208fd245837b7d780988854.jpg?wh=2637x1298" /></p>
 <p>首先需要保证API的稳定，尽可能保证扩展但不修改，避免在多个版本出现不兼容问题。另外，当依赖的应用不存在时，调用方需要保证功能的兼容性，可以将相关的特性屏蔽，更多关于兼容性的处理方法，你可以参考<a href="https://time.geekbang.org/column/article/638406">第13节课</a>的内容。</p>
 <p>特别需要注意的是，封装API的时候最好是<strong>基于数据的封装</strong>，而不是基于界面的封装。例如应用B需要展示应用A的一些内容，如果应用B直接通过API获取应用A的View来展示，就可能导致当应用A与应用B之间需要统一视觉风格时，版本之间会存在强依赖。但如果只是数据的依赖，则会更加稳定，应用B的视觉风格变化不依赖应用A的修改。</p>
 <h3 id="_6">应用与框架解耦</h3>
 <p>对于应用与框架的耦合，解耦重点是<strong>封装统一的扩展SDK，避免应用调用系统的非公开接口，导致与系统大版本产生耦合。</strong>你可以对照后面的示意图来加深理解。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/48/f1/4827c4fbef5df68924a8ec6814f4b5f1.jpg?wh=2637x2043" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/48/f1/4827c4fbef5df68924a8ec6814f4b5f1.jpg?wh=2637x2043" /></p>
 <p>对照图片可以看出，我们的策略是通过扩展的SDK封装原先对系统的非公开接口和扩展的API，并且做好大版本的兼容性处理，应用会统一使用扩展的SDK来增强系统的能力。这样对于应用来说，就不用做大量的版本判断代码，同时也能有统一的入口来管理版本的API。</p>
 <p>需要注意的是，扩展SDK有些方法仍然没有办法做到百分之百的兼容。比方说在T版本上有A接口，但是在S版本上没有等价的实现，那么我们同样需要在应用侧进行兼容性判断处理。但是使用统一的扩展SDK还是有好处的，这么做能帮助应用简化90%以上的兼容性维护工作，并且能统一规范。</p>
 <h3 id="_7">框架与框架解耦</h3>
 <p>最后我们来看框架间的耦合，<strong>框架与框架的解耦重点是减少对原生代码的修改，只保留稳定的插桩接口，将具体的实现独立成单独的组件</strong>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f9/97/f983ef399a7f841c2d6097c67ffe1a97.jpg?wh=2637x1244" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f9/97/f983ef399a7f841c2d6097c67ffe1a97.jpg?wh=2637x1244" /></p>
 <p>首先我们需要定义桩点接口，为了减少编译时的耦合，可以采用反射的机制去查找接口的实现。</p>
 <p>我来举个例子，AOSP中有一个类为AMS，其中有一个方法为onCreate()，原先在这个方法里面插入了代码，此时我们可以定义一个IAMS的接口，抽象一个onCreate()的桩点接口，然后将实现代码移动至IAMS的实现类中。</p>
 <p>伪代码是后面这样。</p>
@@ -14336,7 +14336,7 @@
 <h2 id="_9">总结</h2>
 <p>今天，我们一起学习了Android系统组件化的设计，讨论了针对常用耦合问题的解耦思路。</p>
 <p>组件化设计就是将自己扩展的代码独立成内聚的组件，以二进制与整机集成，尽量减少在AOSP框架中的代码修改量。下面我给你总结了组件化解耦常见的3种情况，你可以通过后面的表格回顾。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a2/fa/a279434566d86366bea9b42dfab82afa.jpg?wh=2990x1416" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a2/fa/a279434566d86366bea9b42dfab82afa.jpg?wh=2990x1416" /></p>
 <p>实施组件化有很多好处，一方面，能够帮助我们有效减少分支数量、多版本维护工作，让团队更聚焦在高价值的业务研发和质量打磨工作中。另一方面，也能帮助我们减少产品的质量问题、提高产品的响应力。</p>
 <p>通过扩展篇的学习，我们深入探索了Android系统的架构，了解了研发过程中常见的耦合以及解耦的一些思路。</p>
 <p>相比应用的解耦，系统解耦的复杂度和需要处理的耦合场景更多，特别是相对于框架的解耦，编译调试验证的难度更大。相同之处则是都要采用同样的组件化思路，以业务内聚组件，让组件独立做演进。</p>
@@ -14463,8 +14463,6 @@ Q4 APP安全问题。APP开发完成后，安全性方面，有哪些工作需�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

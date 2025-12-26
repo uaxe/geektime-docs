@@ -5831,7 +5831,7 @@
 <p>在真实的业务开发中，实现双端下拉刷新的正确逻辑是：<strong>iOS 基于 bounces 实现，Android 基于手势实现</strong>。不过，为了方便，我在写 Demo 的时候，直接把 iOS 的 bounces 效果关了，双端统一使用手势实现，省去了 if else 的代码，这样你看代码会容易一些。</p>
 <p>那我们又应该从哪里开始进行实现回弹下拉刷新？</p>
 <p>要实现回弹下拉刷新，首先要理解 Android 回弹滚动的原理，我们先来看一下<strong>Android 回弹滚动的结构示意图</strong>：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0f/61/0f11873068f746e96f08ac16478e4b61.png?wh=1920x982" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0f/61/0f11873068f746e96f08ac16478e4b61.png?wh=1920x982" /></p>
 <p>你可以看到，Android 回弹滚动涉及的结构一共有 5 种，最外层是手机屏幕，手机屏幕内有一个比屏幕高一些的 Animated.View。Animated.View 比屏幕高出来的部分，正好等于 Loading 视图的高度，Loading 视图这里我直接用 Text 元素代替了。Animated.View 和屏幕同高的部分是 ScrollView 视图。在 ScrollView 视图的内部，ScrollView 的内容 Content 部分是比 ScrollView 容器更高的，这样内容才能滚动。</p>
 <p>如果我们从 ScrollView 内容的最底部开始，一直往上滚，滚到内容的最顶部。在没有 bounces 回弹效果的容器中，内容的顶部和手机屏幕的顶部是平齐的。如果支持 bounces 回弹或手势回弹，那么内容还可以继续往下拉，内容的顶部可以低于手机屏幕顶部。</p>
 <p>这里有个小细节。你可能注意到了，我并没有使用 absolute 绝对定位将 Text 定位到手机屏幕上方的位置，而是增加了其父容器 Animated.View 的高度。这是因为，我以前遇到过 Android 手机子视图超出父容器后不显示的问题。为了避免超出不显示，在Animated.View 的子视图这里，我采用的是从上到下的默认布局方式，把子视图都包裹在 Animated.View 视图内部，而不是让子视图 Loading 浮在 Animated.View 视图的外面。</p>
@@ -5893,7 +5893,7 @@
 <p>和 scrollY 只读不写不同，<strong>refreshY 的值会跟着拖拽手势的变化而变化</strong>。当你拖拽下拉时， refreshY 的值从 -30 逐渐变大；当 refreshY 的值变为 0 时， Loading 字样会完全出现；继续向下拖拽， refreshY 会继续变大，页面继续下移，松手时，重新变为 -30。</p>
 <p><strong>了解了整体的 JSX 结构和共享值后，接下来我们面临的难题就是，回弹滚动究竟如何实现呢？</strong></p>
 <p>一图胜千言，我还画一张原理示意图，相信你看一下就能明白：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/82/44/82c626b4681a0623156dba963bbb6a44.png?wh=1920x2269" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/82/44/82c626b4681a0623156dba963bbb6a44.png?wh=1920x2269" /></p>
 <p>示意图一共分为 6 步，有两种可能结果。</p>
 <p>首先，在初始化时，你先将 ScrollView 内容滚动到最底部，然后手势向下往内容的最顶部方向滚动。此时，因为你的手是一直放在 ScrollView 视图上的，所以 ScrollView 视图会同时响应滚动手势和拖拽手势。但是滚动手势也就意味着触发了滚动动画，而拖拽手势只是触发了拖拽回调 onChange，但回调中并未改变共享值 refreshY，也未执行拖拽动画。</p>
 <p>绑定手势的相关代码如下：</p>
@@ -6014,7 +6014,7 @@
 <p>要让 ScrollView 视图和 Loading 视图同时监听滚动和拖拽手势，要让执行拖拽动画时不能执行滚动动画，就涉及多视图多手势的冲突问题了。</p>
 <p>那么，多视图多手势冲突问题该怎么解决？</p>
 <p>解决多视图多手势的冲突问题，我们首先要学会站在单个手势的视角来解决这个问题，我给你画了一个示意图，你先看看：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/66/72/6684e3312f30fc2630c47090e7c5d872.png?wh=1920x901" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/66/72/6684e3312f30fc2630c47090e7c5d872.png?wh=1920x901" /></p>
 <p>示意图中左边的部分，就是站在拖拽手势的视角来解决冲突问题的。拖拽手势是这么想的：既然你想在响应我拖拽手势的同时响应轻按、滚动手势，那我可以提供一个方法函数，你把轻按、滚动手势都告诉我吧。</p>
 <p>咦？这里多了个轻按手势，它是用来干嘛的呢？我们先保留一个悬念，你一会就知道了。</p>
 <p>然后我们再看示意图中右边的部分，这是站在滚动手势的视角来解决冲突问题的。滚动手势是这么想的：你想让我滚动手势和拖拽手势同时响应，但不想让滚动动画和拖拽动画同时执行，但我滚动手势并不知道拖拽动画是否能执行呀！</p>
@@ -6282,8 +6282,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

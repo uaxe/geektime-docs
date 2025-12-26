@@ -14655,11 +14655,11 @@
 <p>现在我们几乎所有的程序都默默地享受着这些成果，但是天下没有免费的午餐，并发程序很多诡异问题的根源也在这里。</p>
 <h2 id="_2">源头之一：缓存导致的可见性问题</h2>
 <p>在单核时代，所有的线程都是在一颗CPU上执行，CPU缓存与内存的数据一致性容易解决。因为所有线程都是操作同一个CPU的缓存，一个线程对缓存的写，对另外一个线程来说一定是可见的。例如在下面的图中，线程A和线程B都是操作同一个CPU里面的缓存，所以线程A更新了变量V的值，那么线程B之后再访问变量V，得到的一定是V的最新值（线程A写过的值）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a0/da/a07e8182819e2b260ce85b2167d446da.png?wh=1142%2A640" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a0/da/a07e8182819e2b260ce85b2167d446da.png?wh=1142%2A640" /></p>
 <p>CPU缓存与内存的关系图</p>
 <p>一个线程对共享变量的修改，另外一个线程能够立刻看到，我们称为<strong>可见性</strong>。</p>
 <p>多核时代，每颗CPU都有自己的缓存，这时CPU缓存与内存的数据一致性就没那么容易解决了，当多个线程在不同的CPU上执行时，这些线程操作的是不同的CPU缓存。比如下图中，线程A操作的是CPU-1上的缓存，而线程B操作的是CPU-2上的缓存，很明显，这个时候线程A对变量V的操作对于线程B而言就不具备可见性了。这个就属于硬件程序员给软件程序员挖的“坑”。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e2/ea/e2aa76928b2bc135e08e7590ca36e0ea.png?wh=1142%2A640" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e2/ea/e2aa76928b2bc135e08e7590ca36e0ea.png?wh=1142%2A640" /></p>
 <p>多核CPU的缓存与内存关系图</p>
 <p>下面我们再用一段代码来验证一下多核场景下的可见性问题。下面的代码，每执行一次add10K()方法，都会循环10000次count+=1操作。在calc()方法中我们创建了两个线程，每个线程调用一次add10K()方法，我们来想一想执行calc()方法得到的结果应该是多少呢？</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>public class Test {
@@ -14692,12 +14692,12 @@
 <p>直觉告诉我们应该是20000，因为在单线程里调用两次add10K()方法，count的值就是20000，但实际上calc()的执行结果是个10000到20000之间的随机数。为什么呢？</p>
 <p>我们假设线程A和线程B同时开始执行，那么第一次都会将 count=0 读到各自的CPU缓存里，执行完 count+=1 之后，各自CPU缓存里的值都是1，同时写入内存后，我们会发现内存中是1，而不是我们期望的2。之后由于各自的CPU缓存里都有了count的值，两个线程都是基于CPU缓存里的 count 值来计算，所以导致最终count的值都是小于20000的。这就是缓存的可见性问题。</p>
 <p>循环10000次count+=1操作如果改为循环1亿次，你会发现效果更明显，最终count的值接近1亿，而不是2亿。如果循环10000次，count的值接近20000，原因是两个线程不是同时启动的，有一个时差。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ec/79/ec6743e74ccf9a3c6d6c819a41e52279.png?wh=1142%2A640" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ec/79/ec6743e74ccf9a3c6d6c819a41e52279.png?wh=1142%2A640" /></p>
 <p>变量count在CPU缓存和内存的分布图</p>
 <h2 id="_3">源头之二：线程切换带来的原子性问题</h2>
 <p>由于IO太慢，早期的操作系统就发明了多进程，即便在单核的CPU上我们也可以一边听着歌，一边写Bug，这个就是多进程的功劳。</p>
 <p>操作系统允许某个进程执行一小段时间，例如50毫秒，过了50毫秒操作系统就会重新选择一个进程来执行（我们称为“任务切换”），这个50毫秒称为“<strong>时间片</strong>”。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/25/fb/254b129b145d80e9bb74123d6e620efb.png?wh=1142%2A640" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/25/fb/254b129b145d80e9bb74123d6e620efb.png?wh=1142%2A640" /></p>
 <p>线程切换示意图</p>
 <p>在一个时间片内，如果一个进程进行一个IO操作，例如读个文件，这个时候该进程可以把自己标记为“休眠状态”并出让CPU的使用权，待文件读进内存，操作系统会把这个休眠的进程唤醒，唤醒后的进程就有机会重新获得CPU的使用权了。</p>
 <p>这里的进程在等待IO时之所以会释放CPU使用权，是为了让CPU在这段等待时间里可以做别的事情，这样一来CPU的使用率就上来了；此外，如果这时有另外一个进程也读文件，读文件的操作就会排队，磁盘驱动在完成一个进程的读操作后，发现有排队的任务，就会立即启动下一个读操作，这样IO的使用率也上来了。</p>
@@ -14710,7 +14710,7 @@
 <li>指令3：最后，将结果写入内存（缓存机制导致可能写入的是CPU缓存而不是内存）。</li>
 </ul>
 <p>操作系统做任务切换，可以发生在任何一条<strong>CPU指令</strong>执行完，是的，是CPU指令，而不是高级语言里的一条语句。对于上面的三条指令来说，我们假设count=0，如果线程A在指令1执行完后做线程切换，线程A和线程B按照下图的序列执行，那么我们会发现两个线程都执行了count+=1的操作，但是得到的结果不是我们期望的2，而是1。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/33/63/33777c468872cb9a99b3cdc1ff597063.png?wh=1142%2A640" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/33/63/33777c468872cb9a99b3cdc1ff597063.png?wh=1142%2A640" /></p>
 <p>非原子操作的执行路径示意图</p>
 <p>我们潜意识里面觉得count+=1这个操作是一个不可分割的整体，就像一个原子一样，线程的切换可以发生在count+=1之前，也可以发生在count+=1之后，但就是不会发生在中间。<strong>我们把一个或者多个操作在CPU执行的过程中不被中断的特性称为原子性</strong>。CPU能保证的原子操作是CPU指令级别的，而不是高级语言的操作符，这是违背我们直觉的地方。因此，很多时候我们需要在高级语言层面保证操作的原子性。</p>
 <h2 id="_4">源头之三：编译优化带来的有序性问题</h2>
@@ -14743,7 +14743,7 @@
 <li>最后在内存M上初始化Singleton对象。</li>
 </ol>
 <p>优化后会导致什么问题呢？我们假设线程A先执行getInstance()方法，当执行完指令2时恰好发生了线程切换，切换到了线程B上；如果此时线程B也执行getInstance()方法，那么线程B在执行第一个判断时会发现 <code>instance != null</code> ，所以直接返回instance，而此时的instance是没有初始化过的，如果我们这个时候访问 instance 的成员变量就可能触发空指针异常。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/64/d8/64c955c65010aae3902ec918412827d8.png?wh=1142%2A640" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/64/d8/64c955c65010aae3902ec918412827d8.png?wh=1142%2A640" /></p>
 <p>双重检查创建单例的异常执行路径</p>
 <h2 id="_5">总结</h2>
 <p>要写好并发程序，首先要知道并发程序的问题在哪里，只有确定了“靶子”，才有可能把问题解决，毕竟所有的解决方案都是针对问题的。并发程序经常出现的诡异问题看上去非常无厘头，但是深究的话，无外乎就是直觉欺骗了我们，<strong>只要我们能够深刻理解可见性、原子性、有序性在并发场景下的原理，很多并发Bug都是可以理解、可以诊断的</strong>。</p>
@@ -14965,8 +14965,6 @@ Implementations of the Java Virtual Machine are encouraged to avoid splitting 64
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

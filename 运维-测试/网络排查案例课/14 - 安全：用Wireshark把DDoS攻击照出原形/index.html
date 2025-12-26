@@ -6469,16 +6469,16 @@
 <p>补充：抓包示例文件已经上传至<a href="https://gitee.com/steelvictor/network-analysis/tree/master/14">Gitee</a>，建议Wireshark打开抓包文件，结合文稿一起学习。</p>
 </blockquote>
 <p>从抓包文件概览来看，确实是不正常。按惯例，我们看一下Expert Information：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/fd/5a/fd308647a1b1fe2b1bb813113e857e5a.jpg?wh=1820x216" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fd/5a/fd308647a1b1fe2b1bb813113e857e5a.jpg?wh=1820x216" /></p>
 <p>游戏业务一般也是基于TCP，但这里并没多少TCP相关的信息。那我们看下具体报文呢？</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/5b/0c/5beeb84467b2a31dd97a2e563f277c0c.jpg?wh=1920x980" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5b/0c/5beeb84467b2a31dd97a2e563f277c0c.jpg?wh=1920x980" /></p>
 <p>全部都是这种NTP Version 2, Private, Response, MON_GETLIST_1的报文。客户根本没有对外提供什么NTP服务，这些报文是怎么来的呢，这是攻击吗？</p>
 <p>确实，这就是DDoS攻击的一种类型，叫<strong>NTP反射放大攻击</strong>。NTP全称是Network Time Protocol，它的作用是通过网络服务来同步时间。其中有一项功能叫Monlist，它在一些比较老的设备上是默认启用的，会返回与NTP服务器进行过时间同步的最后600个客户端的IP。</p>
 <p>响应包按照每6个IP进行分割，最多有100个响应包。这样的话，一个简单的NTP Monlist响应，就可能是请求的200多倍。想象一下，如果请求是1Gbps，那这次反射攻击就可以达到200Gbps以上，实在惊人！</p>
 <p>我们还是用Wireshark，展开UDP部分，看一看这种Monlist响应报文的细节：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/26/f3/26cefaeyy5484c497d760719538301f3.jpg?wh=1660x680" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/26/f3/26cefaeyy5484c497d760719538301f3.jpg?wh=1660x680" /></p>
 <p>每个Monlist item占用72字节：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/4b/4a/4bbc3de9562104968a680e7bb9947a4a.jpg?wh=1264x1104" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4b/4a/4bbc3de9562104968a680e7bb9947a4a.jpg?wh=1264x1104" /></p>
 <p>选中一个Monlist item后，我们可以通过3种不同的方式找到它的长度：</p>
 <ul>
 <li>它有个字段Size of data item的值是72，这是协议本身提供的元数据；</li>
@@ -6487,9 +6487,9 @@
 </ul>
 <p>这些方法，对于你平时用Wireshark解读抓包文件，特别是需要核对字段的具体信息时，是挺有用的。</p>
 <p>不过，现在Wireshark窗口里解读UDP报文长度不是很直观，这是因为<strong>Wireshark默认没有显示UDP长度的列，但我们可以自己添加</strong>。在UDP详情里选中Length，然后右单击，选中Aplly as Column：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b4/f1/b4cb43df336152e5d937de7ff63c19f1.jpg?wh=1920x985" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b4/f1/b4cb43df336152e5d937de7ff63c19f1.jpg?wh=1920x985" /></p>
 <p>然后就能在主窗口里看到UDP报文长度了，这个列的默认名称是Length。当然你也可以把它改为UDP Length等你觉得更合适的名称。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3b/8f/3b1e05cbab2fce92fd552af1f782ec8f.jpg?wh=1920x508" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3b/8f/3b1e05cbab2fce92fd552af1f782ec8f.jpg?wh=1920x508" /></p>
 <p>从图上看，这些UDP报文的长度都不大，只有448字节，这是为什么呢？我们知道MTU一般是1500字节，去掉IP头20字节和UDP头8字节，最多还有1500-20-8=1472字节，远大于448字节，为什么不用足这1472字节呢？</p>
 <p>其实，这里就涉及UDP的一个概念：<strong>UDP报文的载荷最好不要大于512字节</strong>。</p>
 <p>这个限制来自于IPv4协议。在IPv4的协议规范<a href="https://www.rfc-editor.org/rfc/rfc791#section-3.1">RFC791</a>里建议，虽然IP报文的长度字段是2个字节，最大可以到65535，但是由于网络不允许传输这么大的报文，所以IPv4规范建议，报文长度应该控制在相对小的范围内，这个范围是576字节，相应的UDP载荷在512字节以内：</p>
@@ -6503,7 +6503,7 @@
 <p>很多应用程序都做了这部分逻辑的处理，也就是控制UDP载荷在512字节以内，比如这次的NTP Monlist的长度就是NTP协议实现，而不是内核UDP实现的。另外像DNS解析，如果数据量超过512字节，也是会自动切换为TCP模式的，根本原因也是这个很早以前的规定。</p>
 <p>那么检查了载荷，我们很快会发现新的问题：“这里怎么只有NTP回复，没有NTP请求呢？”</p>
 <p>其实，这正是前面说的1Gbps能放大为200多Gbps的原因。它的背后，就是反射攻击的核心技巧：<strong>它利用IP协议“不对源IP做验证”的不足，构造一个IP报文，其源IP为被攻击站点的IP，使得NTP服务器回复的报文也被发往被攻击站点</strong>。大量的响应报文就被引到了被攻击站点这里。而且这个过程中，NTP服务器被利用了还不知道。我们看个示意图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cb/8e/cb817f657b773c832eceb3a0f9b52f8e.jpg?wh=2000x857" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cb/8e/cb817f657b773c832eceb3a0f9b52f8e.jpg?wh=2000x857" /></p>
 <p>如果我们面临这种攻击，该怎么办呢？</p>
 <ul>
 <li>假如这些被利用的NTP服务器是我们的，那么需要升级版本，避免自己成为“帮凶”。</li>
@@ -6515,13 +6515,13 @@
 <p>但是，要拿到这么多“肉机”却并非易事。于是，聪明的黑客又想到了另外一种思路：借力打力。</p>
 <p>借什么力呢？借协议的“<strong>响应是请求的很多倍</strong>”这个力。显然，前面介绍的NTP反射攻击就是这样的。所以这种攻击，英文里叫reflection attack with amplification。amplication就是放大的意思。在这种模式下，只需要量很少的“肉机”，就可以发起巨大的攻击流量。</p>
 <p>下面是另外一个客户的案例。当时他们遭受了一波攻击，也正好做了抓包。我们看一下抓包文件的Expert Information：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/be/de/be8932473a55aeffef2557e0c5261fde.jpg?wh=1806x172" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/be/de/be8932473a55aeffef2557e0c5261fde.jpg?wh=1806x172" /></p>
 <blockquote>
 <p>补充：抓包示例文件已经上传至<a href="https://gitee.com/steelvictor/network-analysis/tree/master/14">Gitee</a>，建议Wireshark打开抓包文件，结合文稿一起学习。</p>
 </blockquote>
 <p>你是不是也觉得比较奇怪？这里没有TCP握手报文，上来就是HTTP/1.1 200 OK，这HTTP有点“自来熟”啊。既然这里有51257个HTTP 200响应报文，那按常理也至少有几十个TCP连接，而这里连一个SYN和FIN都没有。</p>
 <p>那就让我们直接看看这些HTTP 200具体是怎样的：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a8/02/a86588af9b086c7fc91b108cb5152602.jpg?wh=859x724" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a8/02/a86588af9b086c7fc91b108cb5152602.jpg?wh=859x724" /></p>
 <p>奇怪，这里srcPort和dstPort居然都是空白的？不过视线移到下方，很快就找到答案了：原来是用了UDP协议。我们上面的srcPort和dstPort列是指TCP的端口号，难怪是空白。</p>
 <p>但更奇怪的问题来了：这里的HTTP竟然用了UDP作为传输协议？HTTP一般是用TCP协议的，那这里用UDP又是怎么回事呢？是不是感觉网络协议到处都可能有意想不到的情况？</p>
 <p>其实，这就是有名的 <strong>SSDP反射放大攻击</strong>。SSDP是在UDP这个传输层协议上，用HTTP协议格式传送信息。2014年，人们发现SSDP可以被攻击者利用。启用了SSDP协议的主要是一些家用路由器，在它们的UPnP软件中有一个漏洞，这个漏洞被攻击者利用后，这些路由器会从端口1900返回响应报文。那么显然，这些响应报文的目的地址，是被攻击站点的IP，而不是攻击发起者自己的IP了。</p>
@@ -6577,7 +6577,7 @@
 <p>而这，就是DDoS的核心目标：<strong>耗尽网络带宽</strong>。</p>
 <p>假设被攻击的站点的带宽为1Gbps，那么攻击者只要让到达这个站点的流量超过1Gbps，就可以让这个站点失去正常服务的能力。至于这些报文是否属于被攻击站点正在监听的有效流量，是没有关系的。它的目的很直接：把你家门口的路给堵死，让正常的流量没有机会进来。</p>
 <p>我们看一下示意图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d4/0c/d46a0295a1b4f47b342c11c79f51530c.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d4/0c/d46a0295a1b4f47b342c11c79f51530c.jpg?wh=2000x1125" /></p>
 <p>理解了原理，那么技术性问题就来了：如何产生巨大的流量呢？</p>
 <p>一种常见的实现方式就是反射型攻击。它的核心方法论是：利用一些协议的“<strong>响应是请求的很多倍</strong>”这样的特点，同时也利用“<strong>IP协议不验证源IP</strong>”的不足，达到把流量引到被攻击站点上去的目的。</p>
 <p>上面的NTP反射攻击和SSDP都是如此。除此以外，你有没有发现别的这种“响应报文是请求报文的很多倍”的情况呢？如果有，那么恭喜你，你也能找到反射攻击的方式了！</p>
@@ -6587,7 +6587,7 @@
 <p>TCP当然也可能被DDoS所用，但是相对来说，如果用同样的成本，选择反射型攻击更加高效。而反射型攻击，主要基于UDP，这是为什么呢？主要有两个原因。</p>
 <h3 id="udp">UDP报文简单易于构造</h3>
 <p>我们看一下UDP头部。<a href="https://datatracker.ietf.org/doc/html/rfc768">RFC768</a>定义了UDP头部的格式：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/26/b2/26ed0d4f50a7cc54e910435c05b27bb2.jpg?wh=473x305" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/26/b2/26ed0d4f50a7cc54e910435c05b27bb2.jpg?wh=473x305" /></p>
 <p>由上图可见，UDP头部其实只有8个字节，分别是：</p>
 <ul>
 <li>2个字节的源端口号；</li>
@@ -6596,7 +6596,7 @@
 <li>2个字节的校验和。</li>
 </ul>
 <p>还是借助Wireshark，我们更加近距离地看一个UDP报文：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/90/98/90c05f5c609c11b49045b6f8d57a1298.jpg?wh=609x472" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/90/98/90c05f5c609c11b49045b6f8d57a1298.jpg?wh=609x472" /></p>
 <p>而TCP头部就复杂多了，除了源目端口，还有序列号、确认号、各种标志位、各种TCP扩展选项等等。而因为UDP报文头部如此简单，这就减少了攻击者做伪造的难度，只要做好这几件事就好了：</p>
 <ul>
 <li>伪造一个源IP；</li>
@@ -6605,33 +6605,33 @@
 </ul>
 <h3 id="udp_1">UDP是无状态的</h3>
 <p>这可能是一个<strong>更加关键</strong>的原因。UDP是无状态的，不需要握手。像NTP反射攻击、SSDP反射攻击，都是只要“一问一答”即可，所以攻击者只需要伪造一个请求报文，那么后续的响应报文，自然就发送给了被攻击站点了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/98/17/988449a5e4107ba3a0867f231c772917.jpg?wh=1698x806" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/98/17/988449a5e4107ba3a0867f231c772917.jpg?wh=1698x806" /></p>
 <p>但是TCP就非常不同了。首先TCP需要三次握手，如果攻击者的SYN报文的源地址是伪造成被攻击站点的IP，那么SYN+ACK报文就直接回复到那个站点的IP了，而不是攻击者。然后会发生什么呢？</p>
 <p>被攻击站点收到一个莫名其妙的SYN+ACK，就会被RST掉。这次TCP握手就这么结束了，攻击就没法继续了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/04/8c/041893ed942fdf744bccbe8b520f8d8c.jpg?wh=1672x807" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/04/8c/041893ed942fdf744bccbe8b520f8d8c.jpg?wh=1672x807" /></p>
 <p>那跳过TCP握手，直接发送应用层请求（源地址还是伪造成被攻击站点的IP）给反射服务呢？当然是直接被RST，因为连握手都没做过呢。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bb/03/bb77fb1751yycf77e4bcae072dbc4503.jpg?wh=1687x807" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bb/03/bb77fb1751yycf77e4bcae072dbc4503.jpg?wh=1687x807" /></p>
 <p>而且，即使通过了握手，后续通信双方还有对序列号和确认号进行校验等机制。虽然这些在技术上都可以实现，但难度大了很多，而选择UDP，就不需要考虑这么多问题。</p>
 <p>所以，<strong>用TCP的话就是直接攻击</strong>，而不是反射攻击了。比如SYN攻击、半连接攻击、全连接攻击、CC攻击等等。从“性价比”上看，反射攻击的优势更大些。</p>
 <h2 id="ddos_1">如何对付DDoS？</h2>
 <p>前面我们分析了DDoS中最为典型的反射放大攻击。以后如果我们发现服务异常，比如客户端的请求十分卡顿的话，就可以在服务端抓包，然后进行分析，就能快速定位是否是DDoS攻击了。</p>
 <p>当然，还有一个更为简单直接的证据，就是你的公网接口带宽使用图，如果图上有明显的突增，甚至达到了接口带宽的上限，那也基本可以判定是遭遇DDoS了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/90/a4/9022db0b266107b161e2677yy309f8a4.jpg?wh=471x501" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/90/a4/9022db0b266107b161e2677yy309f8a4.jpg?wh=471x501" /></p>
 <p>上面都是排查的手段，那接下来如何处理呢？一般来说，你自己单干是不行的，这里给你介绍几种应对策略，这样你以后就心里有数了。</p>
 <h3 id="_1">高防</h3>
 <p>一般来说，如果你的服务架设在公有云上，那么可以考虑使用云商或者其他专业安全服务商的高防产品。</p>
 <p><strong>高防是需要放置在源站前面的一类安全防护和清洗系统。</strong>它利用了自身的足够大的带宽，以及强大的防护清洗集群，实现对流量清洗，最终把攻击流量拦截在外面，清洗过后的正常流量进入源站，得以被正常处理。示意图如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3c/21/3c8bd54238a4b884dd42bfe95246fb21.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3c/21/3c8bd54238a4b884dd42bfe95246fb21.jpg?wh=2000x1125" /></p>
 <blockquote>
 <p>补充：这里的源站，就是被攻击的站点。</p>
 </blockquote>
 <p>由于高防按时计费而且费用高昂，一般平时是不接入高防的。只有探测到被攻击时，才自动或者手动转入高防。这里的“接入高防”是什么意思呢？其实就是把站点域名指向高防的域名，这样就把流量先流向高防，再经清洗后回到源站。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/59/75/595873d6f7d858f28d9e4be1592f4275.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/59/75/595873d6f7d858f28d9e4be1592f4275.jpg?wh=2000x1125" /></p>
 <p>那如果攻击者不是通过域名解析，而是直接盯着IP做攻击的呢？也不难，你就把老的IP解绑，让攻击流量进入路由黑洞，然后绑定新的IP。这时候，不要暴露新的IP的信息，它只能给高防回源用，不能让更多的人知道。</p>
 <p>你有没有发现，从防护的生效点来说，高防这种方式是作用在<strong>服务端这一侧</strong>。那你可能会想到：如果我们能<strong>在攻击的源头就做防护</strong>，那是不是效果会更好呢？这就是另一类DDoS防护产品的设计思想，其中比较典型的产品是电信云堤。</p>
 <h3 id="_2">云堤</h3>
 <p>云堤本身属于运营商自己的系统，而无论被攻击站点还是肉机，都依托于运营商的公网线路才能进入因特网，所以云堤<strong>具有“地理”上的天然优势</strong>。它可以作用在肉机的攻击流量进入骨干网之前，所以很可能这些攻击都没有机会走到被攻击站点的跟前了，相当于“扼杀在摇篮里”。我们看一下示意图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/73/c7/733994d215a69b4b6372defde7dd48c7.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/73/c7/733994d215a69b4b6372defde7dd48c7.jpg?wh=2000x1125" /></p>
 <h3 id="anycastpop">anycast和多POP</h3>
 <p>我们知道了DDoS的本质是挤占网络带宽，那么对付它的核心策略就是：</p>
 <ul>
@@ -6643,7 +6643,7 @@
 <p>比较大型的网站都会在各地部署POP点（也就是多POP），然后这些POP点会宣告相同的IP段。一旦有DDoS攻击，因为它的目标IP是属于anycast网段的，所以会被因特网的路由策略，相对均匀地分布到这些POP。</p>
 <p>假如你有20个POP点宣告同一个网段，那么你就有机会把DDoS攻击化整为零，平均每个POP点承受1/20的攻击流量，大大降低了危害性。在攻击流量不高的时候，仅依靠自己的多个POP就可以吸收掉这些攻击流量，然后用自己的设备进行清洗就可以了。</p>
 <p>这一点上看，anycast+多个POP+自有的清洗设备，这一整套做好以后，相当于自己建设了一个中小型的高防系统。我画了个示意图供你参考：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/dc/67/dc3faa23209f13da54799c62350c0267.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dc/67/dc3faa23209f13da54799c62350c0267.jpg?wh=2000x1125" /></p>
 <blockquote>
 <p>补充：这里的anycast一般是作用在网段级别。而在单个IP级别的anycast应用还较局限，目前主要还是主要应用在基于UDP的服务，比如DNS服务上。基于anycast的HTTP是比较前沿的领域，目前有少数公司已经开始实践，相信在不久的将来，应该会看到越来越多的公司应用HTTP over anycast。</p>
 </blockquote>
@@ -6827,8 +6827,6 @@ DDoS拒绝服务攻击的种类
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

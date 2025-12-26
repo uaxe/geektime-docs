@@ -14064,7 +14064,7 @@
 </code></pre></div>
 <p>接着，让我们来看下写入操作。当有key-value值写入时，如果这个key在read中不存在，接下来就要做新增操作，它会加锁写入dirty map中，并且将amended标记设置为true。而amended标记用于表示dirty中是否有不在read中的key-value值。</p>
 <p>这个操作过程你可以结合后面的示意图看一下，这样理解起来更直观。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ey/7d/eyybed76bbdd94d0d86057dd02ab3b7d.jpg?wh=2900x1683" title="图1 key-value 写入" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ey/7d/eyybed76bbdd94d0d86057dd02ab3b7d.jpg?wh=2900x1683" title="图1 key-value 写入" /></p>
 <p>如果这个key在read中存在，则会进行更新操作，由于read map和dirty map里面存储的值是entry类型的指针，且entry类型的成员变量也是atomic.Pointer类型（如后面代码所示）。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1">// An entry is a slot in the map corresponding to a particular key.</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kd">type</span><span class="w"> </span><span class="nx">entry</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
@@ -14072,7 +14072,7 @@
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="p">}</span>
 </code></pre></div>
 <p>因此在更新时就像下面的图那样，可以直接用CAS无锁操作替换指针p指向的变量，而无需做加锁操作。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/28/6b/2818fca6cdc5aeeb89111640a52c616b.jpg?wh=2800x1239" title="图2 value 更新" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/28/6b/2818fca6cdc5aeeb89111640a52c616b.jpg?wh=2800x1239" title="图2 value 更新" /></p>
 <p>然后，让我们来看看读取操作，我们还是结合具体代码来理解。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1">// Load returns the value stored in the map for a key, or nil if no</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1">// value is present.</span>
@@ -14103,7 +14103,7 @@
 <a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a><span class="p">}</span>
 </code></pre></div>
 <p>当读取key对应的值时，会先从read中读取，当read中读不到，并且amended为true时，则会加锁从dirty map中读。<strong>这里可能导致从sync.Map读取的性能劣化，因为它既要从read中读一遍，又要加锁从dirty map中读一遍。</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2f/f5/2f59ace16127a243ebc620d9b4d78cf5.jpg?wh=2900x1857" title="图3 读 Key 数据" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2f/f5/2f59ace16127a243ebc620d9b4d78cf5.jpg?wh=2900x1857" title="图3 读 Key 数据" /></p>
 <p>同时，每次read读不到，从dirty map中读时，它会调用missLocked方法，这个方法用于将map的misses字段加1，misses字段用于表示read读未命中次数，如果misses值比较大，说明read map的数据可能比dirty map少了很多。为了提升读性能，missLocked方法里会将dirty map变成新的read map，代码如下。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">m</span><span class="w"> </span><span class="o">*</span><span class="nx">Map</span><span class="p">)</span><span class="w"> </span><span class="nx">missLocked</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nx">m</span><span class="p">.</span><span class="nx">misses</span><span class="o">++</span>
@@ -14115,7 +14115,7 @@
 <a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="nx">m</span><span class="p">.</span><span class="nx">misses</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">0</span>
 <a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="p">}</span>
 </code></pre></div>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3b/fe/3bd3484c3532bfa5e7108280b23e52fe.jpg?wh=2653x1688" title="图4 dirty 切换为 read" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3b/fe/3bd3484c3532bfa5e7108280b23e52fe.jpg?wh=2653x1688" title="图4 dirty 切换为 read" /></p>
 <p>最后，让我们来看看另一个可能导致写入sync.Map的性能劣化的点。上面的missLocked方法，会将dirty map置为nil，当有新的key-value值写入时，为了能保持dirty map有全量数据，就像下面代码的swap方法，它会加锁并且调用dirtyLocked方法，遍历read map并全量赋值拷贝给dirty map。</p>
 <p>你可以看看后面的代码，再想想这样写会不会有什么问题？</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1">// Swap swaps the value for a key and returns the previous value if any.</span>
@@ -14468,8 +14468,6 @@ read 存储了部分写入 Map 的内容，用来加速读操作。而 dirty 存
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -7862,7 +7862,7 @@
 <p>这也是为什么Chubby，没有被直接用来为Bigtable提供事务功能，而是只作为一个粗粒度的锁。因为这样，Chubby只需要管理极少发生变化的元数据，确保元数据的一致性，而不需要去管理高并发的数据库事务请求。</p>
 <p>而这种先选举出单个Master，然后都基于Master进行操作的Paxos算法实现，显然是不适合Megastore的。而且除了这两个特性之外，这个单Master的策略对于Megastore还有一个难以接受的点，那就是<strong>网络延时</strong>。</p>
 <p>不要忘记，<strong>Megastore最重要的特性之一，就是“跨数据中心复制”。</strong>明明用户离得最近的数据中心是在上海，你非要把请求先发送到在北京的Master，然后再让Master向上海的数据中心发起提案，这可就白白多出了很大一段的网络延时。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1d/24/1d9a79a44c67fda2d7971189fc167224.jpg?wh=1920x1080" title="就近写入可以减少一轮跨数据中心的网络开销" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1d/24/1d9a79a44c67fda2d7971189fc167224.jpg?wh=1920x1080" title="就近写入可以减少一轮跨数据中心的网络开销" /></p>
 <p>这么看来，Megastore显然应该让提案可以从集群里的任何一个节点发起。也就是，用户的请求会到达离他最近的数据中心，然后对应的提案也是从这个数据中心的Paxos节点发起的。这个，也就让我们重新回到了最初的Paxos算法。</p>
 <p>不过，选举出一个Master的算法也是有好处的，那就是Master可以减少Paxos算法的网络开销。</p>
 <p>这个优化是这样的：对于原本是两阶段的Prepare-Accept的请求，我们可以在Accept请求里，带上下一次Paxos算法里的Prepare请求。因为所有的外部请求都会先到达Master，然后由Master发起提案，所以这样的策略在实现上非常容易。而且因为请求都是从Master发起的，所以达成共识的过程中很少会有冲突，往往一个Prepare-Accept的过程，共识就已经达成了。</p>
@@ -7896,7 +7896,7 @@
 </ul>
 <p>第四步，如果我们在“追赶”的过程中，是通过本地副本来发起整个追赶过程的。那么一旦这个追赶的过程完成，意味着本地的数据已经更新到了最新的状态。那么它会向本地的协同服务器发起一个Validate的消息，让协同服务器知道这个实体组的数据已经是最新的了。这个消息不需要等待协同服务器确认返回，因为即使它失败了，无非是下一次读数据的时候，把前面的整个过程再走一遍就是了。</p>
 <p>等到前面的这个过程完成，在第五步，我们就根据使用了哪一个“副本”来“追赶共识”，通过我们拿到的日志位置和时间戳，去问它的Bigtable要数据。如果这个时候，这个副本不可用了，那么我们就要再找一个副本，从前面的第三步“追赶共识”开始重复一遍。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/fe/e1/fe155d27e69fae21c66f6807e8e3d5e1.png?wh=681x511" title="论文中的图7，从本地副本A读取数据的时间线" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fe/e1/fe155d27e69fae21c66f6807e8e3d5e1.png?wh=681x511" title="论文中的图7，从本地副本A读取数据的时间线" /></p>
 <p>这么一看Megastore的查询似乎还挺复杂的，但是其实你不用担心。因为在实践当中，我们的数据中心，不是慵懒的Paxos城邦里的居民，想要参与共识算法的时候就来参与，没空的时候就不来参与。<strong>我们分布在多个数据中心里的Paxos集群，是尽全力参与整个共识过程的。</strong>在绝大部分情况下，我们数据的写入，会在所有的副本中都写入成功。网络中断和硬件故障，毕竟是低概率事件。</p>
 <p>这也就意味着，一般来说，我们的客户端请求只需要通过前面的第一步、第二步的第一小步和第五步这三个步骤，就能获取到数据，其中的第一步、第二步的第一小步这两个步骤，也是并行进行的，而且这些请求都是来自本地数据中心的副本里。而第二步的第二小步、第三步和第四步，都是在“容错”情况下，我们仍然要确保整个系统的“共识”和整个分布式系统的“可线性化”的表现，而设计出来的步骤。</p>
 <p>这整个读数据的过程，其实就是论文中的4.6.2部分，以及对应的图7，你可以再对照着仔细看一下。</p>
@@ -7914,7 +7914,7 @@
 <li>在Accept阶段成功之后，我们需要向所有没有Accept最新的值的副本，发起一个Invalidate的请求，确保它们的协同者服务器，把对应的实体组从Validate的集合中去除掉了。</li>
 <li>最后是一个<strong>Apply阶段</strong>，在Apply阶段，客户端会让尽可能多的副本，去把实际修改应用到数据库里。如果发现要应用的数据和实际提案的数据不同，会返回一个冲突的报错（conflict error<strong>）。</strong></li>
 </ol>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/86/7d/8693ed78a2af90d04a250df247ddc67d.png?wh=611x561" title="论文里的图8，数据写入的时间线" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/86/7d/8693ed78a2af90d04a250df247ddc67d.png?wh=611x561" title="论文里的图8，数据写入的时间线" /></p>
 <p>整个写入的过程，也对应着论文里的图8，我也把这张图放在了这里，你可以对照着看。</p>
 <p>可以看到，Megastore里面通过Paxos实现的事务，和我们之前看过的Paxos算法和数据库事务有一点不同。</p>
 <p><strong>在Paxos算法层面</strong>，无论从哪一个客户端的数据中心发起事务，我们都会先尝试向Leader所在的副本提交。那么，这就和基于Master的Paxos实现一样，我们可以先在Leader这个单节点解决并发冲突。这样如果有并发冲突，我们不会需要通过多轮的Paxos算法才能解决冲突。而如果Leader节点挂掉了，也没有关系，我们可以直接退回到多轮协商的Paxos算法。这样，我们也不会遇到Master挂掉，我们就要等待Master恢复才能推进事务，导致整个系统的可用性偏弱的问题。</p>
@@ -7923,7 +7923,7 @@
 <p>比如，上一讲里我们就看过，User这个实体组里，有很多Photo这些子实体，这个模型最合适的就是一个相册的应用。那么，因为一个用户是一个实体组，而用户不可能频繁地搬家到不同的城市。就比如我住在上海，拍摄上传的照片大概率都在上海。自然Megastore就可以根据前一次写入的时候，离哪个数据中心近，就提名哪个数据中心的副本作为Leader就好了。</p>
 <p>而如果我出门旅游去了广州，那么只有第一次上传的照片，会需要跨越地域提交到在上海的Leader副本，接下来旅游连续拍摄的照片，又会就近提交到广州的数据中心。可以说，Megastore的这个策略，很好地利用了我们的数据写入，是有局部性的这个特征。</p>
 <p>不过，我们也要看到，<strong>这个策略是和Megastore的数据模型，以及开发者设计的数据表结构高度相关的。</strong>如果我们设计了一个订单实体，Order作为实体组，那么订单可能来自全国各地，我们就会遇到大量的事务提交需要跨地域的问题了，会非常影响整个系统的性能。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/29/c3/2938214d5fc76331317d6d632fb582c3.jpg?wh=1920x1080" title="只要实体组的数据写入，在连续的时间段内有地域的局部性[br]那么我们的数据写入在大部分情况下都是提交给就近的数据中心的Leader副本" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/29/c3/2938214d5fc76331317d6d632fb582c3.jpg?wh=1920x1080" title="只要实体组的数据写入，在连续的时间段内有地域的局部性[br]那么我们的数据写入在大部分情况下都是提交给就近的数据中心的Leader副本" /></p>
 <p><strong>在数据库事务层面</strong>，Megastore也和一般的数据库事务稍有不同。我们传统的数据库事务，事务提交成功了，就可以直接读数据了。在论文里称之为，在提交点（commit point）和可见点（visibility point）是相同的。</p>
 <p>但是在Megastore的数据写入里，在Paxos算法确认哪个提案胜出之后，事务提交已经完成了。而此时，并不是所有的副本都已经接受了这个最新事务的“值”，也不是所有的协同服务器，都已经把对应的实体组在自己这里标注为“失效”。只有当这两者之一完成之后，我们才能确保下一次读取对应副本的数据，一定能读取到实体组最新版本的数据。</p>
 <p>到这里，相信你也能明白，我们一开始Megastore的“两个保障”里所说的，“写入，可能在被确认之前就被观察到”究竟是怎么一回事儿了。在数据写入的第3步，Accept已经完成了，事务已经提交了。但是，对应的数据更新还没有同步到所有的副本，这个时候，可能某一个节点的副本已经更新完成了。所以用我们前面的数据读取过程，从这个副本读取数据的时候，会读取到最新版本的数据。但是，在其他副本，这个数据可能还没有更新到Bigtable的数据表里。也就是，并不是所有副本都已经完成了事务的“应用”，所谓的<strong>事务确认</strong>（acknowledge）的过程还没有完成。</p>
@@ -7940,7 +7940,7 @@
 <li>那么后面所有的数据，都需要通过Paxos的“多数投票”方式，请求多个远程的副本。</li>
 </ul>
 <p>换句话说，也是一旦协同服务器觉得网络出现分区了，那么就放弃自己维护的本地状态，退回到原始的Paxos“多数投票”的策略。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/24/83/241040610a36783ae8a6dcdc348bf383.jpg?wh=1920x1080" title="论文中的图5，Megastore的架构示例" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/24/83/241040610a36783ae8a6dcdc348bf383.jpg?wh=1920x1080" title="论文中的图5，Megastore的架构示例" /></p>
 <p>最后，到了这里，整个Megastore的系统架构也就呼之欲出了。那就让我们来看一下整个Megastore系统的整体架构。</p>
 <p><strong>横向来看</strong>，是这样的：</p>
 <ul>
@@ -8090,8 +8090,6 @@ Megastore 的写入的吞吐量慢就慢在向集群确认最新的事务日志�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

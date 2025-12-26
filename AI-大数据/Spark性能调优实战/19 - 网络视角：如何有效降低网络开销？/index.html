@@ -7133,11 +7133,11 @@
 <p>你好，我是吴磊。</p>
 <p>在平衡不同硬件资源的时候，相比CPU、内存、磁盘，网络开销无疑是最拖后腿的那一个，这一点在处理延迟上表现得非常明显。</p>
 <p>下图就是不同硬件资源的处理延迟对比结果，我们可以看到最小的处理单位是纳秒。你可能对纳秒没什么概念，所以为了方便对比，我把纳秒等比放大到秒。这样，其他硬件资源的处理延迟也会跟着放大。最后一对比我们会发现，网络延迟是以天为单位的！</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c1/a9/c1e4926d3748bdc98a5317fcf4e5b2a9.png?wh=1749%2A711" title="不同硬件资源处理延迟对比" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c1/a9/c1e4926d3748bdc98a5317fcf4e5b2a9.png?wh=1749%2A711" title="不同硬件资源处理延迟对比" /></p>
 <p>因此，要想维持硬件资源之间的平衡，尽可能地降低网络开销是我们在性能调优中必须要做的。今天这一讲，我就按照数据进入系统的时间顺序，也就是数据读取、数据处理和数据传输的顺序，带你去分析和总结数据生命周期的不同阶段有效降低网络开销的方法。</p>
 <h2 id="_1">数据读写</h2>
 <p>对于绝大多数应用来说，第一步操作都是从分布式文件系统读取数据源。Spark支持的数据源种类非常丰富，涉及的存储格式和存储系统可以说是五花八门。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2a/c3/2a1e6190f6e746e97661bf6f09941cc3.jpeg?wh=622%2A825" title="存储格式与存储系统" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2a/c3/2a1e6190f6e746e97661bf6f09941cc3.jpeg?wh=622%2A825" title="存储格式与存储系统" /></p>
 <p>这么多存储格式和外部存储系统交叉在一起又会有无数种组合，并且每一种组合都有它的应用场景。那么，我们该怎么判断网络开销会出现在哪些场景下呢？其实，<strong>不管是什么文件格式，也不管是哪种存储系统，访问数据源是否会引入网络开销，取决于任务与数据的本地性关系，也就是任务的本地性级别</strong>，它一共有4种：</p>
 <ul>
 <li>PROCESS_LOCAL：任务与数据同在一个JVM进程中</li>
@@ -7146,7 +7146,7 @@
 <li>ANY：任务与数据是跨机架、甚至是跨DC（Data Center，数据中心）的关系</li>
 </ul>
 <p>根据定义我们很容易判断出，不同本地性级别下的计算任务是否会引入磁盘或网络开销，结果如下表所示。从表格中我们不难发现，从PROCESS_LOCAL到ANY，数据访问效率是逐级变差的。在读取数据源阶段，数据还未加载到内存，任务没有办法调度到PROCESS_LOCAL级别。因此，这个阶段我们能够调度的最佳级别是NODE_LOCAL。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/15/36/1532cde0f3956d77e44byy7138453736.jpeg?wh=1390%2A680" title="不同本地性级别与磁盘、网络开销的关系" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/15/36/1532cde0f3956d77e44byy7138453736.jpeg?wh=1390%2A680" title="不同本地性级别与磁盘、网络开销的关系" /></p>
 <p>根据NODE_LOCAL的定义，在这个级别下，调度的目标节点至少在磁盘上存有Spark计算任务所需的数据分片。这也就意味着，在集群部署上，Spark集群与外部存储系统在物理上是紧紧耦合在一起的。相反，如果Spark集群与存储集群在物理上是分开的，那么任务的本地性级别只能退化到RACK_LOCAL，甚至是ANY，来通过网络获取所需的数据分片。</p>
 <p><strong>因此，对于Spark加HDFS和Spark加MongoDB来说，是否会引入网络开销完全取决于它们的部署模式。物理上紧耦合，在NODE_LOCAL级别下，Spark用磁盘I/O替代网络开销获取数据；物理上分离，网络开销就无法避免。</strong></p>
 <p>除此之外，物理上的隔离与否同样会影响数据的写入效率。当数据处理完毕，需要将处理结果落盘到外部存储的时候，紧耦合模式下的数据写入会把数据分片落盘到本地节点，避免网络开销。</p>
@@ -7158,7 +7158,7 @@
 <p>说起数据处理中的网络开销，我猜你最先想到的操作就是Shuffle。Shuffle作为大多数计算场景的“性能瓶颈担当”，确实是网络开销的罪魁祸首。根据“能省则省”的开发原则，我们自然要想尽办法去避免Shuffle。在数据关联的场景中，省去Shuffle最好的办法，就是把Shuffle Joins转化为Broadcast Joins。关于这方面的调优技巧，我们在广播变量那几讲有过详细的讲解，你可以翻回去看一看。尽管广播变量的创建过程也会引入网络传输，但是，两害相权取其轻，相比Shuffle的网络开销，广播变量的开销算是小巫见大巫了。</p>
 <p>遵循“能省则省”的原则，把Shuffle消除掉自然是最好的。如果实在没法避免Shuffle，我们要尽可能地在计算中多使用Map端聚合，去减少需要在网络中分发的数据量。这方面的典型做法就是用reduceByKey、aggregateByKey替换groupByKey，不过在RDD API使用频率越来越低的当下，这个调优技巧实际上早就名存实亡了。但是，Map端聚合的思想并不过时。为什么这么说呢？下面，我通过一个小例子来你详细讲一讲。</p>
 <p>在绝大多数2C（To Consumer）的业务场景中，我们都需要刻画用户画像。我们的小例子就是“用户画像”中的一环，：给定用户表，按照用户群组统计兴趣列表，要求兴趣列表内容唯一，也就是不存在重复的兴趣项，用户表的Schema如下表所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/80/83/80ff54fe0683b8e7aeea408539998383.jpeg?wh=1738%2A551" title="用户表Schema示例" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/80/83/80ff54fe0683b8e7aeea408539998383.jpeg?wh=1738%2A551" title="用户表Schema示例" /></p>
 <p>要获取群组兴趣列表，我们应该先按照groupId分组，收集群组内所有用户的兴趣列表，然后再把列表中的兴趣项展平，最后去重得到内容唯一的兴趣列表。应该说思路还是蛮简单的，我们先来看第一版实现代码。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>val filePath: String = _
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>val df = spark.read.parquent(filePath)
@@ -7183,7 +7183,7 @@
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>))
 </code></pre></div>
 <p>另外，与Kryo Serializer有关的配置项，我也把它们汇总到了下面的表格中，方便你随时查找。其中，spark.serializer可以明确指定Spark采用Kryo Serializer序列化器。而spark.kryo.registrationRequired就比较有意思了，如果我们把它设置为True，当Kryo Serializer遇到未曾注册过的自定义类型的时候，它就不会再帮你做序列化的工作，而是抛出异常，并且中断任务执行。这么做的好处在于，在开发和调试阶段，它能帮我们捕捉那些忘记注册的类型。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/82/64/821f4c71a21bf22c30187ca7fc3be064.jpeg?wh=1920%2A549" title="与Kryo Serializer有关的配置项" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/82/64/821f4c71a21bf22c30187ca7fc3be064.jpeg?wh=1920%2A549" title="与Kryo Serializer有关的配置项" /></p>
 <p>为了方便你理解，我们不妨把Java serializer和Kryo Serializer比作是两个不同的搬家公司。</p>
 <p>Java Serializer是老牌企业，市场占有率高，而且因为用户体验很好，所以非常受欢迎。只要你出具家庭住址，Java Serializer会派专人到家里帮你打包，你并不需要告诉他们家里都有哪些物件，他们对不同种类的物品有一套自己的打包标准，可以帮你省去很多麻烦。不过，Java Serializer那套打包标准过于刻板，不仅打包速度慢，封装出来的包裹往往个头超大、占地儿，你必须租用最大号的货车才能把家里所有的物品都装下。</p>
 <p>Kryo Serializer属于市场新贵，在打包速度和包裹尺寸方面都远胜Java Serializer。Kryo Serializer会以最紧凑的方式打包，一寸空间也不浪费，因此，所有包裹用一辆小货车就能装下。但是，订阅Kryo Serializer的托管服务之前，用户需要提供详尽的物品明细表，因此，很多用户都嫌麻烦，Kryo Serializer市场占有率也就一直上不去。</p>
@@ -7337,8 +7337,6 @@ rdd.map(o =&gt; (o.id, o.name)).aggregateByKey(Set[String]())(localDistinct, com
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

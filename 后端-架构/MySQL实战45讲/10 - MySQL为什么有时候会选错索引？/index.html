@@ -14444,11 +14444,11 @@
 </code></pre></div>
 <p>你一定会说，这个语句还用分析吗，很简单呀，a上有索引，肯定是要使用索引a的。</p>
 <p>你说得没错，图1显示的就是使用explain命令看到的这条语句的执行情况。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2c/e3/2cfce769551c6eac9bfbee0563d48fe3.png?wh=1743%2A159" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2c/e3/2cfce769551c6eac9bfbee0563d48fe3.png?wh=1743%2A159" /></p>
 <p>图1 使用explain命令查看语句执行情况</p>
 <p>从图1看上去，这条查询语句的执行也确实符合预期，key这个字段值是’a’，表示优化器选择了索引a。</p>
 <p>不过别急，这个案例不会这么简单。在我们已经准备好的包含了10万行数据的表上，我们再做如下操作。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1e/1e/1e5ba1c2934d3b2c0d96b210a27e1a1e.png?wh=936%2A344" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1e/1e/1e5ba1c2934d3b2c0d96b210a27e1a1e.png?wh=936%2A344" /></p>
 <p>图2 session A和session B的执行流程</p>
 <p>这里，session A的操作你已经很熟悉了，它就是开启了一个事务。随后，session B把数据都删除后，又调用了 idata这个存储过程，插入了10万行数据。</p>
 <p>这时候，session B的查询语句select * from t where a between 10000 and 20000就不会再选择索引a了。我们可以通过慢查询日志（slow log）来查看一下具体的执行情况。</p>
@@ -14464,7 +14464,7 @@
 <li>第三句，Q2是加了force index(a)来和session B原来的查询语句执行情况对比。</li>
 </ul>
 <p>如图3所示是这三条SQL语句执行完成后的慢查询日志。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7c/f6/7c58b9c71853b8bba1a8ad5e926de1f6.png?wh=1221%2A325" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7c/f6/7c58b9c71853b8bba1a8ad5e926de1f6.png?wh=1221%2A325" /></p>
 <p>图3 slow log结果</p>
 <p>可以看到，Q1扫描了10万行，显然是走了全表扫描，执行时间是40毫秒。Q2扫描了10001行，执行了21毫秒。也就是说，我们在没有使用force index的时候，MySQL用错了索引，导致了更长的执行时间。</p>
 <p>这个例子对应的是我们平常不断地删除历史数据和新增数据的场景。这时，MySQL竟然会选错索引，是不是有点奇怪呢？今天，我们就从这个奇怪的结果说起吧。</p>
@@ -14477,7 +14477,7 @@
 <p>MySQL在真正开始执行语句之前，并不能精确地知道满足这个条件的记录有多少条，而只能根据统计信息来估算记录数。</p>
 <p>这个统计信息就是索引的“区分度”。显然，一个索引上不同的值越多，这个索引的区分度就越好。而一个索引上不同的值的个数，我们称之为“基数”（cardinality）。也就是说，这个基数越大，索引的区分度越好。</p>
 <p>我们可以使用show index方法，看到一个索引的基数。如图4所示，就是表t的show index 的结果 。虽然这个表的每一行的三个字段值都是一样的，但是在统计信息中，这三个索引的基数值并不同，而且其实都不准确。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/16/d4/16dbf8124ad529fec0066950446079d4.png?wh=1850%2A209" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/16/d4/16dbf8124ad529fec0066950446079d4.png?wh=1850%2A209" /></p>
 <p>图4 表t的show index 结果</p>
 <p>那么，<strong>MySQL是怎样得到索引的基数的呢？</strong>这里，我给你简单介绍一下MySQL采样统计的方法。</p>
 <p>为什么要采样统计呢？因为把整张表取出来一行行统计，虽然可以得到精确的结果，但是代价太高了，所以只能选择“采样统计”。</p>
@@ -14493,7 +14493,7 @@
 <p>你可以从图4中看到，这次的索引统计值（cardinality列）虽然不够精确，但大体上还是差不多的，选错索引一定还有别的原因。</p>
 <p>其实索引统计只是一个输入，对于一个具体的语句来说，优化器还要判断，执行这个语句本身要扫描多少行。</p>
 <p>接下来，我们再一起看看优化器预估的，这两个语句的扫描行数是多少。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e2/89/e2bc5f120858391d4accff05573e1289.png?wh=1606%2A382" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e2/89/e2bc5f120858391d4accff05573e1289.png?wh=1606%2A382" /></p>
 <p>图5 意外的explain结果</p>
 <p>rows这个字段表示的是预计扫描行数。</p>
 <p>其中，Q1的结果还是符合预期的，rows的值是104620；但是Q2的rows值是37116，偏差就大了。而图1中我们用explain命令看到的rows是只有10001行，是这个偏差误导了优化器的判断。</p>
@@ -14504,7 +14504,7 @@
 <p>使用普通索引需要把回表的代价算进去，在图1执行explain的时候，也考虑了这个策略的代价 ，但图1的选择是对的。也就是说，这个策略并没有问题。</p>
 <p>所以冤有头债有主，MySQL选错索引，这件事儿还得归咎到没能准确地判断出扫描行数。至于为什么会得到错误的扫描行数，这个原因就作为课后问题，留给你去分析了。</p>
 <p>既然是统计信息不对，那就修正。analyze table t 命令，可以用来重新统计索引信息。我们来看一下执行效果。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/20/9c/209e9d3514688a3bcabbb75e54e1e49c.png?wh=1736%2A397" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/20/9c/209e9d3514688a3bcabbb75e54e1e49c.png?wh=1736%2A397" /></p>
 <p>图6 执行analyze table t 命令恢复的explain结果</p>
 <p>这回对了。</p>
 <p>所以在实践中，如果你发现explain的结果预估的rows值跟实际情况差距比较大，可以采用这个方法来处理。</p>
@@ -14515,7 +14515,7 @@
 <p>从条件上看，这个查询没有符合条件的记录，因此会返回空集合。</p>
 <p>在开始执行这条语句之前，你可以先设想一下，如果你来选择索引，会选择哪一个呢？</p>
 <p>为了便于分析，我们先来看一下a、b这两个索引的结构图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1d/b9/1d037f92063e800c3bfff3f4dbf1a2b9.png?wh=1142%2A856" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1d/b9/1d037f92063e800c3bfff3f4dbf1a2b9.png?wh=1142%2A856" /></p>
 <p>图7 a、b索引的结构图</p>
 <p>如果使用索引a进行查询，那么就是扫描索引a的前1000个值，然后取到对应的id，再到主键索引上去查出每一行，然后根据字段b来过滤。显然这样需要扫描1000行。</p>
 <p>如果使用索引b进行查询，那么就是扫描索引b的最后50001个值，与上面的执行过程相同，也是需要回到主键索引上取值再判断，所以需要扫描50001行。</p>
@@ -14523,7 +14523,7 @@
 <p>图8是执行explain的结果。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>mysql&gt; explain select * from t where (a between 1 and 1000) and (b between 50000 and 100000) order by b limit 1;
 </code></pre></div>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/48/b8/483bcb1ef3bb902844e80d9cbdd73ab8.png?wh=1891%2A163" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/48/b8/483bcb1ef3bb902844e80d9cbdd73ab8.png?wh=1891%2A163" /></p>
 <p>图8 使用explain方法查看执行计划 2</p>
 <p>可以看到，返回结果中key字段显示，这次优化器选择了索引b，而rows字段显示需要扫描的行数是50198。</p>
 <p>从这个结果中，你可以得到两个结论：</p>
@@ -14535,7 +14535,7 @@
 <p>其实大多数时候优化器都能找到正确的索引，但偶尔你还是会碰到我们上面举例的这两种情况：原本可以执行得很快的SQL语句，执行速度却比你预期的慢很多，你应该怎么办呢？</p>
 <p><strong>一种方法是，像我们第一个例子一样，采用force index强行选择一个索引。</strong>MySQL会根据词法解析的结果分析出可能可以使用的索引作为候选项，然后在候选列表中依次判断每个索引需要扫描多少行。如果force index指定的索引在候选索引列表中，就直接选择这个索引，不再评估其他索引的执行代价。</p>
 <p>我们来看看第二个例子。刚开始分析时，我们认为选择索引a会更好。现在，我们就来看看执行效果：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/95/54/9582401a6bed6cb8fd803c9555750b54.png?wh=1235%2A115" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/95/54/9582401a6bed6cb8fd803c9555750b54.png?wh=1235%2A115" /></p>
 <p>图9 使用不同索引的语句执行耗时</p>
 <p>可以看到，原本语句需要执行2.23秒，而当你使用force index(a)的时候，只用了0.05秒，比优化器的选择快了40多倍。</p>
 <p>也就是说，优化器没有选择正确的索引，force index起到了“矫正”的作用。</p>
@@ -14544,7 +14544,7 @@
 <p>所以，数据库的问题最好还是在数据库内部来解决。那么，在数据库里面该怎样解决呢？</p>
 <p>既然优化器放弃了使用索引a，说明a还不够合适，所以<strong>第二种方法就是，我们可以考虑修改语句，引导MySQL使用我们期望的索引。</strong>比如，在这个例子里，显然把“order by b limit 1” 改成 “order by b,a limit 1” ，语义的逻辑是相同的。</p>
 <p>我们来看看改之后的效果：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/14/94/14cd598e52a2b72dd334a42603e5b894.png?wh=1623%2A146" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/14/94/14cd598e52a2b72dd334a42603e5b894.png?wh=1623%2A146" /></p>
 <p>图10 order by b,a limit 1 执行结果</p>
 <p>之前优化器选择使用索引b，是因为它认为使用索引b可以避免排序（b本身是索引，已经是有序的了，如果选择索引b的话，不需要再做排序，只需要遍历），所以即使扫描行数多，也判定为代价更小。</p>
 <p>现在order by b,a 这种写法，要求按照b,a排序，就意味着使用这两个索引都需要排序。因此，扫描行数成了影响决策的主要条件，于是此时优化器选了只需要扫描1000行的索引a。</p>
@@ -14552,7 +14552,7 @@
 <p>如果你觉得修改语义这件事儿不太好，这里还有一种改法，图11是执行效果。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>mysql&gt; select * from  (select * from t where (a between 1 and 1000)  and (b between 50000 and 100000) order by b limit 100)alias limit 1;
 </code></pre></div>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b1/d7/b1a2ad43c78477d7f93dbc692cbaa0d7.png?wh=1824%2A165" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b1/d7/b1a2ad43c78477d7f93dbc692cbaa0d7.png?wh=1824%2A165" /></p>
 <p>图11 改写SQL的explain</p>
 <p>在这个例子里，我们用limit 100让优化器意识到，使用b索引代价是很高的。其实是我们根据数据特征诱导了一下优化器，也不具备通用性。</p>
 <p><strong>第三种方法是，在有些场景下，我们可以新建一个更合适的索引，来提供给优化器做选择，或删掉误用的索引。</strong></p>
@@ -14782,8 +14782,6 @@ and subtype=&#39;xx&#39; and type=&#39;xx&#39; and company_id =x order by create
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

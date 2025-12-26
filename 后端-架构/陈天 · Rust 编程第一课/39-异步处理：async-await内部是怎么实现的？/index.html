@@ -15319,7 +15319,7 @@
 </code></pre></div>
 <p>可以生成一个 AwaitingWriteData 数据结构，把 file 和 fut 都放进去，然后在 WriteHelloFile 中引用它。此时，在同一个数据结构内部，fut 指向了对 file 的引用，这样的数据结构，叫<strong>自引用结构（Self-Referential Structure）</strong>。</p>
 <p>自引用结构有一个很大的问题是：一旦它被移动，原本的指针就会指向旧的地址。
-<img alt="" src="https://static001.geekbang.org/resource/image/d9/25/d98a5812510307d1274e066d4b663c25.jpg?wh=2067x1164" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d9/25/d98a5812510307d1274e066d4b663c25.jpg?wh=2067x1164" /></p>
 <p>所以需要有某种机制来保证这种情况不会发生。Pin 就是为这个目的而设计的一个数据结构，我们可以 Pin 住指向一个 Future 的指针，看文稿中 Pin 的声明：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="k">pub</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">Pin</span><span class="o">&lt;</span><span class="n">P</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">pointer</span><span class="p">:</span><span class="w"> </span><span class="nc">P</span><span class="p">,</span>
@@ -15339,7 +15339,7 @@
 <a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a><span class="p">}</span>
 </code></pre></div>
 <p>Pin 拿住的是<strong>一个可以解引用成 T 的指针类型 P</strong>，而不是直接拿原本的类型 T。所以，对于 Pin 而言，你看到的都是 Pin&lt;Box&lt;T&gt;&gt;、Pin&lt;&amp;mut T&gt;，但不会是 Pin&lt;T&gt;。因为 Pin 的目的是，把 T 的内存位置锁住，从而避免移动后自引用类型带来的引用失效问题。
-<img alt="" src="https://static001.geekbang.org/resource/image/f2/72/f2ac4b8ebaa25718191f747edca71072.jpg?wh=2067x1164" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f2/72/f2ac4b8ebaa25718191f747edca71072.jpg?wh=2067x1164" /></p>
 <p>这样数据结构可以正常访问，但是你<strong>无法直接</strong>拿到原来的数据结构进而移动它。</p>
 <h3 id="_1">自引用数据结构</h3>
 <p>当然，自引用数据结构并非只在异步代码里出现，只不过异步代码在内部生成用状态机表述的 Future 时，很容易产生自引用结构。我们看一个和 Future 无关的例子（<a href="https://play.rust-lang.org/?version=stable&amp;mode=debug&amp;edition=2021&amp;gist=84d31bad09e9cf0824e07b64fa7930fb">代码</a>）：</p>
@@ -15420,9 +15420,9 @@
 <a id="__codelineno-14-75" name="__codelineno-14-75" href="#__codelineno-14-75"></a><span class="p">}</span>
 </code></pre></div>
 <p>我们创建了一个自引用结构 SelfReference，它里面的 name_ref 指向了 name。正常使用它时，没有任何问题，但一旦对这个结构做 move 操作，name_ref 指向的位置还会是 move 前 name 的地址，这就引发了问题。看下图：
-<img alt="" src="https://static001.geekbang.org/resource/image/31/07/31002299965d19c7bb014050987f4907.jpg?wh=2067x1164" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/31/07/31002299965d19c7bb014050987f4907.jpg?wh=2067x1164" /></p>
 <p>同样的，如果我们使用 std::mem:swap，也会出现类似的问题，一旦 swap，两个数据的内容交换，然而，由于 name_ref 指向的地址还是旧的，所以整个指针体系都混乱了：
-<img alt="" src="https://static001.geekbang.org/resource/image/42/17/420d3e07c76f9948135857f1d1898d17.jpg?wh=2118x2026" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/42/17/420d3e07c76f9948135857f1d1898d17.jpg?wh=2118x2026" /></p>
 <p>看代码的输出，辅助你理解：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="k">struct</span><span class="w"> </span><span class="mh">0x7ffeea91d6e8</span><span class="p">:</span><span class="w"> </span><span class="p">(</span><span class="n">name</span><span class="p">:</span><span class="w"> </span><span class="mh">0x7ffeea91d6e8</span><span class="w"> </span><span class="n">name_ptr</span><span class="p">:</span><span class="w"> </span><span class="mh">0x7ffeea91d6e8</span><span class="p">),</span><span class="w"> </span><span class="n">name</span><span class="p">:</span><span class="w"> </span><span class="nc">Tyr</span><span class="p">,</span><span class="w"> </span><span class="n">name_ref</span><span class="p">:</span><span class="w"> </span><span class="nc">Tyr</span>
 <a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="k">struct</span><span class="w"> </span><span class="mh">0x7ffeea91d760</span><span class="p">:</span><span class="w"> </span><span class="p">(</span><span class="n">name</span><span class="p">:</span><span class="w"> </span><span class="mh">0x7ffeea91d760</span><span class="w"> </span><span class="n">name_ptr</span><span class="p">:</span><span class="w"> </span><span class="mh">0x7ffeea91d6e8</span><span class="p">),</span><span class="w"> </span><span class="n">name</span><span class="p">:</span><span class="w"> </span><span class="nc">Tyr</span><span class="p">,</span><span class="w"> </span><span class="n">name_ref</span><span class="p">:</span><span class="w"> </span><span class="nc">Tyr</span>
@@ -15517,7 +15517,7 @@
 <a id="__codelineno-17-69" name="__codelineno-17-69" href="#__codelineno-17-69"></a><span class="p">}</span>
 </code></pre></div>
 <p>由于数据结构被包裹在 Pin 内部，所以在函数间传递时，变化的只是指向 data 的 Pin：
-<img alt="" src="https://static001.geekbang.org/resource/image/d8/80/d8b774c6c4970abc8dbce29cbb2fde80.jpg?wh=2067x1164" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d8/80/d8b774c6c4970abc8dbce29cbb2fde80.jpg?wh=2067x1164" /></p>
 <p>学习了Pin，不知道你有没有想起 Unpin 。</p>
 <h3 id="unpin">那么，Unpin 是做什么的？</h3>
 <p>我们在介绍<a href="https://time.geekbang.org/column/article/421324">主要的系统 trait</a> 时，曾经提及 Unpin 这个 marker trait：</p>
@@ -15635,7 +15635,7 @@
 <h2 id="_2">小结</h2>
 <p>这一讲我们深入地探讨了 Future 接口各个部分Context、Pin/Unpin的含义，以及 async/await 这样漂亮的接口之下会产生什么样子的代码。</p>
 <p>对照下面这张图，我们回顾一下过去两讲的内容：
-<img alt="" src="https://static001.geekbang.org/resource/image/e3/4c/e3934324381bc8f90c061bbca629234c.jpg?wh=3022x1724" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e3/4c/e3934324381bc8f90c061bbca629234c.jpg?wh=3022x1724" /></p>
 <p>并发任务运行在 Future 这样的协程上时，async/await是产生和运行并发任务的手段，async 定义一个可以并发执行的Future任务，await 触发这个任务并发执行。具体来说：</p>
 <p>当我们使用 async 关键字时，它会产生一个 impl Future 的结果。对于一个 async block 或者 async fn 来说，内部的每个 await 都会被编译器捕捉，并成为返回的 Future 的 poll() 方法的内部状态机的一个状态。</p>
 <p>Rust 的 Future 需要异步运行时来运行 Future，以 tokio 为例，它的 executor 会从 run queue 中取出 Future 进行 poll()，当 poll() 返回 Pending 时，这个 Future 会被挂起，直到 reactor 得到了某个事件，唤醒这个 Future，将其添加回 run queue 等待下次执行。</p>
@@ -15766,8 +15766,6 @@ write_hello_file_async(&quot;&#47;tmp&#47;hello&quot;).await?;在调用处是如
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

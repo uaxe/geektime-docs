@@ -14230,21 +14230,21 @@
 <h3 id="2">2. 关系型和统计型数据缓存刷新</h3>
 <p>关系型或统计型缓存刷新有很多种方法，这里我给你讲一些最常用的。</p>
 <p>首先是<strong>人工维护缓存方式</strong>。我们知道，关系型数据或统计结果缓存刷新存在一定难度，核心在于这些统计是由多条数据计算而成的。当我们对这类数据更新缓存时，很难识别出需要刷新哪些<strong>关联</strong>缓存。对此，我们需要人工在一个地方记录或者定义特殊刷新逻辑来实现相关缓存的更新。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0a/cc/0a1ea9f053fa3c3cb8byy041d2070ecc.jpg?wh=1920x1234" title="人工维护缓存" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0a/cc/0a1ea9f053fa3c3cb8byy041d2070ecc.jpg?wh=1920x1234" title="人工维护缓存" /></p>
 <p>不过这种方式比较精细，<strong>如果刷新缓存很多，那么缓存更新会比较慢，并且存在延迟</strong>。而且人工书写还需要考虑如何查找到新增数据关联的所有ID，因为新增数据没有登记在ID内，人工编码维护会很麻烦。</p>
 <p>除了人工维护缓存外，还有一种方式就是通过<strong>订阅数据库来找到ID数据变化。</strong>如下图，我们可以使用Maxwell或Canal，对MySQL的更新进行监控。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/48/7f/4833ec768edc882d4f081338e00aee7f.jpg?wh=1920x775" title="通过记录ID关系刷新缓存" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/48/7f/4833ec768edc882d4f081338e00aee7f.jpg?wh=1920x775" title="通过记录ID关系刷新缓存" /></p>
 <p>这样变更信息会推送到Kafka内，我们可以根据对应的表和具体的SQL确认更新涉及的数据ID，然后根据脚本内设定好的逻辑对相 关key进行更新。例如用户更新了昵称，那么缓存更新服务就能知道需要更新user_info_9527这个缓存，同时根据配置找到并且删除其他所有相关的缓存。</p>
 <p>很显然，这种方式的好处是能及时更新简单的缓存，同时核心系统会给子系统广播同步数据更改，代码也不复杂；缺点是复杂的关联关系刷新，仍旧需要通过人工写逻辑来实现。</p>
 <p>如果我们表内的数据更新很少，那么可以采用<strong>版本号缓存设计</strong>。</p>
 <p>这个方式比较狂放：一旦有任何更新，整个表内所有数据缓存一起过期。比如对user_info表设置一个key，假设是user_info_version，当我们更新这个表数据时，直接对 user_info_version 进行incr +1。而在写入缓存时，同时会在缓存数据中记录user_info_version的当前值。</p>
 <p>当业务要读取user_info某个用户的信息的时候，业务会同时获取当前表的version。如果发现缓存数据内的版本和当前表的版本不一致，那么就会更新这条数据。但如果version更新很频繁，就会严重降低缓存命中率，所以这种方案适合更新很少的表。</p>
 <p>当然，我们还可以对这个表做一个范围拆分，比如按ID范围分块拆分出多个version，通过这样的方式来减少缓存刷新的范围和频率。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b9/11/b97a93c01cc98e68a01d73b920115311.jpg?wh=1920x1234" title="版本号方式刷新缓存" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b9/11/b97a93c01cc98e68a01d73b920115311.jpg?wh=1920x1234" title="版本号方式刷新缓存" /></p>
 <p>此外，关联型数据更新还可以通过识别<strong>主要实体ID</strong>来刷新缓存。这要保证其他缓存保存的key也是主要实体ID，这样当某一条关联数据发生变化时，就可以根据主要实体ID对所有缓存进行刷新。这个方式的缺点是，我们的缓存要能够根据修改的数据反向找到它关联的主体ID才行。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3d/c1/3dfccf998db897ea07705621a06323c1.jpg?wh=1920x854" title="通过主要实体ID刷新缓存" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3d/c1/3dfccf998db897ea07705621a06323c1.jpg?wh=1920x854" title="通过主要实体ID刷新缓存" /></p>
 <p>最后，我再给你介绍一种方式：<strong>异步脚本遍历数据库刷新所有相关缓存</strong>。这个方式适用于两个系统之间同步数据，能够减少系统间的接口交互；缺点是删除数据后，还需要人工删除对应的缓存，所以更新会有延迟。但如果能配合订阅更新消息广播的话，可以做到准同步。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/2c/c8/2cd645766ac43cf90aa5ddd5258898c8.jpg?wh=1920x811" title="遍历数据库刷新缓存" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2c/c8/2cd645766ac43cf90aa5ddd5258898c8.jpg?wh=1920x811" title="遍历数据库刷新缓存" /></p>
 <h2 id="_4">长期热数据缓存</h2>
 <p>到这里，我们再回过头看看之前的临时缓存伪代码，它虽然能解决大部分问题，但是请你想一想，当TTL到期时，<strong>如果大量缓存请求没有命中，透传的流量会不会打沉我们的数据库？</strong>这其实就是行业里常提到的缓存穿透问题，如果缓存出现大规模并发穿透，那么很有可能导致我们服务宕机。</p>
 <p>所以，数据库要是扛不住平时的流量，我们就不能使用<strong>临时缓存</strong>的方式去设计缓存系统，只能用<strong>长期缓存</strong>这种方式来实现<strong>热点缓存</strong>，以此避免缓存穿透打沉数据库的问题。不过，要想实现长期缓存，就需要我们人工做更多的事情来保持缓存和数据表数据的一致性。</p>
@@ -14323,7 +14323,7 @@
 <p>通过这节课，我希望你能明白：不是所有的数据放在缓存就能有很好的收益，我们要从<strong>数据量</strong>、<strong>使用频率</strong>、<strong>缓存命中率</strong>三个角度去分析。读多写少的数据做缓存虽然能降低数据层的压力，但要根据一致性需求对其缓存的数据做更新。其中，单条实体数据最容易实现缓存更新，但是有条件查询的统计结果并不容易做到实时更新。</p>
 <p>除此之外，如果数据库承受不了透传流量压力，我们需要将一些热点数据做成<strong>长期缓存</strong>，来防止大量请求穿透缓存，这样会影响我们的服务稳定。同时通过singleflight方式预防临时缓存被大量请求穿透，以防热点数据在从临时缓存切换成热点之前，击穿缓存，导致数据库崩溃。</p>
 <p>读多写少的缓存技巧我还画了一张导图，如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1f/cc/1f6bfb4a04342fbedc254a817e577dcc.jpg?wh=3330x2141" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1f/cc/1f6bfb4a04342fbedc254a817e577dcc.jpg?wh=3330x2141" /></p>
 <h2 id="_6">思考题</h2>
 <p>1.使用Bloom Filter识别热点key时，有时会识别失误，进而导致数据没有找到，那么如何避免这种情况呢？</p>
 <p>2.使用Bloom Filter只能添加新key，不能删除某一个key，如果想更好地更新维护，有什么其他方式吗？</p>
@@ -14479,8 +14479,6 @@ return nil, err
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

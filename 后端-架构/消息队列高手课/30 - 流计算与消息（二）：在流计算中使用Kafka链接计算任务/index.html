@@ -14552,7 +14552,7 @@
 <p>有了CheckPoint，当计算任务失败重启的时候，可以从最近的一个CheckPoint恢复计算任务。具体的做法是，每个子任务先从CheckPoint中读取并恢复自己的状态，然后整个计算任务从CheckPoint中记录的数据源位置开始消费数据，只要这个恢复位置和CheckPoint中每个子任务的状态是完全对应的，或者说，每个子任务的状态恰好是：“刚刚处理完恢复位置之前的那条数据，还没有开始处理恢复位置对应的这条数据”，这个时刻保存的状态，就可以做到严丝合缝地恢复计算任务，每一条数据既不会丢失也不会重复。</p>
 <p>因为每个子任务分布在不同的节点上，并且数据是一直在子任务中流动的，所以确保CheckPoint中记录的恢复位置和每个子任务的状态完全对应并不是一件容易的事儿，Flink是怎么实现的呢？</p>
 <p>Flink通过在数据流中插入一个Barrier（屏障）来确保CheckPoint中的位置和状态完全对应。下面这张图来自<a href="https://ci.apache.org/projects/flink/flink-docs-stable/internals/stream_checkpointing.html">Flink官网的说明文档</a>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0c/fa/0c301d798341dc53515611c31e9031fa.png?wh=902%2A336" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0c/fa/0c301d798341dc53515611c31e9031fa.png?wh=902%2A336" /></p>
 <p>你可以把Barrier理解为一条特殊的数据。Barrier由Flink生成，并在数据进入计算集群时被插入到数据流中。这样，无限的数据流就被很多的Barrier分隔成很多段。Barrier在流经每个计算节点的时候，就会触发这个节点在CheckPoint中保存本节点的状态，如果这个节点是数据源节点，还会保存数据源的位置。</p>
 <p>当一个Barrier流过所有计算节点，流出计算集群后，一个CheckPoint也就保存完成了。由于每个节点都是在Barrier流过的时候保存的状态，这时的状态恰好就是Barrier所在位置（也就是CheckPoint数据源位置）对应的状态，这样就完美解决了状态与恢复位置对应的问题。</p>
 <p>Flink通过CheckPoint机制实现了集群内计算任务的Exactly Once语义，但是仍然实现不了在输入和输出两端数据不丢不重。比如，Flink在把一条计算结果发给Kafka并收到来自Kafka的“发送成功”响应之后，才会继续处理下一条数据。如果这个时候重启计算任务，Flink集群内的数据都可以完美地恢复到上一个CheckPoint，但是已经发给Kafka的消息却没办法撤回，还是会出现数据重复的问题。</p>
@@ -14567,7 +14567,7 @@
 <p>下面进入实战环节，我们来把上节课的“统计Web请求的次数”的Flink Job改造一下，让这个Job具备Exactly Once特性。这个实时统计任务接收NGINX的access.log，每5秒钟按照IP地址统计Web请求的次数。假设我们已经有一个实时发送access.log的日志服务来发送日志，日志的内容只包含访问时间和IP地址，这个日志服务就是我们流计算任务的数据源。</p>
 <p>改造之后，我们需要把数据的来源替换成Kafka的ip_count_source主题，计算结果也要保存到Kafka的主题ip_count_sink中。</p>
 <p>整个系统的数据流向就变成下图这样：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b6/6d/b62a67148c0600a1814f763a70b2056d.jpg?wh=4266%2A457" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b6/6d/b62a67148c0600a1814f763a70b2056d.jpg?wh=4266%2A457" /></p>
 <p>日志服务将日志数据发送到Kafka的主题ip_count_source，计算任务消费这个主题的数据作为数据源，计算结果会被写入到Kafka的主题ip_count_sink中。</p>
 <p>Flink提供了Kafka Connector模块，可以作为数据源从Kafka中消费数据，也可以作为Kafka的Producer，将计算结果发送给Kafka，并且，这个Kafka Connector已经实现了Exactly Once语义，我们在使用的时候只要做适当的配置就可以了。</p>
 <p>这次我们用Java语言来实现这个任务，改造后的计算任务代码如下：</p>
@@ -14769,8 +14769,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

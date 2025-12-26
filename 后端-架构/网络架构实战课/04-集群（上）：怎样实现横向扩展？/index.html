@@ -13601,7 +13601,7 @@
 <p>你好，我是谢友鹏。</p>
 <p>你是否经历过这样的情景？系统最初只用几台服务器就能轻松应对业务需求，运行稳定、毫无压力。但某天，随着业务量飙升，服务器频繁告警，用户投诉增多，甚至网站直接宕机。</p>
 <p>面对这种情况，我们有两种解决方案：一种是纵向扩展（Scale Up），即通过增加服务器的性能来提升处理能力；另一种则是横向扩展（Scale Out），也就是通过增加服务器的数量来分担负载。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/32/24/326d44a408d89f8fa670ed1f3ba4fd24.jpg?wh=5157x2936" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/32/24/326d44a408d89f8fa670ed1f3ba4fd24.jpg?wh=5157x2936" /></p>
 <p>接下来的两节课，我们将通过深入探讨横向扩展的策略，分析网络路径上各个转发设备的横向扩展方法。通过这些方案，我们将一步步构建出弹性和抗压性更好的集群系统，让你的架构能够应对更高的流量和更复杂的业务场景。</p>
 <h2 id="_1">横向扩展架构要思考的几个问题</h2>
 <p>所谓横向扩展就是将多个具有相同功能的机器组建成一个集群，整体对外提供服务，如果集群性能不够了，可以通过增加机器解决。关于横向扩展，我们有两个问题需要想清楚。</p>
@@ -13612,7 +13612,7 @@
 <h2 id="_2">整体网络架构的横向扩展</h2>
 <p>为了解决以上疑问，我们需要先了解整体网络架构的横向扩展过程，理清网络请求各个环节的横向扩展点。</p>
 <p>如图所示，从客户端发出的请求经过LB到达服务器的过程中，至少有三个关键节点可以进行横向扩展。<strong>首先，客户端可以在多个LB集群之间进行轮询。其次，可以组建LB集群来提升分发能力。最后，可以扩展服务器集群以应对更大流量。</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e3/c4/e3b78da8105fd78f10c5cbaf90a74ec4.jpg?wh=1264x1050" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e3/c4/e3b78da8105fd78f10c5cbaf90a74ec4.jpg?wh=1264x1050" /></p>
 <p>其中，<strong>客户端到LB集群的横向扩展能力可以通过一个域名绑定多个IP来实现</strong>。比如，我们现在解析一下淘宝的域名：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>$ dig taobao.com
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
@@ -13650,7 +13650,7 @@
 <p><strong>LB选择</strong></p>
 <p>我们先选择一种LB来展开接下来的环节。LB可以选择硬件负载均衡，如F5 BIG-IP系列、A10 Thunder系列等，也可以选择软件负载均衡如Nginx、Envoy、Pingora，四层负载均衡甚至直接可以用Linux自带的LVS。</p>
 <p><a href="https://help.aliyun.com/zh/slb/classic-load-balancer/product-overview/architecture">阿里云官网</a>给出了一张LB的架构图，可以看出四层负载均衡是基于lvs实现的，七层负载均衡是基于Tengine（阿里基于Nginx开源的加强版Nginx项目）。我们干脆也用这个架构来实验，不过我们拆分一下，今天这节课专注使用LB横向扩展server，四、七层LB都用Nginx实现。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b7/d5/b7d197d1702d7afc328e0a3ee83462d5.jpg?wh=5000x2801" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b7/d5/b7d197d1702d7afc328e0a3ee83462d5.jpg?wh=5000x2801" /></p>
 <p>(图片来自<a href="https://help.aliyun.com/zh/slb/classic-load-balancer/product-overview/architecture">阿里云官网</a>）</p>
 <p>LB选定后，我们回答前面提出的第一个问题“怎样将请求按照预期算法调度到各个机器上?”</p>
 <p>LB是通过<strong>负载均衡算法</strong>来实现这个功能的。</p>
@@ -13667,12 +13667,12 @@
 <p>LB会通过<strong>健康检查</strong>来解决这个问题。健康检查即LB按照某种规则对下游系统做探测，如果发现下游某个server不可用，能自动摘除到这个server的流量。如果故障server恢复了，LB能自动添加回这个server的流量。按照触发时机，健康检查分为<strong>主动健康检查</strong>和<strong>被动健康检查</strong>。</p>
 <p>主动健康检查就是请求还没来就主动探测，等请求来的时候已经检查好了，请求就不会到达故障机器上了。主动健康检查一般为定时触发。被动健康检查就是把请求当作检查，如果请求失败了，做个记录，规定时间内达到一定失败次数就认定机器故障，然后摘流。显然这种方式请求会走到故障机器上，导致失败，不过我们可以结合重试来兜底。</p>
 <p>我把他们的特点和优劣总结在下面的表格里供你参考。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/de/12/defe6b00597116cbd680f2f7941afe12.jpg?wh=8000x2685" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/de/12/defe6b00597116cbd680f2f7941afe12.jpg?wh=8000x2685" /></p>
 <p>Nginx的开源版本只支持被动健康检查，我们接下来实验使用这种方式，你可以先打开<a href="https://docs.nginx.com/nginx/admin-guide/load-balancer/http-health-check/">手册</a>了解一下。如果想用主动健康检查也可以使用GitHub上的第三方模块或使用 <a href="https://nginx-extras.getpagespeed.com/tengine/">Tengine</a>。另外，我们今天实验还用到了Nginx的重试，如果你想了解更多，可以通过<a href="https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_next_upstream">手册</a>了解一下。</p>
 <h2 id="server_1">server横向扩展实战</h2>
 <p>现在我们已经了解了横向扩展的基本原理，让我们开始动手实践吧。</p>
 <h3 id="_3">实验设计</h3>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ed/ca/ed7a2426f7de78251d84b67f35726dca.jpg?wh=1859x1133" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ed/ca/ed7a2426f7de78251d84b67f35726dca.jpg?wh=1859x1133" /></p>
 <p>为了简化部署环境，今天的实验全部在一台机器完成。我们将会使用不同端口模拟不同服务：使用8080端口作为http LB的监听端口，8081、8082、8083端口作为其后端的可横向扩展的http集群。使用7080端口作为tcp LB的监听端口，7081、7082、7083端口作为其后端的可横向扩展的tcp集群。</p>
 <p>LB的负载均衡算法使用默认的轮询算法，健康检查使用被动健康检查，然后结合重试，为检查失败的请求兜底。</p>
 <h3 id="_4">开始实验</h3>
@@ -13876,7 +13876,7 @@
 <p>今天实验就到这里，tcp的健康检查实验就留给你课后自己尝试了。</p>
 <h2 id="_5">小结</h2>
 <p>今天的内容就是这些，我给你准备了一个思维导图回顾要点。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8c/71/8c88ee6481dbd8fdyy3773516bedaa71.jpg?wh=2022x1138" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8c/71/8c88ee6481dbd8fdyy3773516bedaa71.jpg?wh=2022x1138" /></p>
 <p>为了应对业务增长和流量增加，我们学习了横向扩展的架构。首先，我们分析了在整体网络架构中实现横向扩展的关键点，包括客户端通过DNS实现横向扩展、通过负载均衡器（LB）实现服务器的横向扩展，以及LB本身如何实现横向扩展。</p>
 <p>接着，我们掌握了通过LB横向扩展服务器的核心要点，重点讲是负载均衡算法和健康检查。最后，我们结合实验展示了如何使用Nginx作为负载均衡器，实现了四层和七层的服务器横向扩展，确保请求的有效分发和故障恢复。</p>
 <p>今天我们学习了如何使用LB搭建可横向扩展的服务器集群。下节课我们将探讨LB本身的横向扩展架构，欢迎继续学习。</p>
@@ -14003,8 +14003,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

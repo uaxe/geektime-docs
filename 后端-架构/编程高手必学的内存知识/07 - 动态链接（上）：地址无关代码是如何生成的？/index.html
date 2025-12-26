@@ -14318,18 +14318,18 @@
 <p>首先，我们思考一下，动态库文件被加载到内存中并且被多个进程共享时，它的内存是什么样子的。</p>
 <p>在<a href="https://time.geekbang.org/column/article/431904">第3节课</a>我们已经看到了，可执行文件或者动态库文件被加载进内存的时候，文件中不同的section会被加载进内存中不同segment，比如.data和.bss段被加载进数据段(data segment)，而.code, .rodata被加载进代码段(code segment)。</p>
 <p>在多进程共享动态库的时候，因为代码段是不可写的，所以进程间共享不存在问题，而数据段可写，系统必须保证一个进程写了共享库的数据段，另外一个进程看不到。这时的内存映射情况如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f3/b4/f372ba2fdae24f462c45fc4bfd8a3db4.jpg?wh=2284x1385" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f3/b4/f372ba2fdae24f462c45fc4bfd8a3db4.jpg?wh=2284x1385" /></p>
 <p>上面这幅图与<a href="https://time.geekbang.org/column/article/430073">第1节课</a>中的页面映射的图几乎如出一辙。正是虚拟地址技术让我们在进程间共享动态库变得容易，我们只需要在虚拟空间里设置一下到物理地址的映射即可完成共享。</p>
 <p>虽然libc.so在物理内存中只有一份，但它可以被多个进程进行映射。<strong>而且进程1映射libc.so代码段的虚拟地址与进程2映射libc.so代码段的虚拟地址可以不相等</strong>。正如本节课开头所分析的，这样做可以使得多个进程共享一份代码，大大节约了内存。</p>
 <p>到目前为止，动态库技术看上去都非常好。但不知道你有没有发现一个问题？如果共享的动态库超过了两个，并且这些动态库之间还有相互引用的时候，情况就变得复杂了。我们还是用图来说明：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ba/63/baa40c177b411856f1c2e1918bc2ef63.jpg?wh=2284x1261" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ba/63/baa40c177b411856f1c2e1918bc2ef63.jpg?wh=2284x1261" /></p>
 <p>如上图所示，如果两个进程共享了libc.so和libd.so两个动态库，而且libc中会调用libd中定义的foo方法。</p>
 <p>进程1将foo方法映射到自己的虚拟地址0x1000处，而调用foo方法的指令被映射到0x2000处，那么call指令如果采用依赖rip寄存器的相对寻址的办法，这个偏移量应该填-0x1000。进程2将foo方法映射到自己虚拟地址0x2000处，调用foo方法的指令被映射到0x5000处，那么call指令的参数就应该填-0x3000。这就产生了冲突。</p>
 <p>显然，我们第6节课所讲的通过rip寄存器进行相对寻址的办法在这里行不通了，相对寻址要求目标地址和本条指令的地址之间的相对值是固定的，这种代码就是地址有关的代码。当目标地址和调用者的地址之间的相对值不固定时，就需要地址无关代码技术了。</p>
 <h2 id="_5">地址无关代码的核心结构</h2>
 <p>在计算机科学领域，有一句名言：“计算机领域的所有问题都可以使用新加一层抽象来解决”。这句话的应用在计算机领域随处可见。同样地，要实现代码段的地址无关代码，思路也是通过添加一个中间层，使得对全局符号的访问由直接访问变成间接访问。</p>
 <p>我们可以引入一个固定地址，让引用者与这个固定地址之间的相对偏移是固定的，然后这个地址处再填入foo函数真正的地址。当然，这个地方必然位于数据段中，是每个进程私有的，这样才能做到在不同的进程里，可以访问不同的虚拟地址。这个新引入的固定地址就是<strong>全局偏移表(Global Offset Table, GOT)</strong>。GOT的工作原理如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e7/88/e790179942821d8c5acb02de69fb1b88.jpg?wh=2284x1307" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e7/88/e790179942821d8c5acb02de69fb1b88.jpg?wh=2284x1307" /></p>
 <p>在上图中，call指令处被填入了0x3000，这是因为进程1的GOT与call指令之间的偏移是0x5000-0x2000=0x3000，同时进程2的GOT与call指令之间的偏移是0x8000-0x5000=0x3000。所以对于这一段共享代码，不管是进程1执行还是进程2执行，它们都能跳到自己的GOT表里。</p>
 <p>然后，进程1通过访问自己的GOT表，查到foo函数的地址是0x1000，它就能真正地调用到foo函数了。进程2访问自己的GOT表，查到foo函数的地址是0x2000，它也能顺利地调用foo函数。这样我们就通过引入了GOT这个间接层，解决了call指令和foo函数定义之间的偏移不固定的问题。</p>
 <p>这种技术就是地址无关代码(Position Independent Code, PIC)。接下来我们用一个实际例子让你加深对PIC技术的理解。</p>
@@ -14453,7 +14453,7 @@
 <p>通过今天这节课，我们对动态链接和其中地址无关代码技术有了整体的认知，但在这里面仍然可以看到引入动态链接带来的一些问题。下节课，我们会进一步探讨动态链接的优化，以及动态链接器与loader的实现。</p>
 <h2 id="_7">思考题</h2>
 <p>我们在<a href="https://time.geekbang.org/column/article/431904">第3节课</a>讲过二进制文件的.text段会被加载进内存的代码段(code segment)，请你想一想，.got段加载进内存的什么位置是比较合理的？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/57/6d/57bff71ccae778cd475df11f6bbc946d.jpg?wh=2284x1361" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/57/6d/57bff71ccae778cd475df11f6bbc946d.jpg?wh=2284x1361" /></p>
 <p>好啦，这节课到这就结束啦。欢迎你把这节课分享给更多对计算机内存感兴趣的朋友。我是海纳，我们下节课再见！</p>
 <div><strong>精选留言（15）</strong></div>
 <ul>
@@ -14602,8 +14602,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

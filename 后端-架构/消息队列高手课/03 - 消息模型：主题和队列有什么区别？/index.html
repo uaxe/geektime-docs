@@ -14569,19 +14569,19 @@
 <p>这个定义里面包含几个关键点，第一个是先进先出，这里面隐含着的一个要求是，在消息入队出队过程中，需要保证这些消息<strong>严格有序</strong>，按照什么顺序写进队列，必须按照同样的顺序从队列中读出来。不过，队列是没有“读”这个操作的，“读”就是出队，也就是从队列中“删除”这条消息。</p>
 <p><strong>早期的消息队列，就是按照“队列”的数据结构来设计的。</strong>我们一起看下这个图，生产者（Producer）发消息就是入队操作，消费者（Consumer）收消息就是出队也就是删除操作，服务端存放消息的容器自然就称为“队列”。</p>
 <p>这就是最初的一种消息模型：队列模型。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b1/84/b18f43f67ae1b0d24d88f0ba39708a84.jpg?wh=4266%2A856" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b1/84/b18f43f67ae1b0d24d88f0ba39708a84.jpg?wh=4266%2A856" /></p>
 <p>如果有多个生产者往同一个队列里面发送消息，这个队列中可以消费到的消息，就是这些生产者生产的所有消息的合集。消息的顺序就是这些生产者发送消息的自然顺序。如果有多个消费者接收同一个队列的消息，这些消费者之间实际上是竞争的关系，每个消费者只能收到队列中的一部分消息，也就是说任何一条消息只能被其中的一个消费者收到。</p>
 <p>如果需要将一份消息数据分发给多个消费者，要求每个消费者都能收到全量的消息，例如，对于一份订单数据，风控系统、分析系统、支付系统等都需要接收消息。这个时候，单个队列就满足不了需求，一个可行的解决方式是，为每个消费者创建一个单独的队列，让生产者发送多份。</p>
 <p>显然这是个比较蠢的做法，同样的一份消息数据被复制到多个队列中会浪费资源，更重要的是，生产者必须知道有多少个消费者。为每个消费者单独发送一份消息，这实际上违背了消息队列“解耦”这个设计初衷。</p>
 <p>为了解决这个问题，演化出了另外一种消息模型：“<strong>发布-订阅模型（Publish-Subscribe Pattern）</strong>”。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d5/54/d5c0742113b2a6f5a419e1ffc3327354.jpg?wh=4062%2A1448" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d5/54/d5c0742113b2a6f5a419e1ffc3327354.jpg?wh=4062%2A1448" /></p>
 <p>在发布-订阅模型中，消息的发送方称为发布者（Publisher），消息的接收方称为订阅者（Subscriber），服务端存放消息的容器称为主题（Topic）。发布者将消息发送到主题中，订阅者在接收消息之前需要先“订阅主题”。“订阅”在这里既是一个动作，同时还可以认为是主题在消费时的一个逻辑副本，每份订阅中，订阅者都可以接收到主题的所有消息。</p>
 <p>在消息领域的历史上很长的一段时间，队列模式和发布-订阅模式是并存的，有些消息队列同时支持这两种消息模型，比如ActiveMQ。我们仔细对比一下这两种模型，生产者就是发布者，消费者就是订阅者，队列就是主题，并没有本质的区别。<strong>它们最大的区别其实就是，一份消息数据能不能被消费多次的问题。</strong></p>
 <p>实际上，在这种发布-订阅模型中，如果只有一个订阅者，那它和队列模型就基本是一样的了。也就是说，发布-订阅模型在功能层面上是可以兼容队列模型的。</p>
 <p>现代的消息队列产品使用的消息模型大多是这种发布-订阅模型，当然也有例外。</p>
 <h2 id="rabbitmq">RabbitMQ的消息模型</h2>
 <p>这个例外就是RabbitMQ，它是少数依然坚持使用队列模型的产品之一。那它是怎么解决多个消费者的问题呢？你还记得我在上节课中讲到RabbitMQ的一个特色Exchange模块吗？在RabbitMQ中，Exchange位于生产者和队列之间，生产者并不关心将消息发送给哪个队列，而是将消息发送给Exchange，由Exchange上配置的策略来决定将消息投递到哪些队列中。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2d/a5/2df04ce80ff54702240df8598f277ca5.jpg?wh=4266%2A1284" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2d/a5/2df04ce80ff54702240df8598f277ca5.jpg?wh=4266%2A1284" /></p>
 <p>同一份消息如果需要被多个消费者来消费，需要配置Exchange将消息发送到多个队列，每个队列中都存放一份完整的消息数据，可以为一个消费者提供消费服务。这也可以变相地实现新发布-订阅模型中，“一份消息数据可以被多个订阅者来多次消费”这样的功能。具体的配置你可以参考RabbitMQ官方教程，其中一个<a href="http://www.rabbitmq.com/tutorials/tutorial-three-python.html">章节</a>专门是讲如何实现发布订阅的。</p>
 <h2 id="rocketmq">RocketMQ的消息模型</h2>
 <p>讲完了RabbitMQ的消息模型，我们再来看看RocketMQ。RocketMQ使用的消息模型是标准的发布-订阅模型，在RocketMQ的术语表中，生产者、消费者和主题与我在上面讲的发布-订阅模型中的概念是完全一样的。</p>
@@ -14595,7 +14595,7 @@
 <p>消费组中包含多个消费者，同一个组内的消费者是竞争消费的关系，每个消费者负责消费组内的一部分消息。如果一条消息被消费者Consumer1消费了，那同组的其他消费者就不会再收到这条消息。</p>
 <p>在Topic的消费过程中，由于消息需要被不同的组进行多次消费，所以消费完的消息并不会立即被删除，这就需要RocketMQ为每个消费组在每个队列上维护一个消费位置（Consumer Offset），这个位置之前的消息都被消费过，之后的消息都没有被消费过，每成功消费一条消息，消费位置就加一。这个消费位置是非常重要的概念，我们在使用消息队列的时候，丢消息的原因大多是由于消费位置处理不当导致的。</p>
 <p>RocketMQ的消息模型中，比较关键的概念就是这些了。为了便于你理解，我画了下面这张图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/46/17/465142ab5b5096f283118c307e8cc117.jpg?wh=4266%2A1743" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/46/17/465142ab5b5096f283118c307e8cc117.jpg?wh=4266%2A1743" /></p>
 <p>你可以对照这张图再把我刚刚讲的这些概念继续消化一下，加深理解。</p>
 <h2 id="kafka">Kafka的消息模型</h2>
 <p>我们再来看看另一种常见的消息队列Kafka，Kafka的消息模型和RocketMQ是完全一样的，我刚刚讲的所有RocketMQ中对应的概念，和生产消费过程中的确认机制，都完全适用于Kafka。唯一的区别是，在Kafka中，队列这个概念的名称不一样，Kafka中对应的名称是“分区（Partition）”，含义和功能是没有任何区别的。</p>
@@ -14754,8 +14754,6 @@ consumergourp中的某个consumer是和某个具体的queue一一关联绑定的
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

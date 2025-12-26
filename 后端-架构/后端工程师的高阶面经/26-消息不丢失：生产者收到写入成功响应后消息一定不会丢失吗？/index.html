@@ -15036,7 +15036,7 @@
 <h2 id="kafka-isr">Kafka 主从同步与 ISR</h2>
 <p>在 Kafka 中，消息被存储在分区中。为了避免分区所在的消息服务器宕机，分区本身也是一个主从结构。换一句话来说，不同的分区之间是一个对等的结构，而每一个分区其实是由一个主分区和若干个从分区组成的。</p>
 <p>不管是主分区还是从分区，都放在 broker 上。但是在放某个 topic 分区的时候，尽量做到一个 broker 上只放一个主分区，但是可以放别的主分区的从分区。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f8/yb/f8b5a1f5a32849a155283dea50d60yyb.png?wh=1920x1076" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f8/yb/f8b5a1f5a32849a155283dea50d60yyb.png?wh=1920x1076" /></p>
 <p>这种思路也很容易理解，它有点像是隔离，也就是通过将主分区分布在不同的 broker 上，避免 broker 本身崩溃影响多个主分区。</p>
 <h3 id="_1">写入语义</h3>
 <p>结合我们在 MySQL 部分对写入语义的讨论，你就可以想到，当我们说写入消息的时候，既可以是写入主分区，也可以是写入了主分区之后再写入一部分从分区。</p>
@@ -15046,42 +15046,42 @@
 </ul>
 <!--THE END-->
 
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ac/83/ac3146bb0e35a512ebbd0c51477d4583.png?wh=1920x836" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ac/83/ac3146bb0e35a512ebbd0c51477d4583.png?wh=1920x836" /></p>
 <ul>
 <li>1：当主分区写入成功的时候，就认为已经发送成功了。</li>
 </ul>
 <!--THE END-->
 
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/13/77/1353ae8a02b273f87ae59ccae30e7f77.png?wh=1920x786" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/13/77/1353ae8a02b273f87ae59ccae30e7f77.png?wh=1920x786" /></p>
 <ul>
 <li>all：不仅写入了主分区，还同步给了所有 ISR 成员。
-<img alt="图片" src="https://static001.geekbang.org/resource/image/eb/84/ebbb36b5b50yy462ecba039152359b84.png?wh=1920x802" /></li>
+<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/eb/84/ebbb36b5b50yy462ecba039152359b84.png?wh=1920x802" /></li>
 </ul>
 <p>这时候，你就接触到了 Kafka 中另外一个核心概念 ISR。</p>
 <h3 id="isr">ISR</h3>
 <p>ISR（In-Sync Replicas）是指和主分区保持了主从同步的所有从分区。比如说，一个主分区本身有 3 个从分区，但是因为网络之类的问题，导致其中一个从分区和主分区失去了联系，没办法同步数据，那么对于这个主分区来说，它的 ISR 就是剩下的 2 个分区。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/12/3f/12a8a6a8c0db302e2459bab8ca594b3f.png?wh=1920x853" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/12/3f/12a8a6a8c0db302e2459bab8ca594b3f.png?wh=1920x853" /></p>
 <p>Kafka 对 ISR 里面的分区数量有没有限制呢？比如说，我有一个主分区，有 11 个从分区，那我的 ISR 可以只有一个从分区吗？</p>
 <p>是可以的，我们能够通过min.insync.replicas这个参数来配置。比如说当你设置 min.insync.replicas = 2 的时候，就意味着 ISR 里面至少要有两个从分区。如果分区数量不足，那么生产者在配置 acks = all 的时候，发送消息会失败。与它对应的一个概念是 OSR，也就是不在 ISR 里面的分区集合。</p>
 <h2 id="_2">消息丢失的各种场景</h2>
 <p>为了让你理解后面我们提到的各种措施，现在我要先带你分析一下消息从生产者发送到消费者完成消费这个过程中，究竟哪些环节可能导致消息丢失。</p>
 <h3 id="_3">生产者发送</h3>
 <p>了解了 acks 参数之后，我们首先能够想到一个消息丢失的场景就是生产者把 acks 设置成 0，然后发送消息。这个时候虽然生产者能够拿到消息客户端返回的成功响应，但是事实上 broker 可能根本没收到，或者收到了但是处理新消息的时候遇到 Bug 了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/by/e6/byy09273953344093825845yy28e8fe6.png?wh=1920x749" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/by/e6/byy09273953344093825845yy28e8fe6.png?wh=1920x749" /></p>
 <p>如果你启用了批量发送功能，而且批次比较大的话，那么还可能发生的情况就是，Kafka 客户端连请求都没有发送出去，服务就整个崩溃了，这种情况也会引起消息丢失。</p>
 <p>那么是不是主分区真的写入了就万无一失了呢？也不是，因为你还要考虑主从同步的问题。</p>
 <h3 id="_4">主从同步</h3>
 <p>我们注意到在 acks=1 的时候，只要求写入主分区就可以。所以假设在写入主分区之后，主分区所在 broker 立刻就崩溃了。这个时候发起新的主分区选举，不管是哪个从分区被选上，它都缺了这条消息。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3b/30/3be0fc0783a37ba7a72a031dd896da30.png?wh=1920x752" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3b/30/3be0fc0783a37ba7a72a031dd896da30.png?wh=1920x752" /></p>
 <p>这么看起来，只要使用 acks=all 就肯定不会有问题了，对不对？实际上也不是，因为 Kafka 里面还有一种 unclean 选举。在允许 unclean 选举的情况下，如果 ISR 里面没有任何分区，那么 Kafka 就会选择第一个从分区来作为主分区。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ef/83/efa51a426a5243408dbc58faeb786183.png?wh=1920x1006" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ef/83/efa51a426a5243408dbc58faeb786183.png?wh=1920x1006" /></p>
 <p>这种 unclean 选举机制本身主要是为了解决你希望尽可能保证 Kafka 依旧可用，并且等待从分区重新进入 ISR 的问题。类似地，unclean 选出来的新的主分区也可能少了部分数据。那么如果我设置 acks=all 并且禁用 unclean 选举，是不是就万无一失了？</p>
 <p>实际上也不是，因为你还有一个问题没有考虑到，就是刷盘。</p>
 <h3 id="_5">刷盘</h3>
 <p>之前我们在数据库部分讨论过写入语义，提到了 redo log 和 binlog 的刷盘问题。在 Kafka 这里还是会有这个问题。</p>
 <p>当 acks=1 的时候，主分区返回写入成功的消息，但是这个时候消息可能还在操作系统的 page cache 里面。</p>
 <p>而当 acks=all 的时候，主分区返回写入成功的消息，不管是主分区还是 ISR 中的从分区，这条消息都可能还在 page cache 里面。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d8/89/d8229a87f6e364e8703yybcfc66e1089.png?wh=1920x945" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d8/89/d8229a87f6e364e8703yybcfc66e1089.png?wh=1920x945" /></p>
 <p>而在 Kafka 中，控制刷盘的参数有三个。</p>
 <ul>
 <li>log.flush.interval.messages：控制消息到多少条就要强制刷新磁盘。Kafka 会在写入 page cache 的时候顺便检测一下。</li>
@@ -15137,7 +15137,7 @@
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>#找出三分钟前还没发送出去的消息，然后补发。
 </code></pre></div>
 <p>整个过程如下图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d8/86/d8d681ff7bc0469aa703d80bc2481f86.png?wh=1844x1414" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d8/86/d8d681ff7bc0469aa703d80bc2481f86.png?wh=1844x1414" /></p>
 <p>我在图里标注了三个易出错点，面试官大概率会追问这三个点，也就是你要刷亮点的地方。</p>
 <blockquote>
 <ol>
@@ -15178,12 +15178,12 @@
 <p>这里就可以把话题引导到异步消费上，你也就可以顺便提起消息积压的问题，这样整个面试节奏就在你的掌控之中了。</p>
 <h2 id="kafka">亮点方案：在 Kafka 上支持消息回查机制</h2>
 <p>所谓的消息回查机制是指消息队列允许你在发送消息的时候，先发一个准备请求，里面带着你的消息。这个时候消息队列并不会把消息转交给消费者，而是当业务完成之后，你需要再发一个确认请求，这时候消息中间件才会把消息转交给消费者。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8d/d6/8d9d674df16be9850b2a1d67c5dc2cd6.png?wh=1920x1080" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8d/d6/8d9d674df16be9850b2a1d67c5dc2cd6.png?wh=1920x1080" /></p>
 <p>显然，这就是之前我们讨论的两阶段提交的一个简单应用，所以这个也被叫做事务消息。</p>
 <p>你仔细看一下事务消息这张图，你就会发现一个问题：如果我的业务成功了，但是我的确认请求没发怎么办？所以这时候就有了消息回查，也就是消息在没收到确认请求的时候，会反过来问一下你，这个消息要不要交给消费者。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ff/40/ff789860cf433f3e91517cacd11d9540.png?wh=1920x1080" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ff/40/ff789860cf433f3e91517cacd11d9540.png?wh=1920x1080" /></p>
 <p>消息回查机制依赖于消息队列的支持。RocketMQ 是支持的，但是不幸的是 Kafka 和 RabbitMQ 都不支持。所以这里就有一个问题了，就是怎么在 Kafka 的基础上支持消息回查。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c8/c7/c83e031e7c8895710bfc1f1ddddf77c7.png?wh=1920x1120" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c8/c7/c83e031e7c8895710bfc1f1ddddf77c7.png?wh=1920x1120" /></p>
 <p>你可以结合图片简要回答整个流程。</p>
 <blockquote>
 <p>我们公司用的是 Kafka，它并不支持消息回查机制，所以我在公司里面设计过一个系统来支持回查功能。</p>
@@ -15198,7 +15198,7 @@
 <p>整个过程到处都是亮点，我们一个一个看。</p>
 <h3 id="_12">亮点一：回查实现</h3>
 <p>你应该注意到了，如果在业务操作完成之后，没有发提交消息，这时候就需要回查中间件来回查。一般来说，回查中间件会异步地扫描长时间未提交的消息，然后回查业务方。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/90/c0/90b4f9762f283c80b0a34f5504fe3ac0.png?wh=1920x1076" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/90/c0/90b4f9762f283c80b0a34f5504fe3ac0.png?wh=1920x1076" /></p>
 <p>这里的关键点就是<strong>回查中间件得知道怎么回查你的应用代码</strong>。正常来说，你这里应该要设计成可扩展的，也就是说可以回查 HTTP 接口，也可以回查 RPC 接口。</p>
 <p>所以你接着补充。</p>
 <blockquote>
@@ -15251,7 +15251,7 @@
 <p>这里我再强调一点，我几次提到重试的时候你就应该能够想到，这必然会导致重复消费，也因此要求消费者必须是幂等的。</p>
 <p>同时，结合延迟消息，我给了你两个增强 Kafka 功能的方案。你如果有时间，可以尝试自己把它们两者融合在一起，做成一个开源框架。</p>
 <p>一方面，这两个方案都要求支持高并发、高性能、大数据，对你来说很能锻炼自己设计和实现一个系统的能力。另外一方面，如果你真的能够按照开源标准做出来，那么你只要不是面什么高级架构师之类的岗位，就都能赢得竞争优势。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a3/0d/a3b33a0dc84166b8ebaa35fea709920d.jpg?wh=2290x3237" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a3/0d/a3b33a0dc84166b8ebaa35fea709920d.jpg?wh=2290x3237" /></p>
 <h2 id="_16">思考题</h2>
 <p>最后请你来思考两个问题。</p>
 <ul>
@@ -15387,8 +15387,6 @@ Q2：回看中间件，相当于基于MQ进行二次开发了，需要针对选�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

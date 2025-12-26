@@ -6109,8 +6109,8 @@
 <p>针对云上网络连接的方式，相信你已经了解到不少，如专线（高速通道）、VPN网关、对等连接等方式。这些方式，有的用来解决IDC和VPC的连接，有的用来解决VPC与VPC之间的互通。</p>
 <p>这其中，对等连接的确可以解决函数跨VPC的问题，但我们试想一下，如果每个用户都通过这种方式来解决这种问题，那么平台每次都需要搭建两端的连接，并且还可能会遇到IP网段冲突的问题。这样的做法显然不具备普适性，成本也过高。</p>
 <p>为此，针对Serverless的函数计算场景，我们通常会通过弹性网卡（ENI）的方式来打通。弹性网卡是绑定在云主机或者容器实例上的，也就是说，我们是通过弹性网卡ENI来关联用户的VPC和用户的设备实例，使得设备和VPC互通的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b5/9b/b50e677c4be24c8c456yybf536ca139b.jpg?wh=1920x735" title="绑定容器实例的方式" /></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/56/3c/56547df7a2fa28yy82cb9fb6361aba3c.jpg?wh=1920x702" title="绑定主机的方式" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b5/9b/b50e677c4be24c8c456yybf536ca139b.jpg?wh=1920x735" title="绑定容器实例的方式" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/56/3c/56547df7a2fa28yy82cb9fb6361aba3c.jpg?wh=1920x702" title="绑定主机的方式" /></p>
 <p>但实际上，我们暂且抛开这两者在网络速率上的差别，不论是在容器实例还是在主机上，他们都会面临同样的问题。</p>
 <ul>
 <li><strong>冷启动耗时较长：</strong>弹性网卡这种虚拟化的资源，它的创建时间是避免不了的；</li>
@@ -6127,12 +6127,12 @@
 <h2 id="_2">动手实操</h2>
 <p>这节课，我会通过一个打通跨VPC网络的实验案例，带你实现函数通过Proxy机器代理的方式访问用户VPC的资源的全过程。在这个案例中，我选取了百度智能云服务器BCC来进行实验。</p>
 <p>在实验之前，我们需要准备两个VPC网段，模拟创建函数集群和用户集群，并在云上购买三台云服务器BCC，其中2台BCC在VPC1，另外1台在VPC2。下面这个图可以清晰的描述部署的逻辑：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/26/3c/2607byy178c3724603ce01d9efb1943c.jpg?wh=1920x1188" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/26/3c/2607byy178c3724603ce01d9efb1943c.jpg?wh=1920x1188" /></p>
 <h3 id="_3">隧道技术</h3>
 <p>准备工作完成之后，我们来看隧道技术。</p>
 <p>什么是隧道？在网络中，隧道是一种使用网络不支持的协议，构建网络之间高效和安全的链接，实现在网络中传输数据的方法。</p>
 <p>内核中的tunnel可以通过ip tunnel help看到，当前有五个：IPIP、GRE、SIT、ISATAP和VTI。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/fe/f1/fef8b20ef074bf4f373bebe2ff66b5f1.png?wh=1920x645" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fe/f1/fef8b20ef074bf4f373bebe2ff66b5f1.png?wh=1920x645" /></p>
 <p>本节课，我们选择使用GRE（Generic Routing Encapsulation），它是IPIP（IP in IP）协议的更进一步版本，从官方的描述上来看，可以取代IPIP。隧道技术本身的概念和区别不是本节的重点。不过，如果感兴趣的话，你也可以通过我文末给的延伸阅读深入了解。</p>
 <p>接下来我们来创建隧道，使得func bcc1和proxy bcc能通过隧道打通连接。我们先在func bcc1中执行如下命令来创建GRE隧道：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c"># 加载GRE模块</span>
@@ -6152,16 +6152,16 @@
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">ip</span> <span class="n">neigh</span> <span class="n">replace</span> <span class="n">10</span><span class="p">.</span><span class="n">0</span><span class="p">.</span><span class="n">0</span><span class="p">.</span><span class="n">3</span> <span class="n">lladdr</span> <span class="n">192</span><span class="p">.</span><span class="n">168</span><span class="p">.</span><span class="n">80</span><span class="p">.</span><span class="n">8</span> <span class="n">dev</span> <span class="n">mgre0</span>
 </code></pre></div>
 <p>最后，我们还可以通过ping命令来验证proxy bcc与func bcc1的GRE隧道是否打通。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/bb/7c/bb561b4dd8ff0b2a014f7cccb9eea67c.jpg?wh=1920x583" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bb/7c/bb561b4dd8ff0b2a014f7cccb9eea67c.jpg?wh=1920x583" /></p>
 <p>到这里，我们隧道的打通任务已经完成一半了，下面，我们要看proxy bcc如何与user bcc打通。</p>
 <h3 id="_4">转发技术</h3>
 <p>我们注意到，proxy bcc和user bcc是不在一个VPC集群内的。那我们要怎么解决这个问题呢？</p>
 <p>构建的逻辑就是在user vpc下构建一个虚拟网卡eth1，而eth1，又隶属于proxy bcc下。这个方法，和我们在上面“跨VPC的演进”中讲到的“动态创建网卡”的方法是一致的。</p>
 <p>这里需要说明一点，如果你是一个业务函数的开发者，可能云厂商没有开放相应的特权账号，没有创建弹性网卡的能力，实操不了，那么，这里你只要了解过程即可。如果你是云平台维护工作者，可以体验一下这其中的操作方式。</p>
 <p>弹性网卡创建并绑定好后，我们会发现，有2个网卡存在于proxy bcc中。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/74/59/74108bd630497f16d9e35beea8461759.jpg?wh=1920x840" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/74/59/74108bd630497f16d9e35beea8461759.jpg?wh=1920x840" /></p>
 <p>我们通过ping命令，可以验证是否能够和user bcc打通。这里要注意，proxy bcc与user bcc可以互通是因为弹性网卡是基于user bcc所在的VPC的子网Subnet创建的，但租户还是属于proxy bcc。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/83/60/833aeb5f01d840389252d1a424851260.jpg?wh=1920x569" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/83/60/833aeb5f01d840389252d1a424851260.jpg?wh=1920x569" /></p>
 <p>打通之后，我们就需要用到转发技术了，也就是将func bcc1的数据包通过proxy bcc的请求到达user bcc。</p>
 <p>首先，我们需要通过将ip_forward设置为1，开启proxy bcc的转发能力。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nb">echo </span><span class="n">1</span> <span class="p">&gt;</span> <span class="p">/</span><span class="n">proc</span><span class="p">/</span><span class="n">sys</span><span class="p">/</span><span class="n">net</span><span class="p">/</span><span class="n">ipv4</span><span class="p">/</span><span class="n">ip_forward</span>
@@ -6176,7 +6176,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">iptables</span> <span class="n">-t</span> <span class="n">nat</span> <span class="n">-A</span> <span class="n">POSTROUTING</span> <span class="n">-o</span> <span class="n">eth1</span> <span class="n">-j</span> <span class="n">MASQUERADE</span>
 </code></pre></div>
 <p>到这里，我们就可以在func bcc1中ping通user bcc了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/78/c2/78507536ae69dc708b8a68d67f3d1cc2.jpg?wh=1920x550" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/78/c2/78507536ae69dc708b8a68d67f3d1cc2.jpg?wh=1920x550" /></p>
 <h3 id="_5">容器网络</h3>
 <p>在虚机上，我们已经操作体验一遍了，但通常我们的函数是在容器实例里面运行的 的，容器在访问用户vpc服务的时候，是存在一点差别的。我们也可以验证一下，会发现，pod 发起的请求正常路由到了 proxy bcc 下的 tunnel 设备，但是没有继续转发到 eth1 中。</p>
 <p>为什么会出现这样的情况呢？通常是因为Pod的IP和我们在proxy bcc上构建的路由规则是不一致的。至于怎么解答，我先不做回答，你可以先思考一下。我们先来看一个概念：ip-masq-agent。</p>
@@ -6189,7 +6189,7 @@
 <p>HaVip是一种可以独立创建和释放的内网IP，可以与高可用软件（例如，KeepAlived）配合使用，搭建高可用主备服务，提高业务的可用性。</p>
 <p>另外，从Serverless的角度看，你还需要依据函数访问的流量对Proxy Node进行自动扩缩容。当流量增大时，需要自动对Proxy Node进行扩容；当流量降低时，需要自动对Proxy Node进行缩容。</p>
 <p>我们继续在上面的架构图上进一步完善一下，<strong>增加主备Proxy Node和容器Pod之后的架构示意图</strong>如下所示。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/aa/41/aaf8c2e1dec3ea5e6712a5374493ab41.jpg?wh=1920x1149" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/aa/41/aaf8c2e1dec3ea5e6712a5374493ab41.jpg?wh=1920x1149" /></p>
 <h2 id="_7">小结</h2>
 <p>最后，我来小结一下我们今天的内容。</p>
 <p>这节课主要围绕着优化函数在跨VPC场景的访问速度来做讲解。我们学习了跨VPC打通的演进过程以及代理的四大要素，最后，也结合一个案例的实操过程，了解了函数代理技术的实现过程。</p>
@@ -6329,8 +6329,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -6056,10 +6056,10 @@
 <p>回忆上节课“<a href="https://time.geekbang.org/column/article/626924">后台发布流程</a>”，我们在设计运营搭建平台数据库的时候，已经设计了数据库的“页面快照表”，在流程的最后节点，页面发布到生产环境的同时，把当时页面版本的数据记录一次快照，存到页面快照表中。这也就是说，页面版本的“数据”存在了“页面快照表”中。</p>
 <p>版本的数据有了，剩下的就是版本“Bundle文件”。</p>
 <p>其实，我们之前在“<a href="https://time.geekbang.org/column/article/626898">页面编译</a>”和“<a href="https://time.geekbang.org/column/article/626924">后台发布流程</a>”两节课中，已经把页面按版本增量编译了。你可以启动执行上节课“页面发布流程”的源码案例，在发布流程中，能发现每次版本迭代发布后，生成的预览页面都带有版本号，同时，Bundle文件路径也带有版本号，而且生产环境的预览页面的JavaScript和CSS的Bundle都带有版本号。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a8/91/a806df728847f8c2af9ae20652419591.png?wh=1920x1198" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a8/91/a806df728847f8c2af9ae20652419591.png?wh=1920x1198" /></p>
 <p>所以，这时候版本的Bundle文件也有了，结合版本的快照数据，就构成了完整的页面版本内容。</p>
 <p>接下来，我们要做的就是进行页面内容管理版本的设计，大致的功能设计效果，你可以参考这张截图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/be/b0/beafa770edcab2a026449bd65564b8b0.png?wh=1920x1208" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/be/b0/beafa770edcab2a026449bd65564b8b0.png?wh=1920x1208" /></p>
 <p>我们把页面版本管理和发布流程聚合在一个页面上，基于快照数据，来管理页面版本数据和版本Bundle文件。</p>
 <p>因为页面快照数据就等于页面版本数据，而且，页面快照数据有当前页面的版本号和页面uuid，可以通过这两个信息，间接管理到页面Bundle文件的路径，或者是CDN的URL链接。所以，<strong>我们管理页面快照，就等于是管理了页面的版本数据，也间接管理了页面版本的Bundle文件。</strong></p>
 <p>现在，技术实现就变得很清晰了。</p>
@@ -6068,7 +6068,7 @@
 <p>我们已经有了页面的版本内容，可以提供给页面回滚措施使用，通过指定回滚版本，恢复搭建页面的完整内容。那么我们面临的第二个问题就是，如何设计和实现回滚措施呢？</p>
 <h2 id="_3">如何设计和实现回滚措施</h2>
 <p>要基于多版本的内容来设计和实现回滚措施，首先，我们要理解的一个核心点就是，<strong>回滚是把页面恢复到指定版本，其实，就是把对应版本的页面布局数据和Bundle文件，重新转入发布流程中。</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/de/c6/de6d1fa5133c100730af27e4effba4c6.jpg?wh=4000x2250" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/de/c6/de6d1fa5133c100730af27e4effba4c6.jpg?wh=4000x2250" /></p>
 <p>我画了一张具体的流程图，“数据”和“文件”重新投入到发布流程中，再次经过测试、预发和生产三个流程节点，把页面内容恢复到生产环境里。可以分成两步。</p>
 <ul>
 <li>复制内容和提升版本号</li>
@@ -6077,7 +6077,7 @@
 <p><strong>第一步，复制内容和新增版本号</strong>，触发了指定版本的内容的回滚，把指定版本的数据和Bundle文件分别复制一份，然后新增一个小版本，进入一次新的发布流程执行操作。</p>
 <p>你可能有困惑，为什么要新增一个新版本号呢？</p>
 <p>这是因为在回滚过程中，恢复页面版本操作也是一种发布行为，也需要新增版本号，所以这个时候在复制页面数据过程中，我们也要附加上使用恢复版本号。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1a/6b/1ace71e158206d41dc09a0226bb6946b.png?wh=1920x1208" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1a/6b/1ace71e158206d41dc09a0226bb6946b.png?wh=1920x1208" /></p>
 <p><strong>第二步，执行发布流程</strong>，跟原来的发布流程一致，以一个新的页面版本进行发布，并且最后发布到生产环境，也要把这次新版本页面内容再一次备份页面快照。其中，页面快照数据也要携带恢复的版本号信息。</p>
 <p>到这里，方案看起来已经完善了，但是，很多人会漏掉一个细节问题，回滚版本需要重新进行页面Bundle编译吗？</p>
 <p>目前的场景和方案看起来不需要，只需要复制Bundle文件就好。但是，<strong>注意，如果回滚到某个版本的同时，需要重新编辑页面布局或者物料数据源，就需要重新进行页面的Bundle文件编译了。</strong></p>
@@ -6085,7 +6085,7 @@
 <p>在这个案例里，我们就要支持对应的“回滚”加“编辑”的功能，把回滚的操作步骤，从“页面发布流程”提前到“页面搭建”。</p>
 <p>也就是说，触发了回滚操作后，复制数据和新增版本号，执行的下一个步骤就是“页面搭建”，让用户自己选择是否要重新编辑。在页面布局操作之后，复用“页面搭建”后的发布流程，不管是否重新编辑过页面，都只认传过来的页面布局数据，再编译一次页面Bundle文件编译，最后执行发布流程。</p>
 <p>所以，我们要<strong>添加一个环节，在回滚的过程中，支持基于恢复的数据重新编辑。</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/13/9c/13aef36bbe8d260be4cf8e222dc62c9c.jpg?wh=4000x2250" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/13/9c/13aef36bbe8d260be4cf8e222dc62c9c.jpg?wh=4000x2250" /></p>
 <p>看修改后的步骤图，回滚和重新页面搭建编辑的步骤分成三步。</p>
 <ul>
 <li>第一步：复制内容和更新版本号</li>
@@ -6235,8 +6235,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

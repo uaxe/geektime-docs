@@ -14184,7 +14184,7 @@
 <p>不知道你在使用RocketMQ的时候有没有遇到过让人有些头疼的问题。我在用RocketMQ时遇到的最常见，也最让我头疼的问题就是<strong>消息发送超时。</strong>而且这种超时不是大面积的，而是偶尔会发生，占比在万分之一到万分之五之间。</p>
 <h2 id="_1">现象与关键日志</h2>
 <p>消息发送超时的情况下，客户端的日志通常是下面这样：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/97/b3/9742c5e7e8ec8d1aebdc5f76b2a8c2b3.png?wh=1079x207" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/97/b3/9742c5e7e8ec8d1aebdc5f76b2a8c2b3.png?wh=1079x207" /></p>
 <p>我们这节课就从这些日志入手，看看怎样排查RocketMQ的消息发送超时故障。</p>
 <p>首先，我们要查看RocketMQ相关的日志，在应用服务器上，RocketMQ的日志默认路径为${USER_HOME}/logs/rocketmqlogs/ rocketmq_client.log。</p>
 <p>在上面这张图中，有两条非常关键的日志。</p>
@@ -14197,29 +14197,29 @@
 <h2 id="_2">单一长连接如何实现多请求并发发送？</h2>
 <p>为什么第二条日志超时后还能收到服务端的响应结果，又为什么匹配不到对应的请求了呢？</p>
 <p>我们可以详细探究一下这背后的原理。原来，这是使用单一长连接进行网络请求的编程范式。举个例子，一条长连接向服务端先后发送了两个请求，客户端在收到服务端响应结果时，需要判断这个响应结果对应的是哪个请求。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/43/0f/435035c392ea7907b9c46e59b169420f.jpg?wh=1920x581" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/43/0f/435035c392ea7907b9c46e59b169420f.jpg?wh=1920x581" /></p>
 <p>正如上图所示，客户端多个线程通过一条连接依次发送了req1，req2两个请求，服务端解码请求后，会将请求转发到线程池中异步执行。如果请求2处理得比较快，比请求1更早将结果返回给客户端，那客户端怎么识别服务端返回的数据对应的是哪个请求呢？</p>
 <p>解决办法是，客户端在发送请求之前，会为这个请求生成一个本机器唯一的请求ID（requestId），它还会采用Future模式，将requestId和Future对象放到一个Map中，然后将reqestId放入请求体。服务端在返回响应结果时，会将请求ID原封不动地放入响应结果中。客户端收到响应时，会先解码出requestId，然后从缓存中找到对应的Future对象，唤醒业务线程，将返回结果通知给调用方，完成整个通信。</p>
 <p>结合日志我发现，如果客户端在指定时间内没有收到服务端的请求，最终会抛出超时异常。但是，网络层面上客户端还是能收到服务端的响应结果。这就把矛头直接指向了Broker端，是不是Broker有瓶颈，处理慢导致的呢？</p>
 <h2 id="broker">如何诊断Broker端内存写入性能？</h2>
 <p>我们知道消息发送时，一个非常重要的过程就是服务端写入。如果服务端出现写入瓶颈，通常会返回各种各样的Broker Busy。我们可以简单来看一下消息发送的写入流程：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9y/6c/9yy4cd8794f51ddab23cc7847943476c.jpg?wh=1920x1093" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9y/6c/9yy4cd8794f51ddab23cc7847943476c.jpg?wh=1920x1093" /></p>
 <p>我们首先要判断的是，是不是消息写入PageCache或者磁盘写入慢导致的问题。我们这个集群采用的是异步刷盘机制，所以写磁盘这一环可以忽略。</p>
 <p>然后，我们可以通过跟踪Broker端写入PageCache的数据指标来判断Broker有没有遇到瓶颈。具体做法是查看RocketMQ中的store.log文件，具体使用命令如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>cd /home/codingw/logs/rocketmqlogs/store.log //其中codingw为当前rocketmq broker进程的归属用户
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>grep &quot;PAGECACHERT&quot; store.log
 </code></pre></div>
 <p>执行命令后，可以得到这样的结果：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/28/41/28e8dcd57b18b1db9cd562796e923341.png?wh=1077x226" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/28/41/28e8dcd57b18b1db9cd562796e923341.png?wh=1077x226" /></p>
 <p>这段日志记录了消息写入到PageCache的耗时分布。通过分析我们可以知道，写入PageCache的耗时都小于100ms，所以PageCache的写入并没有产生瓶颈。不过，<strong>客户端可是真真切切地在3秒后才收到响应结果，难道是网络问题？</strong></p>
 <h2 id="_3">网络层排查通用方法</h2>
 <p>接下来我们就分析一下网络。</p>
 <p>通常，我们可以用netstat命令来分析网络通信，需要重点关注网络通信中的Recv-Q与Send-Q这两个指标。</p>
 <p>netstat命令的执行效果如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b3/75/b395b317544c3961c064985027026a75.png?wh=1077x244" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b3/75/b395b317544c3961c064985027026a75.png?wh=1077x244" /></p>
 <p>解释一下，这里的Recv-Q是TCP通道的接受缓存区；Send-Q是TCP通道的发送缓存区。</p>
 <p>在TCP中，Recv-Q和Send-Q的工作机制如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a0/1b/a0f374d6e43cf7aaeb950fc6ec634f1b.jpg?wh=1920x736" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a0/1b/a0f374d6e43cf7aaeb950fc6ec634f1b.jpg?wh=1920x736" /></p>
 <p>正如上图描述的那样，网络通信有下面几个关键步骤。</p>
 <ul>
 <li>客户端调用网络通道时（例如NIO的Channel写入数据），数据首先是写入到TCP的发送缓存区，如果发送缓存区已满，客户端无法继续向该通道发送请求，从NIO层面调用Channel底层的write方法的时候会返回0。这个时候在应用层面需要注册写事件，待发送缓存区有空闲时，再通知上层应用程序继续写入上次未写入的数据。</li>
@@ -14227,16 +14227,16 @@
 <li>发送方在收到ACK后，会删除发送缓冲区的数据。如果接收方一直不读取数据，那发送方也无法发送数据。</li>
 </ul>
 <p>运维同事分别在客户端和MQ服务器上，在服务器上写一个脚本，每500ms采集一次netstat 。最终汇总到的采集结果如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d2/bc/d2663e95c03913273d319eece0baaabc.png?wh=1075x234" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d2/bc/d2663e95c03913273d319eece0baaabc.png?wh=1075x234" /></p>
 <p>从客户端来看，客户端的Recv-Q中出现大量积压，它对应的是MQ的Send-Q中的大量积压。</p>
 <p>结合Recv-Q、Send-Q的工作机制，再次怀疑可能是客户端从网络中读取字节太慢导致的。为了验证这个观点，我修改了和RocketMQ Client相关的包，加入了Netty性能采集方面的代码：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7c/4d/7c7ac37cae929419c65f4327cfbdb14d.png?wh=856x530" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7c/4d/7c7ac37cae929419c65f4327cfbdb14d.png?wh=856x530" /></p>
 <p>我的核心思路是，针对每一次被触发的读事件，判断客户端会对一个通道进行多少次读取操作。如果一次读事件需要触发很多次的读取，说明这个通道确实积压了很多数据，网络读存在瓶颈。</p>
 <p>部分采集数据如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/53/95/5374ce040ff2a31e2b7ce6e565762f95.png?wh=1058x102" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/53/95/5374ce040ff2a31e2b7ce6e565762f95.png?wh=1058x102" /></p>
 <p>我们可以通过awk命令对这个数据进行分析。从结果可以看出，一次读事件触发，大部分通道只要读两次就可以成功抽取读缓存区中的数据。读数据方面并不存在瓶颈。</p>
 <p>统计分析结果如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/38/ff/38c60d07ce3ff424c69e81de77dc8eff.png?wh=673x173" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/38/ff/38c60d07ce3ff424c69e81de77dc8eff.png?wh=673x173" /></p>
 <p>如此看来，瓶颈应该不在客户端，还是需要将目光转移到服务端。</p>
 <p>从刚才的分析中我们已经看到，Broker服务端写入PageCache很快。但是刚刚我们唯独没有监控“响应结果写入网络”这个环节。那是不是写入响应结果不及时，导致消息大量积压在Netty的写缓存区，不能及时写入到TCP的发送缓冲区，最终造成消息发送超时呢？</p>
 <h2 id="_4">解决方案</h2>
@@ -14427,8 +14427,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

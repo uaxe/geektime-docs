@@ -14093,10 +14093,10 @@
 <p>今天我们就来聊聊，在本地缓存全量数据时，如何处理缓存加载、更新以及数据量过大的问题。</p>
 <h2 id="_1">启动：如何解决加载慢的问题？</h2>
 <p>如果采用本地缓存全量数据的方案，那么当程序启动时，我们就需要加载所有数据。对于数据的加载，<strong>最简单的方法就是当程序启动时，轮询从数据库拉取所有数据，并写入本地缓存</strong>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b0/47/b0e32cb435580170a2e8e6b3c9356947.jpg?wh=2056x1308" title="图1 轮询 poll 加载" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b0/47/b0e32cb435580170a2e8e6b3c9356947.jpg?wh=2056x1308" title="图1 轮询 poll 加载" /></p>
 <p>对于数据量较小的场景，这种方法是可行的。然而，随着数据量的增加，这种从数据库拉取全量数据的方式，会导致程序的启动时间显著变长。一旦服务出现问题，很难快速完成发布与回滚操作。</p>
 <p>为了优化启动性能，我们可以采用<strong>本地文件加载和数据库轮询加载相结合的策略</strong>。实现这个策略的流程如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4d/01/4d5ffe4029382ceb207f0cd4c7039a01.jpg?wh=3987x2554" title="图2 本地文件加载" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4d/01/4d5ffe4029382ceb207f0cd4c7039a01.jpg?wh=3987x2554" title="图2 本地文件加载" /></p>
 <p>首先，我们可以用 <a href="https://help.aliyun.com/zh/emr/emr-on-ecs/user-guide/sqoop?spm=a2c4g.11186623.help-menu-28066.d_2_1_14_0.2d666af8KKGEy1&amp;scm=20140722.H_451787._.OR_help-T_cn~zh-V_1">Sqoop</a> 等DTS（数据传输服务）工具，以一天或者一小时为周期，将数据库中的数据导入 Hive 表。</p>
 <p>接着，我们用一个定时任务，定时将Hive表的数据处理成我们需要的格式，并传到远程文件存储系统。</p>
 <p>然后，在服务编译时，我们的编译脚本需要从远程存储拉取这些预处理的文件，并与程序的二进制文件一起打包，在发布时将它们部署到目标机器上。</p>
@@ -14140,10 +14140,10 @@
 <h3 id="_4">广播触发更新</h3>
 <p>为了让数据更新能尽可能实时更新到本地缓存中，减少数据延迟对业务的影响，业界有一种<strong>基于广播机制触发本地缓存更新的策略</strong>。下面是两种实现这一策略的方法，供你参考。</p>
 <p>首先，如下面的图所示，我们可以在数据写入数据库后，异步地将数据写到消息队列RocketMQ。由于<a href="https://help.aliyun.com/zh/apsaramq-for-rocketmq/cloud-message-queue-rocketmq-4-x-series/developer-reference/clustering-consumption-and-broadcasting-consumption">RocketMQ支持广播消费模式</a>，这意味着同一条消息可以被服务端的每个实例所对应的消费者进程接收并处理。这样，每个服务实例都能够根据接收到的消息内容，及时地更新其本地缓存。通过这种机制，我们就能实现本地缓存数据的快速更新。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/78/03/78ab9f2ayyd6a2bb6e0c41a7baef1103.jpg?wh=4531x3872" title="图3 RocketMQ 广播消费" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/78/03/78ab9f2ayyd6a2bb6e0c41a7baef1103.jpg?wh=4531x3872" title="图3 RocketMQ 广播消费" /></p>
 <p>然而，直接在数据库操作中集成MQ写入逻辑，虽然能够实现数据的实时更新，但这种做法会增加数据库操作代码的复杂性。而且，如果我们绕过服务接口直接对数据库进行操作，会导致本地缓存无法同步更新，需要重启服务来解决这一问题。</p>
 <p>所以另一个方法就派上用场了，就像下面的图一样，与直接在数据库操作代码中耦合MQ的逻辑不同，我们可以利用像 <a href="https://github.com/alibaba/canal">Canal</a> 这样的开源中间件，来达成数据同步目标。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f1/24/f1d9185049c68a937641500f3b744324.jpg?wh=4000x3352" title="图4 binlog 订阅模式" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f1/24/f1d9185049c68a937641500f3b744324.jpg?wh=4000x3352" title="图4 binlog 订阅模式" /></p>
 <p>Canal能模拟MySQL主从复制的交互协议，把自己伪装成一个MySQL的从节点，向MySQL主节点发送数据转储（dump）请求。MySQL收到这些请求后，就会开始向Canal推送Binlog。Canal接收到Binlog字节流后，会解析这些日志并将其转换成易于读取的结构化数据，然后我们可以将这些数据写入RocketMQ中。</p>
 <p>这种方法不仅减少了对现有数据库操作代码的侵入，还可以确保直接对数据库进行操作时，本地缓存与数据库变更能保持同步，而无需重启服务。</p>
 <p>当然，使用RocketMQ广播消费的方式，虽然能够提升数据同步的实时性，但同时也可能面临数据丢失的风险，例如写入RocketMQ时失败或者RocketMQ本身出现故障。</p>
@@ -14153,7 +14153,7 @@
 <p>然而，采用本地全量缓存的方式，由于单机内存规格是有限的，随着数据变多，单机内存可能存不下全量数据。这个时候，我们该怎么办呢？</p>
 <p>我们可以借鉴数据库分库分表的设计思路，将数据按一定规则拆分成多份，并放入不同的服务集群中，上游服务根据规则将请求路由到相应的集群，这就是所谓的<strong>分片集群策略</strong>。</p>
 <p>比如，就像下面的图一样，我们可以将服务拆分成两个集群，集群1加载user_id模2为0的数据，集群2加载user_id模2为1的数据。然后上游服务根据请求的user_id，请求我们的不同集群。通过这种方式，我们能够有效减少单个服务实例所需加载的数据量。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/27/38/277ab03018f7842ab43490156108ff38.jpg?wh=4899x3899" title="图5 分片集群" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/27/38/277ab03018f7842ab43490156108ff38.jpg?wh=4899x3899" title="图5 分片集群" /></p>
 <p>当然，对于集群的分片规则，和前面第11节课讲的数据库分库分表规则一样，较为常用的同样是范围路由、hash 路由以及配置路由这三种类型，你可以根据自己的场景选择。</p>
 <h2 id="_6">小结</h2>
 <p>今天的课程里，我们讨论了全量本地缓存数据所面临的几个挑战，并针对这些挑战提出了相应的解决策略。现在，让我们一起回顾下这些关键问题和解决方案。</p>
@@ -14279,8 +14279,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

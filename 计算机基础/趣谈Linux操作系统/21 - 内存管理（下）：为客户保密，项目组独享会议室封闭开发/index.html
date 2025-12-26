@@ -6847,10 +6847,10 @@
 <p>上一节，我们讲了虚拟空间的布局。接下来，我们需要知道，如何将其映射成为物理地址呢？</p>
 <p>你可能已经想到了，咱们前面讲x86 CPU的时候，讲过分段机制，咱们规划虚拟空间的时候，也是将空间分成多个段进行保存。</p>
 <p>那就直接用分段机制呗。我们来看看分段机制的原理。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/96/eb/9697ae17b9f561e78514890f9d58d4eb.jpg?wh=3193%2A1949" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/96/eb/9697ae17b9f561e78514890f9d58d4eb.jpg?wh=3193%2A1949" /></p>
 <p>分段机制下的虚拟地址由两部分组成，<strong>段选择子</strong>和<strong>段内偏移量</strong>。段选择子就保存在咱们前面讲过的段寄存器里面。段选择子里面最重要的是<strong>段号</strong>，用作段表的索引。段表里面保存的是这个段的<strong>基地址</strong>、<strong>段的界限</strong>和<strong>特权等级</strong>等。虚拟地址中的段内偏移量应该位于0和段界限之间。如果段内偏移量是合法的，就将段基地址加上段内偏移量得到物理内存地址。</p>
 <p>例如，我们将上面的虚拟空间分成以下4个段，用0～3来编号。每个段在段表中有一个项，在物理空间中，段的排列如下图的右边所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7c/04/7c82068d2d6bdb601084a07569ac8b04.jpg?wh=2323%2A1553" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7c/04/7c82068d2d6bdb601084a07569ac8b04.jpg?wh=2323%2A1553" /></p>
 <p>如果要访问段2中偏移量600的虚拟地址，我们可以计算出物理地址为，段2基地址2000 + 偏移量600 = 2600。</p>
 <p>多好的机制啊！我们来看看Linux是如何使用这个机制的。</p>
 <p>在Linux里面，段表全称<strong>段描述符表</strong>（segment descriptors），放在<strong>全局描述符表GDT</strong>（Global Descriptor Table）里面，会有下面的宏来初始化段描述符表里面的表项。</p>
@@ -6890,20 +6890,20 @@
 <p>其实Linux倾向于另外一种从虚拟地址到物理地址的转换方式，称为<strong>分页</strong>（Paging）。</p>
 <p>对于物理内存，操作系统把它分成一块一块大小相同的页，这样更方便管理，例如有的内存页面长时间不用了，可以暂时写到硬盘上，称为<strong>换出</strong>。一旦需要的时候，再加载进来，叫做<strong>换入</strong>。这样可以扩大可用物理内存的大小，提高物理内存的利用率。</p>
 <p>这个换入和换出都是以页为单位的。页面的大小一般为4KB。为了能够定位和访问每个页，需要有个页表，保存每个页的起始地址，再加上在页内的偏移量，组成线性地址，就能对于内存中的每个位置进行访问了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ab/40/abbcafe962d93fac976aa26b7fcb7440.jpg?wh=2173%2A1452" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ab/40/abbcafe962d93fac976aa26b7fcb7440.jpg?wh=2173%2A1452" /></p>
 <p>虚拟地址分为两部分，<strong>页号</strong>和<strong>页内偏移</strong>。页号作为页表的索引，页表包含物理页每页所在物理内存的基地址。这个基地址与页内偏移的组合就形成了物理内存地址。</p>
 <p>下面的图，举了一个简单的页表的例子，虚拟内存中的页通过页表映射为了物理内存中的页。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/84/eb/8495dfcbaed235f7500c7e11149b2feb.jpg?wh=2077%2A1347" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/84/eb/8495dfcbaed235f7500c7e11149b2feb.jpg?wh=2077%2A1347" /></p>
 <p>32位环境下，虚拟地址空间共4GB。如果分成4KB一个页，那就是1M个页。每个页表项需要4个字节来存储，那么整个4GB空间的映射就需要4MB的内存来存储映射表。如果每个进程都有自己的映射表，100个进程就需要400MB的内存。对于内核来讲，有点大了 。</p>
 <p>页表中所有页表项必须提前建好，并且要求是连续的。如果不连续，就没有办法通过虚拟地址里面的页号找到对应的页表项了。</p>
 <p>那怎么办呢？我们可以试着将页表再分页，4G的空间需要4M的页表来存储映射。我们把这4M分成1K（1024）个4K，每个4K又能放在一页里面，这样1K个4K就是1K个页，这1K个页也需要一个表进行管理，我们称为页目录表，这个页目录表里面有1K项，每项4个字节，页目录表大小也是4K。</p>
 <p>页目录有1K项，用10位就可以表示访问页目录的哪一项。这一项其实对应的是一整页的页表项，也即4K的页表项。每个页表项也是4个字节，因而一整页的页表项是1K个。再用10位就可以表示访问页表项的哪一项，页表项中的一项对应的就是一个页，是存放数据的页，这个页的大小是4K，用12位可以定位这个页内的任何一个位置。</p>
 <p>这样加起来正好32位，也就是用前10位定位到页目录表中的一项。将这一项对应的页表取出来共1k项，再用中间10位定位到页表中的一项，将这一项对应的存放数据的页取出来，再用最后12位定位到页中的具体位置访问数据。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b6/b8/b6960eb0a7eea008d33f8e0c4facc8b8.jpg?wh=2594%2A2514" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b6/b8/b6960eb0a7eea008d33f8e0c4facc8b8.jpg?wh=2594%2A2514" /></p>
 <p>你可能会问，如果这样的话，映射4GB地址空间就需要4MB+4KB的内存，这样不是更大了吗？ 当然如果页是满的，当时是更大了，但是，我们往往不会为一个进程分配那么多内存。</p>
 <p>比如说，上面图中，我们假设只给这个进程分配了一个数据页。如果只使用页表，也需要完整的1M个页表项共4M的内存，但是如果使用了页目录，页目录需要1K个全部分配，占用内存4K，但是里面只有一项使用了。到了页表项，只需要分配能够管理那个数据页的页表项页就可以了，也就是说，最多4K，这样内存就节省多了。</p>
 <p>当然对于64位的系统，两级肯定不够了，就变成了四级目录，分别是全局页目录项PGD（Page Global Directory）、上层页目录项PUD（Page Upper Directory）、中间页目录项PMD（Page Middle Directory）和页表项PTE（Page Table Entry）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/42/0b/42eff3e7574ac8ce2501210e25cd2c0b.jpg?wh=2593%2A1492" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/42/0b/42eff3e7574ac8ce2501210e25cd2c0b.jpg?wh=2593%2A1492" /></p>
 <h2 id="_1">总结时刻</h2>
 <p>这一节我们讲了分段机制、分页机制以及从虚拟地址到物理地址的映射方式。总结一下这两节，我们可以把内存管理系统精细化为下面三件事情：</p>
 <ul>
@@ -6911,11 +6911,11 @@
 <li>第二，物理内存的管理，将物理内存分成大小相等的页；</li>
 <li>第三，内存映射，将虚拟内存页和物理内存页映射起来，并且在内存紧张的时候可以换出到硬盘中。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7d/91/7dd9039e4ad2f6433aa09c14ede92991.jpg?wh=2523%2A1629" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7d/91/7dd9039e4ad2f6433aa09c14ede92991.jpg?wh=2523%2A1629" /></p>
 <h2 id="_2">课堂练习</h2>
 <p>这一节我们说一个页的大小为4K，有时候我们需要为应用配置大页（HugePage）。请你查一下大页的大小及配置方法，咱们后面会用到。</p>
 <p>欢迎留言和我分享你的疑惑和见解，也欢迎你收藏本节内容，反复研读。你也可以把今天的内容分享给你的朋友，和他一起学习、进步。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8c/37/8c0a95fa07a8b9a1abfd394479bdd637.jpg?wh=1110%2A659" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8c/37/8c0a95fa07a8b9a1abfd394479bdd637.jpg?wh=1110%2A659" /></p>
 <div><strong>精选留言（15）</strong></div>
 <ul>
 <li><span>geraltlaush</span> 👍（72） 💬（2）<p>分页机制本质上来说就是类似于linux文件系统的目录管理一样，页目录项和页表项相当于根目录和上级目录，页内便宜量就是相对路径，绝对路径就是整个32位地址，分布式存储系统也是采用的类似的机制，先用元数据存储前面的路径，再用块内偏移定位到具体文件，感觉道理都差不多</p>2019-05-15</li><br/><li><span>栋能</span> 👍（17） 💬（2）<p>64位Linux机器，4KB页大小，那虚拟地址组成应该是：22位PGD、10位PUD、10位PMD、10位PTE、12位页偏移地址</p>2019-07-20</li><br/><li><span>崔伟协</span> 👍（16） 💬（4）<p>分页，分段机制的优劣在于哪儿呢，为什么有分页分段</p>2019-05-15</li><br/><li><span>Helios</span> 👍（10） 💬（5）<p>请问老师为什么一个表项用4个字节去存储呢</p>2019-05-15</li><br/><li><span>garlic</span> 👍（4） 💬（1）<p>处理器体系结构支持多重页面大小，操作系统可以根据需要进行相关设置，Linux可以通过hugepage，结合处理器支持页面大小设置多种页面大小，相关笔记： https:&#47;&#47;garlicspace.com&#47;2020&#47;01&#47;10&#47;%e5%86%85%e5%ad%98%e7%ae%a1%e7%90%86-%e9%a1%b5%e9%9d%a2%e5%a4%a7%e5%b0%8f&#47;</p>2020-01-11</li><br/><li><span>饭粒</span> 👍（2） 💬（5）<p>32位系统的两级页表那“ 映射 4GB 地址空间就需要 4MB+4KB 的内存”，怎么算的 4MB+4KB ？不太明白。</p>2019-06-27</li><br/><li><span>小松松</span> 👍（2） 💬（1）<p>请问一下，Linux在哪些管理上使用的分段，哪些情况使用的是分页呢？  还是说现代操作系统都已经倾向于使用分页来管理了。</p>2019-05-20</li><br/><li><span>有铭</span> 👍（2） 💬（2）<p>为什么页的默认大小是4KB，这是以什么理由定下来的，为什么不是2KB或者8KB呢</p>2019-05-15</li><br/><li><span>k先生</span> 👍（1） 💬（1）<p>老师，现在不都是用倒排页表了吗？还用多级页表吗？</p>2020-01-07</li><br/><li><span>佳俊</span> 👍（0） 💬（1）<p>老师，你好，页表目录和页表也需要内存空间，这些内存空间是在哪里分配的呢？</p>2020-05-18</li><br/><li><span>落石</span> 👍（0） 💬（1）<p>64 位系统 2的64次方。四级页表，如果每级仍然以4K划分那就是 2^64 &#47; 2^12 * 4 &#47; 2^10 * 4 &#47; 2^10 * 4 &#47; 2^10 * 4 = 2^24，即16M*4，64M每个进程？为什么没有采用位图的形式，记录页表索引。这样可以大量节约空间。</p>2019-07-11</li><br/><li><span>zhouzg</span> 👍（0） 💬（1）<p>课程太好了，系统的认识了操作系统，之前总是会出现一些想不明白的点，找的资料都是零散的，虽然也能看明白一点，但总是不系统，东西窜不起来。</p>2019-06-26</li><br/><li><span>zhouzg</span> 👍（0） 💬（1）<p>这里之前了解过一点内存寻址的原理，CPU引脚对寻址的作用等。虽然还没理解透，但是结合这篇文章有一些启发。</p>2019-06-26</li><br/><li><span>深海极光</span> 👍（0） 💬（2）<p>老师请问下，不同进程的虚拟地址会出现映射到同一个物理地址即相同的page，如果会是把这个page换出还是怎么处理的，如果不回映射到同一个又是怎么保证的呢，谢谢</p>2019-06-03</li><br/><li><span>一笔一画</span> 👍（0） 💬（1）<p>hugepage好像dpdk用过，这个应该对应的页目录项也会相应变少吧？另外，换页不是会很惨吗？</p>2019-05-17</li><br/>
@@ -7031,8 +7031,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

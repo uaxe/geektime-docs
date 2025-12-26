@@ -6092,9 +6092,9 @@
 <a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>cat $CGROUP_CONTAINER_PATH/memory.limit_in_bytes
 </code></pre></div>
 <p>好了，容器启动后，里面有一个小程序mem_alloc会不断地申请内存。当它申请的内存超过512MB的时候，你就会发现，我们启动的这个容器消失了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2d/5c/2db8dc6de63ae22c585e64fbf1a0395c.png?wh=1626%2A480" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2d/5c/2db8dc6de63ae22c585e64fbf1a0395c.png?wh=1626%2A480" /></p>
 <p>这时候，如果我们运行<code>docker inspect</code> 命令查看容器退出的原因，就会看到容器处于"exited"状态，并且"OOMKilled"是true。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/da/2a/dafcb895b0c49b9d01b10d0bbac9102a.png?wh=1102%2A408" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/da/2a/dafcb895b0c49b9d01b10d0bbac9102a.png?wh=1102%2A408" /></p>
 <p>那么问题来了，什么是OOM Killed呢？它和之前我们对容器Memory Cgroup做的设置有什么关系，又是怎么引起容器退出的？想搞清楚这些问题，我们就需要先理清楚基本概念。</p>
 <h3 id="oom-killer">如何理解OOM Killer？</h3>
 <p>我们先来看一看OOM Killer是什么意思。</p>
@@ -6133,7 +6133,7 @@
 <p>我们可以查看这个值，然后把它和memory.limit_in_bytes里的值做比较，根据接近程度来可以做个预判。这两个值越接近，OOM的风险越高。通过这个方法，我们就可以得知，当前控制组内使用总的内存量有没有OOM的风险了。</p>
 <p>控制组之间也同样是树状的层级结构，在这个结构中，父节点的控制组里的memory.limit_in_bytes值，就可以限制它的子节点中所有进程的内存使用。</p>
 <p>我用一个具体例子来说明，比如像下面图里展示的那样，group1里的memory.limit_in_bytes设置的值是200MB，它的子控制组group3里memory.limit_in_bytes值是500MB。那么，我们在group3里所有进程使用的内存总值就不能超过200MB，而不是500MB。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6c/07/6c65856f5dce81c064a63d6ffe0ca507.jpeg?wh=1920%2A1080" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6c/07/6c65856f5dce81c064a63d6ffe0ca507.jpeg?wh=1920%2A1080" />
 好了，我们这里介绍了Memory Cgroup最基本的概念，简单总结一下：</p>
 <p>第一，Memory Cgroup中每一个控制组可以为一组进程限制内存使用量，一旦所有进程使用内存的总量达到限制值，缺省情况下，就会触发OOM Killer。这样一来，控制组里的“某个进程”就会被杀死。</p>
 <p>第二，这里杀死“某个进程”的选择标准是，<strong>控制组中总的可用页面乘以进程的oom_score_adj，加上进程已经使用的物理内存页面，所得值最大的进程，就会被系统选中杀死。</strong></p>
@@ -6146,7 +6146,7 @@
 <p>还是拿我们这一讲最开始发生OOM的容器作为例子。我们通过查看内核的日志，使用用 <code>journalctl -k</code> 命令，或者直接查看日志文件/var/log/message，我们会发现当容器发生OOM Kill的时候，内核会输出下面的这段信息，大致包含下面这三部分的信息：</p>
 <p>第一个部分就是<strong>容器里每一个进程使用的内存页面数量。</strong>在"rss"列里，"rss'是Resident Set Size的缩写，指的就是进程真正在使用的物理内存页面数量。</p>
 <p>比如下面的日志里，我们看到init进程的"rss"是1个页面，mem_alloc进程的"rss"是130801个页面，内存页面的大小一般是4KB，我们可以做个估算，130801 * 4KB大致等于512MB。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f6/ec/f681cd4d97a34ebb8a9458b7a0d5a9ec.png?wh=3350%2A454" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f6/ec/f681cd4d97a34ebb8a9458b7a0d5a9ec.png?wh=3350%2A454" /></p>
 <p>第二部分我们来看上面图片的 <strong>"oom-kill:"</strong> 这行，这一行里列出了发生OOM的Memroy Cgroup的控制组，我们可以从控制组的信息中知道OOM是在哪个容器发生的。</p>
 <p>第三部分是图中 <strong>"Killed process 7445 (mem_alloc)" 这行，它显示了最终被OOM Killer杀死的进程。</strong></p>
 <p>我们通过了解内核日志里的这些信息，可以很快地判断出容器是因为OOM而退出的，并且还可以知道是哪个进程消耗了最多的Memory。</p>
@@ -6160,7 +6160,7 @@
 <p>请注意，这里Linux系统肯定不能随心所欲地杀掉进程，那具体要用什么选择标准呢？</p>
 <p>杀掉“某个进程”的选择标准，涉及到内核函数oom_badness()。具体的计算方法是 ：<strong>系统总的可用页面数乘以进程的OOM校准值oom_score_adj，再加上进程已经使用的物理页面数，计算出来的值越大，那么这个进程被OOM Kill的几率也就越大。</strong></p>
 <p>接下来，我给你讲解了Memory Cgroup里最基本的三个参数，分别是<strong>memory.limit_in_bytes， memory.oom_control 和 memory.usage_in_bytes。</strong>我把这三个参数的作用，给你总结成了一张图。第一个和第三个参数，下一讲中我们还会用到，这里你可以先有个印象。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2e/81/2e3121a256b34bab80799002b2549881.jpeg?wh=3200%2A1800" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2e/81/2e3121a256b34bab80799002b2549881.jpeg?wh=3200%2A1800" /></p>
 <p>容器因为OOM被杀，要如何处理呢？我们可以通过内核日志做排查，查看容器里内存使用最多的进程，然后对它进行分析。根据我的经验，解决思路要么是提高容器的最大内存限制，要么需要我们具体去解决进程代码的BUG。</p>
 <h2 id="_4">思考题</h2>
 <p>在我们的例子<a href="https://github.com/chengyli/training/blob/main/memory/oom/start_container.sh">脚本</a>基础上，你可以修改一下，在容器刚一启动，就在容器对应的Memory Cgroup中禁止OOM，看看接下来会发生什么？</p>
@@ -6298,8 +6298,6 @@ anon-rss +  file-rss &gt; limit时触发，然后看到您在评论里有描述�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -7017,12 +7017,12 @@
 <p>我们通常所说的内存容量，就像我刚刚提到的8GB，其实指的是物理内存。物理内存也称为主存，大多数计算机用的主存都是动态随机访问内存（DRAM）。只有内核才可以直接访问物理内存。那么，进程要访问内存时，该怎么办呢？</p>
 <p>Linux 内核给每个进程都提供了一个独立的虚拟地址空间，并且这个地址空间是连续的。这样，进程就可以很方便地访问内存，更确切地说是访问虚拟内存。</p>
 <p>虚拟地址空间的内部又被分为<strong>内核空间和用户空间</strong>两部分，不同字长（也就是单个CPU指令可以处理数据的最大长度）的处理器，地址空间的范围也不同。比如最常见的 32 位和 64 位系统，我画了两张图来分别表示它们的虚拟地址空间，如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ed/7b/ed8824c7a2e4020e2fdd2a104c70ab7b.png?wh=1004%2A456" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ed/7b/ed8824c7a2e4020e2fdd2a104c70ab7b.png?wh=1004%2A456" /></p>
 <p>通过这里可以看出，32位系统的内核空间占用 1G，位于最高处，剩下的3G是用户空间。而 64 位系统的内核空间和用户空间都是 128T，分别占据整个内存空间的最高和最低处，剩下的中间部分是未定义的。</p>
 <p>还记得进程的用户态和内核态吗？进程在用户态时，只能访问用户空间内存；只有进入内核态后，才可以访问内核空间内存。虽然每个进程的地址空间都包含了内核空间，但这些内核空间，其实关联的都是相同的物理内存。这样，进程切换到内核态后，就可以很方便地访问内核空间内存。</p>
 <p>既然每个进程都有一个这么大的地址空间，那么所有进程的虚拟内存加起来，自然要比实际的物理内存大得多。所以，并不是所有的虚拟内存都会分配物理内存，只有那些实际使用的虚拟内存才分配物理内存，并且分配后的物理内存，是通过<strong>内存映射</strong>来管理的。</p>
 <p>内存映射，其实就是将<strong>虚拟内存地址</strong>映射到<strong>物理内存地址</strong>。为了完成内存映射，内核为每个进程都维护了一张页表，记录虚拟地址与物理地址的映射关系，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fc/b6/fcfbe2f8eb7c6090d82bf93ecdc1f0b6.png?wh=572%2A370" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fc/b6/fcfbe2f8eb7c6090d82bf93ecdc1f0b6.png?wh=572%2A370" /></p>
 <p>页表实际上存储在 CPU 的内存管理单元 MMU中，这样，正常情况下，处理器就可以直接通过硬件，找出要访问的内存。</p>
 <p>而当进程访问的虚拟地址在页表中查不到时，系统会产生一个<strong>缺页异常</strong>，进入内核空间分配物理内存、更新进程页表，最后再返回用户空间，恢复进程的运行。</p>
 <p>另外，我在 <a href="https://time.geekbang.org/column/article/69859">CPU 上下文切换的文章中</a>曾经提到， TLB（Translation Lookaside Buffer，转译后备缓冲器）会影响 CPU 的内存访问性能，在这里其实就可以得到解释。</p>
@@ -7031,12 +7031,12 @@
 <p>页的大小只有4 KB ，导致的另一个问题就是，整个页表会变得非常大。比方说，仅 32 位系统就需要 100 多万个页表项（4GB/4KB），才可以实现整个地址空间的映射。为了解决页表项过多的问题，Linux 提供了两种机制，也就是多级页表和大页（HugePage）。</p>
 <p>多级页表就是把内存分成区块来管理，将原来的映射关系改成区块索引和区块内的偏移。由于虚拟内存空间通常只用了很少一部分，那么，多级页表就只保存这些使用中的区块，这样就可以大大地减少页表的项数。</p>
 <p>Linux 用的正是四级页表来管理内存页，如下图所示，虚拟地址被分为5个部分，前4个表项用于选择页，而最后一个索引表示页内偏移。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b5/25/b5c9179ac64eb5c7ca26448065728325.png?wh=1390%2A460" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b5/25/b5c9179ac64eb5c7ca26448065728325.png?wh=1390%2A460" /></p>
 <p>再看大页，顾名思义，就是比普通页更大的内存块，常见的大小有 2MB 和 1GB。大页通常用在使用大量内存的进程上，比如 Oracle、DPDK 等。</p>
 <p>通过这些机制，在页表的映射下，进程就可以通过虚拟地址来访问物理内存了。那么具体到一个 Linux 进程中，这些内存又是怎么使用的呢？</p>
 <h2 id="_2">虚拟内存空间分布</h2>
 <p>首先，我们需要进一步了解虚拟内存空间的分布情况。最上方的内核空间不用多讲，下方的用户空间内存，其实又被分成了多个不同的段。以 32 位系统为例，我画了一张图来表示它们的关系。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/71/5d/71a754523386cc75f4456a5eabc93c5d.png?wh=266%2A354" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/71/5d/71a754523386cc75f4456a5eabc93c5d.png?wh=266%2A354" /></p>
 <p>通过这张图你可以看到，用户空间内存，从低到高分别是五种不同的内存段。</p>
 <ol>
 <li>只读段，包括代码和常量等。</li>
@@ -7265,8 +7265,6 @@ redis对内存比较敏感，曾经就因为配置项是默认值，在内存用
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

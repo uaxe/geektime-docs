@@ -6529,7 +6529,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>julia&gt; add(2,3)
 </code></pre></div>
 <p>这会触发Julia的编译过程，并且程序会停在断点上。我整理了一下调用栈的信息，你可以看看，即时编译是如何被触发的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c8/75/c87ce502a6299f9ec36920a3f5358c75.jpg?wh=2284%2A2758" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c8/75/c87ce502a6299f9ec36920a3f5358c75.jpg?wh=2284%2A2758" /></p>
 <p>通过跟踪执行和阅读源代码，你会发现Julia中最重要的几个源代码：</p>
 <ul>
 <li><strong>gf.c</strong>：Julia以方法分派快速而著称。对于类似加法的这种运算，它会有上百个方法的实现，所以在运行时，就必须能迅速定位到准确的方法。分派就是在gf.c里。</li>
@@ -6548,9 +6548,9 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>(lldb) expr jl_(src)
 </code></pre></div>
 <p>为了让你能更容易看懂，我稍微整理了一下输出的信息的格式：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3c/dc/3c618c6594d3f021fe36cafc28b222dc.jpg?wh=1566%2A1194" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3c/dc/3c618c6594d3f021fe36cafc28b222dc.jpg?wh=1566%2A1194" /></p>
 <p>你会发现，这跟用<strong>@code_typed(add(2,3))命令</strong>打印出来的信息是一致的，只不过宏里显示的信息会更加简洁：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f5/25/f5be1674c76593192ae65c00f3402325.jpg?wh=504%2A164" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f5/25/f5be1674c76593192ae65c00f3402325.jpg?wh=504%2A164" /></p>
 <p>接下来，查看emit_function函数，你就能够看到生成LLVM IR的整个过程。</p>
 <h2 id="llvm-ir">生成LLVM IR</h2>
 <p>LLVM的IR有几个特点：</p>
@@ -6570,11 +6570,11 @@
 <h2 id="llvmpass">运行LLVM的Pass</h2>
 <p>我们之所以会使用LLVM，很重要的一个原因就是利用它里面的丰富的优化算法。</p>
 <p>LLVM的优化过程被标准化成了一个个的Pass，并由一个PassManager来管理。你可以查看jitlayers.cpp中的<a href="https://github.com/JuliaLang/julia/blob/v1.4.1/src/jitlayers.cpp#L113">addOptimizationPasses</a>()函数，看看Julia都使用了哪些Pass。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/78/7f/7894d70bbd53dc60f70feb0b63c1097f.jpg?wh=2284%2A3464" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/78/7f/7894d70bbd53dc60f70feb0b63c1097f.jpg?wh=2284%2A3464" /></p>
 <p>LoopRotate：<a href="https://llvm.org/docs/LoopTerminology.html#loop-terminology-loop-rotate">官方文档</a> / SLPVectorizer：<a href="https://llvm.org/docs/Vectorizers.html#the-slp-vectorizer">官方文档</a> /《编译原理之美》：<a href="https://time.geekbang.org/column/article/160990">第31讲</a></p>
 <p>上面表格中的Pass都是LLVM中自带的Pass。你要注意，运用好这些Pass，会产生非常好的优化效果。比如，某个开源项目，由于对性能的要求比较高，所以即使在Windows平台上，仍然强烈建议使用Clang来编译，而Clang就是基于LLVM的。</p>
 <p>除此之外，Julia还针对自己语言的特点，写了几个个性化的Pass。比如：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/12/56/12381d4dce04315f25cfb0fc40819256.jpg?wh=2284%2A1639" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/12/56/12381d4dce04315f25cfb0fc40819256.jpg?wh=2284%2A1639" /></p>
 <p>这些个性化的Pass是针对Julia本身的语言特点而编写的。比如对于垃圾收集，每种语言的实现策略都不太一样，因此就必须自己实现相应的Pass，去插入与垃圾收集有关的代码。再比如，Julia是面向科学计算的，比较在意数值计算的性能，所以自己写了两个Pass来更好地利用CPU的一些特殊指令集。</p>
 <p>emit_function函数最后返回的是一个<strong>模块（Module）对象</strong>，这个模块里只有一个函数。这个模块会被加入到一个<a href="https://github.com/JuliaLang/julia/blob/v1.4.1/src/jitlayers.h#L105">JuliaOJIT</a>对象中进行集中管理。Julia可以从JuliaOJIT中，查找一个函数并执行，这就是Julia能够即时编译并运行的原因。</p>
 <p>不过，我们刚才说的都是生成LLVM IR和基于IR做优化。<strong>那么，LLVM的IR又是如何生成机器码的呢？对于垃圾收集功能，LLVM是否能给予帮助呢？在使用LLVM方面还需要注意哪些方面的问题呢？</strong></p>
@@ -6621,7 +6621,7 @@
 <li><strong>LLVM为程序优化和生成目标代码提供了可靠的支持</strong>，值得重视。而Julia为使用LLVM，就提供了一个很好的参考。</li>
 </ul>
 <p>本讲的思维导图我也给你整理出来了，供你参考和复习回顾知识点：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0c/58/0cc76aeee4ced068a99227c0e74bc858.jpg?wh=2284%2A1916" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0c/58/0cc76aeee4ced068a99227c0e74bc858.jpg?wh=2284%2A1916" /></p>
 <h2 id="_3">一课一思</h2>
 <p>LLVM强调全生命周期优化的概念。那么我们来思考一个有趣的问题：能否让Julia也像Java的JIT功能一样，在运行时基于推理来做一些激进的优化？如何来实现呢？欢迎在留言区发表你的观点。</p>
 <h2 id="_4">参考资料</h2>
@@ -6750,8 +6750,6 @@ error: attach failed: could not find a process named julia
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

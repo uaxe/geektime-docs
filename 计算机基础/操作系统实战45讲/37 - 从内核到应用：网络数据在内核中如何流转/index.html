@@ -6788,13 +6788,13 @@
 <p>内核态对应的系统服务函数会复制应用程序的数据到内核的内存空间中，然后将数据移交给网络协议栈，在网络协议栈中将数据层层打包。</p>
 <p>最后，包装好的数据会交给网卡驱动，网卡驱动程序负责将打包好的数据写入网卡并让其发送出去。</p>
 <p>我为你准备了一张流程图供你参考，如下所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/dc/bc/dcb38fc1c0eef666eb1496cbf97a82bc.jpg?wh=2705x3530" title="发送过程总览" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dc/bc/dcb38fc1c0eef666eb1496cbf97a82bc.jpg?wh=2705x3530" title="发送过程总览" /></p>
 <p>上图中，只是展示了大致流程，其中还有DMA处理、CRC校验、出错处理等细节，但对于我们理解梳理发送流程，这些就够了。</p>
 <h3 id="_3">接收过程总览</h3>
 <p>了解了发送数据的过程以后，掌握接收数据的过程就更容易了，因为它就是<strong>发送数据的逆过程</strong>。</p>
 <p>首先，网卡接收到数据，通过DMA复制到指定的内存，接着发送中断，以便通知网卡驱动，由网卡驱动处理中断复制数据。然后网络协议收到网卡驱动传过来的数据，层层解包，获取真正的有效数据。最后，这个数据会发送给用户态监听的应用进程。</p>
 <p>为了让你更加直观地了解这一过程，我特意准备了一张流程图供你参考，如下所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8a/dd/8a726909f0a19ff1683e541d3712b4dd.jpg?wh=3095x3230" title="接收过程总览" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8a/dd/8a726909f0a19ff1683e541d3712b4dd.jpg?wh=3095x3230" title="接收过程总览" /></p>
 <p>前面只是帮你梳理一下数据的发送与接收的流程，其实我们真正要关注的是网络协议。可是我们若手动实现一个完整的网络协议，不太现实，网络协议的复杂度大到也许要重新开一门课程，才可以完全解决，所以下面我们借用一下lwIP项目，以这个为基础来讨论网络协议。</p>
 <h2 id="lwip">认识一下lwIP架构</h2>
 <p>现在我们清楚了一次具体网络发收过程是怎么回事，那怎么让Cosmos实现网络通信呢？这里我们选择lwIP这个TCP/IP协议的轻量级开源项目，让它成为Cosmos的网络部的战略合作伙伴。</p>
@@ -6803,7 +6803,7 @@
 <p>这里的“完整性”主要是指TCP协议的完整性，实现的关键点就是<strong>在保持TCP协议主要功能的基础上减少对RAM的占用。</strong>同时，lwIP还支持IPv6的标准实现，这也让我们与现代交换设备的对接变得非常方便。</p>
 <p>这里额外提供你一份扩展阅读资料，lwIP的项目<a href="http://savannah.nongnu.org/projects/lwip/">主页链接</a>，这里包含了大量相关资料，感兴趣的同学可以课后深入了解。另外，lwIP既可以移植到操作系统上运行，也可以在没有操作系统的情况下独立运行。</p>
 <p>lwIP在结构上可分为四层：OS层、API层、核心层、硬件驱动层，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ba/60/ba5f483d0f1a6a5d241bde9c25e6d160.jpg?wh=2745x2524" title="lwIP架构图副本" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ba/60/ba5f483d0f1a6a5d241bde9c25e6d160.jpg?wh=2745x2524" title="lwIP架构图副本" /></p>
 <p><strong>第一层</strong></p>
 <p>MCU的业务层是lwIP的服务对象，也是其自身代码使用lwIP的地方。大部分时候我们都是从这里入手，通过netconn或lwip_api使用lwIP的各种功能函数。</p>
 <p>在典型的TCP通信的客户端应用程序中，一般先要通过netconn_new创建一个struct netconn对象，然后调用netconn_connect连接到服务器，并返回成功或失败。成功后，可以调用netconn_write向服务器发送数据，也可以调用netconn_recv接收数据。最后，关闭连接并通过netconn_close释放资源。</p>
@@ -6828,13 +6828,13 @@
 <p>由于我们把lwIP作为Cosmos的一个内核组件来工作，自然要由lwIP接收来自内核上层发来的数据。内核上层首先会调用lwIP的netconn层的接口函数<strong>netconn_write</strong>，通过这个函数，数据正式流进lwIP组件层。</p>
 <p>接着，netconn层调用lwIP组件的TCP层的接口函数tcp_write，在TCP层对数据首次进行打包。然后，TCP层将打包好的数据通过调用io_output函数，向下传递给lwIP组件的IP层，进行打包。</p>
 <p>最后，IP层将打包好的数据发送给网卡驱动接口层netif，这里调用了实际的网卡驱动程序，将数据发送出去。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b3/2c/b31c19ff5c0f89729f0a3d2a42a2452c.jpg?wh=2455x3222" title="数据发送逻辑" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b3/2c/b31c19ff5c0f89729f0a3d2a42a2452c.jpg?wh=2455x3222" title="数据发送逻辑" /></p>
 <h3 id="_5">数据接收</h3>
 <p>数据接收的步骤相比数据发送稍微多一些，但也不用害怕，跟住我的讲解思路一定可以理清这个过程。</p>
 <p>数据接收需要应用程序首先调用lwIP的netconn层的netconn_recv接口。然后由netconn层调用sys_arch_mbox_fetch函数，进入监听等待相关的mbox。</p>
 <p>接着，数据会进入网卡，驱动程序相关的函数负责把它复制到内存。再然后是调用ethernet_input函数，进入ethernet层。完成相关处理后，调用ip4_input函数，数据在lwIP组件的IP层对数据解包，进行相应处理之后，还会调用tcp_input函数，进入lwIP组件的TCP层对数据解包。</p>
 <p>最后，调用sys_mbox_trypost函数把数据放入特定的mbox，也就是消息盒子里，这样等待监听的应用程序就能得到数据了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d3/ef/d3e0530bb72990da0b56784a73e8ecef.jpg?wh=4030x2305" title="数据接收逻辑" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d3/ef/d3e0530bb72990da0b56784a73e8ecef.jpg?wh=4030x2305" title="数据接收逻辑" /></p>
 <p>在了解了lwIP组件收发数据的过程之后，就可以进行移植的相关工作了。lwIP的结构设计非常优秀，这让移植工作变得很容易。我们这里只要了解lwIP组件的<strong>sys_arch层的接口函数</strong>即可。</p>
 <p>下面我们一起了解lwIP的移植细节。</p>
 <h2 id="_6">协议栈移植</h2>
@@ -6845,7 +6845,7 @@
 <h3 id="_7">有操作系统模式</h3>
 <p>在之前的课程里我们已经正确实现了Cosmos操作系统了，现在我们就可以在Cosmos系统提供的IPC等机制基础之上，对照 sys.h 文件中声明的函数一一去实现了。</p>
 <p>实际工程中完整移植网络栈，需要将后面表格里的这30多个函数全部实现。我会带你完成邮箱和系统线程相关的关键部分移植，其他函数的移植思路也大同小异，这里就不一一演示了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/51/ff/51791a1817fca811aaa1c0240c4135ff.jpg?wh=902x1198" title="函数表格" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/51/ff/51791a1817fca811aaa1c0240c4135ff.jpg?wh=902x1198" title="函数表格" /></p>
 <p>从上表中我们可以发现，这些变量和函数主要面向信号量、互斥体和邮箱，包括创建、删除、释放和获取等各种操作，所以我们需要根据操作系统的规定来实现这些函数。</p>
 <p>突然看到这么多功能，是不是有点慌？其实不用怕，因为这些功能的实现起来非常简单。首先，我们通过一个例子来看看邮箱功能的实现。</p>
 <p>在lwIP中，用户代码通过邮箱与协议栈内部交互。邮箱本质上是指向数据的指针。API将指针传递给内核，内核通过这个指针访问数据，然后进行处理。相反，内核也是通过邮箱将数据传递给用户代码的。</p>
@@ -7146,8 +7146,6 @@ https:&#47;&#47;www.kancloud.cn&#47;jiejietop&#47;tcpip&#47;988547</p>2021-08-03
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

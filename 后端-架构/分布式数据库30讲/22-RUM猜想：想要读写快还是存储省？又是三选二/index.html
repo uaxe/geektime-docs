@@ -14507,7 +14507,7 @@
 <p>我们可以想一下，数据以什么形式存储，可以实现最快的写入速度？答案肯定是按照顺序写入，每次新增数据都追加在文件尾部，因为这样物理磁盘的磁头移动距离最小。</p>
 <p>但这种方式对于读取显然是不友好的，因为没有任何有意义的数据结构做辅助，读操作必须从头到尾扫描文件。反过来，如果要实现更高效的读取，就要设计更复杂的数据结构，那么写入的速度当然就降低了，同时在存储空间上也会有额外的要求。</p>
 <p>2016年的一篇论文将我们这种朴素的理解提升到理论层面，这就是RUM猜想。RUM猜想来自论文“<a href="https://stratos.seas.harvard.edu/files/stratos/files/rum.pdf">Designing Access Methods: The RUM Conjecture</a>”（Manos Athanassoulis et al.(2016)），同时被SIGMOD和EDBT收录。它说的是，对任何数据结构来说，在Read Overhead（读）、Update Overhead（写） 和 Memory or Storage Overhead（存储） 中，同时优化两项时，需要以另一项劣化作为代价。论文用一幅图展示了常见数据结构在这三个优化方向中的位置，这里我摘录下来便于你理解。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ea/15/eafcd1bd0c76c600f576b4a364bf7f15.png?wh=2406%2A1308" title="引自Manos Athanassoulis et al.(2016)" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ea/15/eafcd1bd0c76c600f576b4a364bf7f15.png?wh=2406%2A1308" title="引自Manos Athanassoulis et al.(2016)" /></p>
 <p>在这张图中，我们可以看到两个非常熟悉的数据结构B-Tree和LSM，它们被用于分布式数据库的存储引擎中，前者（实际是B+Tree，B-Tree的变体）主要用于PGXC，后者则主要用于NewSQL。这是不是代表PGXC就是要针对读操作，而NewSQL是针对写操作呢？并没有这么简单，还是要具体分析数据结构的使用过程。</p>
 <p>下面，我们先从B+Tree说起，它也是单体数据库广泛使用的数据结构。</p>
 <h2 id="_1">存储结构</h2>
@@ -14515,9 +14515,9 @@
 <p>B+Tree是对读操作优化的存储结构，能够支持高效的范围扫描，叶节点之间保留链接并且按主键有序排列，扫描时避免了耗时的遍历树操作。</p>
 <p>我们用一个例子来演示下MySQL数据库的B+Tree写操作过程。</p>
 <p>下面这张图中展示了一棵高度为2的B+Tree，数据存储在5个页表中，每页可存放4条记录。为了方便你理解，我略去了叶子节点指向数据的指针以及叶子节点之间的顺序指针。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6b/c8/6bd6149970b0b760bf61a80fea54ffc8.jpg?wh=2700%2A1019" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6b/c8/6bd6149970b0b760bf61a80fea54ffc8.jpg?wh=2700%2A1019" /></p>
 <p>B+Tree由内节点（InterNode）和叶节点（LeafNode）两类节点构成，前者仅包含索引信息，后者则携带了指向数据的指针。当插入一个索引值为70的记录，由于对应页表的记录已满，需要对B+Tree重新排列，变更其父节点所在页表的记录，并调整相邻页表的记录。完成重新分布后的效果如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/60/46/6069eba71bb31754e85940d34526ae46.jpg?wh=2700%2A1223" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/60/46/6069eba71bb31754e85940d34526ae46.jpg?wh=2700%2A1223" /></p>
 <p>在这个写入过程中存在两个问题：</p>
 <ol>
 <li>写放大</li>
@@ -14535,11 +14535,11 @@
 <p>相对于PGXC，NewSQL风格分布式数据库的底层存储引擎则主要采用LSM-Tree。</p>
 <h3 id="lsm-tree">LSM-Tree</h3>
 <p>LSM-Tree（Log Structured-Merge Tree）由Patrick O’Neil在1996年的<a href="http://db.cs.berkeley.edu/cs286/papers/lsm-acta1996.pdf">同名论文</a>中首先提出。而后Google在<a href="https://www2.cs.duke.edu/courses/cps399.28/current/papers/osdi06-ChangDeanEtAl-bigtable.pdf">Bigtable</a>（Fay Chang et al.(2008)）中使用了这个模型，它的大致处理过程如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/21/39/21dc63cef862c71f5614445cb6477839.png?wh=2184%2A1164" title="引自Fay Chang et al.(2008)" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/21/39/21dc63cef862c71f5614445cb6477839.png?wh=2184%2A1164" title="引自Fay Chang et al.(2008)" /></p>
 <p>系统接收到写操作后会记录日志（Tablet Log）并将数据写入内存（Memtable），这时写操作就可以返回成功了。而在系统接收到读操作时，会在内存和磁盘文件中查找对应的数据。</p>
 <p>你肯定会说不对呀，如果写入的数据都在内存中，磁盘文件又是哪来的呢？</p>
 <p>的确，这中间还少了重要的一步，就是数据落盘的过程，这也是LSM-Tree最有特点的设计。其实，LSM是分成三步完成了数据的落盘。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/71/8e/71ae4696ce4d5cbbfedfc6f5d9f0518e.jpg?wh=2700%2A1423" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/71/8e/71ae4696ce4d5cbbfedfc6f5d9f0518e.jpg?wh=2700%2A1423" /></p>
 <ol>
 <li>第一步已经说过了，就是写入Memtable，同时记录Tablet Log；</li>
 <li>当Memtable的数据达到一定阈值后，系统会把其冻结并将其中的数据顺序写入磁盘上的有序文件（Sorted String Table，SSTable）中，这个操作被称为Flush；当然，执行这个动作的同时，系统会同步创建一个新的Memtable，处理写入请求。</li>
@@ -14573,23 +14573,23 @@
 </ol>
 <!--THE END-->
 
-<p><img alt="" src="https://static001.geekbang.org/resource/image/40/ac/404015015046166f426ab3f159864bac.jpg?wh=2700%2A1276" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/40/ac/404015015046166f426ab3f159864bac.jpg?wh=2700%2A1276" /></p>
 <ol>
 <li>通常系统会通过指定SSTable数量和大小的方式控制每一个层的数据总量。当L0超过预定文件数量，就会触发L0向L1的Compact。因为在L0的SSTable中Key是交叉的，所以要读取L0的所有SSTable，写入L1，完成后再删除L0文件。从L1开始，SSTable都是保证Key不重叠的。</li>
 </ol>
 <!--THE END-->
 
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a7/95/a7c9c1ca7723cfaa180461c1b3a8fd95.jpg?wh=2700%2A1271" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a7/95/a7c9c1ca7723cfaa180461c1b3a8fd95.jpg?wh=2700%2A1271" /></p>
 <ol>
 <li>随着L1层数据量的增多，SSTable可能会重新划分边界，目的是保证数据相对均衡的存储。</li>
 </ol>
 <!--THE END-->
 
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f6/d6/f65536e12e95565ebe36c1596c53f9d6.jpg?wh=2700%2A1267" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f6/d6/f65536e12e95565ebe36c1596c53f9d6.jpg?wh=2700%2A1267" /></p>
 <ol>
 <li>由于L1的文件大小和数量也是受限的，所以随着数据量的增加又会触发L1向L2的Compact。因为L1的文件是不重叠的，所以不用所有L1的文件都参与Compact，这就延缓了磁盘I/O的开销。而L2的单个文件容量会更大，通常从L1开始每层的存储数据量以10倍的速度增长。这样，每次Ln到L(n+1)的compact只会涉及少数的SSTable，间隔的时间也会越来越长。</li>
 </ol>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8c/50/8c891780dd19146d4454a6636c052c50.jpg?wh=2700%2A1548" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8c/50/8c891780dd19146d4454a6636c052c50.jpg?wh=2700%2A1548" /></p>
 <p>说完处理流程，我们再从RUM三个角度来分析下。</p>
 <ol>
 <li>读放大</li>
@@ -14606,7 +14606,7 @@
 <p>数据在同层的SSTable不重叠，这就保证了同层不会存在重复记录。而由于每层存储的数据量是按照比例递增的，所以大部分数据会存储在底层。因此，大部分数据是没有重复记录的，所以数据的空间放大也得到了有效控制。</p>
 <h2 id="_3">分布式数据库的实现</h2>
 <p>到这里我们已经介绍了存储结构的实现原理和它们在单体数据库中的运转过程。在分布式数据库中，数据存储是在每个数据节点上各自进行的，所以原理和过程是完全一样的。因此，TiDB和CockroachDB干脆直接使用RocksDB作为单机存储引擎。在这两个分布式数据库的架构中，RocksDB都位于Raft协议之下，承担具体的数据落地工作。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/19/9f/19a017c90e3cb51c59a96f54563f019f.jpg?wh=2700%2A1155" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/19/9f/19a017c90e3cb51c59a96f54563f019f.jpg?wh=2700%2A1155" /></p>
 <p>他们为什么选择RocksDB呢？CockroachDB的官方解释是，他们的选择完全不是因为要考虑LSM的写优化能力，而是因为RocksDB作为一个成熟的单机存储引擎，可以加速CockroachDB的开发过程，而RocksDB本身也非常优秀，是他们能找到的最好选择。另一方面，TiDB虽然没有提到选择一个写优化的存储引擎是否有特殊意义，但同样也认为RocksDB 是一个非常优秀开源项目，可以满足他们对单机引擎的各种要求。</p>
 <p>不过，很有意思的地方是，经过了早期版本的演进，TiDB和CockroachDB不约而同都推出了自己的单机存储引擎。</p>
 <p>你猜是什么原因呢？我在稍后再给出答案。现在让我们先看看另一款NewSQL风格分布式数据库OceanBase的实现。</p>
@@ -14623,7 +14623,7 @@
 <p>OceanBase的优化还停留在工程层面，那么还有没有更好的理论模型呢?</p>
 <p>2016年真的出现了新的模型，这就是WiscKey。论文“<a href="https://www.usenix.org/system/files/conference/fast16/fast16-papers-lu.pdf">WiscKey: Separating Keys from Values in SSD-conscious Storage</a>”（Lanyue Lu et al.(2016)）阐述了这种模型的设计思想。WiscKey 提出的改进是通过将 value 分离出LSM-Tree的方法来降低写放大。</p>
 <p>WiscKey的主要设计思想是，在SSTable的重写过程中，核心工作是对Key进行整理，保证多个SSTable的Key范围不重叠，且内部有序。而这个过程中Value的重写是没有太大价值的，而从实践看，Value占用的存储空间远远大于Key。这意味着大量的写操作和空间成本被浪费了。所以WiscKey提出将Value从SSTable中分离出来单独存储，这样就降低了写放大系数。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d0/a9/d0eda0529ce4c9796f777c95d46914a9.png?wh=2418%2A958" title="引自Lanyue Lu et al.(2016)" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d0/a9/d0eda0529ce4c9796f777c95d46914a9.png?wh=2418%2A958" title="引自Lanyue Lu et al.(2016)" /></p>
 <p>Value单独存储的问题是按照Key连续读取数据时，对应的Value并不是连续存储，磁盘寻址成本增大。而WiscKey的设计前提是使用SSD替换HDD，SSD的随机读写效率接近于顺序读写，所以能够保持较高的整体效率。事实上，过高的写放大也会严重缩短SSD的使用寿命。WiscKey就是针对SSD提出的存储模型。</p>
 <p>说完WiscKey，你或许猜到了TiDB和Cockroach放弃RocksDB的原因。</p>
 <p>没错，TiDB的新存储引擎TiTan就是受到WiscKey的启发，它目标之一就是将 Value 从 LSM-Tree 中分离出来单独存储，以降低写放大。</p>
@@ -14649,7 +14649,7 @@
 </ol>
 <p>这一讲，我们简单介绍了近年来的主流存储模型，不难发现LSM占据了主导位置。但这并不代表B+Tree是一种失败的设计，两者只是在RUM之间选择了不同的优化方向。同时，是否有可靠的开源工程实现也直接影响到了对应存储模型的流行度，这一点和Raft协议的大规模使用很相似。</p>
 <p>我的一点建议是，记下这些存储模型虽然重要，但更加关键的是对RUM猜想的深入思考，因为架构设计的精髓就在于做出适当的取舍。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5b/32/5bbd48e644e90fda6ce91a0360e7e332.jpg?wh=2700%2A2916" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5b/32/5bbd48e644e90fda6ce91a0360e7e332.jpg?wh=2700%2A2916" /></p>
 <h2 id="_8">思考题</h2>
 <p>课程的最后，我们来看看今天的思考题。今天的课程中，我们介绍了不同的存储模型，其中也提到了Bloom Filter的使用。它是一种神奇的数据结构，在RUM中是空间优化的典型，用很少的空间就可以记录很多数值是否存在。这种数据结构提供了两种操作方式，用于数值的写入和数值的检核，但数据库查询更多是范围查询，在K/V中体现为Scan操作，显然不能直接对应。所以我的问题是，Scan操作是否可以使用Bloom Filter来加速，如果可以又该如何设计呢？</p>
 <p>欢迎你在评论区留言和我一起讨论，我会在答疑篇和你继续讨论这个问题。如果你身边的朋友也对存储引擎这个话题感兴趣，你也可以把今天这一讲分享给他，我们一起讨论。</p>
@@ -14781,8 +14781,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -7217,7 +7217,7 @@
 <p>接下来，我们先来说说，如何使用配置项来“温和”地让Spark SQL选择Broadcast Join。对于参与Join的两张表来说，我们把其中尺寸较小的表称作基表。</p>
 <p>如果基表的存储尺寸小于广播阈值，那么无需开发者显示调用broadcast函数，Spark SQL同样会选择Broadcast Join的策略，在基表之上创建广播变量，来完成两张表的数据关联。</p>
 <p>那么问题来了，广播阈值是什么，它是怎么定义的呢？广播阈值实际上就是一个标记存储尺寸的数值，它可以是10MB、也可是1GB，等等。<strong>广播阈值由如下配置项设定，只要基表小于该配置项的设定值，Spark SQL就会自动选择Broadcast Join策略</strong>。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/94/c2/94842ac81446fdb91942eccf9664fbc2.jpg?wh=1920x411" title="广播阈值配置项" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/94/c2/94842ac81446fdb91942eccf9664fbc2.jpg?wh=1920x411" title="广播阈值配置项" /></p>
 <p>如上表所示，广播阈值的默认值为10MB。一般来说，在工业级应用中，我们往往把它设置到2GB左右，即可有效触发Broadcast Join。广播阈值有了，要比较它与基表存储尺寸谁大谁小，Spark SQL还要还得事先计算好基表的存储尺寸才行。那问题来了，Spark SQL依据什么来计算这个数值呢？</p>
 <p>这个问题要分两种情况讨论：如果基表数据来自文件系统，那么Spark SQL用来与广播阈值对比的基准，就是基表在磁盘中的存储大小。如果基表数据来自DAG计算的中间环节，那么Spark SQL将参考DataFrame执行计划中的统计值，跟广播阈值做对比，如下所示。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">df</span><span class="p">:</span><span class="w"> </span><span class="nc">DataFrame</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_</span>
@@ -7245,7 +7245,7 @@
 <p>为了弥补静态优化的缺陷、同时让Spark SQL变得更加智能，Spark社区在3.0版本中推出了AQE机制。</p>
 <p><strong>AQE的全称是Adaptive Query Execution，翻译过来是“自适应查询执行”。它包含了3个动态优化特性，分别是Join策略调整、自动分区合并和自动倾斜处理</strong>。</p>
 <p>或许是Spark社区对于新的优化机制偏向于保守，AQE机制默认是未开启的，要想充分利用上述的3个特性，我们得先把spark.sql.adaptive.enabled修改为true才行。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/62/53/6213e9819da6a63be3f9714932da0c53.jpg?wh=1920x437" title="是否启用AQE" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/62/53/6213e9819da6a63be3f9714932da0c53.jpg?wh=1920x437" title="是否启用AQE" /></p>
 <p>好啦，成功开启了AQE机制之后，接下来，我们就结合相关的配置项，来聊一聊这些特性都解决了哪些问题，以及它们是如何工作的。</p>
 <h3 id="join">Join策略调整</h3>
 <p>我们先来说说Join策略调整，如果用一句话来概括，<strong>Join策略调整指的就是Spark SQL在运行时动态地将原本的Shuffle Join策略，调整为执行更加高效的Broadcast Join</strong>。</p>
@@ -7269,16 +7269,16 @@
 <h3 id="_1">自动分区合并</h3>
 <p>了解了自动分区合并的用武之地，接下来，我们来说说，Spark SQL具体如何做到把Reduce阶段过小的分区合并到一起。要弄清楚分区合并的工作原理，我们首先得搞明白：“分区合并从哪里开始？又到哪里结束呢？”</p>
 <p>具体来说，Spark SQL怎么判断一个数据分区是不是足够小、它到底需不需要被合并？再者，既然是对多个分区做合并，那么自然就存在一个收敛条件。原因很简单，如果一直不停地合并下去，那么整个数据集就被捏合成了一个超级大的分区，并行度也会下降至1，显然，这不是我们想要的结果。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2d/cb/2d9d860cde0375a061f9cf4628c514cb.jpg?wh=6986x2876" title="分区合并示意图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2d/cb/2d9d860cde0375a061f9cf4628c514cb.jpg?wh=6986x2876" title="分区合并示意图" /></p>
 <p>事实上，Spark SQL采用了一种相对朴素的方法，来实现分区合并。具体来说，<strong>Spark SQL事先并不去判断哪些分区是不是足够小，而是按照分区的编号依次进行扫描，当扫描过的数据体量超过了“目标尺寸”时，就进行一次合并</strong>。而这个目标尺寸，由以下两个配置项来决定。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/44/3f/443a5062311169174b96d7c9bd73843f.jpg?wh=1920x528" title="分区合并相关配置项" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/44/3f/443a5062311169174b96d7c9bd73843f.jpg?wh=1920x528" title="分区合并相关配置项" /></p>
 <p>其中，开发者可以通过第一个配置项spark.sql.adaptive.advisoryPartitionSizeInBytes来直接指定目标尺寸。第二个参数用于限制Reduce阶段在合并之后的并行度，避免因为合并导致并行度过低，造成CPU资源利用不充分。</p>
 <p>结合数据集大小与最低并行度，我们可以反推出来每个分区的平均大小，假设我们把这个平均大小记作是#partitionSize。那么，实际的目标尺寸，取advisoryPartitionSizeInBytes设定值与#partitionSize之间较小的那个数值。</p>
 <p>确定了目标尺寸之后，Spark SQL就会依序扫描数据分区，当相邻分区的尺寸之和大于目标尺寸的时候，Spark SQL就把扫描过的分区做一次合并。然后，继续使用这种方式，依次合并剩余的分区，直到所有分区都处理完毕。</p>
 <h3 id="_2">自动倾斜处理</h3>
 <p>没有对比就没有鉴别，分析完自动分区合并如何搞定数据分区过小、过于分散的问题之后，接下来，我们再来说一说，自动倾斜处理如何应对那些倾斜严重的大分区。</p>
 <p>经过上面的分析，我们不难发现，自动分区合并实际上包含两个关键环节，一个是确定合并的目标尺寸，一个是依次扫描合并。与之相对应，自动倾斜处理也分为两步，<strong>第一步是检测并判定体量较大的倾斜分区，第二步是把这些大分区拆分为小分区</strong>。要做到这两步，Spark SQL需要依赖如下3个配置项。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/48/6b/480177b03202283aa493684672207c6b.jpg?wh=1920x607" title="自动倾斜处理的配置项" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/48/6b/480177b03202283aa493684672207c6b.jpg?wh=1920x607" title="自动倾斜处理的配置项" /></p>
 <p>其中，前两个配置项用于判定倾斜分区，第3个配置项advisoryPartitionSizeInBytes我们刚刚学过，这个参数除了用于合并小分区外，同时还用于拆分倾斜分区，可以说是“一菜两吃”。</p>
 <p>下面我们重点来讲一讲，Spark SQL如何利用前两个参数来判定大分区的过程。</p>
 <p>首先，Spark SQL对所有数据分区按照存储大小做排序，取中位数作为基数。然后，将中位数乘以skewedPartitionFactor指定的比例系数，得到判定阈值。凡是存储尺寸大于判定阈值的数据分区，都有可能被判定为倾斜分区。</p>
@@ -7309,7 +7309,7 @@
 </code></pre></div>
 <p>自动分区合并与自动倾斜处理，实际上都是用来解决Shuffle过后，数据分布不均匀的问题。自动分区合并的作用，在于合并过小的数据分区，从而避免Task粒度过细、任务调度开销过高的问题。与之相对，自动倾斜处理，它的用途在于拆分过大的数据分区，从而避免个别Task负载过高而拖累整个作业的执行性能。</p>
 <p>不论是广播阈值，还是AQE的诸多特性，我们都可以通过调节相关的配置项，来影响Spark SQL的优化行为。为了方便你回顾、查找这些配置项，我整理了如下表格，供你随时参考。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b8/aa/b85084c1f228a649cd1f3d2cfyy762aa.jpg?wh=1920x932" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b8/aa/b85084c1f228a649cd1f3d2cfyy762aa.jpg?wh=1920x932" /></p>
 <h2 id="_4">每课一练</h2>
 <p>结合AQE必须要依赖Shuffle中间文件这一特点，你能说一说，AQE有什么不尽如人意之处吗？（提示：从Shuffle的两个计算阶段出发，去思考这个问题）</p>
 <p>欢迎你在留言区跟我交流讨论，也推荐你把这一讲分享给更多的同事、朋友。</p>
@@ -7428,8 +7428,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -14460,7 +14460,7 @@
 <p>很显然，这个解决方案是可以的。这种调度架构，就是我们通常所说的<strong>两层调度</strong>。如果我们还是把资源比作物质文明、把任务比作精神文明的话，两层调度就可以理解为“物质文明与精神文明两手抓”。</p>
 <p>两层调度结构对应的就是两层调度器，资源的使用状态同时由中央调度器和第二层调度器管理，中央调度器从整体上进行资源的管理与分配，将资源分配到第二层调度器；再由第二层调度器负责将资源与具体的任务配对，因此第二层调度可以有多个调度器，以支持不同的任务类型。</p>
 <p>如下图所示，Scheduler-1表示第一层调度，负责收集和管理集群中的资源信息；Scheduler-2 表示第二层调度，Scheduler-1会将集群资源发送给Scheduler-2，然后Scheduler-2根据任务的资源需求和Scheduler-1发送的资源信息进行任务匹配和调度。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8e/a2/8e7371cc970c85c23fc8f2e70f4fa3a2.png?wh=870%2A686" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8e/a2/8e7371cc970c85c23fc8f2e70f4fa3a2.png?wh=870%2A686" /></p>
 <p>两层调度器中的第一层调度器仍是一个经简化的中央调度器，通常放在分布式集群管理系统中，而第二层调度则是由各个应用程序框架完成。两层调度器的职责分别是：第一层调度器负责管理资源并向框架分配资源，第二层调度器接收分布式集群管理系统中第一层调度器分配的资源，然后根据任务和接收到的资源进行匹配。</p>
 <p>采用两层调度结构的集群管理系统有很多，典型代表是 Apache Mesos 和 Hadoop YARN。我在<a href="https://time.geekbang.org/column/article/148187">第9篇文章</a>中讲述Mesos的体系结构时，和你分析了它采用的是典型的两层调度。那么今天，我就继续以Mesos为例，带你学习两层调度的架构设计和对应的分配算法吧。</p>
 <h2 id="_2">两层调度设计</h2>
@@ -14473,7 +14473,7 @@
 <li>框架（Framework）运行在Mesos上，是负责应用管理与调度的“组件”，比如Hadoop、Spark、MPI和Marathon等，不同的框架用于完成不同的任务，比如批处理任务、实时分析任务等。框架主要由调度器（Scheduler）和执行器（Executor）组成，调度器可以从Master节点获取集群节点的信息 ，执行器在Slave节点上执行任务。</li>
 </ul>
 <p>从上述的架构描述可以看出，Mesos是一个典型的双层调度框架。Mesos Master上有一个调度器（也就是Allocation Module），负责管理并分配集群中的所有资源，是第一层调度。框架上负责任务的管理与调度的调度器，是第二层调度，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0b/a4/0bb9bb6a32b73b094a8fb61bca5c6ca4.png?wh=774%2A685" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0b/a4/0bb9bb6a32b73b094a8fb61bca5c6ca4.png?wh=774%2A685" /></p>
 <p>接下来，我们再看看Mesos两层调度的基本原理吧。</p>
 <ul>
 <li>框架向Mesos Master注册；</li>
@@ -14503,14 +14503,14 @@
 <li>所有资源已分配完，算法终止。</li>
 </ol>
 <p>最大最小公平算法的执行流程，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/73/a4/737a82ebe2ca35f29b2bf8a5c06c4ea4.png?wh=826%2A583" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/73/a4/737a82ebe2ca35f29b2bf8a5c06c4ea4.png?wh=826%2A583" /></p>
 <p>在这个案例中，最大最小公平算法是由于所有资源全部分配完才终止的。至此，对于需求量为（10，25，35，45）的用户们来说，分配到的资源是（10，25，32.5，32.5）。这个算法的另外一个结束条件是，资源分配满足了所有用户的资源需求，即当没有用户有资源需求时，算法也会终止。</p>
 <p><strong>接下来，我们再看看主导资源公平算法。</strong></p>
 <p>最大最小公平算法采用了绝对公平的方式分配资源，会导致大量的资源浪费，比如用户需求量为35和45的用户A和用户D，均分配了32.5的空闲资源，但由于资源不满足需求，这两个用户均无法使用。</p>
 <p>而主导资源公平算法在考虑用户公平性的前提下，还考虑了用户对不同资源类型的需求，以尽可能地合理分配资源。也就是说，同样的资源量，主导资源公平算法可以尽可能地满足更多的用户。</p>
 <p>在Mesos中，框架对资源的需求往往包括对CPU、内存等多种类型资源的需求。针对多种资源的需求，主导资源公平算法首先计算已经分配给用户的每一种资源的占用率（Resource Share），比如已经分配的CPU占总资源量的多少，已经分配的内存占总资源量的多少。所有资源占用率中的最大值称作该<strong>用户的主导资源占用率</strong>，而主导资源占用率对应的资源就是用户的主导资源。</p>
 <p>我们通过一个具体的案例，看看如何判断用户的主导资源吧。如下图所示，假设系统中的资源共包括18个 CPU 和36 GB 内存，有两个Framework（Framework A和Framework B）分别运行了两种任务，假设Framework A运行内存密集型任务，Framework B运行CPU密集型任务，且每个任务所需要的资源量是一致的，分别是&lt;2 CPU, 8 GB&gt; 和 &lt;6 CPU, 2 GB&gt;。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/31/58/315826c3aff89714530b370e520edd58.png?wh=904%2A412" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/31/58/315826c3aff89714530b370e520edd58.png?wh=904%2A412" /></p>
 <p>第一步：计算资源分配量。</p>
 <p>假设x和y分别是Framework A和Framework B分配的任务数，那么Framework A消耗的资源为{2x CPU，8x GB}，Framework B消耗的资源数为{6y CPU，2y GB}，分配给两个Framework的总资源量为（2x+6y）个CPU和（8x+2y）GB内存。</p>
 <p>第二步：确定主导资源。</p>
@@ -14538,7 +14538,7 @@
 <p>而关于第一层的调度算法，通常有最大最小公平算法和主导资源公平算法等。</p>
 <p>两层调度的一个问题是，由于第二层调度只能获得部分资源视图，因此无法实现全局最优调度。</p>
 <p>最后，我将今天这篇文章的核心知识点梳理为了一张思维导图，以方便你理解与记忆。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0c/30/0cd6814755cfa921f5366c71cb224330.png?wh=1249%2A882" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0c/30/0cd6814755cfa921f5366c71cb224330.png?wh=1249%2A882" /></p>
 <p>两层调度提供了多租户多框架的支持，如果你的业务类型比较多或者面向的是不同的租户的话，建议你采用两层调度框架。</p>
 <p>相信你通过这篇文章可以看到，在分布式领域中，同时支持多种框架、支持多种类型任务调度的调度机制，并没有那么神秘，只要你静下心来弄明白这篇文章的调度机制，以后遇到类似的调度机制，就可以做到心中有数了。</p>
 <p>不得不说，Mesos的两层调度设计得非常巧妙，并且Mesos支持你自己写一个调度器注册到Mesos作为第二层调度。赶快动手实践一下吧，<a href="http://mesos.apache.org/">Mesos的官网</a>提供了相应的案例，方便你入门，加油，相信你一定可以！</p>
@@ -14673,8 +14673,6 @@ JVM中的线程池调度模型好像也是两级调度，第一级调度是线�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

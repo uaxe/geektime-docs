@@ -6809,7 +6809,7 @@
 <p>在具体部署时，出于对灵活性或者运行速度的需要，开发人员有可能会用Java、C或者C++等语言重写模型。当然，重写模型是非常耗时耗力的，也不一定总是要这样做。像Tensorflow、PyTorch、Sklearn这些机器学习框架都会提供相应的工具，把数据科学家调试成功的机器学习模型直接发布为Web服务，或是部署到移动设备中。</p>
 <p>在这一讲中，我们会通过一个非常简单的示例，来看看怎么把我们之前做过的<a href="https://time.geekbang.org/column/article/414504">预测微信文章浏览量</a>的机器学习模型嵌入到Web应用中，让模型从数据中学习，同时实时接收用户的输入，并返回预测结果。由于移动设备上的部署，还需要一些额外的步骤和工具，如Tensorflow Lite等，我这里不做展示，你有兴趣的话可以阅读<a href="https://www.tensorflow.org/lite/guide#3_run_inference_with_the_model">相关文档</a>。</p>
 <p>我先给你看看搞定后的页面：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3f/a2/3f301e335d50431a2d1581d0dafe60a2.png?wh=467x211" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3f/a2/3f301e335d50431a2d1581d0dafe60a2.png?wh=467x211" /></p>
 <p>在进入具体的部署之前，我带你先整体了解一下，要搭建这个基于Web的机器学习应用，我们需要构建哪些模块。</p>
 <h2 id="_1">整个项目需要构建哪些模块？</h2>
 <p>在这个项目中，我们实际上要构建的模块有三个：</p>
@@ -6819,11 +6819,11 @@
 <li><strong>HTML页面模板</strong>：允许用户输入点赞数和转发数信息并提交给Web服务器，当Web应用收到信息之后，就会调用机器学习模型，并在HTML页面中显示浏览量的预测值。</li>
 </ul>
 <p>那么，这三个模块在整个Web应用中是如何协作的呢？我们来看看这张流程图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/31/2c/314a503b141c96418ff287f44f112e2c.jpg?wh=2000x911" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/31/2c/314a503b141c96418ff287f44f112e2c.jpg?wh=2000x911" /></p>
 <p>首先，用户通过HTML页面输入点赞数和转发数，并发送预测的REST API请求。代理服务器Nginx接收到请求后，将请求转发给后端服务器uWSGI。接着，后端服务器uWSGI会把请求继续转发给Web应用程序，这时候，Web应用程序会载入机器学习模型，并根据接收到的点赞数和转发数进行预测。预测出的结果再经由Web应用程序、后端服务器uWSGI、代理服务器Nginx，一路返回给HTML页面，呈现给用户。</p>
 <p>你可能已经注意到，在图的上半部分，还有一个“数据导入机器学习模型做训练”的过程。这个过程其实只需要完成一次，就是在我们首次创建好模型的时候，用提前准备好的数据集训练模型。后续Web应用程序每次载入模型都不需要再调用数据集进行训练。</p>
 <p>基于上面这个流程，我们再来看下这个项目的目录结构（你可以在<a href="https://github.com/huangjia2019/geektime/tree/main/%E8%BF%9B%E9%98%B6%E7%AF%8720">这里</a>下载这些文件）：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/dd/b5/dd509707e46e0db991815efdf2fb70b5.png?wh=479x182" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dd/b5/dd509707e46e0db991815efdf2fb70b5.png?wh=479x182" /></p>
 <p>可以看到，在这个项目中，包含了5个文件（文件夹），分别是：</p>
 <ul>
 <li><strong>templates</strong>：这个文件夹中存放着HTML文件<strong>index.html</strong>，这是给用户看的网页模板，也就是对应着用户能够浏览并输入信息的HTML页面；</li>
@@ -6868,15 +6868,15 @@
 <a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>&lt;/html&gt;
 </code></pre></div>
 <p>这段代码其实构建了这样一个页面：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/98/fd/984b75dc7321503a462c618c47464afd.png?wh=481x224" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/98/fd/984b75dc7321503a462c618c47464afd.png?wh=481x224" /></p>
 <p>在这个页面中，用户需要填写两个字段：一个是点赞数，另一个是转发数。这二者都是机器学习模型的特征字段。在这两个字段的旁边还有一个Button“预测浏览量”，用户输入好特征字段后，就可以直接点击这个Button，此时页面会发送Request给Web应用，让它返回模型所预测的标签。</p>
 <p>现在，我们把上面的HTML代码Copy下来，另存为HTML格式的文档，并放在项目结构的templates目录之下就好了。注意，它目前只是一个模板，其中的具体内容还要通过Web应用进行动态的渲染，这个我们等会再细说。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d9/7c/d9732c9449d37b74ba81224e96a4a67c.png?wh=560x154" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d9/7c/d9732c9449d37b74ba81224e96a4a67c.png?wh=560x154" /></p>
 <p>网页模板创建好了之后，我们就要创建能够预测微信软文浏览量的机器学习模型。这个机器学习的创建流程非常简单，你可以回忆一下<a href="https://time.geekbang.org/column/article/414504">第3讲</a>和<a href="https://time.geekbang.org/column/article/415149">第4讲</a>的内容，同时，你也可以在<a href="https://github.com/huangjia2019/geektime/tree/main/%E8%BF%9B%E9%98%B6%E7%AF%8720">这里</a>找到“易速鲜花微信软文”数据集。下面，我会带你重新创建一个极简的模型，你可以把它视为我们对之前内容的一次复习。</p>
 <h2 id="_2">创建机器学习模型</h2>
 <p>整个创建过程说起来很简单。首先，我们使用 Pandas 的fillna函数，处理一下数据集中点赞数字段的缺失值（你也可以考虑用均值填充）。然后，我们再创建线性回归模型作为机器学习算法，并进行拟合和预测。最后，我们把这个模型保存为model.py文档。</p>
 <p>这里你需要注意的是，“.py”格式的Python脚本文件可以整体运行，它不是像Jupyter Notebook中那样按每个单元格来一步步运行，这其实只是为了简化流程。而编辑器，我使用的是Annaconda中自带的Spyder（如下图所示），当然你也可以使用其他Python开发环境来编辑，这并没有特别的限制。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0c/1f/0c02b1yy0b2a17yy4c199ec7e53cf51f.png?wh=1262x772" title="Spyder中的机器学习模型代码" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0c/1f/0c02b1yy0b2a17yy4c199ec7e53cf51f.png?wh=1262x772" title="Spyder中的机器学习模型代码" /></p>
 <p>我们看一下整个创建机器学习模型的Python代码：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>import pandas as pd # 导入Pandas
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>import pickle # 导入序列化工具Pickle
@@ -6911,9 +6911,9 @@
 <p>具体来讲，Pickle会把内存中的模型对象（也就是Python对象），转换为0和1的字节流，形成字节流文件model.pkl存储到磁盘，这个过程叫存盘，也叫“序列化”。</p>
 <p>这个字节流文件model.pkl可以被保存到磁盘的任意地方，当我们需要调用模型的时候，Pickle 会把磁盘中的model.pkl再转换为Python对象，存在内存中。这个时候模型就被还原了，可以使用了。这个过程就叫做“反序列化”。</p>
 <p>在上面的代码中，pickle.dump()做的就是序列化，pickle.load()做的就是反序列化。对于这两个过程，你可以通过下面这张图做进一步的理解：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d9/36/d96fa0b749552704f742ed700bae3036.jpg?wh=2000x945" title="序列化和反序列化" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d9/36/d96fa0b749552704f742ed700bae3036.jpg?wh=2000x945" title="序列化和反序列化" /></p>
 <p>当我们把上面那段Python代码存为model.py文档，并在Spyder中运行model.py后，模型就完成了创建、训练和拟合的过程，同时也经历了序列化。这时候，model.py所在目录下就出现了一个字节流文件model.pkl文件：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/dd/b5/dd509707e46e0db991815efdf2fb70b5.png?wh=479x182" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dd/b5/dd509707e46e0db991815efdf2fb70b5.png?wh=479x182" /></p>
 <p>我们前面提到，在Web应用调用模型的过程中，需要把模型对象做一个转换，然后模型才能被使用。虽然我们用<a href="https://docs.python.org/3/library/pickle.html">Pickle</a>实现这个过程比较方便，但是它要求应用程序也是Python语言开发的，否则应用程序无法读取<a href="https://docs.python.org/3/library/pickle.html">Pickle</a>所生成的序列化文件。</p>
 <p>显然，这并不适用于我们所有的应用开发需求。因此，这里我再给你介绍几种模型序列化和导出的格式，如果你在工程实践中需要使用，参考相关文档即可，它们的原理和Pickle是类似的。</p>
 <ul>
@@ -6971,7 +6971,7 @@
 <p>通过上述讲解，我想你应该可以理解这段创建Web应用的代码了。那到这里呢，我们所有的编码工作也就完成了！下面，我们就来启动这个Web应用。</p>
 <h2 id="app">使用已经发布的App</h2>
 <p>我们单击Spyder的Run按钮就能启动Web应用。当然，你还可以在命令行界面中使用python app.py来运行它。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6e/d8/6eedb2yy314c75709ee7d7324e3cabd8.png?wh=489x223" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6e/d8/6eedb2yy314c75709ee7d7324e3cabd8.png?wh=489x223" /></p>
 <p>App启动运行后，IPython Console中的输出如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>runfile(&#39;C:/Users/jacky.huang/20/app.py&#39;, wdir=&#39;C:/Users/jacky.huang/20&#39;)
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>* Serving Flask app &quot;app&quot; (lazy loading)
@@ -6983,11 +6983,11 @@
 </code></pre></div>
 <p>这表明，此时Web应用已经开始在WSGI服务器上运行，等候客户端页面随时发送请求。</p>
 <p>现在，我们打开一个本机浏览器，访问<a href="http://127.0.0.1:5000/">http://127.0.0.1:5000/</a>页面。服务器返回如下HTML页面：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cc/42/cc412225070cfd4ebc03bda9503ab142.png?wh=486x191" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cc/42/cc412225070cfd4ebc03bda9503ab142.png?wh=486x191" /></p>
 <p>然后，我们充当用户角色，输入点赞数和转发数，希望基于这些数值来预测浏览量：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/98/fd/984b75dc7321503a462c618c47464afd.png?wh=481x224" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/98/fd/984b75dc7321503a462c618c47464afd.png?wh=481x224" /></p>
 <p>点击“预测浏览量”提交数据后，我们得到了浏览量预测结果：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3f/a2/3f301e335d50431a2d1581d0dafe60a2.png?wh=467x211" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3f/a2/3f301e335d50431a2d1581d0dafe60a2.png?wh=467x211" /></p>
 <p>这说明服务器成功接到HTML页面发送过来的POST API的请求，并根据模型的预测，通过<a href="http://127.0.0.1:5000/predict">http://127.0.0.1:5000/predict</a>页面返回了预测结果：当点赞数为500，转发数为300时，机器学习模型预测的文章浏览量是46292。</p>
 <p>这样，我们就把一个简单的机器学习模型打包成了一个Web应用，成功的部署到网页中啦！</p>
 <h2 id="_3">总结一下</h2>
@@ -7008,7 +7008,7 @@
 <li>你还有哪些机器学习模型上线部署的经验，可否跟我分享一下？</li>
 </ol>
 <p>欢迎你在留言区和我分享你的观点，如果你认为这节课的内容有收获，也欢迎把它分享给你的朋友，我们下一讲再见！</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3c/6c/3c5bff0cd573294980d2696d57d6196c.jpg?wh=2284x1280" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3c/6c/3c5bff0cd573294980d2696d57d6196c.jpg?wh=2284x1280" /></p>
 <div><strong>精选留言（2）</strong></div>
 <ul>
 <li><span>明远</span> 👍（4） 💬（2）<p>佳哥你好，请问模型部署后，需要如何持续迭代？模型本身能够持续自学习更新吗？还是要每天定时用全量或者增量数据重新训练？
@@ -7151,8 +7151,6 @@ UnsupportedOperation: not writable</p>2021-10-13</li><br/>
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -14671,7 +14671,7 @@
 <a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a>}
 </code></pre></div>
 <p>我也画了下面这张图，展示了IOThreadMain函数的基本流程，你可以看下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/03/5a/03232ff01d8b0fca4af0981b7097495a.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/03/5a/03232ff01d8b0fca4af0981b7097495a.jpg?wh=2000x1125" /></p>
 <p>好了，到这里你应该就了解了，每一个IO线程运行时，都会不断检查是否有等待它处理的客户端。如果有，就根据操作类型，从客户端读取数据或是将数据写回客户端。你可以看到，这些操作都是Redis要和客户端完成的IO操作，所以，这也是为什么我们把这些线程称为IO线程的原因。</p>
 <p>那么，你看到这里，可能也会产生一些疑问，<strong>IO线程要处理的客户端是如何添加到io_threads_list数组中的呢？</strong></p>
 <p>这就要说到Redis server对应的全局变量server了。server变量中有两个List类型的成员变量：clients_pending_write和clients_pending_read，它们分别记录了待写回数据的客户端和待读取数据的客户端，如下所示：</p>
@@ -14757,7 +14757,7 @@
 <a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>}
 </code></pre></div>
 <p>为了便于你更好地理解，我画了一张图，展示了Redis推迟客户端写操作的函数调用关系，你可以再回顾下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/67/50/672977e056fba83aba183f82600c6d50.jpg?wh=2000x949" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/67/50/672977e056fba83aba183f82600c6d50.jpg?wh=2000x949" /></p>
 <p>不过，当Redis使用clients_pending_read和clients_pending_write两个列表，保存了推迟执行的客户端后，<strong>这些客户端又是如何分配给多IO线程执行的呢？</strong>这就和下面两个函数相关了。</p>
 <ul>
 <li>handleClientsWithPendingReadsUsingThreads函数：该函数主要负责将clients_pending_read列表中的客户端分配给IO线程进行处理。</li>
@@ -14768,7 +14768,7 @@
 <p>首先，我们来了解<strong>handleClientsWithPendingReadsUsingThreads函数</strong>。这个函数是在beforeSleep函数中调用的。</p>
 <p>在Redis 6.0版本的代码中，事件驱动框架同样是调用aeMain函数来执行事件循环流程，该循环流程会调用aeProcessEvents函数处理各种事件。而在aeProcessEvents函数实际调用aeApiPoll函数捕获IO事件之前，beforeSleep函数会被调用。</p>
 <p>这个过程如下图所示，你可以看下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b8/87/b823cf93b7dcyy10069136c4a5c78787.jpg?wh=2000x969" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b8/87/b823cf93b7dcyy10069136c4a5c78787.jpg?wh=2000x969" /></p>
 <p>handleClientsWithPendingReadsUsingThreads函数的主要执行逻辑可以分成四步。</p>
 <p><strong>第一步</strong>，该函数会先根据全局变量server的io_threads_active成员变量，判定IO线程是否激活，并且根据server的io_threads_do_reads成员变量，判定用户是否设置了Redis可以用IO线程处理待读客户端。只有在IO线程激活，并且IO线程可以用于处理待读客户端时，handleClientsWithPendingReadsUsingThreads函数才会继续执行，否则该函数就直接结束返回了。这一步的判断逻辑如以下代码所示：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>if (!server.io_threads_active || !server.io_threads_do_reads)
@@ -14779,7 +14779,7 @@
 <p>为了便于你理解，我来给你举个例子。</p>
 <p>假设IO线程数量设置为3，clients_pending_read列表中一共有5个待读客户端，它们在列表中的序号分别是0，1，2，3和4。在这一步中，0号到4号客户端对线程数量3取模的结果分别是0，1，2，0，1，这也对应了即将处理这些客户端的IO线程编号。这也就是说，0号客户端由0号线程处理，1号客户端有1号线程处理，以此类推。你可以看到，这个分配方式其实就是把待处理客户端，以<strong>轮询方式</strong>逐一分配给各个IO线程。</p>
 <p>我画了下面这张图，展示了这个分配结果，你可以再看下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3e/cc/3ea75f26c5c1fb527e4ec99fe07a4ccc.jpg?wh=2000x790" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3e/cc/3ea75f26c5c1fb527e4ec99fe07a4ccc.jpg?wh=2000x790" /></p>
 <p>以下代码展示的就是以轮询方式将客户端分配给IO线程的执行逻辑：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>int processed = listLength(server.clients_pending_read);
 <a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>listRewind(server.clients_pending_read,&amp;li);
@@ -14834,7 +14834,7 @@
 <a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a>}
 </code></pre></div>
 <p>好了，到这里，你就了解了clients_pending_read列表中的待读客户端，是如何经过以上四个步骤来分配给IO线程进行处理的。下图展示了这个主要过程，你可以再回顾下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1b/45/1b4bb7d5367d9184a9eacefbabfe3345.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1b/45/1b4bb7d5367d9184a9eacefbabfe3345.jpg?wh=2000x1125" /></p>
 <p>那么，接下来，我们再来看下待写客户端的分配和处理。</p>
 <h2 id="io_2">如何把待写客户端分配给IO线程执行？</h2>
 <p>和待读客户端的分配处理类似，待写客户端分配处理是由<strong>handleClientsWithPendingWritesUsingThreads函数</strong>来完成的。该函数也是在beforeSleep函数中被调用的。</p>
@@ -15109,8 +15109,6 @@ if (pending == 0) break;
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

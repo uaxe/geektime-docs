@@ -7781,7 +7781,7 @@
 <p>可以说，GFS是一个基本没有什么一致性保障的文件系统。但即使是这样，通过在客户端库里面加上校验、去重这样的处理机制，GFS在大规模数据处理上已经算是足够好用了。</p>
 <p>OK，那到这里，你应该就大致理解了GFS的设计决策。不过你也要清楚的是，这三个设计原则可远远没有以上我介绍的这么简单。所以接下来，我会通过三节课的时间，来带你分别剖析这三个重要的设计选择。</p>
 <p>那么今天这节课，我们就先一起来看看第一个选择，也就是“简单”这个设计原则。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/15/15/158149b378d1d5b383078b3ee3440915.jpg?wh=1920x947" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/15/15/158149b378d1d5b383078b3ee3440915.jpg?wh=1920x947" /></p>
 <p>在这个设计原则下，我们会看到GFS是一个非常简单的单Master架构，但是这个Master其实有三种不同的身份，分别是：</p>
 <ul>
 <li>相对于存储数据的Chunkserver，Master是一个目录服务；</li>
@@ -7798,7 +7798,7 @@
 <p>因此，在GFS里面，会把每一个文件按照64MB一块的大小，切分成一个个chunk。每个chunk都会有一个在GFS上的唯一的handle，这个handle其实就是一个编号，能够唯一标识出具体的chunk。然后每一个chunk，都会以一个文件的形式，放在chunkserver上。</p>
 <p>而chunkserver，其实就是一台普通的Linux服务器，上面跑了一个用户态的GFS的chunkserver程序。这个程序，会负责和master以及GFS的客户端进行RPC通信，完成实际的数据读写操作。</p>
 <p>当然，为了确保数据不会因为某一个chunkserver坏了就丢失了，每个chunk都会存上整整三份副本（replica）。其中一份是主数据（primary），两份是副数据（secondary），当三份数据出现不一致的时候，就以主数据为准。有了三个副本，不仅可以防止因为各种原因丢数据，还可以在有很多并发读取的时候，分摊系统读取的压力。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4c/2e/4ccb89f66276af2ce19c1fc83fdb432e.jpg?wh=2000x1504" title="文件会拆分成chunk放在不同的chunkserver上" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4c/2e/4ccb89f66276af2ce19c1fc83fdb432e.jpg?wh=2000x1504" title="文件会拆分成chunk放在不同的chunkserver上" /></p>
 <p>如此一来，文件就被拆分成了一个个的chunk存在了chunkserver上。那么你可能还要问：<strong>GFS的客户端，怎么知道该去哪个chunkserver找自己要的文件呢？</strong></p>
 <p>答案当然是问master啦。</p>
 <p>首先，master里面会存放三种主要的元数据（metadata）：</p>
@@ -7807,7 +7807,7 @@
 <li>这些文件被拆分成了哪几个chunk，也就是这个全路径文件名到多个chunk handle的映射关系；</li>
 <li>这些chunk实际被存储在了哪些chunkserver上，也就是chunk handle到chunkserver的映射关系。</li>
 </ol>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/44/e2/440494242af83f78909bf836bbe1c0e2.jpg?wh=1920x982" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/44/e2/440494242af83f78909bf836bbe1c0e2.jpg?wh=1920x982" /></p>
 <p>然后，<strong>当我们要通过一个客户端去读取GFS里面的数据的时候，需要怎么做呢？</strong>GFS会有以下三个步骤：</p>
 <ol>
 <li>客户端先去问master，我们想要读取的数据在哪里。这里，客户端会发出两部分信息，一个是文件名，另一个则是要读取哪一段数据，也就是读取文件的offset及length。因为所有文件都被切成64MB大小的一个chunk了，所以根据offset和length，我们可以很容易地算出客户端要读取的数据在哪几个chunk里面。于是，客户端就会告诉master，我要哪个文件的第几个chunk。</li>
@@ -7815,7 +7815,7 @@
 <li>等客户端拿到chunk所在的chunkserver信息后，客户端就可以直接去找其中任意的一个chunkserver读取自己所要的数据。</li>
 </ol>
 <p>你可以参考下图所展示的客户端读取数据的整个过程指令流向。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/71/95/7124aa76c1ec715b2a29613b5f065d95.jpg?wh=2000x1504" title="GFS里客户端读取数据的整个过程指令流向" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/71/95/7124aa76c1ec715b2a29613b5f065d95.jpg?wh=2000x1504" title="GFS里客户端读取数据的整个过程指令流向" /></p>
 <p>这整个过程抽象一下，其实和Linux文件系统差不多。master节点和chunkserver这样两种节点的设计，其实和操作系统中的文件系统一脉相承。<strong>master就好像存储了所有inode信息的super block，而chunk就是文件系统中的一个个block。</strong>只不过chunk比block的尺寸大了一些，并且放在了很多台不同的机器上而已。我们通过master找到chunk的位置来读取数据，就好像操作系统里通过inode到block的位置，再从block里面读取数据。</p>
 <p>所以，这个时候的master，其实就是一个“<strong>目录服务</strong>”，master本身不存储数据，而是只是存储目录这样的元数据。这个和我们的单机系统的设计思想是一样的。其实在计算机这个行业中，所有的系统都是从最简单、最底层的系统演化而来的。而这个课程中你看到的大部分的设计，其实都有这个特质。</p>
 <h2 id="master_1">master的快速恢复性和可用性保障</h2>
@@ -7827,7 +7827,7 @@
 <p>当然，光有这些还不够，如果只是master节点重新启动一下，从Checkpoints和日志中恢复到最新状态自然是很快的。<strong>可要是master节点的硬件彻底故障了呢？</strong></p>
 <p>你要知道，去数据中心重新更换硬件可不是几分钟的事情，所以GFS还为master准备好了几个“备胎”，也就是另外几台Backup Master。所有针对master的数据操作，都需要同样写到另外准备的这几台服务器上。只有当数据在master上操作成功，对应的操作记录刷新到硬盘上，并且这几个Backup Master的数据也写入成功，并把操作记录刷新到硬盘上，整个操作才会被视为操作成功。</p>
 <p>这种方式，叫做数据的“<strong>同步复制</strong>”，是分布式数据系统里的一种典型模式。假如你需要一个高可用的MySQL集群，一样也可以采用同步复制的方式，在主从服务器之间同步数据。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/19/c1/199f3ddb59c4d0a0233f9b71549a85c1.jpg?wh=1920x1444" title="在t1时间点上，客户端得到写入成功的返回，此时Master和Backup Master的数据是一致的，但是Shadow Master的数据，要到t2时间点才会追上来" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/19/c1/199f3ddb59c4d0a0233f9b71549a85c1.jpg?wh=1920x1444" title="在t1时间点上，客户端得到写入成功的返回，此时Master和Backup Master的数据是一致的，但是Shadow Master的数据，要到t2时间点才会追上来" /></p>
 <p>而在同步复制这个机制之外，在集群外部还有监控master的服务在运行。如果只是master的进程挂掉了，那么这个监控程序会立刻重启master进程。而如果master所在的硬件或者硬盘出现损坏，那么这个监控程序就会在前面说的Backup Master里面找一个出来，启动对应的master进程，让它“备胎转正”，变成新的master。</p>
 <p>而这个里面的数据，和原来的master其实一模一样。</p>
 <p>不过，为了让集群中的其他chunkserver以及客户端不用感知这个变化，GFS通过一个规范名称（Canonical Name）来指定master，而不是通过IP地址或者Mac地址。这样，一旦要切换master，这个监控程序只需要修改DNS的别名，就能达到目的。有了这个机制，GFS的master就从之前的可恢复（Recoverable），进化成了能够<strong>快速恢复（Fast Recovery）</strong>。</p>
@@ -7841,7 +7841,7 @@
 <li>第二个，是挂掉的master或者Backup Master上的Checkpoints和操作日志，还没有被影子Master同步完；</li>
 <li>第三个，则是我们要读取的内容，恰恰是在没有同步完的那部分操作上；</li>
 </ol>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7a/2d/7a312ed6bda66ce6e8b112yyfb77c82d.jpg?wh=1920x1444" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7a/2d/7a312ed6bda66ce6e8b112yyfb77c82d.jpg?wh=1920x1444" /></p>
 <p>相比于这个小小的可能性，影子Master让整个GFS在master快速恢复的过程中，虽然不能写数据，但仍然是完全可读的。至少在集群的读取操作上，GFS可以算得上是“高可用（High Availability）”的了。</p>
 <h2 id="_1">小结</h2>
 <p>好了，相信到这里，你应该就对GFS的基本架构有一定的了解了。GFS并不是一篇有着大量新的研究发现的理论性的论文。恰恰相反，整个GFS的架构，是通过非常重要的工程原则来设计的，也就是<strong>尽量简单、需要考虑实际的硬件情况</strong>，以及<strong>针对实际的应用场景进行设计</strong>。</p>
@@ -7992,8 +7992,6 @@ Shadow master分担读压力的角色为什么不直接用backup master来分担
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

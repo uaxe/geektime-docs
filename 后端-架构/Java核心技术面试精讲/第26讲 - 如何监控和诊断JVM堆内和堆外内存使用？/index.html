@@ -14427,14 +14427,14 @@
 <p>今天的分析，我会结合相关JVM参数和工具，进行对比以加深你对内存区域更细粒度的理解。</p>
 <p>首先，堆内部是什么结构？</p>
 <p>对于堆内存，我在上一讲介绍了最常见的新生代和老年代的划分，其内部结构随着JVM的发展和新GC方式的引入，可以有不同角度的理解，下图就是年代视角的堆结构示意图。
-<img alt="" src="https://static001.geekbang.org/resource/image/72/89/721e97abc93449fbdb4c071f7b3b5289.png?wh=941%2A351" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/72/89/721e97abc93449fbdb4c071f7b3b5289.png?wh=941%2A351" /></p>
 <p>你可以看到，按照通常的GC年代方式划分，Java堆内分为：</p>
 <p>1.新生代</p>
 <p>新生代是大部分对象创建和销毁的区域，在通常的Java应用中，绝大部分对象生命周期都是很短暂的。其内部又分为Eden区域，作为对象初始分配的区域；两个Survivor，有时候也叫from、to区域，被用来放置从Minor GC中保留下来的对象。</p>
 <ul>
 <li>JVM会随意选取一个Survivor区域作为“to”，然后会在GC过程中进行区域间拷贝，也就是将Eden中存活下来的对象和from区域的对象，拷贝到这个“to”区域。这种设计主要是为了防止内存的碎片化，并进一步清理无用对象。</li>
 <li>从内存模型而不是垃圾收集的角度，对Eden区域继续进行划分，Hotspot JVM还有一个概念叫做Thread Local Allocation Buffer（TLAB），据我所知所有OpenJDK衍生出来的JVM都提供了TLAB的设计。这是JVM为每个线程分配的一个私有缓存区域，否则，多线程同时分配内存时，为避免操作同一地址，可能需要使用加锁等机制，进而影响分配速度，你可以参考下面的示意图。从图中可以看出，TLAB仍然在堆上，它是分配在Eden区域内的。其内部结构比较直观易懂，start、end就是起始地址，top（指针）则表示已经分配到哪里了。所以我们分配新对象，JVM就会移动top，当top和end相遇时，即表示该缓存已满，JVM会试图再从Eden里分配一块儿。
-<img alt="" src="https://static001.geekbang.org/resource/image/f5/bd/f546839e98ea5d43b595235849b0f2bd.png?wh=707%2A559" /></li>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f5/bd/f546839e98ea5d43b595235849b0f2bd.png?wh=707%2A559" /></li>
 </ul>
 <p>2.老年代</p>
 <p>放置长生命周期的对象，通常都是从Survivor区域拷贝过来的对象。当然，也有特殊情况，我们知道普通的对象会被分配在TLAB上；如果对象较大，JVM会试图直接分配在Eden其他位置上；如果对象太大，完全无法在新生代找到足够长的连续空闲空间，JVM就会直接分配到老年代。</p>
@@ -14474,7 +14474,7 @@
 <p>在JVM内部，如果Xms小于Xmx，堆的大小并不会直接扩展到其上限，也就是说保留的空间（reserved）大于实际能够使用的空间（committed）。当内存需求不断增长的时候，JVM会逐渐扩展新生代等区域的大小，所以Virtual区域代表的就是暂时不可用（uncommitted）的空间。</p>
 <p>第二，分析完堆内空间，我们一起来看看JVM堆外内存到底包括什么？</p>
 <p>在JMC或JConsole的内存管理界面，会统计部分非堆内存，但提供的信息相对有限，下图就是JMC活动内存池的截图。
-<img alt="" src="https://static001.geekbang.org/resource/image/fa/2e/fa491795ffe21c1f49982de8b7810c2e.png?wh=930%2A260" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fa/2e/fa491795ffe21c1f49982de8b7810c2e.png?wh=930%2A260" /></p>
 <p>接下来我会依赖NMT特性对JVM进行分析，它所提供的详细分类信息，非常有助于理解JVM内部实现。</p>
 <p>首先来做些准备工作，开启NMT并选择summary模式，</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>-XX:NativeMemoryTracking=summary
@@ -14483,7 +14483,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>-XX:+UnlockDiagnosticVMOptions -XX:+PrintNMTStatistics
 </code></pre></div>
 <p>然后，执行一个简单的在标准输出打印HelloWorld的程序，就可以得到下面的输出
-<img alt="" src="https://static001.geekbang.org/resource/image/55/bb/55f1c7f0550adbbcc885c97a4dd426bb.png?wh=642%2A821" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/55/bb/55f1c7f0550adbbcc885c97a4dd426bb.png?wh=642%2A821" /></p>
 <p>我来仔细分析一下，NMT所表征的JVM本地内存使用：</p>
 <ul>
 <li>第一部分非常明显是Java堆，我已经分析过使用什么参数调整，不再赘述。</li>
@@ -14500,12 +14500,12 @@
 JDK 9的默认GC是G1，虽然它在较大堆场景表现良好，但本身就会比传统的Parallel GC或者Serial GC之类复杂太多，所以要么降低其并行线程数目，要么直接切换GC类型；
 JIT编译默认是开启了TieredCompilation的，将其关闭，那么JIT也会变得简单，相应本地线程也会减少。
 我们来对比一下，这是默认参数情况的输出：
-<img alt="" src="https://static001.geekbang.org/resource/image/97/42/97d060b306e44af3a8443f932a0a4d42.png?wh=607%2A89" /></li>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/97/42/97d060b306e44af3a8443f932a0a4d42.png?wh=607%2A89" /></li>
 </ul>
 <p>下面是替换了默认GC，并关闭TieredCompilation的命令行
-<img alt="" src="https://static001.geekbang.org/resource/image/b0/3b/b07d6da56f588cbfadbb7b381346213b.png?wh=592%2A71" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b0/3b/b07d6da56f588cbfadbb7b381346213b.png?wh=592%2A71" /></p>
 <p>得到的统计信息如下，线程数目从25降到了17，消耗的内存也下降了大概1/3。
-<img alt="" src="https://static001.geekbang.org/resource/image/59/27/593735623f6917695602095fd249d527.png?wh=634%2A85" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/59/27/593735623f6917695602095fd249d527.png?wh=634%2A85" /></p>
 <ul>
 <li>接下来是Code统计信息，显然这是CodeCache相关内存，也就是JIT compiler存储编译热点方法等信息的地方，JVM提供了一系列参数可以限制其初始值和最大值等，例如：</li>
 </ul>
@@ -14514,8 +14514,8 @@ JIT编译默认是开启了TieredCompilation的，将其关闭，那么JIT也会
 <div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>-XX:ReservedCodeCacheSize=value
 </code></pre></div>
 <p>你可以设置下列JVM参数，也可以只设置其中一个，进一步判断不同参数对CodeCache大小的影响。
-<img alt="" src="https://static001.geekbang.org/resource/image/94/70/945740c37433f783d2d877c67dcc1170.png?wh=530%2A42" />
-<img alt="" src="https://static001.geekbang.org/resource/image/82/cd/82d1fbc9ca09698c01ccff18fb97c8cd.png?wh=641%2A60" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/94/70/945740c37433f783d2d877c67dcc1170.png?wh=530%2A42" />
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/82/cd/82d1fbc9ca09698c01ccff18fb97c8cd.png?wh=641%2A60" /></p>
 <p>很明显，CodeCache空间下降非常大，这是因为我们关闭了复杂的TieredCompilation，而且还限制了其初始大小。</p>
 <ul>
 <li>下面就是GC部分了，就像我前面介绍的，G1等垃圾收集器其本身的设施和数据结构就非常复杂和庞大，例如Remembered Set通常都会占用20%~30%的堆空间。如果我把GC明确修改为相对简单的Serial GC，会有什么效果呢？</li>
@@ -14523,7 +14523,7 @@ JIT编译默认是开启了TieredCompilation的，将其关闭，那么JIT也会
 <p>使用命令：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>-XX:+UseSerialGC
 </code></pre></div>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6e/33/6eeee6624c7dc6be54bfce5e93064233.png?wh=641%2A216" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6e/33/6eeee6624c7dc6be54bfce5e93064233.png?wh=641%2A216" /></p>
 <p>可见，不仅总线程数大大降低（25 → 13），而且GC设施本身的内存开销就少了非常多。据我所知，AWS Lambda中Java运行时就是使用的Serial GC，可以大大降低单个function的启动和运行开销。</p>
 <ul>
 <li>Compiler部分，就是JIT的开销，显然关闭TieredCompilation会降低内存使用。</li>
@@ -14663,8 +14663,6 @@ JIT编译默认是开启了TieredCompilation的，将其关闭，那么JIT也会
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

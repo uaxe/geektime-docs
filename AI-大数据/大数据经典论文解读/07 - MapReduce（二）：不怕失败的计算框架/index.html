@@ -7997,11 +7997,11 @@
 <p>第六步，reduce会对排序后的数据执行实际的Reduce函数，并把reduce的结果输出到当前这个reduce分片的最终输出文件里。</p>
 <p>第七步，当所有的map任务和reduce任务执行完成之后，master会唤醒启动MapReduce任务的用户程序，然后回到用户程序里，往下执行MapReduce任务提交之后的代码逻辑。</p>
 <p>其实，以上整个MapReduce的执行过程，还是一个典型的Master-Slave的分布式系统。map和reduce所在的worker之间并不会直接通信，它们都只和master通信。另外，像是map的输出数据在哪里这样的信息，也是告诉master，让master转达给reduce所在的worker。reduce从map里获取数据，也是直接拿到数据所在的地址去抓取，而不是让reduce通过RPC，调用map所在的worker去获取数据。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/fe/8d/fe9a03016b995b0c0581ce23d2b4c98d.jpg?wh=1920x1421" title="我稍稍修改了一下论文中的原图，加上了容易被我们忽视的调度系统的存在" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fe/8d/fe9a03016b995b0c0581ce23d2b4c98d.jpg?wh=1920x1421" title="我稍稍修改了一下论文中的原图，加上了容易被我们忽视的调度系统的存在" /></p>
 <p>如果你熟悉MapReduce的开源实现Hadoop的话，你会发现Hadoop 1.0的实现，其实和MapReduce的论文不太一样。在Hadoop里，每一个MapReduce的任务并没有一个独立的master进程，而是直接让调度系统承担了所有的worker的master的角色，这就是Hadoop 1.0里的<strong>JobTracker</strong>。</p>
 <p>在Hadoop 1.0里，MapReduce论文里面的worker就是<strong>TaskTracker</strong>，用来执行map和reduce的任务。而分配任务，以及和TaskTracker沟通任务的执行情况，都由单一的JobTracker来负责。</p>
 <p>这个设计，也导致了只要服务器数量一多，JobTracker的负载就会很重。所以早年间，单个Hadoop集群能够承载的服务器上限，被卡在了4000台。而且JobTracker也成为了整个Hadoop系统很脆弱的“单点”。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/90/b8/90eecaaee2145c2f8457f20502d254b8.jpg?wh=1920x1073" title="在开源的Hadoop环境下理解MapReduce论文，可以先简单按照映射管理来看" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/90/b8/90eecaaee2145c2f8457f20502d254b8.jpg?wh=1920x1073" title="在开源的Hadoop环境下理解MapReduce论文，可以先简单按照映射管理来看" /></p>
 <p>所以之后在Hadoop 2.0，Hadoop社区把JobTracker的角色，拆分成了进行任务调度的<strong>Resource Mananger</strong>，以及监控单个MapReduce任务执行的<strong>Application Master</strong>，回到了和MapReduce论文相同的架构。</p>
 <p>而在2015年，谷歌发布了Borg这个集群管理系统的论文的时候，大家发现谷歌早在2003~2004年，就已经有了独立的集群管理系统Borg，也就是MapReduce里面所提到的<strong>调度系统</strong>。在后面的资源调度模块中，我们也会专门解读Borg这个调度系统的论文，以及被认为是Borg后继者和开源实现Kubernetes的论文。</p>
 <h2 id="mapreducefault-tolerance">MapReduce的容错（Fault Tolerance）</h2>
@@ -8024,7 +8024,7 @@
 <h3 id="_2"><strong>把程序搬到数据那儿去</strong></h3>
 <p>既然网络带宽是瓶颈，那么优化的办法自然就是<strong>尽可能减少需要通过网络传输的数据</strong>。</p>
 <p>在MapReduce这个框架下，就是在分配map任务的时候，根据需要读取的数据在哪里进行分配。通过前面GFS论文的学习，我们可以知道，GFS是知道每一个Block的数据是在哪台服务器上的。而MapReduce，会找到同样服务器上的worker，来分配对应的map任务。如果那台服务器上没有，那么它就会找离这台服务器最近的、有worker的服务器，来分配对应的任务。你可以参考下面给出的示意图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/23/e4/23b33f40bf6d1c8a3eaf8f5d8d5254e4.jpg?wh=1920x1153" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/23/e4/23b33f40bf6d1c8a3eaf8f5d8d5254e4.jpg?wh=1920x1153" /></p>
 <p>除此之外，由于MapReduce程序的代码往往很小，可能只有几百KB或者几MB，但是每个map需要读取的一个分片的数据是64MB大小。这样，我们通过把要执行的MapReduce程序，复制到数据所在的服务器上，就不用多花那10倍乃至100倍的网络传输量了。</p>
 <p>这就好像你想要研究金字塔，最好的办法不是把金字塔搬到你家来，而是你买张机票飞过去。这里的金字塔就是要处理的数据，而你，就是那个分配过去的MapReduce程序。</p>
 <h3 id="combiner"><strong>通过Combiner减少网络数据传输</strong></h3>
@@ -8036,7 +8036,7 @@
 <p>实际上，不仅是同一个Map函数的输出可以合并，同一台服务器上多个Map的输出，我们都可以合并。反正它们都在一台机器上，合并只需要本地的硬盘读写和CPU，并不需要我们最紧缺的网络资源。</p>
 <p>我就以域名的访问次数为例，它的数据分布一定有很强的头部效应，少量20%的域名可能占了80%的访问记录。这样一合并，我们要传输的数据至少可以减少60%。如果考虑一台16核的服务器，有16个map的worker运行，应该还能再减少80%以上。这样，通过一个中间的Combiner，我们要传输的数据一下子就下降了两个数量级，大大缓解了网络传输的压力。</p>
 <p>你可以参考下面给出的示意图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3e/59/3e849249397c9558a87e6c11e76c3059.jpg?wh=1920x949" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3e/59/3e849249397c9558a87e6c11e76c3059.jpg?wh=1920x949" /></p>
 <h2 id="mapreducedebug">MapReduce的debug信息</h2>
 <p>好，性能优化完了，最后我们来看一下MapReduce对于开发者的易用性。</p>
 <p>虽然我们一直说，我们希望MapReduce让开发者意识不到分布式的存在。但是归根到底，<strong>map和reduce的任务都是在分布式集群上运行的，这个就给我们对程序debug带来了很大的挑战。</strong>无论是通过debugger做单步调试，还是打印出日志来看程序执行的情况，都不太可行。所以，MapReduce也为开发者贴心地提供了三个办法来解决这一点。</p>
@@ -8045,7 +8045,7 @@
 <p>另外通过这个HTTP服务器，你还可以看到具体是哪一个worker里的任务失败了，对应的错误日志是什么。这样，你就可以快速在线上定位你的程序出了什么错，是在哪台服务器上。我在《<a href="https://time.geekbang.org/column/article/119901">深入浅出计算机组成原理</a>》的课程中，就举过一个我自己遇到的“<a href="https://time.geekbang.org/column/article/119901">单比特翻转</a>”导致的问题。而对于产生这个问题根本原因的推断，就是通过查看MapReduce的任务日志，发现数据出错的worker总是在固定的一台服务器上。</p>
 <p>最后一个，是<strong>MapReduce框架里提供了一个计数器（counter）的机制</strong>。作为开发者，你可以自己定义几个计数器，然后在Map和Reduce的函数里去调用这个计数器进行自增。所有map和reduce的计数器都会汇总到master节点上，通过上面的HTTP服务器里展现出来。</p>
 <p>比如，你就可以利用这个计数器，去统计有多少输入日志的格式和预期的不一样。如果比例太高，那么多半你的程序就有Bug，没有兼容所有合法的日志。下图展示的就是在Hadoop里，通过JobTracker查看Task的执行情况，以及对应每个Task的日志：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6c/b0/6c73299936820db5de8ee83fcb0699b0.jpg?wh=685x546" title="Hadoop里，你可以通过JobTracker看到任务的执行情况和对应每个Task的日志" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6c/b0/6c73299936820db5de8ee83fcb0699b0.jpg?wh=685x546" title="Hadoop里，你可以通过JobTracker看到任务的执行情况和对应每个Task的日志" /></p>
 <blockquote>
 <p><a href="https://www.researchgate.net/publication/246546759_Perform_wordcount_Map-Reduce_Job_in_Single_Node_Apache_Hadoop_cluster_and_compress_data_using_Lempel-Ziv-Oberhumer_LZO_algorithm">图片来源</a></p>
 </blockquote>
@@ -8191,8 +8191,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

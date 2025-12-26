@@ -6395,13 +6395,13 @@
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>kubectl get sts
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>kubectl get pod
 </code></pre></div>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/71/88/71b485401dca6946fe4788fa97e3fd88.png?wh=1268x414" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/71/88/71b485401dca6946fe4788fa97e3fd88.png?wh=1268x414" /></p>
 <p>从截图里，你应该能够看到，StatefulSet所管理的Pod不再是随机的名字了，而是有了顺序编号，从0开始分别被命名为 <code>redis-sts-0</code>、<code>redis-sts-1</code>，Kubernetes也会按照这个顺序依次创建（0号比1号的AGE要长一点），这就解决了<strong>“有状态应用”的第一个问题：启动顺序</strong>。</p>
 <p>有了启动的先后顺序，应用该怎么知道自己的身份，进而确定互相之间的依赖关系呢？</p>
 <p>Kubernetes给出的方法是<strong>使用hostname</strong>，也就是每个Pod里的主机名，让我们再用 <code>kubectl exec</code> 登录Pod内部看看：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>kubectl exec -it redis-sts-0 -- sh
 </code></pre></div>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/be/39/be44f94eaf07f3591c7a2a8b9cdd1739.png?wh=1308x468" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/be/39/be44f94eaf07f3591c7a2a8b9cdd1739.png?wh=1308x468" /></p>
 <p>在Pod里查看环境变量 <code>$HOSTNAME</code> 或者是执行命令 <code>hostname</code>，都可以得到这个Pod的名字 <code>redis-sts-0</code>。</p>
 <p>有了这个唯一的名字，应用就可以自行决定依赖关系了，比如在这个Redis例子里，就可以让先启动的0号Pod是主实例，后启动的1号Pod是从实例。</p>
 <p>解决了启动顺序和依赖关系，还剩下<strong>第三个问题：网络标识，这就需要用到Service对象</strong>。</p>
@@ -6422,7 +6422,7 @@
 <a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="nt">targetPort</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">6379</span>
 </code></pre></div>
 <p>写好Service之后，还是用 <code>kubectl apply</code> 创建这个对象：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/5f/c8/5f8e4dbedaa563801bb6bbe09c441dc8.png?wh=1584x1056" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5f/c8/5f8e4dbedaa563801bb6bbe09c441dc8.png?wh=1584x1056" /></p>
 <p>可以看到这个Service并没有什么特殊的地方，也是用标签选择器找到StatefulSet管理的两个Pod，然后找到它们的IP地址。</p>
 <p>不过，StatefulSet的奥秘就在它的域名上。</p>
 <p>还记得在<a href="https://time.geekbang.org/column/article/536829">第20讲</a>里我们说过的Service的域名用法吗？Service自己会有一个域名，格式是“<strong>对象名.名字空间</strong>”，每个Pod也会有一个域名，形式是“<strong>IP地址.名字空间</strong>”。但因为IP地址不稳定，所以Pod的域名并不实用，一般我们会使用稳定的Service域名。</p>
@@ -6431,13 +6431,13 @@
 <p>我们还是用 <code>kubectl exec</code> 进入Pod内部，用ping命令来验证一下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>kubectl exec -it redis-sts-0 -- sh
 </code></pre></div>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f1/39/f1b058b5fb3e5218c638ca0534b92439.png?wh=1524x1338" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f1/39/f1b058b5fb3e5218c638ca0534b92439.png?wh=1524x1338" /></p>
 <p>显然，在StatefulSet里的这两个Pod都有了各自的域名，也就是稳定的网络标识。那么接下来，外部的客户端只要知道了StatefulSet对象，就可以用固定的编号去访问某个具体的实例了，虽然Pod的IP地址可能会变，但这个有编号的域名由Service对象维护，是稳定不变的。</p>
 <p>到这里，通过StatefulSet和Service的联合使用，Kubernetes就解决了“有状态应用”的依赖关系、启动顺序和网络标识这三个问题，剩下的多实例之间内部沟通协调等事情就需要应用自己去想办法处理了。</p>
 <p>关于Service，有一点值得再多提一下。</p>
 <p>Service原本的目的是负载均衡，应该由它在Pod前面来转发流量，但是对StatefulSet来说，这项功能反而是不必要的，因为Pod已经有了稳定的域名，外界访问服务就不应该再通过Service这一层了。所以，从安全和节约系统资源的角度考虑，<strong>我们可以在Service里添加一个字段 <code>clusterIP: None</code> ，告诉Kubernetes不必再为这个对象分配IP地址</strong>。</p>
 <p>我画了一张图展示StatefulSet与Service对象的关系，你可以参考一下它们字段之间的互相引用：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/49/22/490d814cf0f25db56537a20f3af57e22.jpg?wh=1920x1094" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/49/22/490d814cf0f25db56537a20f3af57e22.jpg?wh=1920x1094" /></p>
 <h2 id="statefulset">如何实现StatefulSet的数据持久化</h2>
 <p>现在StatefulSet已经有了固定的名字、启动顺序和网络标识，只要再给它加上数据持久化功能，我们就可以实现对“有状态应用”的管理了。</p>
 <p>这里就能用到上一节课里学的PersistentVolume和NFS的知识，我们可以很容易地定义StorageClass，然后编写PVC，再给Pod挂载Volume。</p>
@@ -6486,28 +6486,28 @@
 <p>这个YAML文件比较长，内容比较多，不过你只要有点耐心，分功能模块逐个去看也能很快看明白。</p>
 <p>首先StatefulSet对象的名字是 <code>redis-pv-sts</code>，表示它使用了PV存储。然后“volumeClaimTemplates”里定义了一个PVC，名字是 <code>redis-100m-pvc</code>，申请了100MB的NFS存储。在Pod模板里用 <code>volumeMounts</code> 引用了这个PVC，把网盘挂载到了 <code>/data</code> 目录，也就是Redis的数据目录。</p>
 <p>下面的这张图就是这个StatefulSet对象完整的关系图：
-<img alt="" src="https://static001.geekbang.org/resource/image/1a/0f/1a06987c87f3db948b591883a81bac0f.jpg?wh=4000x2946" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1a/0f/1a06987c87f3db948b591883a81bac0f.jpg?wh=4000x2946" /></p>
 <p>最后使用 <code>kubectl apply</code> 创建这些对象，一个带持久化功能的“有状态应用”就算是运行起来了：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>kubectl apply -f redis-pv-sts.yml
 </code></pre></div>
 <p>你可以使用命令 <code>kubectl get pvc</code> 来查看StatefulSet关联的存储卷状态：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/33/f5/33eee3c5a5033e4bf73f5003669c4ff5.png?wh=1920x189" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/33/f5/33eee3c5a5033e4bf73f5003669c4ff5.png?wh=1920x189" /></p>
 <p>看这两个PVC的命名，不是随机的，是有规律的，用的是PVC名字加上StatefulSet的名字组合而成，所以即使Pod被销毁，因为它的名字不变，还能够找到这个PVC，再次绑定使用之前存储的数据。</p>
 <p>那我们就来实地验证一下吧，用 <code>kubectl exec</code> 运行Redis的客户端，在里面添加一些KV数据：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>kubectl exec -it redis-pv-sts-0 -- redis-cli
 </code></pre></div>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/94/b7/94a96b1b8a000dcd852d2ea11yy8ddb7.png?wh=1562x530" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/94/b7/94a96b1b8a000dcd852d2ea11yy8ddb7.png?wh=1562x530" /></p>
 <p>这里我设置了两个值，分别是 <code>a=111</code> 和 <code>b=222</code>。</p>
 <p>现在我们模拟意外事故，删除这个Pod：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>kubectl delete pod redis-pv-sts-0
 </code></pre></div>
 <p>由于StatefulSet和Deployment一样会监控Pod的实例，发现Pod数量少了就会很快创建出新的Pod，并且名字、网络标识也都会和之前的Pod一模一样：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/52/23/52e2f02a1d80d8bba2a42c8258cda923.png?wh=1300x236" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/52/23/52e2f02a1d80d8bba2a42c8258cda923.png?wh=1300x236" /></p>
 <p>那Redis里存储的数据怎么样了呢？是不是真的用到了持久化存储，也完全恢复了呢？</p>
 <p>你可以再用Redis客户端登录去检查一下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>kubectl exec -it redis-pv-sts-0 -- redis-cli
 </code></pre></div>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c7/08/c78ca845ee20459dd2d8bayy3db71808.png?wh=1544x530" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c7/08/c78ca845ee20459dd2d8bayy3db71808.png?wh=1544x530" /></p>
 <p>因为我们把NFS网络存储挂载到了Pod的 <code>/data</code> 目录，Redis就会定期把数据落盘保存，所以新创建的Pod再次挂载目录的时候会从备份文件里恢复数据，内存里的数据就恢复原状了。</p>
 <h2 id="_2">小结</h2>
 <p>好了，今天我们学习了专门部署“有状态应用”的API对象StatefulSet，它与Deployment非常相似，区别是由它管理的Pod会有固定的名字、启动顺序和网络标识，这些特性对于在集群里实施有主从、主备等关系的应用非常重要。</p>
@@ -6525,7 +6525,7 @@
 <li>是否可以不使用“volumeClaimTemplates”内嵌定义PVC呢？会有什么样的后果呢？</li>
 </ol>
 <p>欢迎在留言区参与讨论，分享你的想法。我们下节课再见。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/88/e5/884a5c91b82cb515c856ce2ece6a91e5.jpg?wh=1920x1544" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/88/e5/884a5c91b82cb515c856ce2ece6a91e5.jpg?wh=1920x1544" /></p>
 <div><strong>精选留言（15）</strong></div>
 <ul>
 <li><span>Lorry</span> 👍（10） 💬（2）<p>Pod负责服务，Job负责调度，
@@ -6664,8 +6664,6 @@ btw，越学习越能理解到 老师讲的“云原生”的概念了</p>2022-0
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -6107,7 +6107,7 @@
 <p>在这个例子里我们就使用了宿主机本地磁盘，把磁盘上的/tmp/test1目录作为volume挂载到容器的/tmp目录下。</p>
 <p>然后在启动容器之后，我们直接运行fio的命令，这里的参数和我们<a href="https://time.geekbang.org/column/article/318173">第11讲</a>最开始的例子差不多，只是这次我们运行的是write，也就是写磁盘的操作，而写的目标盘就是挂载到/tmp目录的volume。</p>
 <p>可以看到，fio的运行结果如下图所示，IOPS是18K，带宽(BW)是70MB/s左右。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a8/54/a8a156d4a543bc02133751a14ba5a354.png?wh=1920%2A335" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a8/54/a8a156d4a543bc02133751a14ba5a354.png?wh=1920%2A335" /></p>
 <p>好了，刚才我们模拟了一个容器写磁盘的性能。那么如果这时候有两个容器，都在往同一个磁盘上写数据又是什么情况呢？我们可以再用下面的这个脚本试一下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>mkdir<span class="w"> </span>-p<span class="w"> </span>/tmp/test1
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>mkdir<span class="w"> </span>-p<span class="w"> </span>/tmp/test2
@@ -6120,7 +6120,7 @@
 <a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>docker<span class="w"> </span>run<span class="w"> </span>--name<span class="w"> </span>fio_test2<span class="w"> </span>--volume<span class="w"> </span>/tmp/test2:/tmp<span class="w">  </span>registery/fio:v1<span class="w"> </span>fio<span class="w"> </span>-direct<span class="o">=</span><span class="m">1</span><span class="w"> </span>-rw<span class="o">=</span>write<span class="w"> </span>-ioengine<span class="o">=</span>libaio<span class="w"> </span>-bs<span class="o">=</span>4k<span class="w"> </span>-size<span class="o">=</span>1G<span class="w"> </span>-numjobs<span class="o">=</span><span class="m">1</span><span class="w">  </span>-name<span class="o">=</span>/tmp/fio_test2.log<span class="w"> </span><span class="p">&amp;</span>
 </code></pre></div>
 <p>这时候，我们看到的结果，在容器fio_test1里，IOPS是15K左右，带宽是59MB/s了，比之前单独运行的时候性能下降了不少。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cb/64/cb2f19b2da651b03521804e22f14b864.png?wh=1662%2A98" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cb/64/cb2f19b2da651b03521804e22f14b864.png?wh=1662%2A98" /></p>
 <p>显然从这个例子中，我们可以看到多个容器同时写一块磁盘的时候，它的性能受到了干扰。那么有什么办法可以保证每个容器的磁盘读写性能呢？</p>
 <p>之前，我们讨论过用Cgroups来保证容器的CPU使用率，以及控制Memroy的可用大小。那么你肯定想到了，我们是不是也可以用Cgroups来保证每个容器的磁盘读写性能？</p>
 <p>没错，在Cgroup v1中有blkio子系统，它可以来限制磁盘的I/O。不过blkio子系统对于磁盘I/O的限制，并不像CPU，Memory那么直接，下面我会详细讲解。</p>
@@ -6180,8 +6180,8 @@
 <p>还有一点我要提醒一下，不同数据块大小，在性能测试中可以适用于不同的测试目的。但因为这里不是我们要讲的重点，所以为了方便你理解概念，这里就用固定值。</p>
 <p>在我们后面的例子里，fio读写的数据块都固定在4KB。所以对于磁盘的性能限制，我们在blkio Cgroup里就只设置吞吐量限制了。</p>
 <p>在加了blkio Cgroup限制10MB/s后，从fio运行后的输出结果里，我们可以看到这个容器对磁盘无论是读还是写，它的最大值就不会再超过10MB/s了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e2/b3/e26118e821a4b936521eacac924c7db3.png?wh=1492%2A112" />
-<img alt="" src="https://static001.geekbang.org/resource/image/0a/f5/0ae074c568161d24e57d37d185a47af5.png?wh=1502%2A100" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e2/b3/e26118e821a4b936521eacac924c7db3.png?wh=1492%2A112" />
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0a/f5/0ae074c568161d24e57d37d185a47af5.png?wh=1502%2A100" /></p>
 <p>在给每个容器都加了blkio Cgroup限制，限制为10MB/s后，即使两个容器同时在一个磁盘上写入文件，那么每个容器的写入磁盘的最大吞吐量，也不会互相干扰了。</p>
 <p>我们可以用下面的这个脚本来验证一下。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="ch">#!/bin/bash</span>
@@ -6227,8 +6227,8 @@
 <a id="__codelineno-6-41" name="__codelineno-6-41" href="#__codelineno-6-41"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>fio_test2<span class="w"> </span>fio<span class="w"> </span>-direct<span class="o">=</span><span class="m">1</span><span class="w"> </span>-rw<span class="o">=</span>write<span class="w"> </span>-ioengine<span class="o">=</span>libaio<span class="w"> </span>-bs<span class="o">=</span>4k<span class="w"> </span>-size<span class="o">=</span>100MB<span class="w"> </span>-numjobs<span class="o">=</span><span class="m">1</span><span class="w">  </span>-name<span class="o">=</span>/tmp/fio_test2.log<span class="w"> </span><span class="p">&amp;</span>
 </code></pre></div>
 <p>我们还是看看fio运行输出的结果，这时候，fio_test1和fio_test2两个容器里执行的结果都是10MB/s了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/67/a9/6719cc30a8e2933dae1ba6f96235e4a9.png?wh=1492%2A112" />
-<img alt="" src="https://static001.geekbang.org/resource/image/de/c8/de4be66c72ff9e4cdc5007fe71f848c8.png?wh=1482%2A104" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/67/a9/6719cc30a8e2933dae1ba6f96235e4a9.png?wh=1492%2A112" />
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/de/c8/de4be66c72ff9e4cdc5007fe71f848c8.png?wh=1482%2A104" /></p>
 <p>那么做到了这一步，我们是不是就可以认为，blkio Cgroup可以完美地对磁盘I/O做限制了呢？</p>
 <p>你先别急，我们可以再做个试验，把前面脚本里fio命令中的 “-direct=1” 给去掉，也就是不让fio运行在Direct I/O模式了，而是用Buffered I/O模式再运行一次，看看fio执行的输出。</p>
 <p>同时我们也可以运行iostat命令，查看实际的磁盘写入速度。</p>
@@ -6237,19 +6237,19 @@
 <p>为什么会这样的呢？这就要提到Linux的两种文件I/O模式了：Direct I/O和Buffered I/O。</p>
 <p>Direct I/O 模式，用户进程如果要写磁盘文件，就会通过Linux内核的文件系统层(filesystem) -&gt; 块设备层(block layer) -&gt; 磁盘驱动 -&gt; 磁盘硬件，这样一路下去写入磁盘。</p>
 <p>而如果是Buffered I/O模式，那么用户进程只是把文件数据写到内存中（Page Cache）就返回了，而Linux内核自己有线程会把内存中的数据再写入到磁盘中。<strong>在Linux里，由于考虑到性能问题，绝大多数的应用都会使用Buffered I/O模式。</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/10/46/1021f5f7ec700f3c7c66cbf8e07b1a46.jpeg?wh=3200%2A1800" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/10/46/1021f5f7ec700f3c7c66cbf8e07b1a46.jpeg?wh=3200%2A1800" /></p>
 <p>我们通过前面的测试，发现Direct I/O可以通过blkio Cgroup来限制磁盘I/O，但是Buffered I/O不能被限制。</p>
 <p>那通过上面的两种I/O模式的解释，你是不是可以想到原因呢？是的，原因就是被Cgroups v1的架构限制了。</p>
 <p>我们已经学习过了v1 的CPU Cgroup，memory Cgroup和blkio Cgroup，那么Cgroup v1的一个整体结构，你应该已经很熟悉了。它的每一个子系统都是独立的，资源的限制只能在子系统中发生。</p>
 <p>就像下面图里的进程pid_y，它可以分别属于memory Cgroup和blkio Cgroup。但是在blkio Cgroup对进程pid_y做磁盘I/O做限制的时候，blkio子系统是不会去关心pid_y用了哪些内存，哪些内存是不是属于Page Cache，而这些Page Cache的页面在刷入磁盘的时候，产生的I/O也不会被计算到进程pid_y上面。</p>
 <p>就是这个原因，导致了blkio 在Cgroups v1里不能限制Buffered I/O。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/32/ba/32c69a6f69c4ce7f11c842450fe7d9ba.jpeg?wh=3200%2A1800" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/32/ba/32c69a6f69c4ce7f11c842450fe7d9ba.jpeg?wh=3200%2A1800" /></p>
 <p>这个Buffered I/O限速的问题，在Cgroup V2里得到了解决，其实这个问题也是促使Linux开发者重新设计Cgroup V2的原因之一。</p>
 <h2 id="cgroup-v2">Cgroup V2</h2>
 <p>Cgroup v2相比Cgroup v1做的最大的变动就是一个进程属于一个控制组，而每个控制组里可以定义自己需要的多个子系统。</p>
 <p>比如下面的Cgroup V2示意图里，进程pid_y属于控制组group2，而在group2里同时打开了io和memory子系统 （Cgroup V2里的io子系统就等同于Cgroup v1里的blkio子系统）。</p>
 <p>那么，Cgroup对进程pid_y的磁盘 I/O做限制的时候，就可以考虑到进程pid_y写入到Page Cache内存的页面了，这样buffered I/O的磁盘限速就实现了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8a/46/8ae3f3282b9f19720b764c696959bf46.jpeg?wh=3200%2A1800" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8a/46/8ae3f3282b9f19720b764c696959bf46.jpeg?wh=3200%2A1800" /></p>
 <p>下面我们在Cgroup v2里，尝试一下设置了blkio Cgroup+Memory Cgroup之后，是否可以对Buffered I/O进行磁盘限速。</p>
 <p>我们要做的第一步，就是在Linux系统里打开Cgroup v2的功能。因为目前即使最新版本的Ubuntu Linux或者Centos Linux，仍然在使用Cgroup v1作为缺省的Cgroup。</p>
 <p>打开方法就是配置一个kernel参数"cgroup_no_v1=blkio,memory"，这表示把Cgroup v1的blkio和Memory两个子系统给禁止，这样Cgroup v2的io和Memory这两个子系统就打开了。</p>
@@ -6275,7 +6275,7 @@
 </code></pre></div>
 <p>在这个例子里，我们建立了一个名叫iotest的控制组，并且在这个控制组里加入了io和Memory两个控制子系统，对磁盘最大吞吐量的设置为10MB。运行fio的时候不加"-direct=1"，也就是让fio运行在buffered I/O模式下。</p>
 <p>运行fio写入1GB的数据后，你会发现fio马上就执行完了，因为系统上有足够的内存，fio把数据写入内存就返回了，不过只要你再运行”iostat -xz 10” 这个命令，你就可以看到磁盘vdb上稳定的写入速率是10240wkB/s，也就是我们在io Cgroup里限制的10MB/s。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/81/c6/8174902114e01369193945891d054cc6.png?wh=1872%2A1036" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/81/c6/8174902114e01369193945891d054cc6.png?wh=1872%2A1036" /></p>
 <p>看到这个结果，我们证实了Cgoupv2 io+Memory两个子系统一起使用，就可以对buffered I/O控制磁盘写入速率。</p>
 <h2 id="_3">重点总结</h2>
 <p>这一讲，我们主要想解决的问题是如何保证容器读写磁盘速率的稳定，特别是当多个容器同时读写同一个磁盘的时候，需要减少相互的干扰。</p>
@@ -6412,8 +6412,6 @@ Centos8于2021年年底停止了服务, 这个测试demo应该是有问题的，
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

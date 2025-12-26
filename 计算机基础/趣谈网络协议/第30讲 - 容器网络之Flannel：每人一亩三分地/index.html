@@ -6244,12 +6244,12 @@
 <p>容器作为集装箱，可以保证应用在不同的环境中快速迁移，提高迭代的效率。但是如果要形成容器集团军，还需要一个集团军作战的调度平台，这就是Kubernetes。它可以灵活地将一个容器调度到任何一台机器上，并且当某个应用扛不住的时候，只要在Kubernetes上修改容器的副本数，一个应用马上就能变八个，而且都能提供服务。</p>
 <p>然而集团军作战有个重要的问题，就是通信。这里面包含两个问题，第一个是集团军的A部队如何实时地知道B部队的位置变化，第二个是两个部队之间如何相互通信。</p>
 <p>第一个问题位置变化，往往是通过一个称为注册中心的地方统一管理的，这个是应用自己做的。当一个应用启动的时候，将自己所在环境的IP地址和端口，注册到注册中心指挥部，这样其他的应用请求它的时候，到指挥部问一下它在哪里就好了。当某个应用发生了变化，例如一台机器挂了，容器要迁移到另一台机器，这个时候IP改变了，应用会重新注册，则其他的应用请求它的时候，还是能够从指挥部得到最新的位置。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a0/0d/a0763d50fc4e8dcec37ae25a2f6cc60d.jpeg?wh=1582%2A1080" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a0/0d/a0763d50fc4e8dcec37ae25a2f6cc60d.jpeg?wh=1582%2A1080" /></p>
 <p>接下来是如何相互通信的问题。NAT这种模式，在多个主机的场景下，是存在很大问题的。在物理机A上的应用A看到的IP地址是容器A的，是172.17.0.2，在物理机B上的应用B看到的IP地址是容器B的，不巧也是172.17.0.2，当它们都注册到注册中心的时候，注册中心就是这个图里这样子。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e2/dd/e20596506dd34122e302a7cfc8bb85dd.jpg?wh=1920%2A847" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e2/dd/e20596506dd34122e302a7cfc8bb85dd.jpg?wh=1920%2A847" /></p>
 <p>这个时候，应用A要访问应用B，当应用A从注册中心将应用B的IP地址读出来的时候，就彻底困惑了，这不是自己访问自己吗？</p>
 <p>怎么解决这个问题呢？一种办法是不去注册容器内的IP地址，而是注册所在物理机的IP地址，端口也要是物理机上映射的端口。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8f/18/8fabf1de2a7d346856a032dbf2417b18.jpg?wh=2478%2A1268" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8f/18/8fabf1de2a7d346856a032dbf2417b18.jpg?wh=2478%2A1268" /></p>
 <p>这样存在的问题是，应用是在容器里面的，它怎么知道物理机上的IP地址和端口呢？这明明是运维人员配置的，除非应用配合，读取容器平台的接口获得这个IP和端口。一方面，大部分分布式框架都是容器诞生之前就有了，它们不会适配这种场景；另一方面，让容器内的应用意识到容器外的环境，本来就是非常不好的设计。</p>
 <p>说好的集装箱，说好的随意迁移呢？难道要让集装箱内的货物意识到自己传的信息？而且本来Tomcat都是监听8080端口的，结果到了物理机上，就不能大家都用这个端口了，否则端口就冲突了，因而就需要随机分配端口，于是在注册中心就出现了各种各样奇怪的端口。无论是注册中心，还是调用方都会觉得很奇怪，而且不是默认的端口，很多情况下也容易出错。</p>
 <p>Kubernetes作为集团军作战管理平台，提出指导意见，说网络模型要变平，但是没说怎么实现。于是业界就涌现了大量的方案，Flannel就是其中之一。</p>
@@ -6258,7 +6258,7 @@
 <p>接下来的问题，就是<strong>物理机A上的容器如何访问到物理机B上的容器呢？</strong></p>
 <p>你是不是想到了熟悉的场景？虚拟机也需要跨物理机互通，往往通过Overlay的方式，容器是不是也可以这样做呢？</p>
 <p><strong>这里我要说Flannel使用UDP实现Overlay网络的方案。</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/07/71/07217a9ee64e1970ac04de9080505871.jpeg?wh=1920%2A817" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/07/71/07217a9ee64e1970ac04de9080505871.jpeg?wh=1920%2A817" /></p>
 <p>在物理机A上的容器A里面，能看到的容器的IP地址是172.17.8.2/24，里面设置了默认的路由规则default via 172.17.8.1 dev eth0。</p>
 <p>如果容器A要访问172.17.9.2，就会发往这个默认的网关172.17.8.1。172.17.8.1就是物理机上面docker0网桥的IP地址，这台物理机上的所有容器都是连接到这个网桥的。</p>
 <p>在物理机上面，查看路由策略，会有这样一条172.17.0.0/24 via 172.17.0.0 dev flannel.1，也就是说发往172.17.9.2的网络包会被转发到flannel.1这个网卡。</p>
@@ -6276,7 +6276,7 @@
 <p>内部的MAC地址这样写：源为物理机A的flannel.1的MAC地址，目标为物理机B的flannel.1的MAC地址，在外面加上VXLAN的头。</p>
 <p>外层的IP地址这样写：源为物理机A的IP地址，目标为物理机B的IP地址，外面加上物理机的MAC地址。</p>
 <p>这样就能通过VXLAN将包转发到另一台机器，从物理机B的flannel.1上解包，变成内部的网络包，通过物理机B上的路由转发到docker0，然后转发到容器B里面。通信成功。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/01/79/01f86f6049eef051d48e2e235fa43d79.jpeg?wh=1920%2A835" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/01/79/01f86f6049eef051d48e2e235fa43d79.jpeg?wh=1920%2A835" /></p>
 <h2 id="_1">小结</h2>
 <p>好了，今天的内容就到这里，我来总结一下。</p>
 <ul>
@@ -6444,8 +6444,6 @@ Data (159 bytes)</p>2019-12-07</li><br/><li><span>jacy</span> 👍（2） 💬�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -7392,7 +7392,7 @@
 <p>但是问题必须还要解决，我们比较常用的多台服务器状态一致性的解决方案就是ZooKeeper。</p>
 <h2 id="_1">分布式一致性原理</h2>
 <p>讲分布式一致性时，相信你肯定多少听过著名的CAP原理。CAP原理认为，一个提供数据服务的分布式系统无法同时满足数据<strong>一致性</strong>（Consistency）、<strong>可用性</strong>（Availibility）、<strong>分区耐受性</strong>（Patition Tolerance）这三个条件，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bf/b2/bfdc62821672a82c24e6e6f5b62ae6b2.png?wh=1268x730" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bf/b2/bfdc62821672a82c24e6e6f5b62ae6b2.png?wh=1268x730" /></p>
 <p>一致性是说，每次读取的数据都应该是最近写入的数据或者返回一个错误（Every read receives the most recent write or an error），而不是过期数据，也就是说，数据是一致的。</p>
 <p>可用性是说，每次请求都应该得到一个响应，而不是返回一个错误或者失去响应，不过这个响应不需要保证数据是最近写入的（Every request receives a (non-error) response, without the guarantee that it contains the most recent write），也就是说系统需要一直都是可以正常使用的，不会引起调用者的异常，但是并不保证响应的数据是最新的。</p>
 <p>分区耐受性是说，即使因为网络原因，部分服务器节点之间消息丢失或者延迟了，系统依然应该是可以操作的（The system continues to operate despite an arbitrary number of messages being dropped (or delayed) by the network between nodes）。</p>
@@ -7401,16 +7401,16 @@
 <p>所以，关于CAP原理，更准确的说法是，在分布式系统必须要满足分区耐受性的前提下，可用性和一致性无法同时满足。</p>
 <h2 id="zabzookeeper">ZAB算法与ZooKeeper架构</h2>
 <p>ZooKeeper主要提供数据的一致性服务，其实现分布式系统的状态一致性依赖一个叫Paxos的算法。Paxos算法在多台服务器通过内部的投票表决机制决定一个数据的更新与写入。Paxos的基本思路请看下面的图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5b/28/5b47c6fd9f61be41daa1f88662c6fb28.png?wh=1318x844" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5b/28/5b47c6fd9f61be41daa1f88662c6fb28.png?wh=1318x844" /></p>
 <p>应用程序连接到任意一台服务器后提起状态修改请求（也可以是获得某个状态锁的请求），从图上看也就是服务器1，会将这个请求发送给集群中其他服务器进行表决。如果某个服务器同时收到了另一个应用程序同样的修改请求，它可能会拒绝服务器1的表决，并且自己也发起一个同样的表决请求，那么其他服务器就会根据时间戳和服务器排序规则进行表决。</p>
 <p>表决结果会发送给其他所有服务器，最终发起表决的服务器也就是服务器1，会根据收到的表决结果决定该修改请求是否可以执行，事实上，只有在收到多数表决同意的情况下才会决定执行。当有多个请求同时修改某个数据的情况下，服务器的表决机制保证只有一个请求会通过执行，从而保证了数据的一致性。</p>
 <p>Paxos算法有点过于复杂、实现难度也比较高，所以ZooKeeper在编程实现的时候将其简化成了一种叫做ZAB的算法（Zookeeper Atomic Broadcast， Zookeeper原子广播）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e3/42/e3a0b1855e8455cf59584bce0ab5c042.png?wh=2482x1266" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e3/42/e3a0b1855e8455cf59584bce0ab5c042.png?wh=2482x1266" /></p>
 <p>ZAB算法的目的，同样是在多台服务器之间达成一致，保证这些服务器上存储的数据是一致的。ZAB算法的主要特点在于：需要在这些服务器中选举一个Leader，所有的写请求都必须提交给Leader。由Leader服务器向其他服务器（Follower）发起Propose，通知所有服务器：我们要完成一个写操作请求，大家检查自己的数据状态，是否有问题。</p>
 <p>如果所有Follower服务器都回复Leader服务器ACK，即没有问题，那么Leader服务器会向所有Follower发送Commit命令，要求所有服务器完成写操作。这样包括Leader服务器在内的所有ZooKeeper集群服务器的数据，就都更新并保持一致了。如果有两个客户端程序同时请求修改同一个数据，因为必须要经过Leader的审核，而Leader只接受其中一个请求，数据也会保持一致。</p>
 <p>在实际应用中，客户端程序可以连接任意一个Follower，进行数据读写操作。如果是写操作，那么这个请求会被这个Follower发送给Leader，进行如上所述的处理；如果是读操作，因为所有服务器的数据都是一致的，那么这个Follower直接返回自己本地的数据给客户端就可以了。</p>
 <p>ZooKeeper通过一种树状结构记录数据，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0e/27/0e54cac5e7a7ed422d0750a0e2d3e127.png?wh=610x630" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0e/27/0e54cac5e7a7ed422d0750a0e2d3e127.png?wh=610x630" /></p>
 <p>应用程序可以通过路径的方式访问ZooKeeper中的数据，比如/services/YaView/services/stupidname这样的路径方式修改、读取数据。ZooKeeper还支持监听模式，当数据发生改变的时候，通知应用程序。</p>
 <p>因为大数据系统通常都是主从架构，主服务器管理集群的状态和元信息（meta-info），为了保证集群状态一致防止“脑裂”，所以运行期只能有一个主服务器工作（active master），但是为了保证高可用，必须有另一个主服务器保持热备（standby master）。那么应用程序和集群其他服务器如何才能知道当前哪个服务器是实际工作的主服务器呢？</p>
 <p>所以很多大数据系统都依赖ZooKeeper提供的一致性数据服务，用于选举集群当前工作的主服务器。一台主服务器启动后向ZooKeeper注册自己为当前工作的主服务器，而另一台服务器就只能成为热备主服务器，应用程序运行期都和当前工作的主服务器通信。</p>
@@ -7437,7 +7437,7 @@
 <p>使用ZooKeeper提供的API接口，代码非常简单。所有要选举成为主服务器的服务器在启动的时候都在自己的服务器上执行上面这段伪代码的逻辑，其中的getdata、create会连接到ZooKeeper集群去处理。但是根据ZAB算法，只有一个服务器能将自己的hostname写入到ZooKeeper的主服务器路径/servers/leader中，保证集群只有一个主服务器。</p>
 <p>而成功成为主服务器的服务器在创建/servers/leader路径的时候，已指定当前路径为EPHEMERAL，即临时路径。如果当前的主服务器宕机，那么该服务器和ZooKeeper的长连接也就中断了，ZooKeeper据此判断该服务器宕机，删除这个路径。其他监听这个路径的服务器（即在伪代码1中，第二个参数设置为true）就会收到通知，所有服务器重新执行以上的伪代码，重新选举出新的、唯一的主服务器。</p>
 <p>此外，说到ZooKeeper的性能，因为ZooKeeper系统的多台服务器存储相同数据，并且每次数据更新都要所有服务器投票表决，所以和一般的分布式系统相反，ZooKeeper集群的写操作性能会随着服务器数量的增加而下降。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f1/d1/f1767fc5ac7ee1af6d391690db5e58d1.png?wh=964x676" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f1/d1/f1767fc5ac7ee1af6d391690db5e58d1.png?wh=964x676" /></p>
 <p>ZooKeeper通过ZAB算法实现数据一致性，并为各种大数据系统提供主服务器选举服务。虽然ZooKeeper并没有什么特别强大的功能，但是在各类分布式系统和大数据系统中，ZooKeeper的出镜率非常高，因此也是很多系统的基础设施。</p>
 <h2 id="_2">小结</h2>
 <p>如果我们单独看大数据和分布式系统的很多解决方案，如果不把它们放在大规模数据和大规模服务器集群的场景下思考，可能会觉得很多问题和方案都很莫名其妙。比如要保证分布式系统中数据的一致性，才诞生了Paxos、ZAB这样专门的算法和ZooKeeper这样的产品。</p>
@@ -7573,8 +7573,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

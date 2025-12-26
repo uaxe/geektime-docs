@@ -6615,7 +6615,7 @@
 <h4 id="4">4.导出抓包文件，结合应用日志展开分析。</h4>
 <p>这就是我们前面提到的“问题现场”详情了，在抓包文件里，所有的网络行为都会被记录下来。我们把报文情况跟应用层的报错情况做对比，就能极大地推动根因排查工作。</p>
 <p>我把这个方法论整理成了一个简单的流程图，供你参考：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5c/71/5c0ea3757e87b3d2df8d04c6eb9d3171.jpg?wh=2000x528" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5c/71/5c0ea3757e87b3d2df8d04c6eb9d3171.jpg?wh=2000x528" /></p>
 <p>下面，我们就进入实际案例。</p>
 <h2 id="_2">实战案例：网站偶尔会变慢？</h2>
 <p>曾经有个客户向我们报告了这样一个情况：他们的网站偶尔会变慢，比如正常1秒内就能完成的请求，可能会变成5秒钟或者更长。</p>
@@ -6630,7 +6630,7 @@
 <p>在这个时间段内，这个站点依然在对外服务。除此以外，客户那边的几个工程师也用浏览器不断刷新页面作为测试，发现也有遇到一次页面卡顿的情况。所以我们已经清楚，问题现场也就是跟问题相关的数据包，已经在抓包文件里了。</p>
 <p>在这个案例里，因为客户那边的监控手段比较缺乏，没有全面的客户端日志，所以动用了“人肉”重现的方法。</p>
 <p>其实，这个看起来很朴实的方法，在不少场景下也是挺有用的。我前面也提过，<strong>网络排查是一项偏向实践性的工作，只要有效的方法，我们都可以参考采用</strong>。当然如果你有Grafana等比较先进的监控系统，自然可以采用告警通知等更好的办法。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2a/dd/2aa3b64b995d21037cb9323ccc57d9dd.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2a/dd/2aa3b64b995d21037cb9323ccc57d9dd.jpg?wh=2000x1125" /></p>
 <h2 id="1_1">抓包分析1：如何在网络视角上精确定义问题？</h2>
 <p>接下来，就进入了分析阶段。不过在具体展开前，我们先思考两个简单的问题：</p>
 <ul>
@@ -6640,7 +6640,7 @@
 <p>客户的应用是HTTP协议的，业务是在线二手商品交易，他们的客户是通过浏览器和App进来交易的。所以，针对第一个问题，“慢”对于浏览器来说，就可能是页面一直显示转圈圈的图，要很久才能加载好页面。对于App，就是界面里有很多内容空白，过一会儿才能正常使用。</p>
 <p>第二个问题没有标准答案，但一般来说，一个页面响应超过3~4秒问题就很大了，1秒以内完成是最好的。页面打开越快，客户体验越好，成交量就越高。有研究发现，电商网站页面的加载时间只要快0.1秒，成交量就有明显的提升。</p>
 <p>所以，基于以上的分析，我们确定了查找条件，就是“响应时间超过3秒的HTTP事务”相关的报文。但是当我们打开抓包文件，随机选取一个HTTP事务的报文，我们就能很方便地找到“响应时间超过3秒的HTTP事务”吗？</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b0/d2/b085eaf6dac2598e3cbc3af7858eb6d2.png?wh=1155x206" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b0/d2/b085eaf6dac2598e3cbc3af7858eb6d2.png?wh=1155x206" /></p>
 <p>上图是某个随机选取的HTTP事务的TCP流。当然这里也是 <strong>Wireshark的一个小的知识点</strong>：左侧的两个水平方向的箭头（一个向右，一个向左），分别表示这两个数据包是HTTP请求和HTTP响应。然后我们可以根据第二列的时间差（Time），算出来HTTP耗时。</p>
 <p>这次事务的耗时主要发生在642号和641号报文之间，大约是115毫秒，所以不符合3秒的条件。</p>
 <h2 id="2wiresharkhttp">抓包分析2：如何用Wireshark实现对大量HTTP事务的性能分析？</h2>
@@ -6649,23 +6649,23 @@
 <h3 id="_6">过滤器</h3>
 <p>我们先来看看如何使用Wireshark的过滤器，来实现方便的数据分析。</p>
 <p>在这个案例里，我们关注的是HTTP事务的耗时。其实在Wireshark窗口里，我们可以选中一个HTTP响应报文，然后找到它的耗时。比如前面提到的115毫秒的那个事务，它的HTTP响应报文的详情是这样的：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/34/1a/343587d46c4850yy81dfc65164ec4d1a.png?wh=618x399" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/34/1a/343587d46c4850yy81dfc65164ec4d1a.png?wh=618x399" /></p>
 <p>可以看到，<code>[Time since request: xxx seconds]</code> 就表示了HTTP耗时。它本身不是报文属性，而是Wireshark对报文的分析属性。所有Wireshark提供的分析属性，都会用<strong>方括号</strong>标识出来（这跟ps等命令里，把内核线程也用方括号标识出来的做法类似）。</p>
 <p>这个HTTP耗时指标对应的Wireshark过滤器是 <code>http.time</code>。我们可以直接在Wireshark过滤器输入框里输入 <code>http.time</code>，看看会出现什么：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/eb/ea/ebbc2c46d17f36881400a7073bd3b8ea.png?wh=653x307" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/eb/ea/ebbc2c46d17f36881400a7073bd3b8ea.png?wh=653x307" /></p>
 <p>可见，所有的HTTP响应报文都被过滤显示出来了。这是因为Wireshark把http.time这个分析属性体现在HTTP响应报文上，所以这里搜出来的就都是响应报文了。而如果用过滤器http，就会同时显示HTTP请求和HTTP响应的报文。现在没有其他TCP包的干扰，看起来清爽多了。</p>
 <p>不过等等，我们想要看的<strong>耗时信息在哪里呢？</strong>没有地方展示？</p>
 <h3 id="_7">自定义列</h3>
 <p>到这里，就需要第二个特性上场了，也就是<strong>自定义列</strong>。跟之前课程里介绍的<a href="https://time.geekbang.org/column/article/481782">添加自定义列</a>的方法一样，我们在Wireshark窗口下方的http详情部分，选中前面介绍过的Time since request，右单击，选择Apply as column，然后Wireshark主窗口里就多了一列 <code>http.time</code>。</p>
 <p>不过新增加的列默认出现在最右侧，你可以根据需要把它拖放到合适的位置，比如我把它拖到第三列，插入在info列之前，查看起来十分方便。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/30/36/301281a684daaa0be292522485dee436.png?wh=729x309" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/30/36/301281a684daaa0be292522485dee436.png?wh=729x309" /></p>
 <p>这样，我们结合 <code>http.time</code> 过滤器和 <code>http.time</code> 自定义列，就可以很直观地看清楚每个HTTP事务的耗时了。</p>
 <p>好了，这时我们点击 <code>http.time</code> 列就可以排序了，一下子就可以找到耗时最高的几个事务，如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7b/e3/7b255eef494b951007941f65a72f0fe3.png?wh=738x216" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7b/e3/7b255eef494b951007941f65a72f0fe3.png?wh=738x216" /></p>
 <p>我们可以很清楚地看到，有两个事务消耗了长达5到6秒的时间，其他事务就相对很低了，都在1秒以内。既然已经定位到问题事务了，接下来按照常规套路，右单击这个包，选择Follow -&gt; TCP Stream，我们就可以跟踪到这个高耗时事务的前后TCP行为，进而可以定位是否是网络问题。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9e/b6/9e8882627282ca8baa15c944a1b065b6.png?wh=736x459" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9e/b6/9e8882627282ca8baa15c944a1b065b6.png?wh=736x459" /></p>
 <p>这个完整的TCP流是这样的：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/92/de/9244f5f49154e8494245d18dcde988de.png?wh=903x611" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/92/de/9244f5f49154e8494245d18dcde988de.png?wh=903x611" /></p>
 <p>显然，从第二列Time来看，6秒多的时间耗费在576号报文和647号报文之间，具体来说：</p>
 <ul>
 <li>576号报文：服务端（监听在8082端口）回复了TCP确认，确认收到客户端发送过来的POST请求。</li>
@@ -6683,7 +6683,7 @@
 <p>既然排查了网络的嫌疑，客户就转而去检查应用层面的问题了。</p>
 <h2 id="_8"><strong>是否还有其他可能？</strong></h2>
 <p>当然你可能会问，是否有可能服务端及时发送HTTP响应了，只是一直丢包，导致6.5秒后客户端才收到呢？就是下图这种情况：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ee/4c/ee7ccdfd9f4834bb12cc5e948854744c.jpg?wh=1794x1013" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ee/4c/ee7ccdfd9f4834bb12cc5e948854744c.jpg?wh=1794x1013" /></p>
 <p>这个可能性当然是可能存在的，如果做得透彻一点，我们应该同时在客户端和服务端抓包，进行对比即可确认或排查这个可能性。具体的例子可以参考我们在<a href="https://time.geekbang.org/column/article/481042">第5讲</a>介绍的防火墙的案例，里面就是用两侧抓包来查出问题的。</p>
 <p>但是在当前的案例中，假设真有网络问题引起的重传，那么这个<strong>重传行为不会只集中在HTTP响应</strong>上。</p>
 <p>也就是说，一个有丢包表现的网络，不会“聪明”到只盯着HTTP响应去丢包，而是其他阶段也会有丢包。这里说的其他阶段，就是TCP握手、HTTP请求、TCP挥手，等等，丢包同样会引起这些阶段出现重传等现象。但是我们在这个抓包文件中并没有看到这类现象，因此反过来就说明，这个推测不太可能成立。</p>
@@ -6695,9 +6695,9 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>tshark -r 文件名 -T fields -e http.time | grep -v ^$
 </code></pre></div>
 <p>示例输出如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d6/52/d66f4b615a651dc0b389e0e0eyyde252.png?wh=479x321" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d6/52/d66f4b615a651dc0b389e0e0eyyde252.png?wh=479x321" /></p>
 <p>注意，我们在命令的后面，必须加上<strong>管道符“ | ”和“grep -v ^$”</strong>，要不然就会看到下面这种，有大段空白的输出（因为凡是非HTTP的数据包都没有输出，会成为一个空行）：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/13/46/13075fe935cfb325511371f6b2c07946.png?wh=480x290" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/13/46/13075fe935cfb325511371f6b2c07946.png?wh=480x290" /></p>
 <p>当然，如果要针对某个高耗时的事务进行数据面的分析，那光看http.time这一个指标是不够的，你需要知道这个事务对应的包号、TCP流号等信息，并追踪这个流里面的数据包。比如，你可以运行以下命令，把http.time耗时最高的事务对应的TCP流数据包，都在命令行里展示出来：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>tshark -r 文件名 -T fields -e frame.number -e http.time -e tcp.stream | sort -k2 -r | head -1 | awk &#39;{print $3}&#39; | xargs -n 1 -I {} tshark -r captured.pcap -Y &quot;tcp.stream eq {}&quot;
 </code></pre></div>
@@ -6707,7 +6707,7 @@
 <li><code>-Y "tcp.stream eq {}"</code>：在管道符后面使用，指的是需要把这个TCP流号相关的数据包都展示出来。因为结合了xargs命令，所以eq后面是一个<code>{}</code>符号，这个值就是TCP流的编号（由awk命令输出）。</li>
 </ul>
 <p>下图是对这个案例应用此命令得到的输出，这一系列数据包跟我们前面在Wireshark图形界面里Follow TCP Stream，而得到的那些数据包是一致的：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ab/98/abf3a85e16062d1546103b8a305ed698.png?wh=744x277" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ab/98/abf3a85e16062d1546103b8a305ed698.png?wh=744x277" /></p>
 <p>是不是有点神奇？我们在图形界面里能做的事情，在命令行里也一样能做到，只要借助tshark。而正因为它是命令行形式，所以具备下面这些<strong>优势</strong>：</p>
 <ul>
 <li>图形界面里需要反复多次进行的操作，在命令行里利用管道特性，一条命令就可以完成。</li>
@@ -6721,7 +6721,7 @@
 <li><strong>偶发性问题的排查思路</strong></li>
 </ul>
 <p>即先预估时间，然后一边抓包一边观察问题是否出现，在问题出现后停止抓包，最后进行抓包分析。也就是这样的流程：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5c/71/5c0ea3757e87b3d2df8d04c6eb9d3171.jpg?wh=2000x528" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5c/71/5c0ea3757e87b3d2df8d04c6eb9d3171.jpg?wh=2000x528" /></p>
 <ul>
 <li><strong>排查技巧</strong></li>
 </ul>
@@ -6869,8 +6869,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

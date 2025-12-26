@@ -6992,7 +6992,7 @@
 <p>我们都知道，Linux 是一个多任务操作系统，它支持远大于 CPU 数量的任务同时运行。当然，这些任务实际上并不是真的在同时运行，而是因为系统在很短的时间内，将 CPU 轮流分配给它们，造成多任务同时运行的错觉。</p>
 <p>而在每个任务运行前，CPU 都需要知道任务从哪里加载、又从哪里开始运行，也就是说，需要系统事先帮它设置好 <strong>CPU 寄存器和程序计数器</strong>（Program Counter，PC）。</p>
 <p>CPU 寄存器，是 CPU 内置的容量小、但速度极快的内存。而程序计数器，则是用来存储 CPU 正在执行的指令位置、或者即将执行的下一条指令位置。它们都是 CPU 在运行任何任务前，必须的依赖环境，因此也被叫做 <strong>CPU 上下文</strong>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/98/5f/98ac9df2593a193d6a7f1767cd68eb5f.png?wh=438%2A345" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/98/5f/98ac9df2593a193d6a7f1767cd68eb5f.png?wh=438%2A345" /></p>
 <p>知道了什么是 CPU 上下文，我想你也很容易理解 <strong>CPU 上下文切换</strong>。CPU 上下文切换，就是先把前一个任务的 CPU 上下文（也就是 CPU 寄存器和程序计数器）保存起来，然后加载新任务的上下文到这些寄存器和程序计数器，最后再跳转到程序计数器所指的新位置，运行新任务。</p>
 <p>而这些保存下来的上下文，会存储在系统内核中，并在任务重新调度执行时再次加载进来。这样就能保证任务原来的状态不受影响，让任务看起来还是连续运行。</p>
 <p>我猜肯定会有人说，CPU 上下文切换无非就是更新了 CPU 寄存器的值嘛，但这些寄存器，本身就是为了快速运行任务而设计的，为什么会影响系统的 CPU 性能呢？</p>
@@ -7007,7 +7007,7 @@
 <li>内核空间（Ring 0）具有最高权限，可以直接访问所有资源；</li>
 <li>用户空间（Ring 3）只能访问受限资源，不能直接访问内存等硬件设备，必须通过系统调用陷入到内核中，才能访问这些特权资源。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4d/a7/4d3f622f272c49132ecb9760310ce1a7.png?wh=321%2A312" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4d/a7/4d3f622f272c49132ecb9760310ce1a7.png?wh=321%2A312" /></p>
 <p>换个角度看，也就是说，进程既可以在用户空间运行，又可以在内核空间中运行。进程在用户空间运行时，被称为进程的用户态，而陷入内核空间的时候，被称为进程的内核态。</p>
 <p>从用户态到内核态的转变，需要通过<strong>系统调用</strong>来完成。比如，当我们查看文件内容时，就需要多次系统调用来完成：首先调用 open() 打开文件，然后调用 read() 读取文件内容，并调用 write() 将内容写到标准输出，最后再调用 close() 关闭文件。</p>
 <p>那么，系统调用的过程有没有发生 CPU 上下文的切换呢？答案自然是肯定的。</p>
@@ -7023,7 +7023,7 @@
 <p>首先，你需要知道，进程是由内核来管理和调度的，进程的切换只能发生在内核态。所以，进程的上下文不仅包括了虚拟内存、栈、全局变量等用户空间的资源，还包括了内核堆栈、寄存器等内核空间的状态。</p>
 <p>因此，进程的上下文切换就比系统调用时多了一步：在保存当前进程的内核状态和CPU寄存器之前，需要先把该进程的虚拟内存、栈等保存下来；而加载了下一进程的内核态后，还需要刷新进程的虚拟内存和用户栈。</p>
 <p>如下图所示，保存上下文和恢复上下文的过程并不是“免费”的，需要内核在 CPU 上运行才能完成。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/39/6b/395666667d77e718da63261be478a96b.png?wh=966%2A186" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/39/6b/395666667d77e718da63261be478a96b.png?wh=966%2A186" /></p>
 <p>根据 <a href="https://blog.tsunanet.net/2010/11/how-long-does-it-take-to-make-context.html">Tsuna</a> 的测试报告，每次上下文切换都需要几十纳秒到数微秒的 CPU 时间。这个时间还是相当可观的，特别是在进程上下文切换次数较多的情况下，很容易导致 CPU 将大量时间耗费在寄存器、内核栈以及虚拟内存等资源的保存和恢复上，进而大大缩短了真正运行进程的时间。这也正是上一节中我们所讲的，导致平均负载升高的一个重要因素。</p>
 <p>另外，我们知道， Linux 通过 TLB（Translation Lookaside Buffer）来管理虚拟内存到物理内存的映射关系。当虚拟内存更新后，TLB 也需要刷新，内存的访问也会随之变慢。特别是在多处理器系统上，缓存是被多个处理器共享的，刷新缓存不仅会影响当前处理器的进程，还会影响共享缓存的其他处理器的进程。</p>
 <p>知道了进程上下文切换潜在的性能问题后，我们再来看，究竟什么时候会切换进程上下文。</p>
@@ -7064,7 +7064,7 @@
 <h2 id="_5">思考</h2>
 <p>最后，我想邀请你一起来聊聊，你所理解的 CPU 上下文切换。你可以结合今天的内容，总结自己的思路和看法，写下你的学习心得。</p>
 <p>欢迎在留言区和我讨论。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/56/52/565d66d658ad23b2f4997551db153852.jpg?wh=1110%2A549" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/56/52/565d66d658ad23b2f4997551db153852.jpg?wh=1110%2A549" /></p>
 <div><strong>精选留言（15）</strong></div>
 <ul>
 <li><span>D白菜</span> 👍（213） 💬（9）<p>今天的课抽象的东西很多，还需要时间理解消化。对学习做了个简单的总结，初学者有何很多地方理解不对，请老师和童鞋们多多指正。
@@ -7247,8 +7247,6 @@ CFS 调度器没有时间片的概念了，叫做虚拟运行时间。</p>2018-1
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -6376,23 +6376,23 @@
 <li><strong>客户端直接访问服务器的情况</strong></li>
 </ul>
 <p>我们发现，如果客户端绕过LB VIP去直接访问服务器，是正常的，没有超时的报错。服务器上的日志显示，很快收到了客户端发出的请求，花了三百多毫秒就处理完并回复了。比如这个服务器日志：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a1/49/a15b98f0232e30c60522863b21ab2249.png?wh=1920x41" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a1/49/a15b98f0232e30c60522863b21ab2249.png?wh=1920x41" /></p>
 <ul>
 <li><strong>客户端访问LB VIP的情况</strong></li>
 </ul>
 <p>这种情况下，客户端会等待很长的时间才能拿到HTTP响应。日志也印证了这一点：服务器上的日志显示，这个请求的处理耗费了1703毫秒。如下图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/bb/30/bbaeb4c8e9f2c01c35c718c53df49b30.png?wh=1920x39" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bb/30/bbaeb4c8e9f2c01c35c718c53df49b30.png?wh=1920x39" /></p>
 <p>并且，客户端上的日志显示，同样是这个请求，在它看来，从发出请求给LB的VIP，到收到LB的VIP返回的响应，一共消耗了2002毫秒。如下图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/bc/7a/bc3623317b15d122fbd1414b69e3c47a.png?wh=1920x40" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bc/7a/bc3623317b15d122fbd1414b69e3c47a.png?wh=1920x40" /></p>
 <p>我画了一张示意图，帮助你理解得更加清楚一些：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a3/f4/a32407c628f7105702a0469269f66ff4.jpg?wh=1928x910" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a3/f4/a32407c628f7105702a0469269f66ff4.jpg?wh=1928x910" /></p>
 <p>你也许会问：看起来不是服务器那头本身处理的耗时很长吗？为什么不查查服务器上应用代码的Bug？</p>
 <p>我们也一度有这个怀疑，服务器上运行的是Java代码，会不会是GC造成的影响呢？所以我们也去查了当时JVM的运行情况，发现这段时间内并没有GC事件。因此，这个可能性也被排除。并且我们定位到，服务器的耗时主要是花费在了read()调用上，即读取网络I/O上面，所以还是需要回到网络排查的方向上来。</p>
 <blockquote>
 <p>补充：Java有相关的分析工具来定位耗时所在，或者用strace也可以定位系统调用的性能情况。</p>
 </blockquote>
 <p>我们用一个示意图来概括这两种场景下的区别：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e6/e8/e6bde04778244ccdabd66b6339e703e8.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e6/e8/e6bde04778244ccdabd66b6339e703e8.jpg?wh=2000x1125" /></p>
 <p>由此，我们可以初步判定：问题出在LB，或者LB前后的网络环节。</p>
 <p>这里也是我想分享给你的一个小的排查原则：<strong>针对客户端看到超时或者响应慢的这类问题，最好也检查下服务器本身花费的时间，两者对比，就能找到问题的方向了。</strong></p>
 <p>我给你把整个思路用伪代码的形式组织如下：</p>
@@ -6408,13 +6408,13 @@
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>}
 </code></pre></div>
 <p>我也画了一个示意图，供你参考：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/08/c1/08ff1feb493dc5e314f0d723b5de45c1.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/08/c1/08ff1feb493dc5e314f0d723b5de45c1.jpg?wh=2000x1125" /></p>
 <p>那么下面，我们就可以把排查重点，转到 <strong>LB和网络层面</strong>上来。</p>
 <h2 id="lb">抓住排查重点：<strong>LB和网络层</strong></h2>
 <p>首先，我们在LB进行了抓包，用Wireshark打开抓包文件，一开始看到的是一帆风顺，全绿：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b7/79/b7eebffbbfc9b574b7daf4eefb2a3a79.png?wh=1920x265" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b7/79/b7eebffbbfc9b574b7daf4eefb2a3a79.png?wh=1920x265" /></p>
 <p>翻了几页，突然画风一变，全红：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/33/22/339c5120eb663f3yyd3a5ee6ac6f9122.png?wh=1920x431" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/33/22/339c5120eb663f3yyd3a5ee6ac6f9122.png?wh=1920x431" /></p>
 <blockquote>
 <p>补充：抓包示例文件已经上传至<a href="https://gitee.com/steelvictor/network-analysis/tree/master/13">Gitee</a>，建议你结合专栏内容和抓包示例文件一起学习，效果更好。</p>
 </blockquote>
@@ -6432,9 +6432,9 @@
 <blockquote>
 <p>补充：关于Expert Information的解读，我在<a href="https://time.geekbang.org/column/article/481042">第5讲</a>有介绍过，如果你感觉现在印象有点模糊的话，可以回头去温习一下。</p>
 </blockquote>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c3/52/c394008ef274737yyc16024yy23ed852.png?wh=1858x296" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c3/52/c394008ef274737yyc16024yy23ed852.png?wh=1858x296" /></p>
 <p>从图上看，快速重传有8个，DupAck有567个，平均每个快速重传对应了约70个DupAck。这里，我们来看看其中一段连续的DupAck和随后的一个快速重传：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0f/55/0f384babccf2fa56cf49f81fb2430555.png?wh=1920x482" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0f/55/0f384babccf2fa56cf49f81fb2430555.png?wh=1920x482" /></p>
 <p>我给你解读一下：在LB给客户端发送了数十个DupAck之后（比如截图里包号93到104），客户端发送了一次快速重传（包号105），然后LB回复ACK（包号106，针对包号105），接着LB继续新一轮的数十个DupAck（从包号107开始），循环往复。</p>
 <p>其实这里已经说明了这个案例的特殊性，也就是有“<strong>规律性现象</strong>”。如果是网络设备问题导致丢包，那么丢包会是随机现象，不太可能像这样有规律（70个DupAck加一个快速重传，不断循环）。而<strong>往往规律的背后，一般潜藏着某种未知的机制</strong>。</p>
 <p>当然，大量的DupAck和重传，确实跟应用层我们看到的严重的延迟现象对上了。也至少能回答“<strong>应用为什么变慢</strong>”这个问题了。当然，探究根因的话，接下来就是要回答“<strong>为什么有重传</strong>”这个问题。</p>
@@ -6442,7 +6442,7 @@
 <p>在上节课，我们学习过两种重传方式，分别是快速重传和超时重传，而这次的重传呢，Wireshark已经提醒我们，属于快速重传。那为什么会有这种快速重传呢？</p>
 <p>这里我们先来看一下相关数据包的具体细节。</p>
 <p>首先，我们看一下在LB回复大量DupAck之前，客户端的发送情况。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7e/y0/7e2c5707bd693f37361eecc3c87e4yy0.png?wh=1920x153" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7e/y0/7e2c5707bd693f37361eecc3c87e4yy0.png?wh=1920x153" /></p>
 <p>可以看到，在第一个LB DupAck包之前，客户端发送的最后一个数据包是包号67，它的信息是：</p>
 <ul>
 <li>序列号为91305，表明从握手开始有91304（减去握手阶段的1）字节的TCP载荷，从客户端发出了；</li>
@@ -6457,14 +6457,14 @@
 <p>所以，LB就通过DupAck包向客户端宣告：“我这边只确认收到序列号27741之前的数据包。”</p>
 <p>而这里出现几十次DupAck的原因是，一旦LB认为某个数据包我没有收到（此处是序列号为27741的数据包），那么数据就“断档”了，之后客户端送过来的每个数据包，LB都无法ACK这些数据包的序列号+TCP载荷字节数。所以虽然ACK包还是要发，但确认号却只能“停留”在丢包处的确认号，并且这样重复的ACK会有很多个。</p>
 <p>为了便于理解，我把这个过程换一种方式给你展示一遍。除了27741这个号以外，其他序列号是为方便举例而编出来的：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4b/39/4ba01c8e51bd63d115883127493a5639.jpg?wh=2000x922" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4b/39/4ba01c8e51bd63d115883127493a5639.jpg?wh=2000x922" /></p>
 <p>上面是客户端来一个报文，LB回复一次DupAck。当然也可能像下面这样，连续来多个报文，LB回复连续的多个DupAck：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/98/52/9870bdfb5fbcf9f0c8a681dc01f30952.jpg?wh=2000x914" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/98/52/9870bdfb5fbcf9f0c8a681dc01f30952.jpg?wh=2000x914" /></p>
 <p>好了，现在情况就比较清楚了，虽然“丢包”的根因还没找到，但整个排查工作的脉络已经相对清晰了，即：<strong>某处丢包-&gt; TCP重传-&gt; TCP传输速度下降-&gt;应用层超时报错</strong>。</p>
 <p>看起来，我们离成功只剩一步了，也就是，在抓包文件中<strong>找到那个丢失的序列号为27741的数据包</strong>！</p>
 <p>只要证明这个数据包确实是在网络上丢失的，那么我们就去修复网络。TCP不丢包了不重传了，速度就上来了，应用就不超时了。逻辑圆满自洽，感觉胜利已经在向我们招手了，是不是？</p>
 <p>可是峰回路转。我们去翻前面数据包的时候，发现根本就<strong>没有那个“序列号为27741”的数据包</strong>！</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/de/a2/de903d7a576b5e680b2e195385c048a2.png?wh=1662x80" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/de/a2/de903d7a576b5e680b2e195385c048a2.png?wh=1662x80" /></p>
 <p>上图是最接近27741序列号的附近的数据包，有序列号27229的包，也有序列号28689的包，但就是没有位于这两个数中间的27741的包。</p>
 <p>这个时候，恍惚中有点感觉在看悬疑小说：一桩案件的元凶被查出是某某某，结果发现某某某这个人压根不存在。</p>
 <p>你如果有跑步的爱好，应该会知道：跑步过程中会有一个极限区，此时我们的心肺会遇到很大的压力，这种难受的感觉很容易让人放弃。但是，如果继续坚持挺过这个极限区，身体就能提升到一个新的平台上继续平衡运转。进而，我们就可以继续快乐地跑下去了。</p>
@@ -6472,15 +6472,15 @@
 <h4 id="tcp">TCP的本质：再次思考什么是确认号？</h4>
 <p>那么，这个序列号27741的包是消失了吗？还是说它就在那里，只是我们忽视了它的存在？</p>
 <p>TCP序列号、Payload（载荷）、TCP确认号，一般情况下就是一个A+B=C的关系。但是，<strong>确认号必须是序列号+全部载荷吗？它可以是序列号+部分载荷吗？</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/24/5f/242d107b8deb994649774d5200yy525f.jpg?wh=2000x727" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/24/5f/242d107b8deb994649774d5200yy525f.jpg?wh=2000x727" /></p>
 <p>举个例子，如果我从网上购买了一套衣服（上衣+裤子），我也收到了全套。但我觉得裤子尺码不对，上衣还挺合身，我可以只确认我收到了上衣（当然裤子还是要退回的），让卖家重新发裤子给我吗？这是可以的。</p>
 <p>如果TCP也可以这样呢？那么，<strong>“寻找序列号为27741的包”也许就是个伪命题，这个“包”实际上并不是独立的一个包，它只是某一个TCP包的一部分（前半部分）。</strong>我们来看一下包号20（也就是前面找27741的时候，关注的两个报文之一）的详情：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ff/f3/ff25bc8e4e3fa37a1c9f97f945b459f3.jpg?wh=572x295" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ff/f3/ff25bc8e4e3fa37a1c9f97f945b459f3.jpg?wh=572x295" /></p>
 <p>这个包是从客户端发给LB的，它的序列号为27229，载荷为1460字节。Wireshark也告诉我们，客户端将要发的下一个包的序列号会是28689。然而，LB回复的ACK（后续同样的ACK就是DupAck）却是这样：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f7/5f/f73936085eb6edd61ffae08e5731c95f.jpg?wh=572x267" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f7/5f/f73936085eb6edd61ffae08e5731c95f.jpg?wh=572x267" /></p>
 <p>我们再看那个最为可疑的数字27741。显然，27741=27229+512。到这里看清楚了吗？这次LB确认的是一件“上衣”（512字节），而余下的“裤子”（另外的1460-512=948字节），LB并没有确认。没有被确认的数据，在客户端看来，是需要重新发送的。</p>
 <p>我们先看看正常情况（即每次确认1460字节 ）下的数据包交换过程：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/de/7a/de421d69585d066372a67936af0e387a.png?wh=1048x708" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/de/7a/de421d69585d066372a67936af0e387a.png?wh=1048x708" /></p>
 <p>然后再来看一下这次异常交换的过程。</p>
 <ul>
 <li>客户端：我发给你从27229开始的1460字节，下一次你懂的，我将要发的是28689开始的数据。</li>
@@ -6488,12 +6488,12 @@
 <li>客户端：怎么回事？只确认前512字节？麻烦了，我为了保证这次发送的TCP载荷依然能用足一个MSS即1460字节，必须<strong>把前一个包的后948字节和下一个包的前512字节，组合在一起，变成一个新的1460字节的包</strong>，再发送给你。不过还好，所有未被确认的数据还都在我的发送缓存（send buffer）里面，没有丢失。不过原先计算好的安排都要改掉了，我的CPU开销很大啊！</li>
 </ul>
 <p>这次异常通信的过程如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/bd/07/bdd85530dc112bc9283322c0cda3e407.png?wh=1256x680" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bd/07/bdd85530dc112bc9283322c0cda3e407.png?wh=1256x680" /></p>
 <p>这里，我再提醒你一个关键点：<strong>确认号本身代表字节数，所以它是字节级别的，而不是报文级别</strong>。也就是说，确认号是精确到某个字节的，而不是某个报文。</p>
 <p>说到这里，我们再回顾下前面提到过的现象：平均每个快速重传对应了约70个DupAck，而每次重传都需要客户端把发送缓冲区里面打包好的数据包，挨个拆开，重组成LB想要的样子（512字节的位移的关系）。</p>
 <p>想必，现在你已经清楚为什么应用会超时（超过2s）了：因为时间都花费在了各种包的分拆、重组上面了。光是客户端想成功发完一个POST请求，都花费了远远超出预期的时长​。就如同一辆车频繁熄火，还怎么可能高速行驶呢？</p>
 <p>我画了一张更详细的图，来帮助你理解这个复杂的过程：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/48/5f/48cc15a770219761ae21dc293c0a895f.png?wh=1726x1350" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/48/5f/48cc15a770219761ae21dc293c0a895f.png?wh=1726x1350" /></p>
 <ul>
 <li>客户端发送HTTP POST请求，在TCP层面体现为一系列数据包（30KB以内）给LB，LB转发给服务器，在30KB之前一切正常。客户端应用程序的Timeout计时器，也从POST请求发送的那一刻开始计时。</li>
 <li>大约在客户端发送数据到30KB左右时，LB回复的ACK包确认的数据，不再是数据包分界点的字节数，而是<strong>位于中间的某个字节数</strong>（这个行为比较罕见）。</li>
@@ -6502,7 +6502,7 @@
 <li>服务器的时间都花在read()调用上（因为数据还在重传和重组过程中），无法及时收取完整的POST请求并计算处理，此时已经无法在客户端预定的Timeout时限内完成任务，于是客户端报错。</li>
 </ul>
 <p>为了更加方便你的理解，我把这个过程概括成了下面这张图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cc/e0/cc6c3ae1df5f11edc486c6973a18efe0.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cc/e0/cc6c3ae1df5f11edc486c6973a18efe0.jpg?wh=2000x1125" /></p>
 <p>真相大白了！凭借这些详细的分析和充足的证据，我们说服了LB厂商并确认这是一个Bug，它容易在请求尺寸比较大的情况下被触发。比如在这个案例里，一个POST请求平均大小在100KB，也就触发了这个Bug。</p>
 <p>实际上，在Bug修复之前，我们通过扩大TCP receive buffer size，使得缓冲区足够大（你HTTP POST请求大，我缓冲区更大），也做到了对Bug的规避。</p>
 <h2 id="_3">小结</h2>
@@ -6523,9 +6523,9 @@
 </blockquote>
 <p>TCP应该接受 <strong>SND.UNA &lt; SEG.ACK =&lt; SND.NXT</strong> 这样的情形，也就是收到的报文的确认号，应该大于已经被确认的数据的位置，并且小于等于（要发送的）下个序列号。</p>
 <p>一般来说，我们看到的大部分是“确认号等于下个序列号”的情况，如下图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c5/82/c5b77c0bb57cbb062d34108f1f2eba82.jpg?wh=2000x499" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c5/82/c5b77c0bb57cbb062d34108f1f2eba82.jpg?wh=2000x499" /></p>
 <p>但是从这个案例的情况来看，就是<strong>确认号是在中间位置</strong>。这虽然很少见，但也不违规，也可以被操作系统接纳并处理。只不过，引起的开销有点过大了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1d/32/1da50dd84147b3739d7fee5be312d232.jpg?wh=2000x502" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1d/32/1da50dd84147b3739d7fee5be312d232.jpg?wh=2000x502" /></p>
 <p>除了上面的知识点以外，我也建议你务必关注整个排查过程带来的启发：</p>
 <ul>
 <li><strong>网络排查过程中要仔细核对各种事实和数据，避免仅根据表面现象轻易下结论。</strong>比如，在这个案例里，很多的TCP重传很容易让我们把关注点错引到网络状况上面去。所以只有仔细核对这些数据，发现其中的问题，才不会被自己的思维惯性所误导。</li>
@@ -6671,8 +6671,6 @@ LB对于发送过来的1460个字节只ack了512个字节，杨老师说 剩余�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

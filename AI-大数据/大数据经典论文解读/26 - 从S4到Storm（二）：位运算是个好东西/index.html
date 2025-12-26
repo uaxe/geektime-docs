@@ -7817,7 +7817,7 @@
 <li>然后是<strong>Streams</strong>，也就是数据流，一个流包含了无限多个Tuple的序列，这些Tuple会被系统分布式地并行去处理。</li>
 <li>最后就是<strong>Bolts</strong>，也就是我们进行计算逻辑处理的地方。Bolt可以处理任意数量的输入流，然后产生任意数量的输出流。对应地，我们要把计算结果写入到外部数据库，也是通过Bolts来进行处理。乍一看，Bolts似乎很像S4里的PE，用于处理对应的分布式计算逻辑，不过实际上，Bolts和PE完全不一样。</li>
 </ul>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/86/98/8654419dc70ed2e5d239a438b50dbe98.jpg?wh=1920x1480" title="论文中的图1和图3的重绘，和S4的PE不同，Storm的Bolt只是逻辑处理单元，而不是每一个Key就有一个Bolt对象[br]对于数据的分发，是通过对于Tuple的Grouping来进行的，所以系统的并行度可以设置，而不是和PE对象数量相关" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/86/98/8654419dc70ed2e5d239a438b50dbe98.jpg?wh=1920x1480" title="论文中的图1和图3的重绘，和S4的PE不同，Storm的Bolt只是逻辑处理单元，而不是每一个Key就有一个Bolt对象[br]对于数据的分发，是通过对于Tuple的Grouping来进行的，所以系统的并行度可以设置，而不是和PE对象数量相关" /></p>
 <p>Storm的抽象模型里，和S4的最大不同就在 <strong>Bolts</strong> 上。S4的PE，不仅是一个功能逻辑的单元，也是一个KV对的数据。同样类型的事件下，所有相同的Key的数据，都会聚合到同一个PE下。这就使得整个系统里有大量的PE对象，也导致S4的整个系统有几个显著的设计问题。</p>
 <p>首先就是<strong>内存占用和GC开销，大量的PE会占用大量的内存</strong>。</p>
 <p>但是，这个内存占用又是应用开发人员完全控制不了的。因为系统里有多少PE，以及当前计算节点的内存占用是否过大，是由S4框架控制的。而对于应用开发人员来说，他操作的只是单个PE对象，显然单个PE对象本身不会占用太多内存。在内存不足的时候，我们原本可以在应用层面有更灵活的操作，比如更频繁地把数据输出到外部的KV数据库里，释放掉内存占用。但是在S4的框架下，我们做不到这一点。</p>
@@ -7835,7 +7835,7 @@
 <li><strong>本地或随机分组</strong>（Local or Shuffle Grouping），也就是当下游的Bolt如果有一个或者多个“任务（Tasks）”，和上游的Bolt在同一个worker进程里，那么Tuple只会分发到这些进程里的任务里。如果没有的话，那就还是按照随机分组的方式发送Tuple。这个主要是为了性能考虑，如果可以在同一个台机器的同一个进程内通信，会大大节省整个集群的网络开销。</li>
 </ul>
 <p>如果你对照着这里的示意图，可以看到在Storm下进行Top K的单词排序，两边的数据流向是不一样的，S4里的一个WordCountPE的输出，只会给一个SortPE；而Storm里的WordCountBolt的输出，会发送给多个不同的SortCountBolt，因为同一个WordCountBolt下，会包含很多个不同的单词。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/12/c1/12c3db2ce9af32aa18a07977814150c1.jpg?wh=1920x793" title="看似S4和Storm的拓扑结构类似，但是实际上PE和Bolt是完全不同的概念[br]Bolt并不会随着新单词的出现创建，也不会随着TTL而销毁" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/12/c1/12c3db2ce9af32aa18a07977814150c1.jpg?wh=1920x793" title="看似S4和Storm的拓扑结构类似，但是实际上PE和Bolt是完全不同的概念[br]Bolt并不会随着新单词的出现创建，也不会随着TTL而销毁" /></p>
 <h3 id="masterworker_1">Master+Worker的系统架构</h3>
 <p>我们说Storm的Bolt很像MapReduce的Map和Reduce函数，其实Storm本身的架构也和MapReduce非常相似。和我们上节课看过的无中心的S4不同，Storm选择了一个典型的Master+Worker的架构设计。整个Storm集群里，也是由 <strong>Nimbus+Supervisor+Worker</strong> 这样三种类型的进程组成的。</p>
 <p>首先是<strong>Nimbus进程</strong>，其实也就是Storm集群的Master节点。它的作用，类似于Hadoop里的JobTracker，或者说MapReduce里的Scheduler+Master，也就是负责资源的分配和任务的调度。</p>
@@ -7843,11 +7843,11 @@
 <p>然后是<strong>Supervisor进程</strong>，这个类似于Hadoop里的TaskTracker，也就是MapReduce里的Worker。Supervisor在每一个服务器上都会有一个，它本身不负责执行任务，但是会负责接收Nimbus分配的任务，然后管理本地的Worker进程，让Worker进程来实际执行任务。</p>
 <p>最后是<strong>Worker进程</strong>，一台服务器上会有多个Worker进程。Storm是使用Clojure写的，跑在JVM上，所以每一个Worker进程就是一个独立的JVM，Worker里面还会通过JVM的Executor来维护一个线程池。然后实际的线程池里，会有很多个Spout/Bolt的任务。因为Java的Executor的实现里会复用线程，所以Spout和Bolt实际上会使用同一个线程。这个，也会大大减少整个系统的开销。</p>
 <p>而把整个系统拆分成Nimbus、Supervisor和Worker三种进程，就使得Storm的容错能力也大大增强了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3f/d2/3f2da739b6f2eeb569fd42eaaf4934d2.jpg?wh=1920x1480" title="论文中的图2，Storm系统的宏观架构图，我稍稍做了一下修改，方便你理解每个物理服务器里会有多个Worker进程" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3f/d2/3f2da739b6f2eeb569fd42eaaf4934d2.jpg?wh=1920x1480" title="论文中的图2，Storm系统的宏观架构图，我稍稍做了一下修改，方便你理解每个物理服务器里会有多个Worker进程" /></p>
 <p>Nimbus和Supervisor之间，并不是直接通信的。因为如果这样的话，显然Nimbus会成为一个故障的“单点”。所以Nimbus是把对应的任务分配写到Zookeeper里，也就是一个类似于Chubby这样的分布式锁系统。所以我们的任务分配是<strong>持久化</strong>的，而且会由Paxos协议来保障容错能力。而Supervisor也是从Zookeeper里面，去读取对应的任务分配。</p>
 <p>Nimbus和Supervisor的职责都非常简单，Nimbus只需要进行Topology的解析和任务调度，而Supervisor只需要接收任务，并且监控Worker进程是否存活。<strong>它们本身不处理数据，而且也不在内存里面保存数据。</strong>即使挂掉了，也只需要简单重启一下进程就好了。</p>
 <p>这种类似的设计思路，我们在Megastore里的协同服务器（Coordinator）里已经看到过一次了，通过把一些职责单独拆分出来，让特定的节点足够简单。即使这些节点可能成为单点，但是它们的稳定性，也会远高于要处理复杂逻辑的Worker进程或者Bigtable。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/88/b6/88f9c89900910c500fa8b60983c287b6.jpg?wh=1920x953" title="其实Storm对于系统的拆分和MapReduce非常相似" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/88/b6/88f9c89900910c500fa8b60983c287b6.jpg?wh=1920x953" title="其实Storm对于系统的拆分和MapReduce非常相似" /></p>
 <p>这样来看，Storm的整体设计思路和MapReduce很像，各个节点的角色都能在MapReduce的各种节点里找到对应的影子。其实，<strong>各类分布式系统的设计思路都是类似的</strong>，特别是这样Master+Worker组合的模型，那就是Master负责调度，Worker负责实际处理问题。而为了解决高可用性，往往我们会引入分布式锁，确保任务分配的数据不依赖Master。</p>
 <p>另外，为了让整个系统更稳定，我们也会拆分调度任务的进程，和直接执行任务的进程，让每个进程都只有单一的职责。希望在学习和解读完这么多篇论文之后，你在未来的系统设计里。也能遵循这样的理念。</p>
 <h2 id="storm">Storm的容错机制</h2>
@@ -7855,7 +7855,7 @@
 <p>相比于通过一个RPC，消息队列有一个很大的优点，那就是<strong>高性能</strong>。上游节点不需要等待下游节点返回接收成功，就能发送下一条信息。不过，这也带来了一个问题，就是如果在消息发送之后，下游是否成功接收并处理了这条消息，上游是不知道的。可能因为网络超时、也可能因为下游节点的软硬件故障，<strong>在分布式系统里，“错误”是在所难免的</strong>。</p>
 <p>而且，在流式数据处理里，我们可能不只有一层链路。就拿论文里的统计Tweet里的单词数量为例，我们先要从一个TweetSpout里，读取数据流里的Tweet，随机发送给到一个ParseTweetBolt，这个Bolt会解析Tweet成一个个单词，再发送给下游的多个WordCountBolt。</p>
 <p>要注意，这里下游不只有一个WordCountBolt，而是不同的单词会发送给不同的WordCountBolt。而且，任何一个WordCountBolt没有被成功处理，都意味着我们面临“错误”。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/28/ec/28a45aa97514538624487e288b9634ec.jpg?wh=2000x1480" title="一个从Spout发出的Tuple，后续所有衍生出来的Tuple都属于这个根Tuple树的一部分" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/28/ec/28a45aa97514538624487e288b9634ec.jpg?wh=2000x1480" title="一个从Spout发出的Tuple，后续所有衍生出来的Tuple都属于这个根Tuple树的一部分" /></p>
 <p>Storm选择的解决方案，是把从Spout发起的第一个Tuple作为一棵树的根。下游所有衍生出来发送的Tuple，都是这棵树的一部分。任何一个Tuple处理失败或者超时了，那么就从Spout重新发送消息。</p>
 <p>而要做到这一点，Storm需要在系统里引入一个特殊的Bolt，叫做AckerBolt。Spout发送出去的消息，同时会通知给到AckerBolt。而Bolt一旦处理完<strong>根Tuple</strong>相关的消息，也会通知给到Acker。</p>
 <p><strong>Bolt会告诉AckerBolt两个信息</strong>，一个是我已经处理完了某一个Tuple，另一个是这个Tuple衍生往下游的哪些Tuple我也已经发送出去了。这样，Acker就有了一开始Spout发出的Tuple的整棵树的完整信息。等到最后一层的Bolt处理完对应的Tuple，然后发送了对应的通知给到AckerBolt，并且告诉它后面没有新的Tuple了，那么AckerBolt就知道，整棵Tuple树已经处理完成了。</p>
@@ -7865,7 +7865,7 @@
 <p>而下游的每一个Bolt，会处理完这个Tuple相关的消息，并且向外发送新的Tuple。每个新发送的Tuple里，都需要带上根Tuple的message-id。在新Tuple发送出去之后，Bolt会通知AckerBolt，通知的内容也很简单，也是一个根message-id到校验码的映射关系。</p>
 <p>这里的校验码，就是把当前对外发送的所有消息的message-id，和已经处理完的消息的message-id做一下异或。然后AckerBolt收到这个消息，会把收到的校验码，和本地的校验码也做一下异或，更新成最新的校验码。</p>
 <p>因为异或操作，就是当两个数字完全相同的时候，会变成0，也就是A XOR A = 0。而在其他情况下，最后的结果一定不会每一位都是0。我们发送一次消息，并且acking一次消息，相当于在这个校验码上执行了一次A XOR A。所以，只要有Tuple还没有被acking，我们的校验码就不会是0，但是一旦所有的Tuple树上的Tuple都被acking了，那么这个校验码必然就是0。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ce/e5/ceedd4f5df638894d0f03c273ca3e6e5.jpg?wh=2000x1184" title="你可以随机生成一些message-id，按照这个XOR的算法试一下，看看是否所有消息处理完后，对应的校验码就是0" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ce/e5/ceedd4f5df638894d0f03c273ca3e6e5.jpg?wh=2000x1184" title="你可以随机生成一些message-id，按照这个XOR的算法试一下，看看是否所有消息处理完后，对应的校验码就是0" /></p>
 <p>通过message-id加上校验码，Storm只需要16 bytes就能在AckerBolt里维护一个Tuple树是否已经都处理完了。这样，即使你每秒需要处理10万条消息，AckerBolt里需要维护30秒的Tuple，也只需要48MB的内存空间，这即使对于10年前的服务器来说也是绰绰有余的了。</p>
 <p>而且，所有的Bolt通知Acker最新的执行情况，也只需要发送16 bytes的messsage-id和校验码，既不需要发送Tuple的原始内容，也不需要为向下游发送的每一个Tuple都单独发送一条消息，占用的性能消耗也不会太大。</p>
 <p>不过，需要注意的是，<strong>这个机制只能保障，Spout发出来的Tuple至少被处理一次，也就是At Least Once，但是它避免不了Tuple可能被重复处理</strong>。</p>
@@ -8001,8 +8001,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

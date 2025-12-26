@@ -13935,7 +13935,7 @@
 <p>所以这节课我们将重点分析传统架构设计的特点，接着介绍最新的秒杀系统架构，并做好技术选型和环境准备。</p>
 <h2 id="_1">传统秒杀系统架构</h2>
 <p>下面先看一个大家常用的系统功能架构图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/75/10/75c66bf2cb65bdbb125b06765d148c10.jpg?wh=1800x1575" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/75/10/75c66bf2cb65bdbb125b06765d148c10.jpg?wh=1800x1575" /></p>
 <p>这种功能结构以及系统架构，是我们非常熟悉的。在这种方式下，Nginx只做反向代理和负载均衡，甚至这层对我们做业务开发的研发人员来说，都是无感知的，一般运维同事在做生产环境搭建时，都会帮我们配好。研发人员更多的是在开发Web服务和RPC服务，我们把页面以及页面所依赖的静态资源都放到Web服务中，同时Web服务还提供业务接口，RPC服务提供一些支撑服务。</p>
 <p>如果这是个ToB的运营管理系统，这样没有什么问题，因为请求量非常低，系统基本不会有太大的负载。但是对于ToC，且瞬时流量非常大的情况，问题就会暴露出来，那它究竟会有哪些问题呢？</p>
 <h3 id="_2">域名与带宽问题</h3>
@@ -13947,7 +13947,7 @@
 <p>当然了，这个过程中，还会伴有热点数据读写、库存超卖等问题，这些细节也非常重要，我会在后面的课程中一一给你展开说明。</p>
 <h2 id="_3"><strong>新的秒杀系统架构</strong></h2>
 <p>上面我们谈到了传统系统架构的局限性，那么我们新的系统该如何设计才能避免出现以上问题呢？结合上节课对于各链路层级的介绍，我画了一张新的功能结构与系统架构图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6e/8e/6eaca4f202c11ca5fc4954512cda858e.jpg?wh=1800x1671" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6e/8e/6eaca4f202c11ca5fc4954512cda858e.jpg?wh=1800x1671" /></p>
 <p>首先新系统我们依然保留了HTTP服务常用的层级调用关系，即 <strong>Nginx-&gt;Web服务-&gt;RPC服务</strong>，这也是绝大部分公司都会使用的一种系统结构。</p>
 <p>其次将原先由Web服务提供的静态资源放到了CDN（CDN是全国都有的服务器，客户端可以根据所处位置自动就近从CDN上拉取静态资源，速度更快），来大大减轻抢购瞬时秒杀域名的负担。</p>
 <p>最后，同时也是我们所做的最大改变，就是<strong>将Nginx的职责放大</strong>，前置用来做Web网关，承担部分业务逻辑校验，并且增加黑白名单、限流和流控的功能，这其实也是考虑到我们的秒杀业务特点所做的调整。这种在Nginx里写业务的做法在很多大公司里都是很常见的，像京东是用来做商详、秒杀的业务网关，美团用来做负载均衡接入层，12306用来做车票查询等等，他们的共同特点都是要面对高并发的业务场景，这也说明在这种业务场景下，我们的设计是得到了真实实践和广泛认可的。</p>
@@ -13956,7 +13956,7 @@
 <h3 id="nginx"><strong>Nginx介绍</strong></h3>
 <p>Nginx最早被发明出来，就是来应对互联网高速发展下，出现的并发几十万、上百万的网络请求连接场景的，传统Apache服务器无法有效地解决这种问题，而Nginx却具有并发能力强、资源消耗低的特性。</p>
 <p>总的来说，Nginx有5大优点，即<strong>模块化、事件驱动、异步、非阻塞、多进程单线程</strong>。以下是Nginx的架构原理图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3a/9b/3a811fe3cec72e5487e48a5f236f739b.jpg?wh=2406x1084" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3a/9b/3a811fe3cec72e5487e48a5f236f739b.jpg?wh=2406x1084" /></p>
 <p>Nginx是由一个master进程和多个worker进程（可配置）来配合完成工作的。其中master进程负责Nginx配置文件的加载和worker进程的管理工作，而worker进程负责请求的处理与转发，进程之间相互隔离，互不干扰。同时每个进程中只有一个线程，这就省去了并发情况下的加锁以及线程的切换带来的性能损耗。</p>
 <p><strong>但一个线程能支持高并发的业务场景吗？</strong></p>
 <p>这就要说到Nginx的工作模型。以Linux为例，其采用的是epoll模型（即事件驱动模型），该模型是IO多路复用思想的一种实现方式，是异步非阻塞的，什么意思呢？就是一个请求进来后，会由一个worker进程去处理，当程序代码执行到IO时，比如调用外部服务或是通过upstream分发请求到后端Web服务时，IO是阻塞的，但是worker进程不会一直在这等着，而是等IO有结果了再处理，在这期间它会去处理别的请求，这样就可以充分利用CPU资源去处理多个请求了。</p>
@@ -13991,11 +13991,11 @@
 <li>Nginx -V</li>
 </ol>
 <p>然后就可以查看OpenResty是否安装成功。如下图，执行红框内的命令，出现绿框的输出内容，即表示安装成功了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/2a/d8/2a9d383d17932088c11281ac8d4605d8.png?wh=1920x668" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2a/d8/2a9d383d17932088c11281ac8d4605d8.png?wh=1920x668" /></p>
 <ol>
 <li>然后我们就可以测试下Nginx是否好用，所以我们在本地新建了个nginx.conf配置文件，就放在/Users/～/Documents/seckillproject/nginx/conf下，并且在nginx文件夹下新建logs文件夹，用于log日志的输出，新建后的文件目录结构如下：</li>
 </ol>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/93/69/934cb93ab4c052081a921ffb84966169.png?wh=1920x515" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/93/69/934cb93ab4c052081a921ffb84966169.png?wh=1920x515" /></p>
 <p>nginx.conf的内容就用官方的模板，输出个hello world：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>worker_processes  1;
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>error_log logs/error.log;
@@ -14020,10 +14020,10 @@
 <li>nginx -p `pwd`/ -c conf/nginx.conf</li>
 </ol>
 <p>启动Nginx服务，这时输入 `ps -ef|grep nginx` 可以查看起来Nginx进程，有两个，一个master ，一个worker。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6c/27/6c25ac6529f8afe884a2yyce84326427.png?wh=1920x182" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6c/27/6c25ac6529f8afe884a2yyce84326427.png?wh=1920x182" /></p>
 <p>7. curl <a href="http://localhost:8080">http://localhost:8080</a></p>
 <p>访问本地8080端口，可以看到，输出了"&lt;p&gt;hello, world&lt;/p&gt;"，也可以在浏览器输入 <a href="http://localhost:8080">http://localhost:8080</a>，看到 hello,world 的返回。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/af/25/afbf1ed0c3fyyb8bd759eb9d21d7c925.png?wh=1920x287" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/af/25/afbf1ed0c3fyyb8bd759eb9d21d7c925.png?wh=1920x287" /></p>
 <p>8. nginx -p `pwd` -s stop</p>
 <p>停止Nginx服务。</p>
 <h3 id="mysql"><strong>MySQL安装</strong></h3>
@@ -14039,7 +14039,7 @@
 <p>登录数据库，这时会提示你输入密码，输入刚设置的密码即可进入。</p>
 <p>5. show databases;</p>
 <p>查看下当前的所有库，到这里也说明我们的MySQL准备好了，可以建库建表了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/03/a5/034609767df8ecbe23bc6a74f1c4f6a5.png?wh=1920x979" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/03/a5/034609767df8ecbe23bc6a74f1c4f6a5.png?wh=1920x979" /></p>
 <p>6. mysql.server stop</p>
 <p>control+z退出MySQL后，执行该命令，关闭MySQL。</p>
 <h3 id="redis"><strong>Redis安装</strong></h3>
@@ -14049,12 +14049,12 @@
 <li>/usr/local/opt/redis/bin/redis-server /usr/local/etc/redis.conf</li>
 </ol>
 <p>启动Redis服务端，如下图绿框，在安装好后提示我们如何启动Redis，按照提示输入命令，便可以看到启动成功等待连接。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d3/3d/d3c99f1a374cd99635567c7c91a2083d.png?wh=1920x1223" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d3/3d/d3c99f1a374cd99635567c7c91a2083d.png?wh=1920x1223" /></p>
 <ol>
 <li>redis-cli -h 127.0.0.1 -p 6379</li>
 </ol>
 <p>这时新建一个终端窗口，模拟客户端连接Redis服务，如下图所示，可以set一个值，并get查询出来，说明Redis也正常安装成功并可以使用。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/11/51/117820fcf5f023d46312dae5530da851.png?wh=1920x502" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/11/51/117820fcf5f023d46312dae5530da851.png?wh=1920x502" /></p>
 <ol>
 <li>服务端停止，可以直接control+z退出，也可以 sudo pkill redis-server 客户端断开连接 redis-cli shutdown。</li>
 </ol>
@@ -14192,8 +14192,6 @@ Tomcat的IO线程一般控制在400以内，如果每个请求的处理时间为
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

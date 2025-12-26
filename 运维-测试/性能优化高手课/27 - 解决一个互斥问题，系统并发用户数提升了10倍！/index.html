@@ -6043,7 +6043,7 @@
 <h2 id="_1">优化前的业务实现为什么会有性能问题？</h2>
 <p>这个性能优化案例的业务场景是这样的：用户给在线表单提交一条记录，在这条记录中会包含很多个字段内容，其中有些字段在插入时有一个规则要求，即不能与已有的字段值重复。</p>
 <p>为了便于理解，这里我用一个图来描述下，原业务系统中实现字段插入值不重复规则的实现逻辑，具体如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/05/c0/05605d0c6846b378fe502e35c240dbc0.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/05/c0/05605d0c6846b378fe502e35c240dbc0.jpg?wh=2000x1125" /></p>
 <p>可见，在该业务中使用了一个Redis锁来实现互斥访问，从而实现了被加锁的业务逻辑执行的原子性，所以这部分计算逻辑在系统中是串行执行的。而被加锁的业务逻辑主要有三个关键操作，分别是：</p>
 <ol>
 <li><strong>字段不重复检测</strong>：检查插入的字段值在数据库中是否有重复的情况出现，如果出现重复的值，插入失败直接退出，否则执行下一步的操作。这里系统会遍历要求值不能重复的所有字段项，如果其中任何一个字段项出现值重复，就都会退出。</li>
@@ -6066,7 +6066,7 @@
 <h2 id="_2">互斥锁是如何影响最大请求吞吐量的？</h2>
 <p>在<a href="https://time.geekbang.org/column/article/392108">第22讲</a>中，我们已经学习过加锁的计算逻辑属于串行资源，这是系统中潜在的性能瓶颈之一，会影响系统的请求吞吐量的性能指标。</p>
 <p>接下来，我就使用一个公式来描述下在这个案例中，使用了Redis互斥锁以后，来计算Max RPS（最大请求吞吐量）的计算方法，具体公式如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6c/06/6c0a90776af956e63e21327006041d06.jpg?wh=1972x830" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6c/06/6c0a90776af956e63e21327006041d06.jpg?wh=1972x830" /></p>
 <p>在这个公式中，因为Lock和Unlock是采用Redis的互斥锁来实现的，它们所使用的Redis的script脚本实现如图中所示，通过在真实系统中进行测量，其中Lock time + Unlock time的操作时间之和在3ms左右。</p>
 <p>然后你就可以通过上面的公式计算出，如果中间加锁的计算逻辑（resource competition）执行开销为30ms左右，那么对应的Max RPS=1s/(3ms+30ms)，也就是大约在30RPS左右。</p>
 <p>也就是说，如果把加锁的计算逻辑降低极限值为0时，对应的Max RPS才可以到达300RPS左右。</p>
@@ -6079,7 +6079,7 @@
 <p>但是要注意，如果在互斥锁的使用场景中，被加锁的业务操作还有更复杂的一致性要求，比方说存在数据库写冲突的问题等，那么这种互斥锁实现就不能被简单地优化掉了。</p>
 <p>那么对于这个案例中的互斥锁而言，我们应该怎样优化呢？</p>
 <p>我来说说我想到的优化思路。这里呢，为了更清晰地描述该解决方案，我用了一个流程图来给你详细地介绍下性能优化后的具体实现过程，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/28/6d/2891252183ff896ce67d7689537yyb6d.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/28/6d/2891252183ff896ce67d7689537yyb6d.jpg?wh=2000x1125" /></p>
 <p>也就是说，我们可以把“字段不重复检测”“单个字段插入”“其他操作”三个操作绑定到一起，然后实现一种事务机制的能力，支持在后面操作失败的情况下，可以回滚到前面的操作中。</p>
 <p>实际上，原来的Redis互斥锁主要是为了实现“字段不重复检测”和“字段的插入操作”的原子性，而在手动实现事务机制之后，我们就可以把这两步操作放到开始处执行，然后<strong>使用Redis的Pipeline机制</strong>保证这两步操作组合的原子性，从而不会被其他Redis操作干扰到。</p>
 <p>这样针对接下来的其他操作（也就是用户提交数据过程中的一些不可拆分的关键业务操作），如果操作成功，就提交任务成功结束；如果操作失败，则需要回滚之前的字段插入操作。另外为了实现事务的机制和能力，我们还需要在前面字段插入时，同时记录插入前的状态和插入后的变更状态，从而就可以实现失败后的回滚机制。</p>
@@ -6208,8 +6208,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

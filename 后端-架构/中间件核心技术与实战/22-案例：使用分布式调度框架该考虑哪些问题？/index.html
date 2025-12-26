@@ -14097,13 +14097,13 @@
 <p>这节课，我们就一起来看看定时调度框架在消息发送领域的事务一致性设计方案和落地细节。</p>
 <h2 id="_1">设计方案</h2>
 <p>不知道你还记不记得我在<a href="https://time.geekbang.org/column/article/540810">第13讲</a>中提到的用户注册优惠活动的场景，为了实现用户注册主流程与活动的解耦合，我们引入了消息中间件，它的时序图如下所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a7/10/a7fbfeec5964d217dyy47144fab89510.jpg?wh=1920x968" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a7/10/a7fbfeec5964d217dyy47144fab89510.jpg?wh=1920x968" /></p>
 <p>这里的核心指导思想是让账户中心完成用户的注册逻辑，将用户写入到账户中心数据库，然后发送一条消息到MQ服务器，再给返回用户“注册成功”。之后，引入两个消费者，分别对消息进行对应的处理，异步赠送优惠券或者积分。</p>
 <p>这个方法的架构思路非常不错，但是我们还不得不思考一个问题：如何保证写入数据库与消息发送这两个步骤的一致性呢？我们希望这两个步骤要么一起成功，要么一起失败，绝不能出现用户数据成功写入数据库，但消息发送失败的情况。因为这样用户无法收到优惠券，容易产生一系列的投诉和纠纷。</p>
 <p>这其实是一个分布式事务的问题，也就是要保证数据库写入和消息发送这两个分布式操作的一致性。</p>
 <p>一种比较常见的解决方案就是：“本地消息表+定时任务”。</p>
 <p>具体而言，我们首先需要在数据库创建一张本地消息表，表的结构大致如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/69/22/693019a9e29bff087123955aa3cb3f22.jpg?wh=1172x499" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/69/22/693019a9e29bff087123955aa3cb3f22.jpg?wh=1172x499" /></p>
 <p>创建了消息发送本地记录表之后，用户注册的流程将变成：</p>
 <ol>
 <li>开启数据库本地事务；</li>
@@ -14121,7 +14121,7 @@
 <p>数据成功写入消息待发送表后，接下来我们需要引入定时调度程序，定时扫描msg_send_record中的记录，将消息发送到MQ中。</p>
 <p>定时调度程序的数据处理策略主要有三步。首先，按照分页机制从数据库中拉取一批数据；然后，根据用户账户查询用户表，构建消息体（用户账户、用户注册时间）；最后，将消息发送到消息服务器（这里必须提供重试机制）。</p>
 <p>引入定时调度程序后，用户注册送积分的时序图变成了下面这样：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7e/73/7eddb3b603cc2c2069284fc48ee69273.jpg?wh=1920x918" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7e/73/7eddb3b603cc2c2069284fc48ee69273.jpg?wh=1920x918" /></p>
 <p>在计划执行这个方案时，还有一个非常重要的事情，就是要明确定时调度任务的执行频率。</p>
 <p>因为定时调度任务的调度频率直接决定了消息发送的实时性，随着需要调度的任务越来越多，大部分定时调度框架对秒级别的定时调度都不太友好。这时的调度通常都是分钟级的，但分钟级的调度会给任务带来较大的延迟，这是大部分业务无法容忍的，怎么办呢？</p>
 <p>ElasticJob可以通过支持流式任务解决这个问题。具体的思路是：将任务配置为按照分钟级进行调度，例如每分钟执行一次调度。每次调度按照分页去查找数据，处理完一批数据，再查询下一批，如果查到待处理数据，就继续处理数据，直到没有待处理数据时，才结束本次业务处理。如果本次处理时间超过了一个调度周期，那么利用ElasticJob的任务错过补偿执行机制会再触发一次调度。</p>
@@ -14182,14 +14182,14 @@
 <p>先说一下fetchData。</p>
 <p>它主要用于拉取待处理数据，ElasticJob每触发一次任务调度，都会首先调用fetchData方法，尝试获取数据。如果该方法返回数据，ElasticJob将调用processData来完成具体的业务逻辑。处理完一批数据后，还会循环调用fetchData，看有没有待处理的数据。如果有，则继续调用processData，直到查询不到待处理数据时，结束本次业务调度。</p>
 <p>这里有一个非常关键的点：我们可以通过ShardingContext来获取任务的分片信息。其中，shardingTotalCount是本次任务的总分片数量，shardingItem是当前任务所处理数据的分片序号。通常我们可以用这两个数和id取模，实现数据分片。你可以看看下面这张示意图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/64/1c/643c31d91ba3d8bd3f8b65c0191df91c.jpg?wh=1876x1371" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/64/1c/643c31d91ba3d8bd3f8b65c0191df91c.jpg?wh=1876x1371" /></p>
 <p>processData方法，顾名思义，就是用来处理业务逻辑的方法。通过fetchData方法查询到的数据会传入processData方法中执行，我们这个实例主要是根据待发送记录组装MQ消息，然后将消息发送到MQ服务器，更新待发送记录，最后将状态从待发送变更为已发送的过程。</p>
 <p>不过在实际执行过程中，通常还会遇到另外一个问题。假设我们的业务逻辑要根据不同的类型发送不到不同的MQ集群中，部分主题可能一直发送失败，最后影响到其他主题的正常发送。具体的示意图如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3a/46/3ac610263209d7e5d8991038ced13346.jpg?wh=1920x674" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3a/46/3ac610263209d7e5d8991038ced13346.jpg?wh=1920x674" /></p>
 <p>如果fetchData在获取数据时，每一次只拉取3条消息，那么它会一次取出id为1，2，3的三条消息，然后将这些消息发送到cluster_a集群的topic_a主题。如果某一时刻集群cluster_a发生故障，一段时间内无法发送消息，数据仍然被传入proccessData方法，就会发现fetchData每次拉取出的id都是1，2，3。因为这些消息在proccessData中没有处理成功，state的状态不会更新，需要发往集群b的消息也无法正常发送，这会导致严重的业务故障。</p>
 <p>那我们如何解决这个问题呢？</p>
 <p><strong>第一步，</strong>我们要在消息待发送表（msg_send_record）中增加两个字段，一个是当前重试次数（retry_count），另外一个是下一次调度的最小时间（next_select_time）。增加了这两个字段的表数据是下面这样：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/78/79/7890a91be1e55a294eyy9c9ab8bff279.jpg?wh=1920x520" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/78/79/7890a91be1e55a294eyy9c9ab8bff279.jpg?wh=1920x520" /></p>
 <p>在处理数据时，如果第一次处理数据失败了，我们需要将重试次数加一，并设置下一次调度的最小时间。例如，用当前时间加一分钟，意味着一分钟内流式处理任务将不再拉取该数据，这就给了其他数据执行机会。</p>
 <p><strong>第二步，</strong>通过配置文件或者其他整合方式声明一个任务，我们这个实例是用Spirng方式整合了ElasticJob，所以我们需要在XML文件中配置任务，具体的配置代码如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>&lt;job:dataflow id=&quot;UserSendMqJob&quot; class=&quot;net.codingw.mq.task.UserSendMqJob&quot; registry-center-ref=&quot;zkRegistryCenter&quot;
@@ -14331,8 +14331,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

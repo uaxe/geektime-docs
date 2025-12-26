@@ -14337,23 +14337,23 @@
 <h2 id="vs">阻塞/非阻塞 VS 同步/异步</h2>
 <p>尽管在前面的课程中，多少都涉及到了阻塞、非阻塞、同步、异步的概念，但为了避免看见这些概念一头雾水，今天，我们就先来梳理一下这几个概念。</p>
 <p>第一种是阻塞I/O。阻塞I/O发起的read请求，线程会被挂起，一直等到内核数据准备好，并把数据从内核区域拷贝到应用程序的缓冲区中，当拷贝过程完成，read请求调用才返回。接下来，应用程序就可以对缓冲区的数据进行数据解析。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e7/9a/e7f477d5c2e902de5a23b0e90cf9339a.png?wh=730%2A480" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e7/9a/e7f477d5c2e902de5a23b0e90cf9339a.png?wh=730%2A480" />
 第二种是非阻塞I/O。非阻塞的read请求在数据未准备好的情况下立即返回，应用程序可以不断轮询内核，直到数据准备好，内核将数据拷贝到应用程序缓冲，并完成这次read调用。注意，这里最后一次read调用，获取数据的过程，<strong>是一个同步的过程。这里的同步指的是内核区域的数据拷贝到缓冲区的这个过程。</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4f/0c/4f93d6e13fb78be2a937f962175c5b0c.png?wh=718%2A602" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4f/0c/4f93d6e13fb78be2a937f962175c5b0c.png?wh=718%2A602" />
 每次让应用程序去轮询内核的I/O是否准备好，是一个不经济的做法，因为在轮询的过程中应用进程啥也不能干。于是，像select、poll这样的I/O多路复用技术就隆重登场了。通过I/O事件分发，当内核数据准备好时，再通知应用程序进行操作。这个做法大大改善了应用进程对CPU的利用率，在没有被通知的情况下，应用进程可以使用CPU做其他的事情。</p>
 <p>注意，这里read调用，获取数据的过程，<strong>也是一个同步的过程。</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ea/dc/ea8552f28b0b630af702a9e7434f03dc.png?wh=756%2A446" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ea/dc/ea8552f28b0b630af702a9e7434f03dc.png?wh=756%2A446" />
 第一种阻塞I/O我想你已经比较了解了，在阻塞I/O的情况下，应用程序会被挂起，直到获取数据。第二种非阻塞I/O和第三种基于非阻塞I/O的多路复用技术，获取数据的操作不会被阻塞。</p>
 <p>无论是第一种阻塞I/O，还是第二种非阻塞I/O，第三种基于非阻塞I/O的多路复用都是<strong>同步调用技术。为什么这么说呢？因为同步调用、异步调用的说法，是对于获取数据的过程而言的，前面几种最后获取数据的read操作调用，都是同步的，在read调用时，内核将数据从内核空间拷贝到应用程序空间，这个过程是在read函数中同步进行的，如果内核实现的拷贝效率很差，read调用就会在这个同步过程中消耗比较长的时间。</strong></p>
 <p>而真正的异步调用则不用担心这个问题，我们接下来就来介绍第四种I/O技术，当我们发起aio_read之后，就立即返回，内核自动将数据从内核空间拷贝到应用程序空间，这个拷贝过程是异步的，内核自动完成的，和前面的同步操作不一样，应用程序并不需要主动发起拷贝动作。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/de/71/de97e727087775971f83c70c38d6f771.png?wh=732%2A462" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/de/71/de97e727087775971f83c70c38d6f771.png?wh=732%2A462" />
 还记得<a href="https://time.geekbang.org/column/article/141573">第22</a><a href="https://time.geekbang.org/column/article/141573">讲</a>中讲到的去书店买书的例子吗? 基于这个例子，针对以上的场景，我们可以这么理解。</p>
 <p>第一种阻塞I/O就是你去了书店，告诉老板你想要某本书，然后你就一直在那里等着，直到书店老板翻箱倒柜找到你想要的书。</p>
 <p>第二种非阻塞I/O类似于你去了书店，问老板有没有一本书，老板告诉你没有，你就离开了。一周以后，你又来这个书店，再问这个老板，老板一查，有了，于是你买了这本书。</p>
 <p>第三种基于非阻塞的I/O多路复用，你来到书店告诉老板：“老板，到货给我打电话吧，我再来付钱取书。”</p>
 <p>第四种异步I/O就是你连去书店取书的过程也想省了，你留下地址，付了书费，让老板到货时寄给你，你直接在家里拿到就可以看了。</p>
 <p>这里放置了一张表格，总结了以上几种I/O模型。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/17/32/17191523d4dc62acf48915b7e601e832.png?wh=1056%2A127" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/17/32/17191523d4dc62acf48915b7e601e832.png?wh=1056%2A127" /></p>
 <h2 id="aio_readaio_write">aio_read和aio_write的用法</h2>
 <p>听起来，异步I/O有一种高大上的感觉。其实，异步I/O用起来倒是挺简单的。下面我们看一下一个具体的例子：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>#include &quot;lib/common.h&quot;
@@ -14486,7 +14486,7 @@
 <a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>Success.
 </code></pre></div>
 <p>打开/tmp目录下的aio_test_xxxx文件，可以看到，这个文件成功写入了我们期望的数据。
-<img alt="" src="https://static001.geekbang.org/resource/image/27/90/2759999db41b8b4e7c493f7513c75890.png?wh=1158%2A310" />
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/27/90/2759999db41b8b4e7c493f7513c75890.png?wh=1158%2A310" />
 请注意，以上的读写，都不需要我们在应用程序里再发起调用，系统内核直接帮我们做好了。</p>
 <h2 id="linuxsocket">Linux下socket套接字的异步支持</h2>
 <p>aio系列函数是由POSIX定义的异步操作接口，可惜的是，Linux下的aio操作，不是真正的操作系统级别支持的，它只是由GNU libc库函数在用户空间借由pthread方式实现的，而且仅仅针对磁盘类I/O，套接字I/O不支持。</p>
@@ -14662,8 +14662,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

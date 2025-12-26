@@ -6117,13 +6117,13 @@
 <h3 id="_1">同步阻塞交互方式</h3>
 <p>首先，我们来看看第一种IO交互方式：<strong>同步阻塞交互方式</strong>。</p>
 <p>什么是同步阻塞交互方式呢？在Java语言中，传统的基于流的读写操作方式，其实就是采用的同步阻塞方式，前面我介绍的那个MongoDB的查询请求，也是同步阻塞的交互方式。也就是说，虽然从开发人员的视角来看，采用同步阻塞交互方式的程序是同步调用的，但在实际的执行过程中，程序会被操作系统挂起阻塞。我们来看看采用了同步阻塞交互方式的原理示意图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/da/7e/dab56099e9a5dca6a1372dbef79ba27e.jpg?wh=2000%2A1017" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/da/7e/dab56099e9a5dca6a1372dbef79ba27e.jpg?wh=2000%2A1017" /></p>
 <p>从图上你可以看到，业务代码中发送了读写请求之后，当前的线程或进程会被阻塞，只有等IO处理结束之后才会被唤醒。</p>
 <p>所以这里你可能会产生一个疑问：<strong>是不是使用同步阻塞交互方式，性能就一定会非常差呢？</strong>实际上，并没有那么绝对，因为并不是所有的IO访问场景都是性能关键的场景。</p>
 <p>我给你举个例子，针对在程序启动过程中加载配置文件的场景，因为软件在运行过程中只会加载配置文件一次，所以这次的读取操作并不会对软件的业务性能产生影响，这样我们就应该选择最简单的实现方式，也就是同步阻塞交互方式。</p>
 <p>既然如此，你可能又要问了：<strong>如果系统中有很多这样的IO请求操作时，那么软件系统架构会是怎样的呢？</strong></p>
 <p>实际上，早期的Java服务器端经常使用Socket通信，也是采用的同步阻塞交互方式，它对应的架构图是这样的：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/72/57/72d018379f0fea5fc40c54425b341857.jpg?wh=2000%2A968" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/72/57/72d018379f0fea5fc40c54425b341857.jpg?wh=2000%2A968" /></p>
 <p>可以看到，每个Socket会单独使用一个线程，当使用Socket接口写入或读取数据的时候，这个对应的线程就会被阻塞。那么对于这样的架构来说，如果系统中的连接数比较少，即使某一个线程发生了阻塞，也还有其他的业务线程可以正常处理请求，所以它的系统性能实际上并不会非常差。</p>
 <p>不过，现在很多基于Java开发的后端服务，在访问数据库的时候其实也是使用同步阻塞的方式，所以就只能采用很多个线程，来分别处理不同的数据库操作请求。而如果<strong>针对系统中线程数很多的场景，每次访问数据库时都会引起阻塞</strong>，那么就很容易导致系统的性能受限。</p>
 <p>由此，我们就需要考虑采用其他类型的IO交互方式，避免因频繁地进行线程间切换而造成CPU资源浪费，以此进一步提升软件的性能。所以，同步非阻塞交互模式就被提出来，目的就是为了解决这个问题，下面我们具体来看看它的设计原理。</p>
@@ -6153,11 +6153,11 @@
 </code></pre></div>
 <p>你能看到，业务代码中会不断地循环执行selector.select()操作，选择出可读就绪的SocketChannel，然后再调用channel.read，把通道数据读取到Buffer中。</p>
 <p>也就是说，在这个代码执行过程中，SocketChannel从网口设备接收数据期间，并不会长时间地阻塞当前业务线程的执行，所以就可以进一步提升性能。这个IO交互方式对应的原理图如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9b/8a/9bfe57b5130fb1e0e39ebba3d0f4358a.jpg?wh=2000%2A1050" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9b/8a/9bfe57b5130fb1e0e39ebba3d0f4358a.jpg?wh=2000%2A1050" /></p>
 <p>从图中你能看到，当前的业务线程虽然避免了长时间被阻塞挂起，但是在业务线程中，会频繁地调用selector.select接口来查询状态。这也就是说，<strong>在单IO通道的场景下，使用这种同步非阻塞交互方式，性能提升其实是非常有限的。</strong></p>
 <p>不过，与同步阻塞交互方式刚好相反，<strong>当业务系统中同时存在很多的IO交互通道时，使用同步非阻塞交互方式，我们就可以复用一个线程，来查询可读就绪的通道，这样就可以大大减少IO交互引起的频繁切换线程的开销。</strong></p>
 <p>因此，在软件设计的过程中，如果你发现核心业务逻辑也是多IO交互的问题，你就可以基于这种IO同步非阻塞交互方式，来支撑产品的软件架构设计。在采用这种IO交互设计方式实现多个IO交互时，它的软件架构如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a7/73/a7c8f2cc214b1245a2fef1530645aa73.jpg?wh=2000%2A868" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a7/73/a7c8f2cc214b1245a2fef1530645aa73.jpg?wh=2000%2A868" /></p>
 <p>如果你详细阅读了前面SocketChannel在非阻塞模式中读取数据的代码片段，你就会发现在这个图中包含了三个很熟悉的概念，分别是Buffer、Channel、Selector，它们正是Java NIO的核心。这里我也给你简单介绍下：Buffer是一个缓冲区，用来缓存读取和写入的数据；Channel是一个通道，负责后台对接IO数据；而Selector实现的主要功能，就是主动查询哪些通道是处于就绪状态。</p>
 <p>所以，Java NIO正是基于这个IO交互模型，来支撑业务代码实现针对IO进行同步非阻塞的设计，从而降低了原来传统的同步阻塞IO交互过程中，线程被频繁阻塞和切换的开销。</p>
 <blockquote>
@@ -6184,7 +6184,7 @@
 <p>实际上，这个MongoDB访问接口在底层使用是Netty框架，只是重新封装了接口使用方法而已。</p>
 </blockquote>
 <p>由此，我们就可以最大化地减少IO交互过程中CPU参与的开销。这种IO交互方式的原理图如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a6/38/a627db51b54e02efbcbf36e6ebde8a38.jpg?wh=2000%2A1045" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a6/38/a627db51b54e02efbcbf36e6ebde8a38.jpg?wh=2000%2A1045" /></p>
 <p>从这个图中可以看到，在使用异步回调这种处理方式时，回调函数经常会被挂载到另外一个线程中去执行。所以使用这种方式会有一个好处，就是<strong>业务逻辑不需要频繁地查询数据</strong>，但同时，它也会<strong>引入一个新问题</strong>，那就是回调处理函数与正常的业务代码被割裂开了，这会给代码实现增加不少的复杂度。</p>
 <p>我给你举个例子，如果代码中的回调函数在处理过程中，还需要进一步执行其他IO请求时，如果再使用回调机制，那么就会出现万恶的回调嵌套问题，也就是回调函数中再嵌套一个回调函数，这样一直嵌套下去，代码就会很难阅读和维护。</p>
 <p>所以后来，在Node.js中就引入了async和await机制（在C++、Rust中，也都引入了类似的机制），比较好地解决了这个问题。我们使用这个机制，可以将背后的回调函数机制封装到语言内部底层实现中，这样我们就依旧可以使用串行思维模式来处理IO交互。</p>
@@ -6312,8 +6312,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

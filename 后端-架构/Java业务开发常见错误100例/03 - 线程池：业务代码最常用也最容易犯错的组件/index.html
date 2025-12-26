@@ -14692,13 +14692,13 @@
 <a id="__codelineno-6-41" name="__codelineno-6-41" href="#__codelineno-6-41"></a>}
 </code></pre></div>
 <p>60秒后页面输出了17，有3次提交失败了：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4b/2c/4b820e0b24ce0deefbf2dd7af295c32c.png?wh=970%2A204" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4b/2c/4b820e0b24ce0deefbf2dd7af295c32c.png?wh=970%2A204" /></p>
 <p>并且日志中也出现了3次类似的错误信息：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>[14:24:52.879] [http-nio-45678-exec-1] [ERROR] [.t.c.t.demo1.ThreadPoolOOMController:103 ] - error submitting task 18
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>java.util.concurrent.RejectedExecutionException: Task java.util.concurrent.FutureTask@163a2dec rejected from java.util.concurrent.ThreadPoolExecutor@18061ad2[Running, pool size = 5, active threads = 5, queued tasks = 10, completed tasks = 2]
 </code></pre></div>
 <p>我们把printStats方法打印出的日志绘制成图表，得出如下曲线：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d8/1e/d819035f60bf1c0022a98051d50e031e.png?wh=1738%2A684" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d8/1e/d819035f60bf1c0022a98051d50e031e.png?wh=1738%2A684" /></p>
 <p><strong>至此，我们可以总结出线程池默认的工作行为</strong>：</p>
 <ul>
 <li>不会初始化corePoolSize个线程，有任务来了才创建工作线程；</li>
@@ -14804,7 +14804,7 @@
 <a id="__codelineno-12-22" name="__codelineno-12-22" href="#__codelineno-12-22"></a>}
 </code></pre></div>
 <p>可以想象到，这个线程池中的2个线程任务是相当重的。通过printStats方法打印出的日志，我们观察下线程池的负担：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/49/55/49c132595db60f109530e0dec55ccd55.png?wh=2732%2A508" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/49/55/49c132595db60f109530e0dec55ccd55.png?wh=2732%2A508" /></p>
 <p>可以看到，<strong>线程池的2个线程始终处于活跃状态，队列也基本处于打满状态。</strong>因为开启了CallerRunsPolicy拒绝处理策略，所以当线程满载队列也满的情况下，任务会在提交任务的线程，或者说调用execute方法的线程执行，也就是说不能认为提交到线程池的任务就一定是异步处理的。如果使用了CallerRunsPolicy策略，那么有可能异步任务变为同步执行。从日志的第四行也可以看到这点。这也是这个拒绝策略比较特别的原因。</p>
 <p>不知道写代码的同学为什么设置这个策略，或许是测试时发现线程池因为任务处理不过来出现了异常，而又不希望线程池丢弃任务，所以最终选择了这样的拒绝策略。不管怎样，这些日志足以说明线程池是饱和状态。</p>
 <p>可以想象到，业务代码复用这样的线程池来做内存计算，命运一定是悲惨的。我们写一段代码测试下，向线程池提交一个简单的任务，这个任务只是休眠10毫秒没有其他逻辑：</p>
@@ -14821,7 +14821,7 @@
 <a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>}
 </code></pre></div>
 <p>我们使用wrk工具对这个接口进行一个简单的压测，可以看到TPS为75，性能的确非常差。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/98/07/989f7ab383e59e21751adb77a9b53507.png?wh=1188%2A344" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/98/07/989f7ab383e59e21751adb77a9b53507.png?wh=1188%2A344" /></p>
 <p>细想一下，问题其实没有这么简单。因为原来执行IO任务的线程池使用的是CallerRunsPolicy策略，所以直接使用这个线程池进行异步计算的话，<strong>当线程池饱和的时候，计算任务会在执行Web请求的Tomcat线程执行，这时就会进一步影响到其他同步处理的线程，甚至造成整个应用程序崩溃</strong>。</p>
 <p>解决方案很简单，使用独立的线程池来做这样的“计算任务”即可。计算任务打了双引号，是因为我们的模拟代码执行的是休眠操作，并不属于CPU绑定的操作，更类似IO绑定的操作，如果线程池线程数设置太小会限制吞吐能力：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>private static ThreadPoolExecutor asyncCalcThreadPool = new ThreadPoolExecutor(
@@ -14837,7 +14837,7 @@
 <a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>}
 </code></pre></div>
 <p>使用单独的线程池改造代码后再来测试一下性能，TPS提高到了1727：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c2/06/c21eed38ccd18758d38745dd09496a06.png?wh=1214%2A346" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c2/06/c21eed38ccd18758d38745dd09496a06.png?wh=1214%2A346" /></p>
 <p>可以看到，盲目复用线程池混用线程的问题在于，别人定义的线程池属性不一定适合你的任务，而且混用会相互干扰。这就好比，我们往往会用虚拟化技术来实现资源的隔离，而不是让所有应用程序都直接使用物理机。</p>
 <p>就线程池混用问题，我想再和你补充一个坑：<strong>Java 8的parallel stream功能，可以让我们很方便地并行处理集合中的元素，其背后是共享同一个ForkJoinPool，默认并行度是CPU核数-1</strong>。对于CPU绑定的任务来说，使用这样的配置比较合适，但如果集合操作涉及同步IO操作的话（比如数据库操作、外部服务调用等），建议自定义一个ForkJoinPool（或普通线程池）。你可以参考<a href="https://time.geekbang.org/column/article/209494">第一讲</a>的相关Demo。</p>
 <h2 id="_5">重点回顾</h2>
@@ -15017,8 +15017,6 @@ return Result.successInstance();
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

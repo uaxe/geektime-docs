@@ -7234,15 +7234,15 @@
 <p>Redis中的有序集合（Sorted Set）就是用跳表来实现的。如果你有一定基础，应该知道红黑树也可以实现快速地插入、删除和查找操作。<strong>那Redis为什么会选择用跳表来实现有序集合呢？</strong> 为什么不用红黑树呢？学完今天的内容，你就知道答案了。</p>
 <h2 id="_1">如何理解“跳表”？</h2>
 <p>对于一个单链表来讲，即便链表中存储的数据是有序的，如果我们要想在其中查找某个数据，也只能从头到尾遍历链表。这样查找效率就会很低，时间复杂度会很高，是O(n)。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e1/6d/e18303fcedc068e5a168de04df956f6d.jpg?wh=1142%2A268" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e1/6d/e18303fcedc068e5a168de04df956f6d.jpg?wh=1142%2A268" /></p>
 <p>那怎么来提高查找效率呢？如果像图中那样，对链表建立一级“索引”，查找起来是不是就会更快一些呢？每两个结点提取一个结点到上一级，我们把抽出来的那一级叫做<strong>索引</strong>或<strong>索引层</strong>。你可以看我画的图。图中的down表示down指针，指向下一级结点。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/14/8e/14753c824a5ee4a976ea799727adc78e.jpg?wh=1142%2A486" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/14/8e/14753c824a5ee4a976ea799727adc78e.jpg?wh=1142%2A486" /></p>
 <p>如果我们现在要查找某个结点，比如16。我们可以先在索引层遍历，当遍历到索引层中值为13的结点时，我们发现下一个结点是17，那要查找的结点16肯定就在这两个结点之间。然后我们通过索引层结点的down指针，下降到原始链表这一层，继续遍历。这个时候，我们只需要再遍历2个结点，就可以找到值等于16的这个结点了。这样，原来如果要查找16，需要遍历10个结点，现在只需要遍历7个结点。</p>
 <p>从这个例子里，我们看出，<strong>加来一层索引之后，查找一个结点需要遍历的结点个数减少了，也就是说查找效率提高了</strong>。那如果我们再加一级索引呢？效率会不会提升更多呢？</p>
 <p>跟前面建立第一级索引的方式相似，我们在第一级索引的基础之上，每两个结点就抽出一个结点到第二级索引。现在我们再来查找16，只需要遍历6个结点了，需要遍历的结点数量又减少了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/49/65/492206afe5e2fef9f683c7cff83afa65.jpg?wh=1142%2A663" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/49/65/492206afe5e2fef9f683c7cff83afa65.jpg?wh=1142%2A663" /></p>
 <p>我举的例子数据量不大，所以即便加了两级索引，查找效率的提升也并不明显。为了让你能真切地感受索引提升查询效率。我画了一个包含64个结点的链表，按照前面讲的这种思路，建立了五级索引。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/46/a9/46d283cd82c987153b3fe0c76dfba8a9.jpg?wh=1142%2A636" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/46/a9/46d283cd82c987153b3fe0c76dfba8a9.jpg?wh=1142%2A636" /></p>
 <p>从图中我们可以看出，原来没有索引的时候，查找62需要遍历62个结点，现在只需要遍历11个结点，速度是不是提高了很多？所以，当链表的长度n比较大时，比如1000、10000的时候，在构建索引之后，查找效率的提升就会非常明显。</p>
 <p>前面讲的<strong>这种链表加多级索引的结构，就是跳表</strong>。我通过例子给你展示了跳表是如何减少查询次数的，现在你应该比较清晰地知道，跳表确实是可以提高查询效率的。接下来，我会定量地分析一下，用跳表查询到底有多快。</p>
 <h2 id="_2">用跳表查询到底有多快？</h2>
@@ -7252,17 +7252,17 @@
 <p>假设索引有h级，最高级的索引有2个结点。通过上面的公式，我们可以得到n/(2h)=2，从而求得h=log2n-1。如果包含原始链表这一层，整个跳表的高度就是log2n。我们在跳表中查询某个数据的时候，如果每一层都要遍历m个结点，那在跳表中查询一个数据的时间复杂度就是O(m*logn)。</p>
 <p>那这个m的值是多少呢？按照前面这种索引结构，我们每一级索引都最多只需要遍历3个结点，也就是说m=3，为什么是3呢？我来解释一下。</p>
 <p>假设我们要查找的数据是x，在第k级索引中，我们遍历到y结点之后，发现x大于y，小于后面的结点z，所以我们通过y的down指针，从第k级索引下降到第k-1级索引。在第k-1级索引中，y和z之间只有3个结点（包含y和z），所以，我们在K-1级索引中最多只需要遍历3个结点，依次类推，每一级索引都最多只需要遍历3个结点。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d0/0c/d03bef9a64a0368e6a0d23ace8bd450c.jpg?wh=1142%2A439" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d0/0c/d03bef9a64a0368e6a0d23ace8bd450c.jpg?wh=1142%2A439" /></p>
 <p>通过上面的分析，我们得到m=3，所以在跳表中查询任意数据的时间复杂度就是O(logn)。这个查找的时间复杂度跟二分查找是一样的。换句话说，我们其实是基于单链表实现了二分查找，是不是很神奇？不过，天下没有免费的午餐，这种查询效率的提升，前提是建立了很多级索引，也就是我们在<a href="https://time.geekbang.org/column/article/41013">第6节</a>讲过的空间换时间的设计思路。</p>
 <h2 id="_3">跳表是不是很浪费内存？</h2>
 <p>比起单纯的单链表，跳表需要存储多级索引，肯定要消耗更多的存储空间。那到底需要消耗多少额外的存储空间呢？我们来分析一下跳表的空间复杂度。</p>
 <p>跳表的空间复杂度分析并不难，我在前面说了，假设原始链表大小为n，那第一级索引大约有n/2个结点，第二级索引大约有n/4个结点，以此类推，每上升一级就减少一半，直到剩下2个结点。如果我们把每层索引的结点数写出来，就是一个等比数列。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/10/55/100e9d6e5abeaae542cf7841be3f8255.jpg?wh=1142%2A339" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/10/55/100e9d6e5abeaae542cf7841be3f8255.jpg?wh=1142%2A339" /></p>
 <p>这几级索引的结点总和就是n/2+n/4+n/8…+8+4+2=n-2。所以，跳表的空间复杂度是O(n)。也就是说，如果将包含n个结点的单链表构造成跳表，我们需要额外再用接近n个结点的存储空间。那我们有没有办法降低索引占用的内存空间呢？</p>
 <p>我们前面都是每两个结点抽一个结点到上级索引，如果我们每三个结点或五个结点，抽一个结点到上级索引，是不是就不用那么多索引结点了呢？我画了一个每三个结点抽一个的示意图，你可以看下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0b/f7/0b0680ecf500f9349fc142e1a9eb73f7.jpg?wh=1142%2A378" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0b/f7/0b0680ecf500f9349fc142e1a9eb73f7.jpg?wh=1142%2A378" /></p>
 <p>从图中可以看出，第一级索引需要大约n/3个结点，第二级索引需要大约n/9个结点。每往上一级，索引结点个数都除以3。为了方便计算，我们假设最高一级的索引结点个数是1。我们把每级索引的结点个数都写下来，也是一个等比数列。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/19/95/192c480664e35591360cee96ff2f8395.jpg?wh=1142%2A360" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/19/95/192c480664e35591360cee96ff2f8395.jpg?wh=1142%2A360" /></p>
 <p>通过等比数列求和公式，总的索引结点大约就是n/3+n/9+n/27+...+9+3+1=n/2。尽管空间复杂度还是O(n)，但比上面的每两个结点抽一个结点的索引构建方法，要减少了一半的索引结点存储空间。</p>
 <p>实际上，在软件开发中，我们不必太在意索引占用的额外空间。在讲数据结构和算法时，我们习惯性地把要处理的数据看成整数，但是在实际的软件开发中，原始链表中存储的有可能是很大的对象，而索引结点只需要存储关键值和几个指针，并不需要存储对象，所以当对象比索引结点大很多时，那索引占用的额外空间就可以忽略了。</p>
 <h2 id="_4">高效的动态插入和删除</h2>
@@ -7270,17 +7270,17 @@
 <p>我们现在来看下， 如何在跳表中插入一个数据，以及它是如何做到O(logn)的时间复杂度的？</p>
 <p>我们知道，在单链表中，一旦定位好要插入的位置，插入结点的时间复杂度是很低的，就是O(1)。但是，这里为了保证原始链表中数据的有序性，我们需要先找到要插入的位置，这个查找操作就会比较耗时。</p>
 <p>对于纯粹的单链表，需要遍历每个结点，来找到插入的位置。但是，对于跳表来说，我们讲过查找某个结点的时间复杂度是O(logn)，所以这里查找某个数据应该插入的位置，方法也是类似的，时间复杂度也是O(logn)。我画了一张图，你可以很清晰地看到插入的过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/65/6c/65379f0651bc3a7cfd13ab8694c4d26c.jpg?wh=1142%2A844" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/65/6c/65379f0651bc3a7cfd13ab8694c4d26c.jpg?wh=1142%2A844" /></p>
 <p>好了，我们再来看删除操作。</p>
 <p>如果这个结点在索引中也有出现，我们除了要删除原始链表中的结点，还要删除索引中的。因为单链表中的删除操作需要拿到要删除结点的前驱结点，然后通过指针操作完成删除。所以在查找要删除的结点的时候，一定要获取前驱结点。当然，如果我们用的是双向链表，就不需要考虑这个问题了。</p>
 <h2 id="_5">跳表索引动态更新</h2>
 <p>当我们不停地往跳表中插入数据时，如果我们不更新索引，就有可能出现某2个索引结点之间数据非常多的情况。极端情况下，跳表还会退化成单链表。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c8/c5/c863074c01c26538cf0134eaf8dc67c5.jpg?wh=1142%2A493" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c8/c5/c863074c01c26538cf0134eaf8dc67c5.jpg?wh=1142%2A493" /></p>
 <p>作为一种动态数据结构，我们需要某种手段来维护索引与原始链表大小之间的平衡，也就是说，如果链表中结点多了，索引结点就相应地增加一些，避免复杂度退化，以及查找、插入、删除操作性能下降。</p>
 <p>如果你了解红黑树、AVL树这样平衡二叉树，你就知道它们是通过左右旋的方式保持左右子树的大小平衡（如果不了解也没关系，我们后面会讲），而跳表是通过随机函数来维护前面提到的“平衡性”。</p>
 <p>当我们往跳表中插入数据的时候，我们可以选择同时将这个数据插入到部分索引层中。如何选择加入哪些索引层呢？</p>
 <p>我们通过一个随机函数，来决定将这个结点插入到哪几级索引中，比如随机函数生成了值K，那我们就将这个结点添加到第一级到第K级这K级索引中。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a8/a7/a861445d0b53fc842f38919365b004a7.jpg?wh=1142%2A846" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a8/a7/a861445d0b53fc842f38919365b004a7.jpg?wh=1142%2A846" /></p>
 <p>随机函数的选择很有讲究，从概率上来讲，能够保证跳表的索引大小和数据大小平衡性，不至于性能过度退化。至于随机函数的选择，我就不展开讲解了。如果你感兴趣的话，可以看看我在GitHub上的代码或者Redis中关于有序集合的跳表实现。</p>
 <p>跳表的实现还是稍微有点复杂的，我将Java实现的代码放到了GitHub中，你可以根据我刚刚的讲解，对照着代码仔细思考一下。你不用死记硬背代码，跳表的实现并不是我们这节的重点。</p>
 <h2 id="_6">解答开篇</h2>
@@ -7437,8 +7437,6 @@ re: 不需要的 我们找的是62 找到就可以结束了
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

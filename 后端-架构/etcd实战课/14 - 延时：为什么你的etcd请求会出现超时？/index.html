@@ -14025,12 +14025,12 @@
 <p>首先，当我们面对一个高延时的请求案例后，如何梳理问题定位思路呢？</p>
 <p>知彼知己，方能百战不殆，定位问题也是类似。首先我们得弄清楚产生问题的原理、流程，在<a href="https://time.geekbang.org/column/article/335932">02</a>、<a href="https://time.geekbang.org/column/article/336766">03</a>、<a href="https://time.geekbang.org/column/article/337604">04</a>中我已为你介绍过读写请求的核心链路。其次是熟练掌握相关工具，借助它们，可以帮助我们快速攻破疑难杂症。</p>
 <p>这里我们再回顾下03中介绍的，Leader收到一个写请求，将一个日志条目复制到集群多数节点并应用到存储状态机的流程（如下图所示），通过此图我们看看写流程上哪些地方可能会导致请求超时呢？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/df/2c/df9yy18a1e28e18295cfc15a28cd342c.png?wh=1920%2A1328" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/df/2c/df9yy18a1e28e18295cfc15a28cd342c.png?wh=1920%2A1328" /></p>
 <p>首先是流程四，一方面，Leader需要并行将消息通过网络发送给各Follower节点，依赖网络性能。另一方面，Leader需持久化日志条目到WAL，依赖磁盘I/O顺序写入性能。</p>
 <p>其次是流程八，应用日志条目到存储状态机时，etcd后端key-value存储引擎是boltdb。正如我们<a href="https://time.geekbang.org/column/article/342527">10</a>所介绍的，它是一个基于B+ tree实现的存储引擎，当你写入数据，提交事务时，它会将dirty page持久化到磁盘中。在这过程中boltdb会产生磁盘随机I/O写入，因此事务提交性能依赖磁盘I/O随机写入性能。</p>
 <p>最后，在整个写流程处理过程中，etcd节点的CPU、内存、网络带宽资源应充足，否则肯定也会影响性能。</p>
 <p>初步了解完可能导致延时抖动的瓶颈处之后，我给你总结了etcd问题定位过程中常用的工具，你可以参考下面这幅图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b5/fc/b5bb69c8effda97f2ef78b067ab1aafc.png?wh=1920%2A1300" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b5/fc/b5bb69c8effda97f2ef78b067ab1aafc.png?wh=1920%2A1300" /></p>
 <p>图的左边是读写请求链路中可能出现瓶颈或异常的点，比如上面流程分析中提到的磁盘、内存、CPU、网络资源。</p>
 <p>图的右边是常用的工具，分别是metrics、trace日志、etcd其他日志、WAL及boltdb分析工具等。</p>
 <p>接下来，我基于读写请求的核心链路和其可能出现的瓶颈点，结合相关的工具，为你深入分析etcd延时抖动的定位方法和原因。</p>
@@ -14048,9 +14048,9 @@
 <li>etcd_network_client_grpc_received_bytes_total，表示server收到client发送的总字节数，通过这个指标可以监控etcd入流量。</li>
 </ul>
 <p>client入流量监控如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/26/ff/26617a4c08e7c1e155c4332058451cff.png?wh=866%2A356" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/26/ff/26617a4c08e7c1e155c4332058451cff.png?wh=866%2A356" /></p>
 <p>client出流量如下图监控所示。 从图中你可以看到，峰值接近140MB/s(1.12Gbps)，这是非常不合理的，说明业务中肯定有大量expensive read request操作。若etcd集群读写请求开始出现超时，你可以用ifconfig等命令查看是否出现丢包等错误。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4c/0b/4c8659e621305200b8f761b1e319460b.png?wh=856%2A356" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4c/0b/4c8659e621305200b8f761b1e319460b.png?wh=856%2A356" /></p>
 <p>etcd metrics指标名由namespace和subsystem、name组成。namespace为etcd， subsystem是模块名（比如network、name具体的指标名）。你可以在Prometheus里搜索etcd_network找到所有network相关的metrics指标名。</p>
 <p>下面是一个集群中某节点异常后的metrics指标：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>etcd_network_active_peers{Local=&quot;fd422379fda50e48&quot;，Remote=&quot;8211f1d0f64f3269&quot;} 1
@@ -14066,9 +14066,9 @@
 <p>正如我在开头的Raft日志复制整体流程图中和你介绍的，在etcd中无论是Raft日志持久化还是boltdb事务提交，都依赖于磁盘I/O的性能。</p>
 <p><strong>当etcd请求延时出现波动时，我们往往首先关注disk相关指标是否正常。</strong>我们可以通过etcd磁盘相关的metrics(etcd_disk_wal_fsync_duration_seconds和etcd_disk_backend_commit_duration_seconds)来观测应用层数据写入磁盘的性能。</p>
 <p>etcd_disk_wal_fsync_duration_seconds（简称disk_wal_fsync）表示WAL日志持久化的fsync系统调用延时数据。一般本地SSD盘P99延时在10ms内，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9a/52/9a08490980abb23f90d8e59a83543e52.png?wh=1326%2A352" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9a/52/9a08490980abb23f90d8e59a83543e52.png?wh=1326%2A352" /></p>
 <p>etcd_disk_backend_commit_duration_seconds（简称disk_backend_commit）表示后端boltdb事务提交的延时，一般P99在120ms内。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/29/db/294600a0a144be38e9d7b69d9403f3db.png?wh=1338%2A356" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/29/db/294600a0a144be38e9d7b69d9403f3db.png?wh=1338%2A356" /></p>
 <p>这里你需要注意的是，一般监控显示的磁盘延时都是P99，但实际上etcd对磁盘特别敏感，一次磁盘I/O波动就可能产生Leader切换。如果你遇到集群Leader出现切换、请求超时，但是磁盘指标监控显示正常，你可以查看P100确认下是不是由于磁盘I/O波动导致的。</p>
 <p>同时etcd的WAL模块在fdatasync操作超过1秒时，也会在etcd中打印如下的日志，你可以结合日志进一步定位。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>if took &gt; warnSyncDuration {
@@ -14249,7 +14249,7 @@
 <li>容量瓶颈，太多写请求导致线性读请求性能下降等；</li>
 <li>节点配置，CPU繁忙导致请求处理延时、内存不够导致swap等。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/93/a3/9375f08cebd596b87b92623c10786fa3.png?wh=1920%2A1474" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/93/a3/9375f08cebd596b87b92623c10786fa3.png?wh=1920%2A1474" /></p>
 <p>并在分析这些案例的过程中，给你介绍了etcd问题核心工具：metrics、etcd log、trace日志、blktrace、pprof等。</p>
 <p>希望通过今天的内容，能帮助你从容应对etcd延时抖动。</p>
 <h2 id="_4">思考题</h2>
@@ -14372,8 +14372,6 @@ expensive request，大包请求导致的延迟吗</p>2021-02-23</li><br/><li><s
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -6053,7 +6053,7 @@
 <p>关于遇到的这个问题，先来说一下我看到的现象。</p>
 <p>把线上的问题简化之后，我看到 Client 向一个 Server Pod 里的服务上传数据的时候，偶尔连接会发生中断。通过对 Server Pod 所在的宿主机节点上 tcpdump 数据包的抓取，我们会看到，从 Server Pod 向 Client 发送了一个 TCP RST(reset) 数据包之后，上传数据的连接就中断了。</p>
 <p>显然，我们下一步要做的就是<strong>找到这个</strong> <strong>TCP RST</strong> <strong>发送的原因</strong>。不过 TCP RST 发送的原因有很多种，同时，在我们的 Server Pod 里已经注入了 Envoy sidecar 容器，用了 service mesh之后，这样Pod network namespace 里的网络拓扑的复杂度也提高了。这个问题大致的示意图如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/90/1b/90430723216f76d2dcd56b7a838a7f1b.jpg?wh=1920x783" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/90/1b/90430723216f76d2dcd56b7a838a7f1b.jpg?wh=1920x783" /></p>
 <p>在这种情况下，我们想快速找到这个 TCP RST 发送的原因，就需要借助 eBPF 的诊断程序。一个最直接的思路就是找到内核中的发送 TCP RST 数据包的函数，也就是tcp_v4_send_reset() 和 tcp_send_active_reset() 这两个函数，然后用 eBPF 的 kprobe hook来追踪这两个函数的调用。</p>
 <p>通过这些函数的输入参数，我们可以知道 TCP RST 发送前收到的数据包的内容、对应 socket 的状态。我们还可以知道这些被追踪函数的调用关系。</p>
 <p>在运行 eBPF 的诊断程序之后，我们发现了两点：</p>
@@ -6062,7 +6062,7 @@
 <li>第二，内核在发出 TCP RST 数据包之前收到的数据包，其目标地址是 : 。</li>
 </ul>
 <p>整个场景的数据包流程图如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d8/04/d818d719a1f5b92f17eaedb60cb87e04.jpg?wh=1920x825" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d8/04/d818d719a1f5b92f17eaedb60cb87e04.jpg?wh=1920x825" /></p>
 <p>这里，我们结合数据在 Server Pod 里的流向来看下：当 Envoy sidecar 容器注入到 Server Pod 后，会通过 iptables(DNAT) 方式将数据流先重定向到 Envoy, 然后再由 Envoy 将数据发送给 Server。</p>
 <p>结合上面 eBPF 诊断程序的两点发现，我们就会一下子意识到问题所在：某一个数据包没有经过 iptables 的 DNAT 操作，绕过了 Envoy 直接发送到了 Sever，从而触发了一个 TCP RST 被Client 接收到。</p>
 <p>分析到这里，其实我们基本上已经知道产生 TCP RST 的原因了。那么，iptables 为什么没有对某个数据包做 DNAT 呢？这是因为，在 Linux 内核的 conntrack 机制里，如果收到了乱序的包，在缺省配置的情况下（这里提示下，可以去了解一下内核 ip_conntrack_tcp_be_liberal 这个参数），就是会放过这个包而不去做 NAT 的，这是一个很常见的问题了。</p>
@@ -6140,7 +6140,7 @@
 </code></pre></div>
 <p>最后看 raw tracepoint。这是 eBPF 引入的 <a href="https://github.com/torvalds/linux/commit/c4f6699dfcb8558d138fe838f741b2c10f416cf9">raw tracepoint program</a> ，其目的就是访问 tracepoint 定义里的 TP_PROTO 参数。比如在我们当前的这个例子里，用了 raw tracepoint 就可以访问到 task_struct *task 参数了，可以得到 task_struct 里的所有信息，而不是 TP_STRUCT__entry 里的那几个变量了。</p>
 <p>上面的几个例子说明，编写 eBPF 程序首先需要理解 Linux 内核的追踪机制的实现。而在使用 eBPF 定位具体内核问题的时候，就更需要理解内核对应部分的代码了。比如，如果我们要诊断网络问题，很自然地，我们需要知道一个网络数据包从网卡驱动进入到内核网络协议栈的主要函数，然后对这些函数进行追踪。下面是内核网络协议栈数据包的接收和发送主要函数图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8b/f9/8b5cd025f2d77yy73f727a50f024bdf9.jpg?wh=1920x939" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8b/f9/8b5cd025f2d77yy73f727a50f024bdf9.jpg?wh=1920x939" /></p>
 <p>再举一个例子：在云原生平台上，对内核函数的追踪往往需要我们知道这个函数的调用是在哪个 namespace 里，这样就可以知道是哪个容器触发的操作。大部分的 namespace 都可以通过进程控制块 task_struct{} 里的 nsproxy 结构定义得到，不过 pid namespace 有点特殊了： nsproxy 里的 pid_ns_for_children 并不是代表了进程当前所属的 pid namespace，进程真正的 pid namespace 的值需要从进程控制块的 pid-&gt;numbers[pid-&gt;level].ns 中得到。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>struct nsproxy {
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>atomic_t count;
@@ -6293,8 +6293,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

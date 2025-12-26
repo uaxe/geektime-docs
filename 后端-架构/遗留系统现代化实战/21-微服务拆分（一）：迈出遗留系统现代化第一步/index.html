@@ -14114,10 +14114,10 @@
 <p>我们会用四节课的篇幅来讲解如何拆分，分别覆盖代码拆分、数据库拆分、存储过程拆分和一些其他注意事项。这节课我们先来看看如何拆分代码。</p>
 <h2 id="_1">拆分目标与演进计划</h2>
 <p>我们先来回顾一下上节课所制定的架构目标和演进计划。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b7/58/b7d8522135d6828d1e6e178yyfac5b58.jpg?wh=1920x957" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b7/58/b7d8522135d6828d1e6e178yyfac5b58.jpg?wh=1920x957" /></p>
 <p>我们的目标是<strong>将核保模块从遗留的单体应用中剥离出来，形成一个独立的微服务</strong>。这意味着，我们不仅要将代码拆分出来，放到全新的代码库中，数据库也要从原来的单体数据库中独立出来。以前可以随意访问的代码和数据库表，都要通过某种方式完成解耦</p>
 <p>最终核保服务和遗留单体服务之间的关系，可能会像下图这样：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/4a/39/4a52f2af770e24bc6880d94a9750c239.jpg?wh=1920x1174" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4a/39/4a52f2af770e24bc6880d94a9750c239.jpg?wh=1920x1174" /></p>
 <p>接下来我们就来看看如何演进。</p>
 <h2 id="_2">基于反向代理的特性开关</h2>
 <p>我们先通过战术分叉，将单体中的核保模块（包括数据库）以及它所依赖的其他代码都完全复制出来，放到一个全新的Maven module或代码库中，并引入Spring Boot或其他Web框架。这部分工作可能会比较繁琐，但并不太复杂。</p>
@@ -14132,7 +14132,7 @@
 <p>在回退机制上，我们需要建立一个开关，当改造后的核保服务中的API发生问题的时候，能够回退到老的单体服务中。这有点类似于在开发功能时使用的“特性开关”。之后的第二十四节课，我还会详细分享更多在代码中使用特性开关的实践。</p>
 <p>怎么实现这种开关呢？由于目前所有请求都是指向单体服务的，我们可以在单体服务中加入一个“反向代理”层，当一个请求进入单体服务中时，会先判断当前的请求是否由开关控制。</p>
 <p>如果有开关且处于打开状态，就将请求重定向到新的核保服务中，否则就仍然访问单体中的旧代码。如果你的遗留系统中，在单体服务之外已经有了API Gateway，那当然就要把这个反向代理放在API Gateway中了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/69/4c/698e9907314b9c82f665949f81ab624c.jpg?wh=1920x1172" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/69/4c/698e9907314b9c82f665949f81ab624c.jpg?wh=1920x1172" /></p>
 <p>这种反向代理的实现方式有很多。因为专栏里的案例是一个基于Servlet的JSP遗留系统，因此可以使用Filter的方式实现。开关可以存储在DB中，也可以放在配置文件里。下面是一个可以参考的代码实现：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">ReverseProxyFilter</span><span class="w"> </span><span class="kd">implements</span><span class="w"> </span><span class="n">Filter</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nd">@Override</span>
@@ -14161,7 +14161,7 @@
 <p>战术分叉只是将数据库复制了一份出来，但旧的单体服务仍在运行，所以总会有新的核保数据源源不断地写入核保相关的表中。如果这部分数据没有出现在新的核保库中，那么前面我们设置的开关就是无法打开的，因为数据不全，无法正常开展业务。</p>
 <p>为了真正享有反向代理带来的随时可以回退的好处，我们必须建立某种数据同步机制，让写入旧核保表中的数据也能同步到新的核保库中，反之亦然。这样才能保证，开关无论打开还是关闭，看到的数据都能保持一致。</p>
 <p>回忆一下我们建设新老城区的隐喻，这就好比是新城区中没有自来水厂，我们从老城区拉一条管线过去给新城区供水一样。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8b/b7/8b05e2eff30300yy7fe763806d25dab7.jpg?wh=1920x1229" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8b/b7/8b05e2eff30300yy7fe763806d25dab7.jpg?wh=1920x1229" /></p>
 <p>如何建立这种同步机制呢？</p>
 <p>说到同步，你可能最先想到的就是<strong>事件拦截</strong>，这当然是非常有效且一劳永逸的方式。每一个数据变化的点，都会触发一个事件，并持久化到消息中间件中，事件的消费方通过消费这个事件来实现数据的同步。</p>
 <p>如果你的系统中已经存在了消息中间件，并且有足够的事件，那么恭喜你，你是幸运的。然而大多数遗留系统是没有这些事件的，要想补齐所有事件来得到全部数据的修改点，工作量可能会超出服务拆分本身。</p>
@@ -14170,12 +14170,12 @@
 <p>事件拦截和CDC的相关内容，你可以复习一下<a href="https://time.geekbang.org/column/article/514516">第十一节课</a>。</p>
 <p>还有一种方法，我们可以在单体服务和核保服务中对数据库进行“双写”，也就是既写入新的核保库，同时也写入旧的单体库，这样无论开关是否打开，都能保证两边的数据一致。</p>
 <p>当然，双写的时候不能让核保服务直接访问单体数据库（否则我们做微服务拆分以及数据所有权的拆分就都没意义了），而应该在遗留单体中为单体库建立一系列<strong>数据库包装服务</strong>，来提供对单体数据库的读写访问。我们把这类API称为<strong>数据API</strong>。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/bd/00/bdce4cbdb4a23da323cc729dd2686700.jpg?wh=1920x1357" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bd/00/bdce4cbdb4a23da323cc729dd2686700.jpg?wh=1920x1357" /></p>
 <p>尽管某种程度上来说数据API只是一个壳子，它还是会调用已有的旧代码去修改数据，不过双向CDC或双写的方式显然也增加了不少团队认知负载。我们再想想看，还有没有更简单的方法呢？</p>
 <p>当然是有的，但这些方案都存在一定的局限性，需要根据项目实际情况来选择，我们一起来看一下后面这两种方案。</p>
 <p>1.如果拆分出来的服务是<strong>只读</strong>的，我们可以在单体库中为相关的表创建<strong>视图</strong>，让新服务直接访问这些视图。当所有API改造完成之后，我们再根据这些视图，在新库中创建数据表，将数据一次性迁移到这些表中。</p>
 <p>2.如果数据库是像Oracle这种包含类似DBLink技术的，我们可以在新库中创建同义词，通过DBLink指向旧库中的表，这样无论是读写都可以正常完成。当所有API改造完成后，我们根据所创建的同义词，在新库中创建表并迁移数据。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f5/07/f566b0374118bba3c39a9c0fab918607.jpg?wh=1990x1230" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f5/07/f566b0374118bba3c39a9c0fab918607.jpg?wh=1990x1230" /></p>
 <p>上述两种方案可能看起来都不是特别完美，相当于一个微服务通过某种方式，访问了它不应该访问的数据库。但不要忘了，这只是改造过程中的中间步骤。</p>
 <p>当全部改造完成后，这种临时的基础设施（视图或同义词）就会被删除，所以完全不必纠结。另外，这样简单的方式，能让我们比较容易地获取原单体库中的数据，是符合“<strong>以降低认知负载为前提</strong>”这个原则的。</p>
 <p>在这个案例中，虽然核保服务对于核保数据既包含读取，也包含写入，不能使用视图的方式，但由于数据库是Oracle，我们可以使用同义词的方式来实现双向同步。</p>
@@ -14197,7 +14197,7 @@
 <p>1.调自己；</p>
 <p>2.调服务；</p>
 <p>3.组数据。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8c/db/8c56234086125ce90d29f755c87e2bdb.jpg?wh=1920x1263" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8c/db/8c56234086125ce90d29f755c87e2bdb.jpg?wh=1920x1263" /></p>
 <p>我们首先让核保服务调用自己的数据库拿到核保申请数据。然后在单体中创建一个新的API，让它返回保单数据，在核保服务中的防腐层（ACL）中调用这个API，拿到保单数据。最后，在原来的代码处对两部分数据进行组合。由于这个新建的API也是为了给核保服务提供数据，我们仍然将其称为数据API。</p>
 <p>改造后的代码类似下面这种：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1">// 核保服务中的代码 - UnderwriteApplicationService.java</span>
@@ -14358,8 +14358,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

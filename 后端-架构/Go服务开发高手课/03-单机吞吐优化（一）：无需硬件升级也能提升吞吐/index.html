@@ -14093,9 +14093,9 @@
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>go<span class="w"> </span>tool<span class="w"> </span>pprof<span class="w"> </span>-http<span class="w"> </span>:8889<span class="w"> </span>heap.pprof
 </code></pre></div>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5f/1a/5f125ecec3f413f7959b6432dfb08c1a.jpg?wh=2902x628" title="图1 原始函数内存火焰图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5f/1a/5f125ecec3f413f7959b6432dfb08c1a.jpg?wh=2902x628" title="图1 原始函数内存火焰图" /></p>
 <p>从火焰图中我们可以看出来，在应用内部的处理逻辑，也就是Handler方法里，getRawSet函数是内存消耗最大的函数。接着，我们点击火焰图的最后一行进入getRawSet函数内部查看，可以看到下面的图，消耗内存资源的热点代码是map赋值这行代码。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/06/30/0625f65ce35d116708e5754d26158a30.jpg?wh=1538x820" title="图2 内存分配热点代码" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/06/30/0625f65ce35d116708e5754d26158a30.jpg?wh=1538x820" title="图2 内存分配热点代码" /></p>
 <p>结合这行代码的上下文，可知这段代码逻辑的目的是用map构造一个集合。那这里面有没有什么优化空间呢？</p>
 <p>我们可以从两个方向寻找答案：</p>
 <ul>
@@ -14154,18 +14154,18 @@
 <a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>BenchmarkGetEmptyStructSet-4<span class="w">       </span><span class="m">19430</span><span class="w">            </span><span class="m">563814</span><span class="w"> </span>ns/op<span class="w">          </span><span class="m">389449</span><span class="w"> </span>B/op<span class="w">        </span><span class="m">255</span><span class="w"> </span>allocs/op
 </code></pre></div>
 <p>现在让我们再看一下内存火焰图，看看经过空结构体类型的优化后，我们的代码是否还有优化空间。
-<img alt="" src="https://static001.geekbang.org/resource/image/2a/yy/2ae951758abb784f769082bf168fc1yy.jpg?wh=2886x728" title="图3 空结构体优化后内存火焰图" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2a/yy/2ae951758abb784f769082bf168fc1yy.jpg?wh=2886x728" title="图3 空结构体优化后内存火焰图" /></p>
 <p>从火焰图中我们可以看到，用空结构体优化后，构造集合的getEmptyStructSet函数，依然是最消耗内存的函数。</p>
 <p>前面我提到可以从两个方向找答案，并且通过将value的类型，从bool改为空结构体，减少了存入map的数据大小。为了继续降低map的内存资源消耗，现在让我们从第二个方向——map赋值操作的方向找答案。</p>
 <h2 id="_3">指定容量：容器操作如何避免扩容迁移？</h2>
 <p>在搞明白map赋值操作的逻辑之前，我们需要先了解map的数据结构。就像下面的图展示的一样，<strong>map底层其实是以数组+链表的数据结构存储key-value对的</strong>。为了描述方便，数组的每一个位置，通常我们称它为桶。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/43/e8/4358fc1588d7ece96fb69b03547665e8.jpg?wh=1714x903" title="图4 map 内部数据结构" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/43/e8/4358fc1588d7ece96fb69b03547665e8.jpg?wh=1714x903" title="图4 map 内部数据结构" /></p>
 <p>正常情况下，当往map中写入ket-value对时，Go底层会根据key做hash，定位到需要写入key-value对的桶，并插入桶对应的链表中。
-<img alt="" src="https://static001.geekbang.org/resource/image/bb/2b/bbb0bf899974264b2505ae93441bca2b.jpg?wh=2584x884" title="图5 map 写入操作" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bb/2b/bbb0bf899974264b2505ae93441bca2b.jpg?wh=2584x884" title="图5 map 写入操作" /></p>
 <p>但是当map里面写入的数据过多时，数组里面的桶链表会越来越长。而map的写入和读取，都需要遍历桶链表，因此过长的桶链表会影响map的读写性能。</p>
 <p>为了缓解这种情况，在往map写入数据时，如果map中的数据量已经比较多了，Go底层还有个扩容迁徙的分支逻辑，这个扩容迁移的分支逻辑是怎么样的呢？</p>
 <p>扩容迁移的逻辑分成2步，我们结合后面这张图来理解更直观一些。
-<img alt="" src="https://static001.geekbang.org/resource/image/c5/28/c5ba996164c294003e7118ff83875a28.jpg?wh=2774x1978" title="图6 map 写入触发扩容迁移" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c5/28/c5ba996164c294003e7118ff83875a28.jpg?wh=2774x1978" title="图6 map 写入触发扩容迁移" /></p>
 <p>首先<strong>申请更大的数组空间。</strong></p>
 <p>然后将旧数组空间数据迁移到新数组空间。<strong>Go采取了渐进式hash的思想，每次往map写入数据时，会触发从旧数组空间往新数组空间迁移两个桶链表数据，从而避免一次迁移全量数据导致map写请求延时抖动，直到旧数组空间的所有桶链表迁移完为止。</strong></p>
 <p>虽然通过扩容迁移，将原先在同一个桶链表里的数据，重新hash到新数组不同的桶链表中，可以减少桶链表长度，避免map读写性能大幅度裂化。但是扩容迁移属于消耗内存和CPU资源的操作，如果循环往map写入，可能会触发多次扩容迁移，消耗大量内存和CPU资源。</p>
@@ -14210,15 +14210,15 @@
 <li>从 CPU 资源消耗来看，不指定map容量的方式，单次函数调用要563814ns，而指定容量的方式只要287038ns，节约了 49% 左右的 CPU 资源。</li>
 </ul>
 <p>现在让我们再看一下内存火焰图，看看我们的代码是否还有进一步优化空间。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b0/77/b0daf4f8a700d8010ea20feebda95277.jpg?wh=2908x558" title="图7 指定 map 容量优化后的火焰图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b0/77/b0daf4f8a700d8010ea20feebda95277.jpg?wh=2908x558" title="图7 指定 map 容量优化后的火焰图" /></p>
 <p>从内存火焰图中我们可以看出，除了已经优化后的集合构造函数getCapacitySet，现在最消耗内存的是切片生成函数getRawSlice。</p>
 <p>现在我们从火焰图进入getRawSlice函数内部，就会看到下面的图，消耗内存资源的热点代码是切片append这行代码。
-<img alt="" src="https://static001.geekbang.org/resource/image/7b/28/7b6bc457b5fff6afe4af0b4a654b9828.jpg?wh=1688x717" title="图8 getRawSlice 函数内部热点代码" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7b/28/7b6bc457b5fff6afe4af0b4a654b9828.jpg?wh=1688x717" title="图8 getRawSlice 函数内部热点代码" /></p>
 <p>结合这行代码的上下文，可以知道这段代码逻辑是在循环地往切片里面做append操作。那么我们自然会想到，可以去看看切片的append操作是如何实现的，这里面有没有啥优化空间呢？</p>
 <p><strong>切片底层数据结构是用一个数组存储数据的</strong>，通常进行append操作时，会往数组末尾插入数据。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d7/7b/d7cdc766f5b62ab9e1b6efa14488f97b.jpg?wh=1165x654" title="图9 append 操作" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d7/7b/d7cdc766f5b62ab9e1b6efa14488f97b.jpg?wh=1165x654" title="图9 append 操作" /></p>
 <p>但是当<strong>数组空间不够时，append操作会触发扩容迁移，申请更大的数组空间，并将旧数组数据拷贝到新数组，以便存放更多的数据</strong>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/53/8b/53d702086c76a117e8a96fc907cb918b.jpg?wh=1552x886" title="图10 append 触发扩容" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/53/8b/53d702086c76a117e8a96fc907cb918b.jpg?wh=1552x886" title="图10 append 触发扩容" /></p>
 <p>我们从扩容迁移的过程可以看出来，<strong>扩容迁移存在内存分配和数据拷贝操作，需要消耗内存和CPU资源</strong>。当循环做切片append操作时，可能会触发频繁扩容迁移，消耗大量的内存和CPU资源。</p>
 <p>那切片append操作有没有办法避免扩容迁移呢？</p>
 <p>实际上，和map一样，我们在创建切片对象时，也可以传入容量字段。就像下面的代码一样，这样切片就会一次性申请足够数组空间，从而避免后续写入过程发生扩容迁移。</p>
@@ -14260,7 +14260,7 @@
 <li>从 CPU 资源消耗来看，不指定切片容量的方式，单次函数调用要55297ns，而指定容量的方式，只要13318ns，节约了 76% 左右的 CPU 资源。</li>
 </ul>
 <p>让我们用火焰图再看看我们的函数是否还有优化空间。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/93/7f/93c6521d7e75c892cd2239d86yy1287f.jpg?wh=2908x547" title="图11 指定容量优化后内存火焰图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/93/7f/93c6521d7e75c892cd2239d86yy1287f.jpg?wh=2908x547" title="图11 指定容量优化后内存火焰图" /></p>
 <p>从火焰图上我们可以看出来，经过前面几次的优化，应用内部最耗时的函数就只剩下已经优化过之后的getCapacitySet和getCapacitySlices函数，没有进一步优化的空间了。</p>
 <h2 id="_4">小结</h2>
 <p>今天这节课，我以一段待优化的http服务接口为例，在逐步优化其对内存资源的消耗过程中，向你展示了能降低内存和CPU资源消耗的2个高性能容器类型的使用技巧。</p>
@@ -14407,8 +14407,6 @@ map 的性能高度依赖于键的哈希分布，尽量选择能避免哈希冲�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

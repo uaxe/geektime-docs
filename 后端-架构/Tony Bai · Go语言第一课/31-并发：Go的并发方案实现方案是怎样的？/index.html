@@ -15080,19 +15080,19 @@
 <p>课程一开始，我们就经常提到并发（concurrency）这个词。说了这么长时间的并发，那究竟什么是并发呢？它又与并行（parallelism）有什么区别呢？要想搞清楚这些问题，我们需要简单回顾一下操作系统的基本调度单元的变迁，以及计算机处理器的演化对应用设计的影响。</p>
 <p>很久以前，面向大众消费者的主流处理器（CPU）都是单核的，操作系统的基本调度与执行单元是进程（process）。这个时候，用户层的应用有两种设计方式，一种是单进程应用，也就是每次启动一个应用，操作系统都只启动一个进程来运行这个应用。</p>
 <p>单进程应用的情况下，用户层应用、操作系统进程以及处理器之间的关系是这样的：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/80/fa/80b2d27586eea8e6cd04224807c471fa.jpg?wh=1920x1047" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/80/fa/80b2d27586eea8e6cd04224807c471fa.jpg?wh=1920x1047" /></p>
 <p>我们看到，这个设计下，每个单进程应用对应一个操作系统进程，操作系统内的多个进程按时间片大小，被轮流调度到仅有的一颗单核处理器上执行。换句话说，这颗单核处理器在某个时刻只能执行一个进程对应的程序代码，两个进程不存在并行执行的可能。</p>
 <p>这里说的<strong>并行（parallelism），指的就是在同一时刻，有两个或两个以上的任务（这里指进程）的代码在处理器上执行</strong>。从这个概念我们也可以知道，多个处理器或多核处理器是并行执行的必要条件。</p>
 <p>总的来说，单进程应用的设计比较简单，它的内部仅有一条代码执行流，代码从头执行到尾，不存在竞态，无需考虑同步问题。</p>
 <p>用户层的另外一种设计方式，就是多进程应用，也就是应用通过fork等系统调用创建多个子进程，共同实现应用的功能。多进程应用的情况下，用户层应用、操作系统进程以及处理器之间的关系是这样的：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b8/c6/b82486d70620519a7a9e756892d8bcc6.jpg?wh=1920x1047" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b8/c6/b82486d70620519a7a9e756892d8bcc6.jpg?wh=1920x1047" /></p>
 <p>以图中的App1为例，这个应用设计者将应用内部划分为多个模块，每个模块用一个进程承载执行，每个模块都是一个单独的执行流，这样，App1内部就有了多个独立的代码执行流。</p>
 <p>但限于当前仅有一颗单核处理器，这些进程（执行流）依旧无法并行执行，无论是App1内部的某个模块对应的进程，还是其他App对应的进程，都得逐个按时间片被操作系统调度到处理器上执行。</p>
 <p><strong>粗略看起来，多进程应用与单进程应用相比并没有什么质的提升。那我们为什么还要将应用设计为多进程呢？</strong></p>
 <p>这更多是从应用的结构角度去考虑的，多进程应用由于将功能职责做了划分，并指定专门的模块来负责，所以从结构上来看，要比单进程更为清晰简洁，可读性与可维护性也更好。<strong>这种将程序分成多个可独立执行的部分的结构化程序的设计方法，就是并发设计</strong>。采用了并发设计的应用也可以看成是一组独立执行的模块的组合。</p>
 <p>不过，进程并不适合用于承载采用了并发设计的应用的模块执行流。因为进程是操作系统中资源拥有的基本单位，它不仅包含应用的代码和数据，还有系统级的资源，比如文件描述符、内存地址空间等等。进程的“包袱”太重，这导致它的创建、切换与撤销的代价都很大。</p>
 <p>于是线程便走入了人们的视野，线程就是运行于进程上下文中的更轻量级的执行流。同时随着处理器技术的发展，多核处理器硬件成为了主流，这让真正的并行成为了可能，于是主流的应用设计模型变成了这样：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/86/f3/865900c852bd4d18f31e41dc152839f3.jpg?wh=1920x1047" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/86/f3/865900c852bd4d18f31e41dc152839f3.jpg?wh=1920x1047" /></p>
 <p>我们看到，基于线程的应用通常采用单进程多线程的模型，一个应用对应一个进程，应用通过并发设计将自己划分为多个模块，每个模块由一个线程独立承载执行。多个线程共享这个进程所拥有的资源，但线程作为执行单元可被独立调度到处理器上运行。</p>
 <p>线程的创建、切换与撤销的代价相对于进程是要小得多。当这个应用的多个线程同时被调度到不同的处理器核上执行时，我们就说这个应用是并行的。</p>
 <p>讲到这里，我们可以对并发与并行两个概念做一些区分了。就像Go语言之父Rob Pike曾说过那样：<strong>并发不是并行，并发关乎结构，并行关乎执行</strong>。</p>
@@ -15150,7 +15150,7 @@
 <p>Tony Hoare的CSP模型旨在简化并发程序的编写，让并发程序的编写与编写顺序程序一样简单。Tony Hoare认为输入输出应该是基本的编程原语，数据处理逻辑（也就是CSP中的P）只需调用输入原语获取数据，顺序地处理数据，并将结果数据通过输出原语输出就可以了。</p>
 <p>因此，在Tony Hoare眼中，<strong>一个符合CSP模型的并发程序应该是一组通过输入输出原语连接起来的P的集合</strong>。从这个角度来看，CSP理论不仅是一个并发参考模型，也是一种并发程序的程序组织方法。它的组合思想与Go的设计哲学不谋而合。</p>
 <p>Tony Hoare的CSP理论中的P，也就是“Process（进程）”，是一个抽象概念，它代表任何顺序处理逻辑的封装，它获取输入数据（或从其他P的输出获取），并生产出可以被其他P消费的输出数据。这里我们可以简单看下CSP通信模型的示意图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e7/8c/e7c4fcc00ece399601de800e3a7f598c.jpg?wh=1920x465" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e7/8c/e7c4fcc00ece399601de800e3a7f598c.jpg?wh=1920x465" /></p>
 <p>注意了，这里的P并不一定与操作系统的进程或线程划等号。在Go中，与“Process”对应的是goroutine。为了实现CSP并发模型中的输入和输出原语，Go还引入了goroutine（P）之间的通信原语 <code>channel</code>。goroutine可以从channel获取输入数据，再将处理后得到的结果数据通过channel输出。通过channel将goroutine（P）组合连接在一起，让设计和编写大型并发系统变得更加简单和清晰，我们再也不用为那些传统共享内存并发模型中的问题而伤脑筋了。</p>
 <p>比如我们上面提到的获取goroutine的退出状态，就可以使用channel原语实现：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>func spawn(f func() error) &lt;-chan error {
@@ -15443,8 +15443,6 @@ channel
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

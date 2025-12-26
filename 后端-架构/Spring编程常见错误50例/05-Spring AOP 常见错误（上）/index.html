@@ -14147,14 +14147,14 @@ Pay with alipay ...</p>
 <p>回溯之前的代码可知，在@Around的切面类中，我们很清晰地定义了切面对应的方法，但是却没有被执行到。这说明了在类的内部，通过this方式调用的方法，是没有被Spring AOP增强的。这是为什么呢？我们来分析一下。</p>
 <h3 id="_1">案例解析</h3>
 <p>我们可以从源码中找到真相。首先来设置个断点，调试看看this对应的对象是什么样的：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e0/5f/e0f4b047228fac437d57f56dcd18185f.png?wh=700%2A332" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e0/5f/e0f4b047228fac437d57f56dcd18185f.png?wh=700%2A332" /></p>
 <p>可以看到，this对应的就是一个普通的ElectricService对象，并没有什么特别的地方。再看看在Controller层中自动装配的ElectricService对象是什么样：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b2/f9/b24f00b4b96c46983295da05180174f9.png?wh=1112%2A258" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b2/f9/b24f00b4b96c46983295da05180174f9.png?wh=1112%2A258" /></p>
 <p>可以看到，这是一个被Spring增强过的Bean，所以执行charge()方法时，会执行记录接口调用时间的增强操作。而this对应的对象只是一个普通的对象，并没有做任何额外的增强。</p>
 <p>为什么this引用的对象只是一个普通对象呢？这还要从Spring AOP增强对象的过程来看。但在此之前，有些基础我需要在这里强调下。</p>
 <p><strong>1. Spring AOP的实现</strong></p>
 <p>Spring AOP的底层是动态代理。而创建代理的方式有两种，<strong>JDK的方式和CGLIB的方式</strong>。JDK动态代理只能对实现了接口的类生成代理，而不能针对普通类。而CGLIB是可以针对类实现代理，主要是对指定的类生成一个子类，覆盖其中的方法，来实现代理对象。具体区别可参考下图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/99/a1/99c74d82d811ec567b28a24ccd6e85a1.png?wh=1191%2A573" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/99/a1/99c74d82d811ec567b28a24ccd6e85a1.png?wh=1191%2A573" /></p>
 <p><strong>2. 如何使用Spring AOP</strong></p>
 <p>在Spring Boot中，我们一般只要添加以下依赖就可以直接使用AOP功能：</p>
 <blockquote>
@@ -14165,7 +14165,7 @@ Pay with alipay ...</p>
 </blockquote>
 <p>而对于非Spring Boot程序，除了添加相关AOP依赖项外，我们还常常会使用@EnableAspectJAutoProxy来开启AOP功能。这个注解类引入（Import）AspectJAutoProxyRegistrar，它通过实现ImportBeanDefinitionRegistrar的接口方法来完成AOP相关Bean的准备工作。</p>
 <p>补充完最基本的Spring底层知识和使用知识后，我们具体看下创建代理对象的过程。先来看下调用栈：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1f/2a/1fb3735e51a8e06833f065a175517c2a.png?wh=1565%2A570" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1f/2a/1fb3735e51a8e06833f065a175517c2a.png?wh=1565%2A570" /></p>
 <p>创建代理对象的时机就是创建一个Bean的时候，而创建的的关键工作其实是由AnnotationAwareAspectJAutoProxyCreator完成的。它本质上是一种BeanPostProcessor。所以它的执行是在完成原始Bean构建后的初始化Bean（initializeBean）过程中。而它到底完成了什么工作呢？我们可以看下它的postProcessAfterInitialization方法：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>public Object postProcessAfterInitialization(@Nullable Object bean, String beanName) {
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>if (bean != null) {
@@ -14233,7 +14233,7 @@ Pay with alipay ...</p>
 </code></pre></div>
 <p>另一种方法就是直接从AopContext获取当前的Proxy。那你可能会问了，AopContext是什么？简单说，它的核心就是通过一个ThreadLocal来将Proxy和线程绑定起来，这样就可以随时拿出当前线程绑定的Proxy。</p>
 <p>不过使用这种方法有个小前提，就是需要在@EnableAspectJAutoProxy里加一个配置项exposeProxy = true，表示将代理对象放入到ThreadLocal，这样才可以直接通过 AopContext.currentProxy()的方式获取到，否则会报错如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0e/98/0e42f3129e1c098b0f860f1f7f2e6298.png?wh=1489%2A563" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0e/98/0e42f3129e1c098b0f860f1f7f2e6298.png?wh=1489%2A563" /></p>
 <p>按这个思路，我们修改下相关代码：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>import org.springframework.aop.framework.AopContext;
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>import org.springframework.stereotype.Service;
@@ -14331,7 +14331,7 @@ Pay with alipay ...</p>
 <p>String payNum = dminUserService.user.getPayNum();</p>
 </blockquote>
 <p>本来一切正常的代码，因为引入了一个AOP切面，抛出了NullPointerException。这会是什么原因呢？我们先debug一下，来看看加入AOP后调用的对象是什么样子。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cd/a2/cd48479a45c2b06621c2e07a33f519a2.png?wh=917%2A419" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cd/a2/cd48479a45c2b06621c2e07a33f519a2.png?wh=917%2A419" /></p>
 <p>可以看出，加入AOP后，我们的对象已经是一个代理对象了，如果你眼尖的话，就会发现在上图中，属性adminUser确实为null。为什么会这样？为了解答这个诡异的问题，我们需要进一步理解Spring使用CGLIB生成Proxy的原理。</p>
 <h3 id="_3">案例解析</h3>
 <p>我们在上一个案例中解析了创建Spring Proxy的大体过程，在这里，我们需要进一步研究一下通过Proxy创建出来的是一个什么样的对象。正常情况下，AdminUserService只是一个普通的对象，而AOP增强过的则是一个AdminUserService $$EnhancerBySpringCGLIB$$xxxx。</p>
@@ -14398,7 +14398,7 @@ Pay with alipay ...</p>
 <a id="__codelineno-17-32" name="__codelineno-17-32" href="#__codelineno-17-32"></a>}
 </code></pre></div>
 <p>这里我们可以了解到，Spring会默认尝试使用objenesis方式实例化对象，如果失败则再次尝试使用常规方式实例化对象。现在，我们可以进一步查看objenesis方式实例化对象的流程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/42/34/422160a6fd0c3ee1af8b05769a015834.png?wh=1027%2A397" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/42/34/422160a6fd0c3ee1af8b05769a015834.png?wh=1027%2A397" /></p>
 <p>参照上述截图所示调用栈，objenesis方式最后使用了JDK的ReflectionFactory.newConstructorForSerialization()完成了代理对象的实例化。而如果你稍微研究下这个方法，你会惊讶地发现，这种方式创建出来的对象是不会初始化类成员变量的。</p>
 <p>所以说到这里，聪明的你可能已经觉察到真相已经暴露了，我们这个案例的核心是代理类实例的默认构建方式很特别。在这里，我们可以总结和对比下通过反射来实例化对象的方式，包括：</p>
 <ul>
@@ -14463,9 +14463,9 @@ String payNum = adminUserService.getAdminUser().getPayNum();</p>
 </code></pre></div>
 <p>当代理类方法被调用，会被Spring拦截，从而进入此intercept()，并在此方法中获取被代理的原始对象。而在原始对象中，类属性是被实例化过且存在的。因此代理类是可以通过方法拦截获取被代理对象实例的属性。</p>
 <p>说到这里，我们已经解决了问题。但如果你看得仔细，就会发现，其实你改变一个属性，也可以让产生的代理对象的属性值不为null。例如修改启动参数spring.objenesis.ignore如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/83/7e/83e34cbd460ac74c5d623905dce0497e.png?wh=933%2A185" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/83/7e/83e34cbd460ac74c5d623905dce0497e.png?wh=933%2A185" /></p>
 <p>此时再调试程序，你会发现adminUser已经不为null了：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3b/b1/3b2dd77392c3b439d0a182f5817045b1.png?wh=801%2A294" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3b/b1/3b2dd77392c3b439d0a182f5817045b1.png?wh=801%2A294" /></p>
 <p>所以这也是解决这个问题的一种方法，相信聪明的你已经能从前文贴出的代码中找出它能够工作起来的原理了。</p>
 <h2 id="_5">重点回顾</h2>
 <p>通过以上两个案例的介绍，相信你对Spring AOP动态代理的初始化机制已经有了进一步的了解，这里总结重点如下：</p>
@@ -14689,8 +14689,6 @@ System.out.println(personByReflection);</p>2022-07-14</li><br/><li><span>胡同�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

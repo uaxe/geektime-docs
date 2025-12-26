@@ -14653,24 +14653,24 @@
 <h2 id="g1">为什么选择G1？</h2>
 <p>在当前的生产环境中，JDK 8仍是被广泛采用的版本，在JDK 8时代，CMS和G1这两种垃圾回收器不分伯仲，在不同业务场景中，各有优劣。而造成这种现象的原因是我们正处在一个时代的转型期，也就是从物理机到虚拟机再到云时代的转型期，目前正是多代并存的历史节点，也就是在实际生产环境中既有使用传统的物理服务器的业务，也有使用虚拟机的业务，更有已经大规模迁移到云平台的业务。</p>
 <p>底层基础设施变迁，对我们如何使用JVM也在产生着潜移默化的影响。而New Relic最新发布的2023年的报告给我们指明了一个方向。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c9/17/c9be022b49aef415b63dbe273d495017.jpg?wh=2398x1574" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c9/17/c9be022b49aef415b63dbe273d495017.jpg?wh=2398x1574" /></p>
 <p>报告中指出在JDK 11及以上的版本中，G1一骑绝尘，使用率占比达到65% 。所以在这个CMS垃圾收集器逐步淡出历史舞台，而ZGC还未完全成熟的阶段，G1垃圾收器注定将在未来的一段时间内扛起主流垃圾收集器的大旗，成为兼顾延迟与吞吐的最佳选择。而现实中，在JDK 11逐渐登上历史舞台的背景下，越来越多的系统，通过升级到G1以实现性能的提升。这也是我们今天选择G1作为介绍对象的原因。</p>
 <h2 id="g1_1">G1 是什么？</h2>
 <p>G1有很多里程碑式的创新，下图是一个缩减版的垃圾收集器全景图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/12/19/1293a94ac577ec0055e852f468b28a19.png?wh=1920x773" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/12/19/1293a94ac577ec0055e852f468b28a19.png?wh=1920x773" /></p>
 <p>从图中可以看出，G1之前每个垃圾收集器一般只是负责新生代或老年代的垃圾回收，然后通过组合的方式来完成GC的整体职责。而G1是第一个同时支持年轻代和老年代垃圾回收的垃圾回收器。在此之后，其他的垃圾回收器也遵循了这样的发展路线。</p>
 <h2 id="g1_2"><strong>G1 垃圾回收算法</strong></h2>
 <h3 id="g1_3"><strong>G1 内存划分</strong></h3>
 <p>区别于其他采用分代收集算法的垃圾回收器，G1中的年轻代、老年代是一种逻辑划分，而不再是物理划分，也就是说年轻代和老年代不再是连续的内存地址空间，而是一组Region的集合。这里的Region是G1中最小内存分配单元，你可以通过 <code>-XX:G1HeapRegionSize=n</code> 来设置Region的大小，可以设定为1M、2M、4M、8M、16M、32M。</p>
 <p>需要注意的是，JVM中规定Region的大小必须是2的整数幂，并且不能超过32M。如下图所示，当你采用G1作为垃圾收集器时，JVM会将堆内存划分为一个个大小相同的Region进行管理。所以合理设置Region的大小，是用好G1的一个非常重要的因素。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b7/19/b79a1723d3c44b507225f52241c1b519.png?wh=1807x793" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b7/19/b79a1723d3c44b507225f52241c1b519.png?wh=1807x793" /></p>
 <h3 id="_1">垃圾回收算法</h3>
 <p>G1 采用的是分代收集和区域（Region）划分相结合的垃圾回收算法。在最小的物理内存单元是Region的基础上，依据分代收集算法，G1将堆内存在逻辑层面划分为4个区域，分别是Eden Space、Survivor Space、Old Generation 以及 Humongous Space。Eden Space 与 Survivor Space 的组合，就是我们通常说的年轻代，而Humongous Space是G1专门提出来的一个区域，用于专门存储程序中的大对象。</p>
 <p>一个对象的大小如果超过了Region容量的一半，就会被直接存放至 Humongous区域。当对象的大小远超Region大小的时候，JVM会分配连续的Humongous Region用来存放这个对象。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/98/ef/9832d923649164b32e7d92a5b28788ef.png?wh=1920x824" title="G1的内部布局图" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/98/ef/9832d923649164b32e7d92a5b28788ef.png?wh=1920x824" title="G1的内部布局图" /></p>
 <h3 id="gc"><strong>GC 模式</strong></h3>
 <p>基于上面提到的内存划分和垃圾回收算法，在G1中存在三种GC模式，分别是<strong>Young GC、Mixed GC 和 Full GC</strong>。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a9/32/a99c1326de54b42b2172cd7a1b7c3d32.png?wh=1920x630" title="三者之间的关系" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a9/32/a99c1326de54b42b2172cd7a1b7c3d32.png?wh=1920x630" title="三者之间的关系" /></p>
 <p>和所有采用分代收集算法的垃圾回收器一样，当Eden区的内存空间无法支持新对象的内存分配时，G1会触发Young GC。</p>
 <p>当需要分配对象到Humongous区域或者堆内存的空间占比超过 <code>-XX:G1HeapWastePercent</code> 设置的 <code>InitiatingHeapOccupancyPercent</code> 值时，G1 会触发一次 concurrent marking，它的作用就是计算老年代中有多少空间需要被回收，当发现垃圾的占比达到 <code>-XX:G1HeapWastePercent</code> 中所设置的G1HeapWastePercent比例时，在下次Young GC后会触发一次Mixed GC。所谓Mixed GC是指回收年轻代的Region以及一部分老年代中的Region。</p>
 <p>在Mixed GC过程中，如果发现老年代空间还是不足，此时如果G1HeapWastePercent设定过低，可能引发Full GC。<code>-XX:G1HeapWastePercent</code> 默认是5，意味着只有5%的堆是“浪费”的。如果浪费的堆的百分比大于G1HeapWastePercent，则运行Full GC。Full GC是在日常生产中需要格外关注的情况，因为它不仅会影响用户体验，更有可能引发雪崩。课程最后一章我也为你详细讲解怎么避免Full GC的发生。</p>
@@ -14680,7 +14680,7 @@
 <p>在<a href="https://time.geekbang.org/column/article/702278">第 13 讲</a>中，我们提到了GC如何借助OopMap定位待回收对象。在G1定位待回收对象的时候，还有两个重要的工具，分别是Remembered Set（记忆集）和Card Table（卡表）。</p>
 <h4 id="remembered-set">Remembered Set（记忆集）</h4>
 <p>每个Region都有对应的Remember Set。主要记录某个Region里的对象被别的Region的对象引用的情况。这样，当开始扫描时，只需要将某个Region的GC roots set中加上remember set，就能保证没有遗漏。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ae/78/ae39e906a42c0f99b7e7186e9f594178.png?wh=1920x891" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ae/78/ae39e906a42c0f99b7e7186e9f594178.png?wh=1920x891" /></p>
 <h4 id="card-table">Card Table（卡表）</h4>
 <p>Card Table也是G1用于处理跨Region引用的一种方式，主要应用在并发标记阶段。Java堆被分为很多小块，也叫做Card（卡片），每张卡片默认大小就是512Byte，每张卡记录了从某个地址开始连续512字节内存范围的变化情况。当在写入对象引用的时候，JVM会把含有这个引用的卡标记为“dirty”，如果卡中的对象发生了改变，那么对应的卡就会被标记，这样在进行垃圾回收的时候，可以找出可能的跨区引用，避免引用丢失。</p>
 <p>Remembered Set和卡表的主要作用就是为了处理和跟踪跨Region引用关系，避免在进行局部垃圾回收时，出现引用丢失导致应用出错。这两个概念的使用无需程序员关心，都是由JVM和G1收集器自动完成的。但是正是借助记忆集和卡表的功能，G1会在运行期间计算出每个Region回收的性价比。从而借助停顿预测模型，找出用户预期时间内最高回收收益的Region组合。</p>
@@ -14721,12 +14721,12 @@
 <li>合理设置Region的大小，避免过大或者过小，从而影响整体GC的性能。</li>
 </ol>
 <p>最后我们用一张图来总结G1的特点。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/4a/9d/4afb596dd782c5b05f8c11c53d584a9d.png?wh=1920x687" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4a/9d/4afb596dd782c5b05f8c11c53d584a9d.png?wh=1920x687" /></p>
 <h2 id="_5">思考题</h2>
 <p>G1的特性有哪些？G1中的内存是如何管理的？</p>
 <p>欢迎你把思考后的结果分享到评论区，也欢迎你把这节课的内容分享给其他朋友，我们下节课再见！</p>
 <h2 id="_6">💡点亮你的知识框架图</h2>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ce/74/ce566be0c4cb42469c16331451c95b74.jpg?wh=5709x4079" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ce/74/ce566be0c4cb42469c16331451c95b74.jpg?wh=5709x4079" /></p>
 <div><strong>精选留言（6）</strong></div>
 <ul>
 <li><span>peter</span> 👍（1） 💬（1）<p>请教老师两个问题：
@@ -14850,8 +14850,6 @@ Q2：“ConcGCThreads”是“并发”吧。文中说“这个参数设置并�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

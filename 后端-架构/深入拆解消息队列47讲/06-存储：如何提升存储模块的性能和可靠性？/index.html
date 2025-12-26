@@ -14991,10 +14991,10 @@
 </ul>
 <h2 id="_1">提升写入操作的性能</h2>
 <p>上一节我们讲到，消息队列的数据最终是存储在文件中的，数据写入需要经过内存，最终才到硬盘，所以写入优化就得围绕<strong>内存和硬盘</strong>展开。写入性能的提高主要有缓存写、批量写、顺序写三个思路，这里对比来讲。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fb/8c/fbcdcb4b79bb26755a7ec015561aef8c.jpg?wh=4514x1387" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fb/8c/fbcdcb4b79bb26755a7ec015561aef8c.jpg?wh=4514x1387" /></p>
 <h3 id="1">1. 缓存写和批量写</h3>
 <p>在计算机理论基础中，计算机多级存储模型的层级越高，代表速度越快（同时容量也越小，价格也越贵），也就是说写入速度从快到慢分别是：寄存器 &gt; 缓存 &gt; 主存 &gt; 本地存储 &gt; 远程存储。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/13/bc/1301ac45580086ef1bf13fbaa21381bc.jpg?wh=3228x1488" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/13/bc/1301ac45580086ef1bf13fbaa21381bc.jpg?wh=3228x1488" /></p>
 <p>所以基于理论1和2：</p>
 <ul>
 <li>内存读写的效率高于硬盘读写</li>
@@ -15002,7 +15002,7 @@
 </ul>
 <p>写入优化的主要思路之一是：<strong>将数据写入到速度更快的内存中，等积攒了一批数据，再批量刷到硬盘中。</strong></p>
 <p>平时我们在一些技术文章看到的“数据先写入PageCache，再批量刷到硬盘”，说的就是这个思路。PageCache指操作系统的页缓存，简单理解就是内存，通过缓存读写数据可以避免直接对硬盘进行操作，从而提高性能。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/77/76/77b396170d405d0bf82b489781yyd276.jpg?wh=3228x1488" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/77/76/77b396170d405d0bf82b489781yyd276.jpg?wh=3228x1488" /></p>
 <p>具体来说就是把硬盘中的数据缓存到内存中，这样对硬盘的访问就变成了对内存的访问。然后再通过一定的策略，把缓存中的数据刷回到硬盘。一般情况下，内存数据是自动批量刷到硬盘的，这个逻辑对应用是透明的。</p>
 <p>把缓存数据刷回到硬盘，一般有“按照空间占用比例”、“时间周期扫描”和“手动强制刷新”三种策略。操作系统内核提供了前两种处理策略，不需要应用程序感知。我们具体了解一下。</p>
 <p><strong>按空间占用比例刷新</strong>是指当系统内存中的“脏”数据大于某个阈值时会将数据刷新到硬盘。操作系统提供了两个配置项。</p>
@@ -15025,12 +15025,12 @@
 <p>首先，你要理解顺序写和随机写是针对谁的？我们所说的都是针对硬盘的，是整个操作系统和硬盘的关系，而不是单文件和硬盘的关系。</p>
 <p>明白了这一点，我们看下一个问题，“单文件顺序写入硬盘”和“多文件顺序写入硬盘”，从硬盘的角度看都是顺序读写吗？</p>
 <p>单文件顺序写入硬盘很简单，硬盘控制器只需在连续的存储区域写入数据，对硬盘来讲，数据就是顺序写入的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6d/8a/6dbbd839d4a939a7479cb0787fdbed8a.jpg?wh=3228x1488" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6d/8a/6dbbd839d4a939a7479cb0787fdbed8a.jpg?wh=3228x1488" /></p>
 <p>多文件顺序写入硬盘，系统中有很多文件同时写入，这个时候从硬盘的视角看，你会发现操作系统同时对多个不同的存储区域进行操作，硬盘控制器需要同时控制多个数据的写入，所以从硬盘的角度是随机写的。</p>
 <blockquote>
 <p>这里的硬盘控制器只是一个抽象，它包含CPU调度、硬盘驱动、DMA设备、写入调度算法等具体底层实现。</p>
 </blockquote>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/73/93/73b1524828e269f8f9f57d7169118f93.jpg?wh=3228x1488" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/73/93/73b1524828e269f8f9f57d7169118f93.jpg?wh=3228x1488" /></p>
 <p>所以，在消息队列中，实现随机写和顺序写的核心就是<strong>数据存储结构的设计</strong>。</p>
 <p>上节课我们讲过数据存储结构设计有两个思路：每个Partition/Queue单独一个存储文件，每台节点上所有Partition/Queue的数据都存储在同一个文件。</p>
 <p>第一种方案，对单个文件来说读和写都是顺序的，性能最高，但当文件很多且都有读写，在硬盘层面就会退化为随机读写，性能会下降很多。第二种方案，因为只有一个文件，不存在文件过多的情况，写入层面一直都会是顺序的，性能一直很高。所以为了提高写的性能，我们最好使用第二种方案。</p>
@@ -15039,12 +15039,12 @@
 <p>为了提高数据可靠性，在消息队列的存储模块中，一般会通过三种处理手段：同步刷盘、WAL预写日志、多副本备份，进一步提升数据的可靠性。</p>
 <h3 id="1_1">1. 同步刷盘</h3>
 <p>同步刷盘指每条数据都同步刷盘，等于回到了直接写硬盘的逻辑，一般通过写入数据后调用force()操作来完成数据刷盘。这种方案无法利用内存写入速度的优势，效率会降低很多。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/73/b4/73157d635d126aeb23346f29b35758b4.jpg?wh=3228x1488" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/73/b4/73157d635d126aeb23346f29b35758b4.jpg?wh=3228x1488" /></p>
 <p>一般消息队列都会开放这个配置项，默认批量刷盘，但有丢失数据的风险。如果业务需要修改为直接刷盘的策略来提高数据的可靠性，则会有一定的性能降低。至于如何提高同步刷盘的性能，我们在第18讲中还会展开细讲，敬请期待。</p>
 <h3 id="2-wal">2. WAL</h3>
 <p>WAL（预写日志）指在写数据之前先写日志，当出现数据丢失时通过日志来恢复数据，避免数据丢失。</p>
 <p>讲到这里，估计有同学有疑问了，WAL日志需要写入持久存储，业务数据也要写入缓存，多了一步，性能会不会降低呢？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/27/8d/277100c7c4155fd6074ee6a068652f8d.jpg?wh=3228x1488" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/27/8d/277100c7c4155fd6074ee6a068652f8d.jpg?wh=3228x1488" /></p>
 <p>没错，从理论来看，WAL机制肯定会比直接写入缓存中的性能低。但我们实际落地的时候往往可以通过一些手段来优化，降低影响，达到性能要求。</p>
 <p>因为在消息队列中，消息数据的数据量是非常大的，我们不可能直接使用非常高性能的持久存储设备，成本太高。虽然WAL日志需要极高的写入性能，但是数据量一般很小，而且是可顺序存储的、可预测的（根据配置的缓存大小和更新策略可明确计算）。</p>
 <p>所以<strong>在实际落地中，我们可以采取WAL日志盘和实际数据盘分离的策略，提升WAL日志的写入速度</strong>。具体就是让WAL数据盘是高性能、低容量的数据盘，数据盘是性能较低、容量较大的数据盘，如果出现数据异常，就通过WAL日志进行数据恢复。这样，给WAL日志选择合适的设备，再加上并行读写等代码优化手段，性能损失就可控了，甚至可以忽略。</p>
@@ -15052,7 +15052,7 @@
 <p>但强制刷盘、WAL预写日志这两种方案，都是指单机维度的可靠性保证。而我们在实际运维过程中，单机是不可靠的，都需要通过分布式的多副本存储来保证数据的高可靠，也就有了第三种方案。</p>
 <h3 id="3">3. 多副本的备份</h3>
 <p>多副本的备份就是将数据拷贝到多台节点，每台节点都写入到内存中，从而完成数据的可靠性存储。因为单机层面也是把数据写入到内存中就记录写入成功，单机层面也可能出现数据丢失，所以核心思路是同时在多台节点中缓存数据，只要不是多台节点同时重启，数据就可以恢复。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/14/f1/14d282ecd3cae4a3895a6f84f99dbdf1.jpg?wh=3228x1488" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/14/f1/14d282ecd3cae4a3895a6f84f99dbdf1.jpg?wh=3228x1488" /></p>
 <p>好处是可以在分布式存储的基础上做优化，通过多台缓存的手段来降低数据丢失的概率。但是如果所有节点在同一时刻重启，数据还是有可能丢失的，无法保证百分百的数据高可靠。</p>
 <p>从消息队列业界的存储方案来看，方案一所有产品都会支持，方案二和方案三一般会选一种支持，Kakfa、RabbitMQ、RocketMQ用的是第三种，Pulsar用的是第二种。</p>
 <p>接下来我们看如何提升读取操作的性能。</p>
@@ -15061,7 +15061,7 @@
 <h3 id="1_2">1. 冷读和热读</h3>
 <p>经过写优化后，数据先经过内存缓存，再批量刷到硬盘上，而且根据消息队列的特性，数据都是单分区顺序读写的。所以我们在读取数据的时候，有冷读和热读两种场景。</p>
 <p>热读是指消息数据本身还在缓存中，读取数据是从内存中获取，此时性能最高，不需要经过硬盘。冷读是指消息数据刷到硬盘中了，并且数据已经被换页换出缓存了，此时读取数据需要从硬盘读取。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f0/5b/f06da30e248cb19e19b87be271d4375b.jpg?wh=3228x1488" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f0/5b/f06da30e248cb19e19b87be271d4375b.jpg?wh=3228x1488" /></p>
 <p>Java 中使用代码实现读缓存很简单，只需要使用Java.NIO包中的FileChannel.read数据。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>ByteBuffer buffer = ByteBuffer.allocate(1024);
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>int byteRead = channel.read(buffer);
@@ -15071,18 +15071,18 @@
 <p>为了实现大吞吐，在消费的时候服务端都会支持批量读的能力。为了能尽快返回数据给客户端，服务端都会实现数据的预读机制。在读取数据的时候，也读取客户下一步可能会用的数据，预先加载到内存中，以便更快返回数据。</p>
 <p>数据的预读分为两种：硬盘层面预读、应用程序的预读。</p>
 <p>硬盘层面的预读，是在连续的地址空间中读取数据。<strong>但具体实现，我们在程序中无法控制，这和数据目录存储结构设计有关。</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bc/3f/bc73ea61da11b845c5701eef7561c93f.jpg?wh=3228x1932" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bc/3f/bc73ea61da11b845c5701eef7561c93f.jpg?wh=3228x1932" /></p>
 <p>之前讲了两种数据存储目录结构设计。方案一在读取的过程中，因为数据是连续存储的，数据预读非常方便，只要在硬盘上读取连续的数据块即可，不需要在程序上做逻辑处理，性能最高。</p>
 <p>方案二需要根据分区上的数据索引，在具体存储文件的不同位置读取数据。数据可能是连续的，也可能是不连续的。这种情况下硬盘的预读就很有随机性，大部分情况下在硬盘看来就是随机读。性能比第一种方案低。</p>
 <p>应用程序的预读就比较简单，一般通过程序中的逻辑关系，提前通过调度去硬盘读取数据（可能是连续的也可能是不连续的）。因为消息队列的数据是分区有序的，当读取到某条数据时，手动读取后面的一个批次的数据就可以了。这种方案需要程序去控制，比如read(0)时，要同时读read(1,10)的数据，相对繁琐，并且性能较低。</p>
 <p>对比来看，理想情况下，肯定是硬盘层面的顺序预读的性能最高，所以针对读取操作，方案一更合适。</p>
 <h3 id="3_1">3. 零拷贝原理和使用方式</h3>
 <p>零拷贝这个词你肯定很熟悉，但具体是什么含义可能很难说上来。我们用一张流程图来理解，看从硬盘读取数据并发送给网卡的过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/80/d7/80ecda9234bcc260018618a578ea6cd7.jpg?wh=2737x1782" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/80/d7/80ecda9234bcc260018618a578ea6cd7.jpg?wh=2737x1782" /></p>
 <p>如上图所示，在正常读取数据的过程中，数据要经过五步，硬盘 -&gt; ReadBuffer -&gt; 应用程序 -&gt; SocketBuffer -&gt; 网卡设备，四次复制。因为数据在复制过程耗费资源和时间，会降低性能，所以优化流程最重要的是减少数据复制的次数和资源损耗。</p>
 <p>值得注意的是，零拷贝指的是数据在内核空间和用户空间之间的拷贝次数，即图中的第2步和第3步。如果只有1和4两步，没有执行2和3的话，那么内核空间和用户空间之间的拷贝次数就是零，“零拷贝”的零指的是这个次数“零”，因此是零拷贝。</p>
 <p>为了解决复制次数带来的性能损耗，“零拷贝”这个概念就被提出来了。<strong>主要思路是通过减少数据复制次数、减少上下文（内核态和用户态）切换次数、通过DMA（直接内存）代替 CPU 完成数据读写，来解决复制和资源损耗的问题。</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ab/d7/ab6480e91f47f254dd11505c522d3ed7.jpg?wh=2737x1782" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ab/d7/ab6480e91f47f254dd11505c522d3ed7.jpg?wh=2737x1782" /></p>
 <p>图中红色的线，就是通过零拷贝相关技术优化后的效果。</p>
 <ul>
 <li>将数据复制链路缩短成了：硬盘 -&gt; ReadBuffer -&gt; 网卡设备，复制次数从四次减为两次。</li>
@@ -15094,7 +15094,7 @@
 </blockquote>
 <p>零拷贝主要用于在消费的时候提升性能，具体有两种实现方式：<strong>mmap+write 和 sendfile</strong>。</p>
 <p>mmap是一种内存映射文件的方法，把文件或者其他对象映射到进程的地址空间，修改内存文件也会同步修改，这样就减少了一次数据拷贝。所以，我们不需要把数据拷贝到用户空间，修改后再回写到内核空间。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fe/bd/fe2405cfbbd7e75ec8e970ec719e2ebd.jpg?wh=2737x1782" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fe/bd/fe2405cfbbd7e75ec8e970ec719e2ebd.jpg?wh=2737x1782" /></p>
 <p>正常的“读取数据并发送”流程是通过read + write完成的，比如：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>read(file, tmp_buf, len);
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>write(socket, tmp_buf, len);
@@ -15122,11 +15122,11 @@
 <p>另外，消息队列是一款非常重视IO的组件，使用更快的硬盘IO设备，提高单机的吞吐能力，也能快速提升性能。硬盘类型很多，比如物理机部署下的机械盘、SSD、NVMe SSD，以及在云环境部署的各种规格的云盘。核心衡量指标主要有三个：IOPS、吞吐量、延时，这些指标越好，性能越高。</p>
 <h3 id="2_2">2. 配置多盘读写</h3>
 <p>系统层面，我们可以通过在机器上挂多块硬盘提升单机的硬盘吞吐能力。这种方案要内核支持这个机制，在部署的时候进行相关配置才能生效。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/40/b1/4079a61a512454b8e20091690cdb48b1.jpg?wh=2737x1782" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/40/b1/4079a61a512454b8e20091690cdb48b1.jpg?wh=2737x1782" /></p>
 <p>一般实现思路是在消息队列的内核支持多目录读写的能力，将不同的文件或者不同的数据段调度存放在不同硬盘设备对应的挂载目录中。此时在数据的写入和读取的过程中，就可以同时利用到多块盘的吞吐和存储。</p>
 <h3 id="3-raid-lvm">3. 配置 RAID 和 LVM 硬盘阵列</h3>
 <p>多目录读写的问题是多块盘之间无法共享IO能力和存储空间，当遇到数据倾斜时，在单机层面会出现性能和容量瓶颈。Linux提供了RAID硬盘阵列和LVM 逻辑卷管理两种方式，通过串联多块盘的读写能力和容量，提升硬盘的性能和吞吐能力（具体的硬盘阵列构建你可以参考<a href="https://www.infoq.cn/article/xsAkegr9N0VExtFaY8W0">这篇文章</a>）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/48/7e/488b385cf99b0ba6797aa5ed408d027e.jpg?wh=2737x1782" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/48/7e/488b385cf99b0ba6797aa5ed408d027e.jpg?wh=2737x1782" /></p>
 <h2 id="_5">总结</h2>
 <p>写入性能优化的核心是缓存写、批量写、顺序写。</p>
 <p>内存的写性能比任何硬盘都高，通过先写内存、后批量刷新数据到硬盘，可以降低硬盘的写入次数，从而提升写入性能。在写缓存的过程中，要注意数据的可靠性，我们可以通过同步刷盘、副本同步、WAL机制等手段提高性能和可靠性。写入的时候，顺序写的性能比随机写的性能高，顺序写的核心是数据存储目录结构的设计。</p>
@@ -15297,8 +15297,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

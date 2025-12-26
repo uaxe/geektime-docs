@@ -5909,11 +5909,11 @@
 <p>直接内存回收是指在进程上下文同步进行内存回收，那么它具体是怎么引起load飙高的呢？</p>
 <p>因为直接内存回收是在进程申请内存的过程中同步进行的回收，而这个回收过程可能会消耗很多时间，进而导致进程的后续行为都被迫等待，这样就会造成很长时间的延迟，以及系统的CPU利用率会升高，最终引起load飙高。</p>
 <p>我们详细地描述一下这个过程，为了尽量不涉及太多技术细节，我会用一张图来表示，这样你理解起来会更容易。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fe/00/fe84eb2bd4956bbbdd5b0259df8c9400.jpg?wh=3000%2A2912" title="内存回收过程" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fe/00/fe84eb2bd4956bbbdd5b0259df8c9400.jpg?wh=3000%2A2912" title="内存回收过程" /></p>
 <p>从图里你可以看到，在开始内存回收后，首先进行后台异步回收（上图中蓝色标记的地方），这不会引起进程的延迟；如果后台异步回收跟不上进程内存申请的速度，就会开始同步阻塞回收，导致延迟（上图中红色和粉色标记的地方，这就是引起load高的地址）。</p>
 <p>那么，针对直接内存回收引起load飙高或者业务RT抖动的问题，一个解决方案就是<strong>及早地触发后台回收来避免应用程序进行直接内存回收，那具体要怎么做呢？</strong></p>
 <p>我们先来了解一下后台回收的原理，如图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/44/72/44d471fdae7376eb13e6e6bfc70b3172.jpg?wh=2440%2A1300" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/44/72/44d471fdae7376eb13e6e6bfc70b3172.jpg?wh=2440%2A1300" /></p>
 <p>它的意思是：当内存水位低于watermark low时，就会唤醒kswapd进行后台回收，然后kswapd会一直回收到watermark high。</p>
 <p>那么，我们可以增大min_free_kbytes这个配置选项来及早地触发后台回收，该选项最终控制的是内存回收水位，不过，内存回收水位是内核里面非常细节性的知识点，我们可以先不去讨论。</p>
 <blockquote>
@@ -5929,7 +5929,7 @@
 <p>vm.extra_free_kbytes = 4194304</p>
 </blockquote>
 <p>那就是将extra_free_kbytes 配置为4G。extra_free_kbytes在3.10以及以后的内核上都被废弃掉了，不过由于在生产环境中还存在大量的机器运行着较老版本内核，你使用到的也可能会是较老版本的内核，所以在这里还是有必要提一下。它的大致原理如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7d/d2/7d9e537e23489cd4f5f34fedcd6f89d2.jpg?wh=2760%2A1340" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7d/d2/7d9e537e23489cd4f5f34fedcd6f89d2.jpg?wh=2760%2A1340" /></p>
 <p>extra_free_kbytes的目的是为了解决min_free_kbyte造成的内存浪费，但是这种做法并没有被内核主线接收，因为这种行为很难维护会带来一些麻烦，感兴趣的可以看一下这个讨论：<a href="https://lkml.org/lkml/2013/2/17/210">add extra free kbytes tunable</a></p>
 <p>总的来说，通过调整内存水位，在一定程度上保障了应用的内存申请，但是同时也带来了一定的内存浪费，因为系统始终要保障有这么多的free内存，这就压缩了Page Cache的空间。调整的效果你可以通过/proc/zoneinfo来观察：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>$ egrep &quot;min|low|high&quot; /proc/zoneinfo
@@ -5943,7 +5943,7 @@
 <h2 id="load_1">系统中脏页过多引起load飙高</h2>
 <p>接下来，我们分析下由于系统脏页过多引起load飙高的情况。在前一个案例中我们也提到，直接回收过程中，如果存在较多脏页就可能涉及在回收过程中进行回写，这可能会造成非常大的延迟，而且因为这个过程本身是阻塞式的，所以又可能进一步导致系统中处于D状态的进程数增多，最终的表现就是系统的load值很高。</p>
 <p>我们来看一下这张图，这是一个典型的脏页引起系统load值飙高的问题场景：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/90/75/90c693c95d67cfaf89b86edbd1228d75.jpg?wh=3200%2A2500" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/90/75/90c693c95d67cfaf89b86edbd1228d75.jpg?wh=3200%2A2500" /></p>
 <p>如图所示，如果系统中既有快速I/O设备，又有慢速I/O设备（比如图中的ceph RBD设备，或者其他慢速存储设备比如HDD），直接内存回收过程中遇到了正在往慢速I/O设备回写的page，就可能导致非常大的延迟。</p>
 <p>这里我多说一点。这类问题其实是不太好去追踪的，为了更好追踪这种慢速I/O设备引起的抖动问题，我也给Linux Kernel提交了一个patch来进行更好的追踪：<a href="https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=19343b5bdd16ad4ae6b845ef829f68b683c4dfb5">mm/page-writeback: introduce tracepoint for wait_on_page_writeback()</a>，这种做法是在原来的基础上增加了回写的设备，这样子用户就能更好地将回写和具体设备关联起来，从而判断问题是否是由慢速I/O设备导致的（具体的分析方法我会在后面第5讲分析篇里重点来讲）。</p>
 <p>那如何解决这类问题呢？一个比较省事的解决方案是控制好系统中积压的脏页数据。很多人知道需要控制脏页，但是往往并不清楚如何来控制好这个度，脏页控制的少了可能会影响系统整体的效率，脏页控制的多了还是会触发问题，所以我们接下来看下如何来衡量好这个“度”。</p>
@@ -5990,7 +5990,7 @@ vm.dirty_ratio = 20</p>
 <a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>1:  21  10
 </code></pre></div>
 <p>其中CPU0～11，24～35的local node为node 0；而CPU12～23，36～47的local node为node 1。如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/80/e2/80e7c19a8f310d5bf30d368cef86bbe2.jpg?wh=2260%2A1115" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/80/e2/80e7c19a8f310d5bf30d368cef86bbe2.jpg?wh=2260%2A1115" /></p>
 <p>推荐将zone_reclaim_mode配置为0。</p>
 <blockquote>
 <p>vm.zone_reclaim_mode = 0</p>
@@ -6133,8 +6133,6 @@ iotop 却发现大量进程 io 很高（这些业务进程并没有 io 的逻辑
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

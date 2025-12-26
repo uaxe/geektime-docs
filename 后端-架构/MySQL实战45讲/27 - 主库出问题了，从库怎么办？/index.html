@@ -14415,12 +14415,12 @@
 <p>大多数的互联网应用场景都是读多写少，因此你负责的业务，在发展过程中很可能先会遇到读性能的问题。而在数据库层解决读性能问题，就要涉及到接下来两篇文章要讨论的架构：一主多从。</p>
 <p>今天这篇文章，我们就先聊聊一主多从的切换正确性。然后，我们在下一篇文章中再聊聊解决一主多从的查询逻辑正确性的方法。</p>
 <p>如图1所示，就是一个基本的一主多从结构。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/aa/79/aadb3b956d1ffc13ac46515a7d619e79.png?wh=1142%2A856" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/aa/79/aadb3b956d1ffc13ac46515a7d619e79.png?wh=1142%2A856" /></p>
 <p>图1 一主多从基本结构</p>
 <p>图中，虚线箭头表示的是主备关系，也就是A和A’互为主备， 从库B、C、D指向的是主库A。一主多从的设置，一般用于读写分离，主库负责所有的写入和一部分读，其他的读请求则由从库分担。</p>
 <p>今天我们要讨论的就是，在一主多从架构下，主库故障后的主备切换问题。</p>
 <p>如图2所示，就是主库发生故障，主备切换后的结果。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/00/53/0014f97423bd75235a9187f492fb2453.png?wh=1142%2A856" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/00/53/0014f97423bd75235a9187f492fb2453.png?wh=1142%2A856" /></p>
 <p>图2 一主多从基本结构--主备切换</p>
 <p>相比于一主一备的切换流程，一主多从结构在切换完成后，A’会成为新的主库，从库B、C、D也要改接到A’。正是由于多了从库B、C、D重新指向的这个过程，所以主备切换的复杂性也相应增加了。</p>
 <p>接下来，我们再一起看看一个切换系统会怎么完成一主多从的主备切换过程。</p>
@@ -14454,7 +14454,7 @@
 </ol>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>mysqlbinlog File --stop-datetime=T --start-datetime=T
 </code></pre></div>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/34/dd/3471dfe4aebcccfaec0523a08cdd0ddd.png?wh=1574%2A141" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/34/dd/3471dfe4aebcccfaec0523a08cdd0ddd.png?wh=1574%2A141" /></p>
 <p>图3 mysqlbinlog 部分输出结果</p>
 <p>图中，end_log_pos后面的值“123”，表示的就是A’这个实例，在T时刻写入新的binlog的位置。然后，我们就可以把123这个值作为$master_log_pos ，用在节点B的change master命令里。</p>
 <p>当然这个值并不精确。为什么呢？</p>
@@ -14520,7 +14520,7 @@ b. 如果current_gtid没有存在于实例的GTID集合中，就将这个current
 <a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
 <a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>insert into t values(1,1);
 </code></pre></div>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/28/c2/28a5cab0079fb12fd5abecd92b3324c2.png?wh=1390%2A333" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/28/c2/28a5cab0079fb12fd5abecd92b3324c2.png?wh=1390%2A333" /></p>
 <p>图4 初始化数据的binlog</p>
 <p>可以看到，事务的BEGIN之前有一条SET @@SESSION.GTID_NEXT命令。这时，如果实例X有从库，那么将CREATE TABLE和insert语句的binlog同步过去执行的话，执行事务之前就会先执行这两个SET命令， 这样被加入从库的GTID集合的，就是图中的这两个GTID。</p>
 <p>假设，现在这个实例X是另外一个实例Y的从库，并且此时在实例Y上执行了下面这条插入语句：</p>
@@ -14536,7 +14536,7 @@ b. 如果current_gtid没有存在于实例的GTID集合中，就将这个current
 <a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>start slave;
 </code></pre></div>
 <p>其中，前三条语句的作用，是通过提交一个空事务，把这个GTID加到实例X的GTID集合中。如图5所示，就是执行完这个空事务之后的show master status的结果。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c8/57/c8d3299ece7d583a3ecd1557851ed157.png?wh=789%2A219" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c8/57/c8d3299ece7d583a3ecd1557851ed157.png?wh=789%2A219" /></p>
 <p>图5 show master status结果</p>
 <p>可以看到实例X的Executed_Gtid_set里面，已经加入了这个GTID。</p>
 <p>这样，我再执行start slave命令让同步线程执行起来的时候，虽然实例X上还是会继续执行实例Y传过来的事务，但是由于“aaaaaaaa-cccc-dddd-eeee-ffffffffffff:10”已经存在于实例X的GTID集合中了，所以实例X就会直接跳过这个事务，也就不会再出现主键冲突的错误。</p>
@@ -14783,8 +14783,6 @@ B (binlog:   A:1-M,B:1-N,C:1-X) B上面的操作记为C:1-X
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

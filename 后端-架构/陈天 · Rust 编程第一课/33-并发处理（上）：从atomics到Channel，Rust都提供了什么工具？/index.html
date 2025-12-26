@@ -15032,7 +15032,7 @@
 <p>我们把要做的事情放在多个线程中，或者多个异步任务中处理，这是并发的能力。在多核多 CPU 的机器上同时运行这些线程或者异步任务，是并行的手段。可以说，并发是为并行赋能。当我们具备了并发的能力，并行就是水到渠成的事情。</p>
 <p>其实之前已经涉及了很多和并发相关的内容。比如用 std::thread 来创建线程、用 std::sync 下的并发原语（Mutex）来处理并发过程中的同步问题、用 Send/Sync trait 来保证并发的安全等等。</p>
 <p>在处理并发的过程中，<strong>难点并不在于如何创建多个线程来分配工作，在于如何在这些并发的任务中进行同步</strong>。我们来看并发状态下几种常见的工作模式：自由竞争模式、map/reduce 模式、DAG 模式：
-<img alt="" src="https://static001.geekbang.org/resource/image/00/58/003294c9ba4b291e47585fa1a599a358.jpg?wh=2364x1142" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/00/58/003294c9ba4b291e47585fa1a599a358.jpg?wh=2364x1142" /></p>
 <p>在自由竞争模式下，多个并发任务会竞争同一个临界区的访问权。任务之间在何时、以何种方式去访问临界区，是不确定的，或者说是最为灵活的，只要在进入临界区时获得独占访问即可。</p>
 <p>在自由竞争的基础上，我们可以限制并发的同步模式，典型的有 map/reduce 模式和 DAG 模式。map/reduce 模式，把工作打散，按照相同的处理完成后，再按照一定的顺序将结果组织起来；DAG 模式，把工作切成不相交的、有依赖关系的子任务，然后按依赖关系并发执行。</p>
 <p>这三种基本模式组合起来，可以处理非常复杂的并发场景。所以，当我们处理复杂问题的时候，应该<strong>先厘清其脉络，用分治的思想把问题拆解成正交的子问题，然后组合合适的并发模式来处理这些子问题</strong>。</p>
@@ -15233,7 +15233,7 @@
 </code></pre></div>
 <p>注意，我们在 while loop 里，又嵌入了一个 loop。这是因为 CAS 是个代价比较高的操作，它需要获得对应内存的独占访问（exclusive access），我们希望失败的时候只是简单读取 atomic 的状态，只有符合条件的时候再去做独占访问，进行 CAS。所以，看上去多做了一层循环，实际代码的效率更高。</p>
 <p>以下是两个线程同步的过程，一开始 t1 拿到锁、t2 spin，之后 t1 释放锁、t2 进入到临界区执行：
-<img alt="" src="https://static001.geekbang.org/resource/image/5f/62/5fc2678a12c993768365851fe5531662.jpg?wh=2364x1625" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5f/62/5fc2678a12c993768365851fe5531662.jpg?wh=2364x1625" /></p>
 <p>讲到这里，相信你对 atomic 以及其背后的 CAS 有初步的了解了。那么，atomic 除了做其它并发原语，还有什么作用？</p>
 <p>我个人用的最多的是做各种 lock-free 的数据结构。比如，需要一个全局的 ID 生成器。当然可以使用 UUID 这样的模块来生成唯一的 ID，但如果我们同时需要这个 ID 是有序的，那么 <code>AtomicUsize</code> 就是最好的选择。</p>
 <p>你可以用 <code>fetch_add</code> 来增加这个 ID，而 <code>fetch_add</code> 返回的结果就可以用于当前的 ID。这样，不需要加锁，就得到了一个可以在多线程中安全使用的 ID 生成器。</p>
@@ -15310,7 +15310,7 @@
 <p>其实上文中，为了展示如何使用 atomic，我们制作了一个非常粗糙简单的 SpinLock，就可以看做是一个广义的 Mutex。<strong>SpinLock</strong>，顾名思义，就是线程通过 CPU 空转（spin，就像前面的 while loop）忙等（busy wait），来等待某个临界区可用的一种锁。</p>
 <p>然而，这种通过 SpinLock 做互斥的实现方式有使用场景的限制：如果受保护的临界区太大，那么整体的性能会急剧下降， CPU 忙等，浪费资源还不干实事，不适合作为一种通用的处理方法。</p>
 <p>更通用的解决方案是：当多个线程竞争同一个 Mutex 时，获得锁的线程得到临界区的访问，其它线程被挂起，放入该 Mutex 上的一个等待队列里。<strong>当获得锁的线程完成工作，退出临界区时，Mutex 会给等待队列发一个信号，把队列中第一个线程唤醒</strong>，于是这个线程可以进行后续的访问。整个过程如下：
-<img alt="" src="https://static001.geekbang.org/resource/image/54/dc/54caee8ebf240e2812da0022cb099bdc.jpg?wh=2364x1142" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/54/dc/54caee8ebf240e2812da0022cb099bdc.jpg?wh=2364x1142" /></p>
 <p>我们前面也讲过，线程的上下文切换代价很大，所以频繁将线程挂起再唤醒，会降低整个系统的效率。所以很多 Mutex 具体的实现会将 SpinLock（确切地说是 spin wait）和线程挂起结合使用：<strong>线程的 lock 请求如果拿不到会先尝试 spin 一会，然后再挂起添加到等待队列</strong>。Rust 下的 <a href="https://github.com/Amanieu/parking_lot">parking_lot</a> 就是这样实现的。</p>
 <p>当然，这样实现会带来公平性的问题：如果新来的线程恰巧在 spin 过程中拿到了锁，而当前等待队列中还有其它线程在等待锁，那么等待的线程只能继续等待下去，这不符合 FIFO，不适合那些需要严格按先来后到排队的使用场景。为此，parking_lot 提供了 fair mutex。</p>
 <p>Mutex 的实现依赖于 CPU 提供的 atomic。你可以把 Mutex 想象成一个粒度更大的 atomic，只不过这个 atomic 无法由 CPU 保证，而是通过软件算法来实现。</p>
@@ -15573,8 +15573,6 @@ https:&#47;&#47;luyuhuang.tech&#47;2022&#47;06&#47;25&#47;cpp-memory-order.html#
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

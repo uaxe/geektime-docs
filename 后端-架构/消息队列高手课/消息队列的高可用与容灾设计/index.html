@@ -14597,14 +14597,14 @@
 <p>对于像 Kafka 使用的 ZooKeeper 这样，使用多数派选举来实现高可用的系统来说，最少需要三个以上的 AZ。并且，ZooKeeper 节点要在这些 AZ 中均匀分布，这样才能保证失去任何一个 AZ 时，剩余的 AZ 中有超过半数的 ZooKeeper 节点，可以正常选举。</p>
 <p>当系统发生 AZ 故障时，ZooKeeper 能选举出新的 Leader 继续提供服务，Kafka 的各模块也可以利用 ZooKeeper 选出新的 Leader 继续提供服务，从而实现同城容灾。</p>
 <p>下图是典型的 3AZ 高可用容灾部署架构图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f5/bc/f58d23beac43143de785cc4715fa18bc.png?wh=1216x620" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f5/bc/f58d23beac43143de785cc4715fa18bc.png?wh=1216x620" /></p>
 <p>以上是理论设计，工程实践中还需要考虑如下一些问题。</p>
 <p>实践中最常见的选择就是同城 3AZ 容灾，每个 AZ 部署一个 ZooKeeper 节点。Broker 节点需要尽量均匀地分布在 3AZ 中。</p>
 <p>为什么需要均匀部署呢？这里主要考虑的是系统容量问题，相比于高可用，在设计容灾架构时需要额外考虑容量问题。因为容灾架构应对的是大规模故障，所以在设计容灾架构的时候需要保证在失去任何一个 AZ 时，系统还有足够多的节点数量可以承担全部流量，不至于出现因为容量不足而引发过载。</p>
 <p>当 Broker 节点分布不均匀的时候，系统的容量就需要按照 Broker 数量最多的那个 AZ 来计算，所以 Broker 节点分布得越均匀，实现同样容灾能力所需的节点数量就越少。要想保证当我们失去一个 AZ 时，剩余的服务有足够实例数能承载故障 AZ 的流量，需要的服务器数量为：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b3/d7/b31db4659562f9b199b47f8488a874d7.png?wh=1002x110" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b3/d7/b31db4659562f9b199b47f8488a874d7.png?wh=1002x110" /></p>
 <p>其中 N 为 AZ 数量，M 为不考虑容灾情况下所需的实例数量。换算成冗余比例就是：
-<img alt="" src="https://static001.geekbang.org/resource/image/80/98/80130c8cfb21yy66e43c20b4b959f398.png?wh=1000x100" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/80/98/80130c8cfb21yy66e43c20b4b959f398.png?wh=1000x100" /></p>
 <p>通过简单计算可以得知，3AZ 的冗余度为 50%，4AZ 为 33.3%。可见，AZ 数量越多容灾所需的冗余成本越少。但是，考虑到一个城市内的 AZ 数量是有限的，所以 3AZ 是比较常见的选择。</p>
 <p>在创建主题和为主题扩容分区时，需要定制化的分区副本分配策略，保证分区的每个副本都放在不同的 AZ 中。如果一个分区的副本都被分配到了同一个 AZ，当这个 AZ 故障时，这个分区就没法继续提供服务了。相应的生产和消费消息的服务节点也需要多 AZ 部署，以便在 AZ 故障时仍然可以收发消息。</p>
 <p>实践中还有一个需要权衡的问题就是，<strong>如何在性能和数据可靠性上取舍？</strong></p>
@@ -14618,7 +14618,7 @@
 <p>双主题容灾架构的设计思路很简单，就是用两个主题互相备份来实现容灾能力。实现时，两个主题需要分布在两个不同的 AZ 中，这两个主题可以属于同一个集群，但最好是不同集群。</p>
 <p>生产者发消息时，可以采用各种负载均衡算法选择一个主题发送消息。消费者同时接收两个主题的消息。当 AZ 故障时，其中一个主题不可用，还可以使用另外一个主题来继续收发消息，从而保证了系统持续可用。</p>
 <p>下图是双主题容灾部署架构图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/78/a1/78aa249df7d00c32760137aa995d33a1.png?wh=1436x656" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/78/a1/78aa249df7d00c32760137aa995d33a1.png?wh=1436x656" /></p>
 <p>这种双主题的容灾架构可以做到 0RTO，但是需要考虑如何处理故障 AZ 内的主题中那些来不及消费的消息。通常情况下这些消息并不会丢失，但直到故障 AZ 恢复之前都没法被消费。</p>
 <p>在故障恢复后如何处理这部分消息，需要根据不同的业务场景有所区别。</p>
 <p>对于消息时效性要求没那么高，且实现了幂等消费的场景，等故障恢复后就会自动继续把这部分消息消费掉，相当于没有数据丢失。</p>
@@ -14626,7 +14626,7 @@
 <p>对于异地容灾场景，考虑到不同城市之间的时延较高（通常在几十至几百毫秒这个范围内），上面的二种容灾架构就无法适用了。<strong>这种情况下可以考虑采用主备主题的方式来实现异地容灾。</strong></p>
 <p>主备主题容灾架构采用一主一备两个主题，两个主题分别部署在不同城市中。正常情况下，生产者只向主用主题发送消息。同时需要部署一个主从同步的服务，将消息从主用主题实时同步到备用主题。消费者可以根据其所在的城市就近选择主用或备用主题消费。当主用主题所在的城市发生故障时，生产者和消费者都切换到备用主题继续收发消息。</p>
 <p>下图是主备容灾部署架构图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/72/56/72a756653412c7e1662c7881f1410556.png?wh=1152x578" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/72/56/72a756653412c7e1662c7881f1410556.png?wh=1152x578" /></p>
 <p>实践中，因为异地容灾切换的代价非常高，通常异地容灾切换都不是自动触发的。所以，对于消息中间件的主备切换来说，也不需要自动触发主备切换的高可用服务。</p>
 <p><strong>但在主备切换时需要注意停掉主备的消息同步链路，防止故障恢复后，旧的主用主题中的数据被同步到新的主用主题中，引发数据错误。</strong></p>
 <p>以上就是比较常见的三种消息队列的容灾架构，实践中可以根据业务场景按需选择其中的一种。</p>
@@ -14758,8 +14758,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

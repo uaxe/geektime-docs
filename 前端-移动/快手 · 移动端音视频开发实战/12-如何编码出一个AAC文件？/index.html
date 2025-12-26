@@ -5531,7 +5531,7 @@
 <p>Opus集成了以语音编码为导向的SILK和低延迟编码为导向的CELT，所以它同时具有这两者的优点，可以无缝调节高低码率。在较低码率时，使用线性预测编码，在高码率时使用变换编码。</p>
 <p>Opus具有非常低的算法延迟，最低可以做到5ms的延迟，默认为22.5 ms，非常适合用在低延迟语音通话场景。与MP3、AAC等常见格式相比，在低码率（64Kbps及以下）场景下，Opus具有更好的音质表现，同时也有更低的延迟表现。WebRTC中采用的音频默认编码就是Opus编码，并且在Opus编码的协议中，开发者也可以加入自己的增强信息（类似于H264中的SEI）用于一些场景功能的扩展。</p>
 <p>Opus编码的特点是支持众多的帧长范围、码率范围、频率范围，内部有机制，来处理防止丢包策略，在低码率下依然能保持优异的音质。它主要适用于VOIP场景下的语音编码。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b5/bd/b590b60d01377b1d6b63088759ee11bd.png?wh=1920x708" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b5/bd/b590b60d01377b1d6b63088759ee11bd.png?wh=1920x708" /></p>
 <p>在移动平台上，无论是单独的音频编码，还是视频编码中的音频流的编码，用得最广泛的就是AAC这一编码格式。所以我们这节课来重点学习一下音频的AAC编码。</p>
 <p>AAC编码的方式有两种，一种是使用软件编码，另一种是使用Android与iOS平台的硬件编码。软件编码的实现方式我们会基于FFmpeg来讲解，后期无论你想用什么格式，都可以自己配置编码库来实现，编码部分的代码是可以复用的。这节课的输入是我们前两节课用录音器采集下来的PCM文件，最终编码成一个AAC编码格式的M4A文件。</p>
 <p>在学习使用软件编码器编码AAC之前，让我们先来系统了解AAC这种编码格式，底层编码原理与算法我们就不介绍了，但是站在应用层角度我们要学习一下它的编码规格和封装格式，让我们一起来看一下吧。</p>
@@ -5539,26 +5539,26 @@
 <p>对于音视频应用层的开发者来讲，还是要掌握编码器本身的一些高级特性的，在AAC这个编码中，我们需要重点掌握的就是它的编码规格和封装格式。</p>
 <h3 id="aac_1">AAC的编码规格</h3>
 <p>AAC编码器常用的编码规格有三种，分别是LC-AAC、HE-AAC、HE-AACv2，这三种编码规格以及使用的消除冗余的技术手段如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ff/50/ffb29fce82cd718d7c2b9eda9c52b050.png?wh=1356x746" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ff/50/ffb29fce82cd718d7c2b9eda9c52b050.png?wh=1356x746" /></p>
 <p>其中LC-AAC的Profile是最基础的AAC的编码规格，它的复杂度最低，兼容性也是最好的，双声道音乐在128Kbps的码率下可以达到全频带（44.1kHz）的覆盖。</p>
 <p>在LC-AAC的基础上添加SBR技术，形成HE-AAC的编码规格，SBR全称是Spectral Band Replication，其实就是消除频域上的冗余信息，可以在降低码率的情况下保持音质。内部实现原理就是把频谱切割开，低频单独编码保存，来保留主要的频谱部分，高频单独放大编码保存以保留音质，这样就保证在降低码率的情况下，更大程度地保留了音质。</p>
 <p>在HE-AAC的基础上添加PS技术，就形成了HE-AACv2的编码规格，PS全称是Parametric Stereo，其实就是消除立体声中左右声道之间的冗余信息，所以使用这个编码规格编码的源文件必须是<strong>双声道</strong>的。内部实现原理就是存储了一个声道的全量信息，然后再花很少的字节用参数描述另一个声道和全量信息声道有差异的地方，这样就达到了在HE-AAC基础上进一步提高压缩比的效果。</p>
 <p>我们使用FFmpeg命令行，用不同的编码规格，来把同一个输入文件编码成为三个文件，然后使用可视化的音频分析软件Praat看一下它们的质量，我们先来看一下原始文件source.wav（双声道、采样率为44.1kHz）导入到Praat中的频谱分布。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/10/4c/1066fdffa2b4c0034c993af5244cf04c.png?wh=1265x616" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/10/4c/1066fdffa2b4c0034c993af5244cf04c.png?wh=1265x616" /></p>
 <p>可以看到图片中高频的部分到了22050，根据奈奎斯特采样定律，编码之后频带分布到22050就是全频带分布（原始格式44.1kHz），使用下面命令来编码文件。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ffmpeg -i source.wav -acodec libfdk_aac -b:a 48K lc_aac.m4a
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>ffmpeg -i source.wav -acodec libfdk_aac -profile:a aac_he -b:a 48K he_aac.m4a
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>ffmpeg -i source.wav -acodec libfdk_aac -profile:a aac_he_v2 -b:a 48K he_v2_aac.m4a
 </code></pre></div>
 <p>这三行命令使用的都是libfdk_aac编码器，但是用了不同编码器规格，编码出了三个M4A文件。接下来我们把三个文件放到Praat中，如下图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7e/d5/7e42c6dbe9c0f650865913a73d6b39d5.png?wh=1260x1744" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7e/d5/7e42c6dbe9c0f650865913a73d6b39d5.png?wh=1260x1744" /></p>
 <p>可以看到lc_aac.m4a的频带分布到了10KHz就被截断了，对高频部分影响比较大；而he_aac这个文件的截止频率大约到16KHz以上，明显要比第一个好很多；再看第三个文件几乎达到了全频带覆盖，结合之前介绍的原理你就知道为什么这种编码规格可以达到全频带覆盖了。</p>
 <p>AAC编码器的这三种编码规格之间的差异我们了解清楚之后，就可以根据自己的应用场景选择不同的编码规格和码率。</p>
 <h3 id="aac_2">AAC的封装格式</h3>
 <p>我们日常生活中常见的AAC编码的封装格式有两种，一种是ADTS封装格式，可以简单理解为以AAC为后缀名的文件，另外一种是ADIF封装格式，可以简单地理解为以M4A为后缀名的文件。</p>
 <p>ADIF全称是Audio Data Interchange Format，是AAC定义在MPEG4里面的格式，字面意思是交换格式，是将整个流的Meta信息（包括AAC流的声道、采样率、规格、时长）写到头部，解码器只有解析了头部信息之后才可以解码具体的音频帧，像M4A封装格式、FLV封装格式、MP4封装格式都是这样的。</p>
 <p>ADTS全称是Audio Data Transport Stream，是AAC定义在MPEG2里面的格式，含义就是传输流格式，特点就是从流中的任意帧位置都可以直接进行解码。这种格式实现的原理是在每一帧AAC原始数据块的前面都会加上一个头信息（ADTS+ES），形成一个音频帧，然后不断地写入文件中形成一个完整可播放的AAC文件。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e5/f6/e599901899e61a372e59d642f8c403f6.png?wh=1920x1027" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e5/f6/e599901899e61a372e59d642f8c403f6.png?wh=1920x1027" /></p>
 <p>如图所示，ADTS头分为固定头和可变头两部分，各自需要28位来表示，要构造一个ADTS头其实就是分配好这7个字节，下面我们来分配一下这七个字节。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>int adtsLength = 7;
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>char *packet = malloc(sizeof(char) * adtsLength);
@@ -5589,7 +5589,7 @@
 </code></pre></div>
 <p>第一个参数是比特率，也就是最终编码出来的文件的码率，码率越高音质也就越好，对于双声道的音频，一般我们设置128Kb就可以了；接下来的参数是声道数、采样率和位深度；然后是最终编码的文件路径；最后是编码器的名字。注意，最后两个参数是有关联的，比如M4A文件要填入一个AAC的编码器（libfdk_aac）名称、MP3文件要传入一个MP3编码器（lame）的名称。</p>
 <p>这个接口内部会拿着这些信息把编码器初始化，如果编码器初始化成功，则返回0，失败则返回小于0的值。接口内部的核心实现如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6b/ae/6b3d1722b702e3yy9a25b7244a4648ae.png?wh=1920x1202" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6b/ae/6b3d1722b702e3yy9a25b7244a4648ae.png?wh=1920x1202" /></p>
 <p>调用avformat_alloc_context方法分配出封装格式，然后调用avformat_alloc_output_context2 传入输出文件格式，分配出上下文，即分配出封装格。之后调用avio_open2方法将AAC的编码路径传入，相当于打开文件连接通道。这样就可以确定Muxer与Protocol了。</p>
 <p>有了容器之后，就应该向容器中添加音频轨了，调用avformat_new_stream传入刚才的FormatContext构建出一个音频流（AVStream），接着要为这个Stream分配一个编码器，编码器是一个AVCodecContext类型的结构体，先调用avcodec_find_encoder_by_name函数，根据编码器名称找出对应的编码器，接着根据编码器分配出编码器上下文，然后给编码器上下文填充以下几个属性。</p>
 <ul>
@@ -5620,7 +5620,7 @@
 <p>这节课涉及的代码比较多，后续我会把代码实例上传到GitHub上，你可以对着代码再进行练习一下。</p>
 <h2 id="_5">小结</h2>
 <p>最后，我们可以一起来回顾一下。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/41/ce/41fb68f986803e354e81ae68fb50b0ce.png?wh=1136x1192" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/41/ce/41fb68f986803e354e81ae68fb50b0ce.png?wh=1136x1192" /></p>
 <p>一般我们采集得到的原始数据都会比较大，需要我们后期进行压缩编码。目前常用的编码格式有AAC、MP3、WAV、Opus几种，其中WAV格式编码是最常见的，MP3格式是兼容性最好的，而AAC在低码率（128Kb以下）场景下，音质大大超过MP3。目前在音视频开发领域，用得最广泛的就是AAC编码格式。</p>
 <p>这节课，我们用FFmpeg实现了一个编码AAC文件的工具类，并且这个音频编码的工具类不单单可以用到编码AAC格式中，同时支持后续的其他编码，比如WAV编码和MP3编码等。在Android和iOS平台上都提供了各自的硬件编码器用于音频编码，下节课我会给你讲一讲怎么使用这两个平台的硬件编码器来给音频编码，一起期待一下吧！</p>
 <h2 id="_6">思考题</h2>
@@ -5748,8 +5748,6 @@ Q3：前面课程中曾经提到“Mix一轨伴奏”，这个功能是什么意
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

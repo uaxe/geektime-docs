@@ -13810,7 +13810,7 @@
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>}
 </code></pre></div>
 <p>运行的时候panic：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/55/4f/5597316079a8fa37abef2a82bdac7b4f.png?wh=831%2A189" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/55/4f/5597316079a8fa37abef2a82bdac7b4f.png?wh=831%2A189" /></p>
 <h2 id="copymutex">Copy已使用的Mutex</h2>
 <p>第二种误用是Copy已使用的Mutex。在正式分析这个错误之前，我先交代一个小知识点，那就是Package sync的同步原语在使用后是不能复制的。我们知道Mutex是最常用的一个同步原语，那它也是不能复制的。为什么呢？</p>
 <p>原因在于，Mutex是一个有状态的对象，它的state字段记录这个锁的状态。如果你要复制一个已经加锁的Mutex给一个新的变量，那么新的刚初始化的变量居然被加锁了，这显然不符合你的期望，因为你期望的是一个零值的Mutex。关键是在并发环境下，你根本不知道要复制的Mutex状态是什么，因为要复制的Mutex是由其它goroutine并发访问的，状态可能总是在变化。</p>
@@ -13838,9 +13838,9 @@
 </code></pre></div>
 <p>第12行在调用foo函数的时候，调用者会复制Mutex变量c作为foo函数的参数，不幸的是，复制之前已经使用了这个锁，这就导致，复制的Counter是一个带状态Counter。</p>
 <p>怎么办呢？Go在运行时，有<strong>死锁的检查机制</strong>（<a href="https://golang.org/src/runtime/proc.go?h=checkdead#L4345">checkdead()</a> 方法），它能够发现死锁的goroutine。这个例子中因为复制了一个使用了的Mutex，导致锁无法使用，程序处于死锁的状态。程序运行的时候，死锁检查机制能够发现这种死锁情况并输出错误信息，如下图中错误信息以及错误堆栈：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cf/ee/cfb7a4a0e744c5ff534a676fd830d0ee.png?wh=777%2A251" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cf/ee/cfb7a4a0e744c5ff534a676fd830d0ee.png?wh=777%2A251" /></p>
 <p>你肯定不想运行的时候才发现这个因为复制Mutex导致的死锁问题，那么你怎么能够及时发现问题呢？可以使用<strong>vet工具</strong>，把检查写在Makefile文件中，在持续集成的时候跑一跑，这样可以及时发现问题，及时修复。我们可以使用go vet检查这个Go文件：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fa/b8/fa56520yy37009ca58d6640a933f01b8.png?wh=665%2A94" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fa/b8/fa56520yy37009ca58d6640a933f01b8.png?wh=665%2A94" /></p>
 <p>你看，使用这个工具就可以发现Mutex复制的问题，错误信息显示得很清楚，是在调用foo函数的时候发生了lock value复制的情况，还告诉我们出问题的代码行数以及copy lock导致的错误。</p>
 <p>那么，vet工具是怎么发现Mutex复制使用问题的呢？我带你简单分析一下。</p>
 <p>检查是通过<a href="https://github.com/golang/tools/blob/master/go/analysis/passes/copylock/copylock.go">copylock</a>分析器静态分析实现的。这个分析器会分析函数调用、range遍历、复制、声明、函数返回值等位置，有没有锁的值copy的情景，以此来判断有没有问题。可以说，只要是实现了Locker接口，就会被分析。我们看到，下面的代码就是确定什么类型会被分析，其实就是实现了Lock/Unlock两个方法的Locker接口：</p>
@@ -13886,7 +13886,7 @@
 <a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>}
 </code></pre></div>
 <p>写完这个Mutex重入的例子后，运行一下，你会发现类似下面的错误。程序一直在请求锁，但是一直没有办法获取到锁，结果就是Go运行时发现死锁了，没有其它地方能够释放锁让程序运行下去，你通过下面的错误堆栈信息就能定位到哪一行阻塞请求锁：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0b/79/0bc98ef74c15d9640806d52bf030f979.png?wh=855%2A299" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0b/79/0bc98ef74c15d9640806d52bf030f979.png?wh=855%2A299" /></p>
 <p>学到这里，你可能要问了，虽然标准库Mutex不是可重入锁，但是如果我就是想要实现一个可重入锁，可以吗？</p>
 <p>可以，那我们就自己实现一个。这里的关键就是，实现的锁要能记住当前是哪个goroutine持有这个锁。我来提供两个方案。</p>
 <ul>
@@ -14006,7 +14006,7 @@
 <li><strong>不可剥夺</strong>：资源只能由持有它的goroutine来释放。</li>
 <li><strong>环路等待</strong>：一般来说，存在一组等待进程，P={P1，P2，…，PN}，P1等待P2持有的资源，P2等待P3持有的资源，依此类推，最后是PN等待P1持有的资源，这就形成了一个环路等待的死结。</li>
 </ol>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4a/d5/4ace1eecf856ef80607yyb6f7a45abd5.jpg?wh=2106%2A1597" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4a/d5/4ace1eecf856ef80607yyb6f7a45abd5.jpg?wh=2106%2A1597" /></p>
 <p>你看，死锁问题还真是挺有意思的，所以有很多人研究这个事儿。一个经典的死锁问题就是<a href="https://zh.wikipedia.org/wiki/%E5%93%B2%E5%AD%A6%E5%AE%B6%E5%B0%B1%E9%A4%90%E9%97%AE%E9%A2%98">哲学家就餐问题</a>，我不做介绍了，你可以点击链接进一步了解。其实，死锁问题在现实生活中也比比皆是。</p>
 <p>举个例子。有一次我去派出所开证明，派出所要求物业先证明我是本物业的业主，但是，物业要我提供派出所的证明，才能给我开物业证明，结果就陷入了死锁状态。你可以把派出所和物业看成两个goroutine，派出所证明和物业证明是两个资源，双方都持有自己的资源而要求对方的资源，而且自己的资源自己持有，不可剥夺。</p>
 <p>这是一个最简单的只有两个goroutine相互等待的死锁的例子，转化成代码如下：</p>
@@ -14070,7 +14070,7 @@
 <a id="__codelineno-8-58" name="__codelineno-8-58" href="#__codelineno-8-58"></a>}
 </code></pre></div>
 <p>这个程序没有办法运行成功，因为派出所的处理和物业的处理是一个环路等待的死结。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3e/f4/3ea07805dea9d33d5a5c1a8244a7ccf4.png?wh=854%2A262" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3e/f4/3ea07805dea9d33d5a5c1a8244a7ccf4.png?wh=854%2A262" /></p>
 <p>Go运行时，有死锁探测的功能，能够检查出是否出现了死锁的情况，如果出现了，这个时候你就需要调整策略来处理了。</p>
 <p>你可以引入一个第三方的锁，大家都依赖这个锁进行业务处理，比如现在政府推行的一站式政务服务中心。或者是解决持有等待问题，物业不需要看到派出所的证明才给开物业证明，等等。</p>
 <p>好了，到这里，我给你讲了使用Mutex常见的4类问题。你是不是觉得，哎呀，这几类问题也太不应该了吧，真的会有人犯这么基础的错误吗？</p>
@@ -14082,35 +14082,35 @@
 <h3 id="issue-36114">issue 36114</h3>
 <p>Docker的<a href="https://github.com/moby/moby/pull/36114/files">issue 36114</a> 是一个死锁问题。</p>
 <p>原因在于，hotAddVHDsAtStart方法执行的时候，执行了加锁svm操作。但是，在其中调用hotRemoveVHDsAtStart方法时，这个hotRemoveVHDsAtStart方法也是要加锁svm的。很不幸，Go标准库中的Mutex是不可重入的，所以，代码执行到这里，就出现了死锁的现象。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/da/8c/dac838666ee09c98dd9ac5db479aae8c.png?wh=1206%2A654" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/da/8c/dac838666ee09c98dd9ac5db479aae8c.png?wh=1206%2A654" /></p>
 <p>针对这个问题，解决办法就是，再提供一个不需要锁的hotRemoveVHDsNoLock方法，避免Mutex的重入。</p>
 <h3 id="issue-34881">issue 34881</h3>
 <p><a href="https://github.com/moby/moby/pull/34881/files">issue 34881</a>本来是修复Docker的一个简单问题，如果节点在初始化的时候，发现自己不是一个swarm mananger，就快速返回，这个修复就几行代码，你看出问题来了吗？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bf/34/bf78904a947d4228dc006fff94f97334.png?wh=897%2A325" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bf/34/bf78904a947d4228dc006fff94f97334.png?wh=897%2A325" /></p>
 <p>在第34行，节点发现不满足条件就返回了，但是，c.mu这个锁没有释放！为什么会出现这个问题呢？其实，这是在重构或者添加新功能的时候经常犯的一个错误，因为不太了解上下文，或者是没有仔细看函数的逻辑，从而导致锁没有被释放。现在的Docker当然已经没有这个问题了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1c/f1/1c7a5f8e12f642d82aac8045c046c6f1.png?wh=690%2A170" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1c/f1/1c7a5f8e12f642d82aac8045c046c6f1.png?wh=690%2A170" /></p>
 <p>这样的issue还有很多，我就不一一列举了。我给你推荐几个关于Mutex的issue或者pull request，你可以关注一下，分别是36840、37583、35517、35482、33305、32826、30696、29554、29191、28912、26507等。</p>
 <h2 id="kubernetes">Kubernetes</h2>
 <h3 id="issue-72361">issue 72361</h3>
 <p>issue 72361 增加Mutex为了保护资源。这是为了解决data race问题而做的一个修复，修复方法也很简单，使用互斥锁即可，这也是我们解决data race时常用的方法。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/21/31/2171a7a0de179904ceba463026ee7231.png?wh=755%2A375" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/21/31/2171a7a0de179904ceba463026ee7231.png?wh=755%2A375" /></p>
 <h3 id="issue-45192">issue 45192</h3>
 <p><a href="https://github.com/kubernetes/kubernetes/pull/45192/files">issue 45192</a>也是一个返回时忘记Unlock的典型例子，和 docker issue 34881犯的错误都是一样的。</p>
 <p>两大知名项目的开发者都犯了这个错误，所以，你就可以知道，引入这个Bug是多么容易，记住晁老师这句话：<strong>保证Lock/Unlock成对出现，尽可能采用defer mutex.Unlock的方式，把它们成对、紧凑地写在一起</strong>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ba/61/ba0f7671fd64951a47365e46ab68db61.png?wh=985%2A429" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ba/61/ba0f7671fd64951a47365e46ab68db61.png?wh=985%2A429" /></p>
 <p>除了这些，我也建议你关注一下其它的Mutex相关的issue，比如 71617、70605等。</p>
 <h2 id="grpc"><strong>gRPC</strong></h2>
 <p>gRPC是Google发起的一个开源远程过程调用 （Remote procedure call）系统。该系统基于 HTTP/2 协议传输，使用Protocol Buffers 作为接口描述语言。它提供Go语言的实现。</p>
 <p>即使是Google官方出品的系统，也有一些Mutex的issue。</p>
 <h3 id="issue-795">issue 795</h3>
 <p><a href="https://github.com/grpc/grpc-go/pull/795">issue 795</a>是一个你可能想不到的bug，那就是将Unlock误写成了Lock。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b6/f0/b6e97a6938586e95c3427e693eb712f0.png?wh=580%2A223" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b6/f0/b6e97a6938586e95c3427e693eb712f0.png?wh=580%2A223" /></p>
 <p>关于这个项目，还有一些其他的为了保护共享资源而添加Mutex的issue，比如1318、2074、2542等。</p>
 <h2 id="etcd">etcd</h2>
 <p>etcd是一个非常知名的分布式一致性的 key-value 存储技术， 被用来做配置共享和服务发现。</p>
 <h2 id="issue-10419">issue 10419</h2>
 <p><a href="https://github.com/etcd-io/etcd/pull/10419/files">issue 10419</a>是一个锁重入导致的问题。 Store方法内对请求了锁，而调用的Compact的方法内又请求了锁，这个时候，会导致死锁，一直等待，解决办法就是提供不需要加锁的Compact方法。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5f/7f/5fed22fb735c107d130477562c28477f.png?wh=878%2A344" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5f/7f/5fed22fb735c107d130477562c28477f.png?wh=878%2A344" /></p>
 <h1 id="_3">总结</h1>
 <p>这节课，我们学习了Mutex的一些易错场景，而且，我们还分析了流行的Go开源项目的错误，我也给你分享了我自己在开发中的经验总结。需要强调的是，<strong>手误和重入导致的死锁，是最常见的使用Mutex的Bug</strong>。</p>
 <p>Go死锁探测工具只能探测整个程序是否因为死锁而冻结了，不能检测出一组goroutine死锁导致的某一块业务冻结的情况。你还可以通过Go运行时自带的死锁检测工具，或者是第三方的工具（比如<a href="https://github.com/sasha-s/go-deadlock">go-deadlock</a>、<a href="https://github.com/dominikh/go-tools">go-tools</a>）进行检查，这样可以尽早发现一些死锁的问题。不过，有些时候，死锁在某些特定情况下才会被触发，所以，如果你的测试或者短时间的运行没问题，不代表程序一定不会有死锁问题。</p>
@@ -14265,8 +14265,6 @@ PR中加了个recover处理，并且判断recover有error才Unlock，这是一�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

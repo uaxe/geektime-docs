@@ -7926,7 +7926,7 @@
 <p>这个设计，其实和我们之前看过的S4的PE设计是一样的。可以说，<strong>Computation + Key的一个组合，就是一个PE</strong>。而这个Computation + Key的组合，是可以在不同机器之间被调度的。也就是说，我们可以因为某一台服务器的负载太大了，来主动把这台服务器上的一些 Computation + Key的组合，迁移到另外一台服务器上。</p>
 <p>不过，和S4不一样的是，在实际实现上，MillWheel并没有真的把一个Computation + Key变成一个对象来处理。事实上，在MillWheel里，每一个Computation里的Key是像Bigtable里的Tablet一样，分成一段一段的。实际根据负载进行调度的时候，调度的也是这一整段的Key。而这个实现，也就<strong>避免了之前S4对应的PE对象过多的问题</strong>。</p>
 <p>从这个角度，MillWheel的系统逻辑其实更像是Storm，而Computation + 一段Key的组合，其实就是一个Bolt，需要处理某一段Key。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b9/75/b9388b03d31ca0d4d3637069d35b9075.jpg?wh=2000x1542" title="每一个服务器上，有很多个Computation的进程，每个进程管理某一个Computation的某一段Key" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b9/75/b9388b03d31ca0d4d3637069d35b9075.jpg?wh=2000x1542" title="每一个服务器上，有很多个Computation的进程，每个进程管理某一个Computation的某一段Key" /></p>
 <h3 id="low-watermarktimer">低水位（Low Watermark）和定时器（Timer）</h3>
 <p>无论是论文里给出的进行异常搜索量的检测，还是上节课我们举过的广告点击率的统计例子，MillWheel这样的流式系统，都要面对实际的事件发生的时间，和我们接收到数据的时间有差异的问题。</p>
 <p>MillWheel需要有一个机制，能够让每个Computation进程知道，某个时间点之前的日志应该都已经处理完了。所以，它引入了<strong>低水位</strong>这个概念，以及<strong>Injector</strong>这个模块。</p>
@@ -7938,7 +7938,7 @@
 </code></pre></div>
 <p>如果我们的每个Computation的进程，能够知道当前自己这个Computation的低水位是什么，那么很多问题就变得简单了。获取到了当前Computation的低水位，我们就能决策是否应该进一步等待更多的消息，以获得准确的统计数据，还是现有的数据已经是完整的，我们可以把结果输出出去了。</p>
 <p>那么，MillWheel是这么做的：每一个Computation进程，都会统计自己处理的所有日志的“低水位”信息，然后上报给一个Injector模块，而这个Injector模块，会收集所有类型的Computation进程的所有低水位信息。接着，它会通过Injector，把相应的水位信息下发给各个Computation进程，由各个Computation进程自己，来计算自己最终的低水位是什么。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0f/77/0f4aa6aaebb99e0d928a3745ef79dc77.jpg?wh=2000x1542" title="理解每一个计算节点，都会根据本地以及它依赖的上游Computation计算出自己当前的Low Watermark，以理解目前消息处理的进度" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0f/77/0f4aa6aaebb99e0d928a3745ef79dc77.jpg?wh=2000x1542" title="理解每一个计算节点，都会根据本地以及它依赖的上游Computation计算出自己当前的Low Watermark，以理解目前消息处理的进度" /></p>
 <p><strong>每一种类型的Computation，都会有一个自己的水位信息。</strong>同一个Computation下，不同进程的水位信息也是不同的，因为它自己处理的消息的进度可能不一样。而不同类型的Computation，水位信息就是不同的，因为整个数据流的拓扑图可能会很深。很有可能，前面几层Computation的数据已经都处理到12点05分了，但是后面几层Computation才处理到12点01分。如果我们让整个拓扑图，都用同一个水位信息，就意味着前面几层统计结果的输出的延时会变大。</p>
 <p>而有了这个水位信息，我们统计某一个时间段的统计数据，就可以做到基本准确了。</p>
 <p>在论文里，Google给出的经验数据，是只有0.001%（十万分之一）的日志，在考虑了水位信息之后仍然会因为来得太晚而被丢掉。但实际上，由于所有数据都是持久化的，即使这些消息来得太晚，我们仍然可以纠正之前的统计数据。</p>
@@ -8043,7 +8043,7 @@
 </ul>
 <p>所以，为了避免这个情况，MillWheel采取了一个简单粗暴的方式。那就是我们对于下游要发送的数据，会<strong>先作为Checkpoint写下来</strong>。之后才是简单地重放Checkpoint的日志，避免这样基于时间点的隐式依赖，导致不能做到数据层面的一致性。</p>
 <p>而这个Checkpoint的策略，在MillWheel里被称之为<strong>Strong Production</strong>，这个Strong要突出类似于强一致性（Strong Consistency）里的Strong的这个概念。也就是MillWheel的数据处理，虽然支持乱序的数据，但是所有的输入数据，是严格不会重复，也不会丢弃的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d8/85/d8558b03811bcbea04a6d4e7073f3285.jpg?wh=2000x1542" title="没有Strong Production，下游的Computation B对于接收到的消息，很难进行去重过滤[br]无论是用Y覆盖X，还是以X已经收到，去重过滤Y都不合适" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d8/85/d8558b03811bcbea04a6d4e7073f3285.jpg?wh=2000x1542" title="没有Strong Production，下游的Computation B对于接收到的消息，很难进行去重过滤[br]无论是用Y覆盖X，还是以X已经收到，去重过滤Y都不合适" /></p>
 <h3 id="_1">僵尸进程和租约问题</h3>
 <p>事实上，在容错上，我们不仅要考虑这样的时间窗口问题，还需要考虑<strong>僵尸进程</strong>的问题。MillWheel有一个中心化的Master集群，进行负载均衡的调度。并且在节点挂掉的时候，也是由这个Master，在其他的服务器上去启动新的Computation的进程。</p>
 <p>但是，Master判断节点挂掉，并不意味着节点进程真的挂掉了，完全可能是因为网络分区造成的。我们的Master节点连不上某一个Computation所在的服务器，所以在别的服务器上启动了一个新的Computation进程。那这个时候，我们就有可能有两个Computation进程，在管理同一段Key。其中旧的Computation进程，其实就是一个我们没能够杀掉的僵尸进程。</p>
@@ -8184,8 +8184,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

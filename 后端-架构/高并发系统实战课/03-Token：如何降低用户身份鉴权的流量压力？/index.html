@@ -14061,13 +14061,13 @@
 <p>你好，我是徐长龙，这节课我们来看看如何用token算法降低用户中心的身份鉴权流量压力。</p>
 <p>很多网站初期通常会用Session方式实现登录用户的用户鉴权，也就是在用户登录成功后，将这个用户的具体信息写在服务端的Session缓存中，并分配一个session_id保存在用户的Cookie中。该用户的每次请求时候都会带上这个ID，通过ID可以获取到登录时写入服务端Session缓存中的记录。</p>
 <p>流程图如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/58/72/589d13f1d758a44a1af37efaf9dbdc72.jpg?wh=3330x2141" title="Session Cache实现的用户鉴权" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/58/72/589d13f1d758a44a1af37efaf9dbdc72.jpg?wh=3330x2141" title="Session Cache实现的用户鉴权" /></p>
 <p>这种方式的好处在于信息都在服务端储存，对客户端不暴露任何用户敏感的数据信息，并且每个登录用户都有共享的缓存空间（Session Cache）。</p>
 <p>但是随着流量的增长，这个设计也暴露出很大的问题——用户中心的身份鉴权在大流量下很不稳定。因为用户中心需要维护的Session Cache空间很大，并且被各个业务频繁访问，那么缓存一旦出现故障，就会导致所有的子系统无法确认用户身份，进而无法正常对外服务。</p>
 <p>这主要是由于Session Cache和各个子系统的耦合极高，<strong>全站的请求都会对这个缓存至少访问一次</strong>，这就导致缓存的内容长度和响应速度，直接决定了全站的QPS上限，让整个系统的隔离性很差，各子系统间极易相互影响。</p>
 <p>那么，如何降低用户中心与各个子系统间的耦合度，提高系统的性能呢？我们一起来看看。</p>
 <h2 id="jwttoken">JWT登陆和token校验</h2>
-<p>常见方式是采用签名加密的token，这是登录的一个行业标准，即JWT（JSON Web Token）：<img alt="" src="https://static001.geekbang.org/resource/image/02/bf/02f2f3aff0f5db68ef952065da2721bf.jpg?wh=3330x2141" title="token流程" /></p>
+<p>常见方式是采用签名加密的token，这是登录的一个行业标准，即JWT（JSON Web Token）：<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/02/bf/02f2f3aff0f5db68ef952065da2721bf.jpg?wh=3330x2141" title="token流程" /></p>
 <p>上图就是JWT的登陆流程，用户登录后会将用户信息放到一个加密签名的token中，每次请求都把这个串放到header或cookie内带到服务端，服务端直接将这个token解开即可直接获取到用户的信息，无需和用户中心做任何交互请求。</p>
 <p>token生成代码如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="s">&quot;github.com/dgrijalva/jwt-go&quot;</span>
@@ -14107,7 +14107,7 @@
 <p>可以看到，这个token内部包含过期时间，快过期的token会在客户端自动和服务端通讯更换，这种方式可以大幅提高截取客户端token并伪造用户身份的难度。</p>
 <p>同时，服务端也可以和用户中心解耦，业务服务端直接解析请求带来的token即可获取用户信息，无需每次请求都去用户中心获取。而token的刷新可以完全由App客户端主动请求用户中心来完成，而不再需要业务服务端业务请求用户中心去更换。</p>
 <p>JWT是如何保证数据不会被篡改，并且保证数据的完整性呢，我们先看看它的组成。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/24/f6/240a6a36f0fbcd177e990411abbb8df6.jpg?wh=1920x501" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/24/f6/240a6a36f0fbcd177e990411abbb8df6.jpg?wh=1920x501" /></p>
 <p>如上图所示，加密签名的token分为三个部分，彼此之间用点来分割，其中，Header用来保存加密算法类型；PayLoad是我们自定义的内容；Signature是防篡改签名。</p>
 <p>JWT token解密后的数据结构如下图所示：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1">//header</span>
@@ -14148,14 +14148,14 @@
 <p>JWT的token解密很简单，第一段和第二段都是通过base64编码的。直接解开这两段数据就可以拿到payload中所有的数据，其中包括用户昵称、uid、用户权限和token过期时间。要验证token是否过期，只需将其中的过期时间和本地时间对比一下，就能确认当前token是不是有效。</p>
 <p>而验证token是否合法则是通过签名验证完成的，任何信息修改都会无法通过签名验证。要是通过了签名验证，就表明token没有被篡改过，是一个合法的token，可以直接使用。</p>
 <p>这个过程如下图所示：
-<img alt="" src="https://static001.geekbang.org/resource/image/19/8a/19b6179e1ff8ef5a13f0cbf4527ce88a.jpg?wh=3330x2141" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/19/8a/19b6179e1ff8ef5a13f0cbf4527ce88a.jpg?wh=3330x2141" /></p>
 <p>我们可以看到，通过token方式，用户中心压力最大的接口可以下线了，每个业务的服务端只要解开token验证其合法性，就可以拿到用户信息。不过这种方式也有缺点，就是用户如果被拉黑，客户端最快也要在token过期后才能退出登陆，这让我们的管理存在一定的延迟。</p>
 <p>如果我们希望对用户进行实时管理，可以把新生成的token在服务端暂存一份，每次用户请求就和缓存中的token对比一下，但这样很影响性能，极少数公司会这么做。同时，为了提高JWT系统的安全性，token一般会设置较短的过期时间，通常是十五分钟左右，过期后客户端会自动更换token。</p>
 <h2 id="token">token的更换和离线</h2>
 <p>那么如何对JWT的token进行更换和离线验签呢？</p>
 <p>具体的服务端换签很简单，只要客户端检测到当前的token快过期了，就主动请求用户中心更换token接口，重新生成一个离当前还有十五分钟超时的token。</p>
 <p>但是期间如果超过十五分钟还没换到，就会导致客户端登录失败。为了减少这类问题，同时保证客户端长时间离线仍能正常工作，行业内普遍使用双token方式，具体你可以看看后面的流程图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/de/7c/de29bd40ac360cb06ca6d3e75ac87a7c.jpg?wh=3330x2141" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/de/7c/de29bd40ac360cb06ca6d3e75ac87a7c.jpg?wh=3330x2141" /></p>
 <p>可以看到，这个方案里有两种token：<strong>一种是refresh_token，用于更换access_token，有效期是30天；另一种是access_token，用于保存当前用户信息和权限信息，每隔15分钟更换一次</strong>。如果请求用户中心失败，并且App处于离线状态，只要检测到本地refresh_token没有过期，系统仍可以继续工作，直到refresh_token过期为止，然后提示用户重新登陆。这样即使用户中心坏掉了，业务也能正常运转一段时间。</p>
 <p>用户中心检测更换token的实现如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1">//如果还有五分钟token要过期，那么换token</span>
@@ -14312,8 +14312,6 @@ jwt加密策略耦合度低，但是实时性不高
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

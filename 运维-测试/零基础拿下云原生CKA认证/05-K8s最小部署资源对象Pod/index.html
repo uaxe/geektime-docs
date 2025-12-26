@@ -5971,17 +5971,17 @@
 <p>今天，我给你讲一下 K8s 中最核心的资源对象——Pod，它是 K8s 管理的最小可部署资源对象。其他很多资源对象都是基于 Pod 来实现更复杂的应用部署和管理。例如，Deployment 就是通过管理多个 Pod 来实现应用的高可用性和滚动更新。接下来，让我们详细了解一下什么是 Pod。</p>
 <h2 id="pod">认识 Pod</h2>
 <p>Pod 的中文意思为豌豆荚，因为 Pod 中包含了一个或多个容器，容器和 Pod 的关系很像豌豆和豆荚的关系，所以这就是 Pod 名称的来历。在 K8s 中，Pod 是一个逻辑概念，而容器才是运行着应用镜像的实际载体，那为啥 K8s 不直接管理容器，而是还要搞出一个 Pod 呢？</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a9/04/a9059aeyyc92yyffbc54897809a49e04.jpg?wh=300x205" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a9/04/a9059aeyyc92yyffbc54897809a49e04.jpg?wh=300x205" /></p>
 <p>最重要的原因就是：在一些常见的应用场景下，容器并不是孤零零的存在，它可能会跟其他容器之间有着很亲密的关系，它们相互协作，一起启动，一起停止，一起提供服务，同时它们需要彼此间可以方便的通信以及访问相同的数据。所以 K8s 就在容器的基础上创建了 Pod 这个更高层级的资源对象，Pod 可以将多个容器组合到一起部署和管理，同一 Pod 中的容器可以共享网络和存储空间，这种机制保证了对容器管理的一致性和灵活性。</p>
 <p>举个具体例子， Pod 中多容器常用于边车模式（Sidecar），这种模式包含主容器和辅助容器，主容器运行核心业务应用，而辅助容器则负责日志收集、监控等任务，在不影响主业务的情况下扩展了应用功能。这种关系类似三轮摩托车，在摩托车的一侧加装一个边车来增加额外的空间，所以被叫做边车模式。此外，新一代 Service Mesh（服务网格）技术也利用了这种边车模式来增强服务间的通信和管理能力。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/51/6e/51309a427a528f3644ea54de17108a6e.jpg?wh=1190x466" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/51/6e/51309a427a528f3644ea54de17108a6e.jpg?wh=1190x466" /></p>
 <p>在实际应用中，Pod 可以包含一个容器也可以包含多个容器，非常灵活。对于多个容器，Pod 实现了容器间共享网络和存储空间的机制，下面我们来看下 Pod 是如何实现这两种机制。</p>
 <h3 id="_1">共享网络</h3>
 <p>首先，让我们讨论一下 Pod 中容器共享网络的机制。K8s 使用了一种简单的方式来实现共享网络，那就是在 Pod 中的容器启动之前，先自动运行一个 Infra Container（基础容器），这个容器运行了一个非常小的镜像，大概几百 KB，是一个 C 语言写的永远处于 pause（暂停）状态的容器，又叫 pause 容器。然后，当 Pod 中的其他容器启动时，它们都会加入到 Infra Container 的网络中，从而使用 Infra Container 的网络中的网络设备、IP 地址等网络相关的信息，这样就实现了容器之间共享网络。这有点像是一个电脑上同时有两个网络应用，它们都是用这个电脑的同一块网卡来处理网络请求，所以通过 localhost 也就能相互访问。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3d/5d/3dc9921ef04eda18ed56b268yy5c8c5d.jpg?wh=1030x520" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3d/5d/3dc9921ef04eda18ed56b268yy5c8c5d.jpg?wh=1030x520" /></p>
 <h3 id="_2">共享存储</h3>
 <p>接下来，我们再看一下 Pod 中多个容器共享存储，Pod 是通过多个容器挂载共同的数据卷 Volume（数据卷）来实现共享存储的。你可以把数据卷想象成一个共享网盘，Pod 中的容器都可以通过它来存取文件。例如之前说到的边车模式，主容器可以将日志文件写到共享存储空间，然后边车容器可以直接读取共享存储空间的文件来获取日志信息，从而实现业务功能和统计分析功能的分离，就像两个同事共用一个文件夹一样方便。这样，不仅能让各个容器各司其职，还能让整个系统更加灵活和易于管理。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/68/1e/6829b76c9fccfa89ac36154c7499e11e.jpg?wh=1004x546" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/68/1e/6829b76c9fccfa89ac36154c7499e11e.jpg?wh=1004x546" /></p>
 <h3 id="pod_1"><strong>部署一个多容器的 Pod</strong></h3>
 <p>了解了 Pod 的共享原理，下面我们就动手部署一个多容器的 Pod，来验证一下容器间的共享网络和共享存储。部署多容器的 Pod 是 CKA 考试的核心考点，考试中需要用 YAML 文件的方式部署 Pod，所以你要了解这个 YAML 文件的写法。</p>
 <p>首先，编写一个包含两个容器的 Pod 的 YAML 文件（two_container_pod.yaml），其中一个是 Web 服务应用 Nginx，另一个是 Busybox。Busybox 是一个工具镜像，其中包含了 Linux 系统命令行工具，在Busybox容器启动的时候执行了一条 sleep 休眠命令，用于保持容器持续运行。</p>
@@ -6275,8 +6275,6 @@ emptyDir: {}</p>2024-07-17</li><br/>
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

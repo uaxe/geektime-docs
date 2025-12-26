@@ -14775,8 +14775,8 @@
 <p>这也是我们处理故障的一个原则，<strong>遇到故障时，快速收集故障现场必要的信息之后，即使无法迅速定位到故障的根本原因，也要在第一时间恢复业务的正常运行。</strong></p>
 <h2 id="sql">全量SQL分析</h2>
 <p>当然，在故障恢复之后，我们需要找到引起故障的真正原因，因为只有定位到了根本原因，你才能避免下一次出现同样的故障。针对这次故障中的实例，已经启用了RDS产品提供的SQL洞察和审计功能，我们使用这个功能对故障期间执行的SQL做了分析。我们分析了故障发生前，数据库中扫描行数、返回行数看起来比较高的一些SQL，并对这些SQL进行了一些优化。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/79/bd/79e7576059623e11affa58232b535bbd.png?wh=1920x864" />
-<img alt="图片" src="https://static001.geekbang.org/resource/image/3a/25/3a79eed27c31f04e483dba3ae696c025.png?wh=1920x516" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/79/bd/79e7576059623e11affa58232b535bbd.png?wh=1920x864" />
+<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3a/25/3a79eed27c31f04e483dba3ae696c025.png?wh=1920x516" /></p>
 <h2 id="_3">故障再次发生</h2>
 <p>虽然我们找到了一些SQL，做了相应的优化，但实际上，这并不是引起故障的真正原因。在接下来几天的时间里，我们严密监控数据库的运行情况，这期间数据库运行得很平稳。然后，差不多离上次故障近1周的一个下午，也是在下午5点多的业务高峰期，又发生了类似的故障。有了上次的经验，客户先重启了应用系统，恢复了业务。</p>
 <p>但是故障的根本原因是什么？这次必须找出来。我和几位DBA同事一起赶到客户现场，在一间会议室里，跟客户侧的技术负责人、架构师、运维和研发人员，一起分析问题。上次使用常规的分析方法并没有定位到故障的根本原因。我们遗漏了哪些关键信息呢？</p>
@@ -14786,37 +14786,37 @@
 </ol>
 <!--THE END-->
 
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e9/f3/e93a8864ac7ec5f4d41836357d0b98f3.png?wh=1920x874" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e9/f3/e93a8864ac7ec5f4d41836357d0b98f3.png?wh=1920x874" /></p>
 <ol>
 <li>CPU上涨的同时，数据库SQL执行量也差不多翻了一倍，时间上很吻合。</li>
 </ol>
 <!--THE END-->
 
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/fc/65/fce7e69b083b6f12c842599f2d643d65.png?wh=1920x882" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fc/65/fce7e69b083b6f12c842599f2d643d65.png?wh=1920x882" /></p>
 <ol>
 <li>在CPU使用率上升的同时，数据库连接数上涨了好几倍。因此我们认为，由于某种原因，应用程序在瞬间创建了大量连接并执行SQL，超过了MySQL的承受能力，引起性能恶化。</li>
 </ol>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/fa/16/faa65769c46db50415293d65e4ab9c16.png?wh=1920x864" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fa/16/faa65769c46db50415293d65e4ab9c16.png?wh=1920x864" /></p>
 <p>但是我们跟客户确认过，当时并没有做任何推广活动，应用系统也没有任何发布、变更。虽然当时是一天内业务的一个高峰期，但正常的业务流量是逐渐上涨的，也不会说一下子就涨好几倍。</p>
 <ol>
 <li>我们再来看数据库的网络流量趋势图，和CPU使用率、QPS等指标的变化趋势是完全一致的。</li>
 </ol>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8c/15/8cfc70e6cee96f09fcfd4b7d3ec15715.png?wh=1920x880" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8c/15/8cfc70e6cee96f09fcfd4b7d3ec15715.png?wh=1920x880" /></p>
 <p>仔细观察上面这几个性能趋势图，可以发现有一个共同点，就是在指标暴涨之前，先有一个短暂的下跌的过程，这个过程很短，大概也就10-20秒的时间。实际上在上一次的故障中，我们也观察到了同样的现象。当时也对可能的原因做了一些思考，是不是数据库底层环境有性能抖动？但是云厂商的运维人员做了细致地排查后，排除了这种可能性。是不是应用程序的某些特定的逻辑引起的？我们和客户侧的技术人员进行了一些探讨，但也没找到确切的原因。是不是最终用户在那个时间点都不用这个系统了？我们想想也觉得可能性不大。</p>
 <h2 id="_4">从业务链路上来看问题</h2>
 <p>我们跟客户侧的架构师一起，梳理了业务系统的部署结构和调用链路。下面这个架构图中，位于最上层的是负载均衡设备，会把来自用户的请求分发到nginx，nginx再把请求转到后端应用，后端应用还会通过Web Service调用一些服务接口，位于架构最底层的是RDS和Redis。这也是比较典型的一种Web应用部署架构。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/85/92/85da6286217a3d3215f10d6ea41c7692.jpg?wh=852x755" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/85/92/85da6286217a3d3215f10d6ea41c7692.jpg?wh=852x755" /></p>
 <p>要判断来自用户的请求量是否有大的变化，实际上可以看入口处负载均衡的调用量，也可以通过分析nginx的访问日志得到。通过这些日志，我们得到了第一个结论，就是来自用户的请求在故障发生的时间点前后，并没有发生明显的变化。</p>
 <p>是不是链路上的某个应用内部发生了什么变化？</p>
 <p>我询问了客户侧的参会人员，当天下午发生故障前，有没有对应用系统做过任何操作？当天肯定没有做应用发布。后来一位工程师反馈，当时他做了一个数据订正，订正的内容是删除了Redis中的几个Key。正常来说，删除缓存中的几个Key，也不至于造成这么大的影响。我又详细询问了这位工程师，当时操作执行了哪些具体命令。工程师反馈说，他先通过keys pattern命令查找需要删除的Key，然后再把这几个Key删除掉。</p>
 <p>到这里，你可能已经知道问题出在哪里了。Redis中执行 keys * 命令是非常危险的一个操作，如果key的数量比较多，keys * 命令可能需要执行很长的时间，更严重的是，执行期间会导致其他请求被阻塞。</p>
 <p>这个客户的Redis没有在我们的服务范围内，因此我们也根本没有想过这方面的问题。听到工程师的反馈后，我们立刻查看了Redis的监控。在数据库流量下跌的同一个时间，Redis的CPU使用率有大幅度的上涨，最高达到了100%。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d6/e5/d69860ce563468e0192a1f90beb70ee5.png?wh=1920x822" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d6/e5/d69860ce563468e0192a1f90beb70ee5.png?wh=1920x822" /></p>
 <p>看来<strong>对Redis的操作</strong>才是引起故障的真正原因。为了更好地理解这个问题，我画了一个程序访问的时序图。用户扫码付款时，应用程序请求某个API，读取Redis中的一个Key，但由于当时Redis在执行 keys * 命令，读取Key的请求就被阻塞了。</p>
 <p>keys * 命令执行了十几秒，因此这十几秒里，调用这个接口的用户线程都需要等待。最终，keys * 命令执行完成，等待的用户线程都完成了接口调用，然后再调用其他接口，到MySQL中执行SQL。积压了十几秒的用户线程，几乎在同一个时间点连接数据库，执行SQL，最终超出了数据库的承受能力，发生了故障。这和我们从前面几个监控图表中观察到的现象完全一致。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e3/e9/e3b9cc4b4c7f98a30328dc11caeff3e9.jpg?wh=1084x1021" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e3/e9/e3b9cc4b4c7f98a30328dc11caeff3e9.jpg?wh=1084x1021" /></p>
 <p>下面这个图可以更好地解释这个现象。应用程序发起的请求，先在Redis中积压了十几秒，然后又几乎在同一个时间点从Redis请求中返回，一瞬间，这些请求同时涌向了MySQL，MySQL不堪重负，发生了故障。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/61/1f/61d897e428a7b7e20a0bafcfdfbb4d1f.jpg?wh=1252x558" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/61/1f/61d897e428a7b7e20a0bafcfdfbb4d1f.jpg?wh=1252x558" /></p>
 <p>定位到最终问题后，我们和客户悬着的心终于放了下来。接下来，客户在内部进行了强调，禁止在线上执行危险的操作。对于keys *操作，也可以在Redis层面禁用掉。之后，就再也没有发生过这样的故障了。</p>
 <h2 id="_5">总结</h2>
 <p>在这个故障案例中，MySQL的故障，由看起来毫不相关的一个Redis操作引起。这也警示了我们，在分析问题时，要从系统全局出发，不能局限在数据库内部。同时也要注意，在给一个问题下结论的时候，要多问问自己，<strong>这个问题真的是这个原因引起的吗？是不是能解释问题中的所有现象？</strong></p>
@@ -14954,8 +14954,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -7216,12 +7216,12 @@
 <li>存储形式：对象值还是序列化的字节数组，带SER字样的表示以序列化方式存储，不带SER则表示采用对象值。</li>
 <li>副本数量：存储级别名字最后的数字代表拷贝数量，没有数字默认为1份副本。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4e/e2/4ecdfd4b62b1c6e151d029c38088yye2.jpeg?wh=1920%2A1000" title="Cache存储级别" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4e/e2/4ecdfd4b62b1c6e151d029c38088yye2.jpeg?wh=1920%2A1000" title="Cache存储级别" /></p>
 <p>当我们对五花八门的存储级别拆解之后就会发现，它们不过是存储介质、存储形式和副本数量这3类不同基本元素的排列组合而已。我在上表中列出了目前Spark支持的所有存储级别，你可以通过它加深理解。</p>
 <p>尽管缓存级别多得让人眼花缭乱，但实际上<strong>最常用的只有两个：MEMORY_ONLY和MEMORY_AND_DISK，它们分别是RDD缓存和DataFrame缓存的默认存储级别</strong>。在日常的开发工作中，当你在RDD和DataFrame之上调用<code>.cache</code>函数时，Spark默认采用的就是MEMORY_ONLY和MEMORY_AND_DISK。</p>
 <h3 id="_2">缓存的计算过程</h3>
 <p>在MEMORY_AND_DISK模式下，Spark会优先尝试把数据集全部缓存到内存，内存不足的情况下，再把剩余的数据落盘到本地。MEMORY_ONLY则不管内存是否充足，而是一股脑地把数据往内存里塞，即便内存不够也不会落盘。不难发现，<strong>这两种存储级别都是先尝试把数据缓存到内存</strong>。数据在内存中的存储过程我们在<a href="https://time.geekbang.org/column/article/355081">第6讲</a>中讲过了，这里我们再一起回顾一下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8f/e2/8fc350146a7yyb0448303d7f1f094be2.jpg?wh=3936%2A1818" title="分布式数据集缓存到内存" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8f/e2/8fc350146a7yyb0448303d7f1f094be2.jpg?wh=3936%2A1818" title="分布式数据集缓存到内存" /></p>
 <p>无论是RDD还是DataFrame，它们的数据分片都是以迭代器Iterator的形式存储的。因此，要把数据缓存下来，我们先得把迭代器展开成实实在在的数据值，这一步叫做Unroll，如步骤1所示。展开的对象值暂时存储在一个叫做ValuesHolder的数据结构里，然后转换为MemoryEntry。转换的实现方式是toArray，因此它不产生额外的内存开销，这一步转换叫做Transfer，如步骤2所示。最终，MemoryEntry和与之对应的BlockID，以Key、Value的形式存储到哈希字典（LinkedHashMap）中，如图中的步骤3所示。</p>
 <p>当分布式数据集所有的数据分片都从Unroll到Transfer，再到注册哈希字典之后，数据在内存中的缓存过程就宣告完毕。</p>
 <h3 id="_3">缓存的销毁过程</h3>
@@ -7230,7 +7230,7 @@
 <p>那么问题来了，Spark基于什么规则“驱逐”顾客呢？接下来，我就以同时缓存多个分布式数据集的情况为例，带你去分析一下在内存受限的情况下会发生什么。</p>
 <p>我们用一张图来演示这个过程，假设MemoryStore中存有4个RDD/Data Frame的缓存数据，这4个分布式数据集各自缓存了一些数据分片之后，Storage Memory区域就被占满了。当RDD1尝试把第6个分片缓存到MemoryStore时，却发现内存不足，塞不进去了。</p>
 <p>这种情况下，<strong>Spark就会逐一清除一些“尸位素餐”的MemoryEntry来释放内存，从而获取更多的可用空间来存储新的数据分片</strong>。这个过程叫做Eviction，它的中文翻译还是蛮形象的，就叫做驱逐，也就是把MemoryStore中那些倒霉的MemoryEntry驱逐出内存。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b7/14/b73308328ef549579d02c72afb2ab114.jpg?wh=5828%2A1798" title="多个分布式数据集同时缓存到内存" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b7/14/b73308328ef549579d02c72afb2ab114.jpg?wh=5828%2A1798" title="多个分布式数据集同时缓存到内存" /></p>
 <p>回到刚才的问题，Spark是根据什么规则选中的这些倒霉蛋呢？这个规则叫作LRU（Least Recently Used），基于这个算法，最近访问频率最低的那个家伙就是倒霉蛋。因为<a href="https://baike.baidu.com/item/LRU/1269842?fr=aladdin">LRU</a>是比较基础的数据结构算法，笔试、面试的时候经常会考，所以它的概念我就不多说了。</p>
 <p>我们要知道的是，Spark是如何实现LRU的。这里，<strong>Spark使用了一个巧妙的数据结构：LinkedHashMap，这种数据结构天然地支持LRU算法</strong>。</p>
 <p>LinkedHashMap使用两个数据结构来维护数据，一个是传统的HashMap，另一个是双向链表。HashMap的用途在于快速访问，根据指定的BlockId，HashMap以O(1)的效率返回MemoryEntry。双向链表则不同，它主要用于维护元素（也就是BlockId和MemoryEntry键值对）的访问顺序。凡是被访问过的元素，无论是插入、读取还是更新都会被放置到链表的尾部。因此，链表头部保存的刚好都是“最近最少访问”的元素。</p>
@@ -7452,8 +7452,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

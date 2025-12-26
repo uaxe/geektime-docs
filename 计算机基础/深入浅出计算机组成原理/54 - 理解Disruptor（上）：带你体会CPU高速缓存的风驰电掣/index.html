@@ -6642,11 +6642,11 @@
 </code></pre></div>
 <p>我在看到这段代码的第一反应是，变量名取得不规范，p1-p7这样的变量名没有明确的意义啊。不过，当我深入了解了Disruptor的设计和源代码，才发现这些变量名取得恰如其分。因为这些变量就是没有实际意义，只是帮助我们进行<strong>缓存行填充</strong>（Padding Cache Line），使得我们能够尽可能地用上CPU高速缓存（CPU Cache）。那么缓存行填充这个黑科技到底是什么样的呢？我们接着往下看。</p>
 <p>不知道你还记不记得，我们在<a href="https://time.geekbang.org/column/article/107422">35讲</a>里面的这个表格。如果访问内置在CPU里的L1 Cache或者L2 Cache，访问延时是内存的1/15乃至1/100。而内存的访问速度，其实是远远慢于CPU的。想要追求极限性能，需要我们尽可能地多从CPU Cache里面拿数据，而不是从内存里面拿数据。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d3/a6/d39b0f2b3962d646133d450541fb75a6.png?wh=1142%2A588" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d3/a6/d39b0f2b3962d646133d450541fb75a6.png?wh=1142%2A588" /></p>
 <p>CPU Cache装载内存里面的数据，不是一个一个字段加载的，而是加载一整个缓存行。举个例子，如果我们定义了一个长度为64的long类型的数组。那么数据从内存加载到CPU Cache里面的时候，不是一个一个数组元素加载的，而是一次性加载固定长度的一个缓存行。</p>
 <p>我们现在的64位Intel CPU的计算机，缓存行通常是64个字节（Bytes）。一个long类型的数据需要8个字节，所以我们一下子会加载8个long类型的数据。也就是说，一次加载数组里面连续的8个数值。这样的加载方式使得我们遍历数组元素的时候会很快。因为后面连续7次的数据访问都会命中缓存，不需要重新从内存里面去读取数据。这个性能层面的好处，我在第37讲的第一个例子里面为你演示过，印象不深的话，可以返回去看看。</p>
 <p>但是，在我们不使用数组，而是使用单独的变量的时候，这里就会出现问题了。在Disruptor的RingBuffer（环形缓冲区）的代码里面，定义了一个RingBufferFields类，里面有indexMask和其他几个变量，用来存放RingBuffer的内部状态信息。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/23/f6/23adbbc656243ce85fdb8c7fab42ecf6.jpeg?wh=2278%2A1996" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/23/f6/23adbbc656243ce85fdb8c7fab42ecf6.jpeg?wh=2278%2A1996" /></p>
 <p>CPU在加载数据的时候，自然也会把这个数据从内存加载到高速缓存里面来。不过，这个时候，高速缓存里面除了这个数据，还会加载这个数据前后定义的其他变量。这个时候，问题就来了。Disruptor是一个多线程的服务器框架，在这个数据前后定义的其他变量，可能会被多个不同的线程去更新数据、读取数据。这些写入以及读取的请求，会来自于不同的 CPU Core。于是，为了保证数据的同步更新，我们不得不把CPU Cache里面的数据，重新写回到内存里面去或者重新从内存里面加载数据。</p>
 <p>而我们刚刚说过，这些CPU Cache的写回和加载，都不是以一个变量作为单位的。这些动作都是以整个Cache Line作为单位的。所以，当INITIAL_CURSOR_VALUE 前后的那些变量被写回到内存的时候，这个字段自己也写回到了内存，这个常量的缓存也就失效了。当我们要再次读取这个值的时候，要再重新从内存读取。这也就意味着，读取速度大大变慢了。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>......
@@ -6674,14 +6674,14 @@
 <a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>......
 <a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>}
 </code></pre></div>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/93/b1/9330b8fb1e8de3f62d34c6f85f268db1.jpeg?wh=2776%2A1249" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/93/b1/9330b8fb1e8de3f62d34c6f85f268db1.jpeg?wh=2776%2A1249" /></p>
 <p>面临这样一个情况，Disruptor里发明了一个神奇的代码技巧，这个技巧就是缓存行填充。Disruptor 在 RingBufferFields里面定义的变量的前后，分别定义了7个long类型的变量。前面的7个来自继承的 RingBufferPad 类，后面的7个则是直接定义在 RingBuffer 类里面。这14个变量没有任何实际的用途。我们既不会去读他们，也不会去写他们。</p>
 <p>而RingBufferFields里面定义的这些变量都是final的，第一次写入之后不会再进行修改。所以，一旦它被加载到CPU Cache之后，只要被频繁地读取访问，就不会再被换出Cache了。这也就意味着，对于这个值的读取速度，会是一直是CPU Cache的访问速度，而不是内存的访问速度。</p>
 <h2 id="ringbuffer">使用RingBuffer，利用缓存和分支预测</h2>
 <p>其实这个利用CPU Cache的性能的思路，贯穿了整个Disruptor。Disruptor整个框架，其实就是一个高速的<a href="https://en.wikipedia.org/wiki/Producer%E2%80%93consumer_problem">生产者-消费者模型</a>（Producer-Consumer）下的队列。生产者不停地往队列里面生产新的需要处理的任务，而消费者不停地从队列里面处理掉这些任务。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/65/56/659082942118e7c69eb3807b00f5f556.jpeg?wh=2566%2A2356" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/65/56/659082942118e7c69eb3807b00f5f556.jpeg?wh=2566%2A2356" /></p>
 <p>如果你熟悉算法和数据结构，那你应该非常清楚，如果要实现一个队列，最合适的数据结构应该是链表。我们只要维护好链表的头和尾，就能很容易实现一个队列。生产者只要不断地往链表的尾部不断插入新的节点，而消费者只需要不断从头部取出最老的节点进行处理就好了。我们可以很容易实现生产者-消费者模型。实际上，Java自己的基础库里面就有LinkedBlockingQueue这样的队列库，可以直接用在生产者-消费者模式上。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/45/0e/45d4c7c8b0cb1f056684199e39660f0e.jpeg?wh=1894%2A3151" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/45/0e/45d4c7c8b0cb1f056684199e39660f0e.jpeg?wh=1894%2A3151" /></p>
 <p>不过，Disruptor里面并没有用LinkedBlockingQueue，而是使用了一个RingBuffer这样的数据结构，这个RingBuffer的底层实现则是一个固定长度的数组。比起链表形式的实现，数组的数据在内存里面会存在空间局部性。</p>
 <p>就像上面我们看到的，数组的连续多个元素会一并加载到CPU Cache里面来，所以访问遍历的速度会更快。而链表里面各个节点的数据，多半不会出现在相邻的内存空间，自然也就享受不到整个Cache Line加载后数据连续从高速缓存里面被访问到的优势。</p>
 <p>除此之外，数据的遍历访问还有一个很大的优势，就是CPU层面的分支预测会很准确。这可以使得我们更有效地利用了CPU里面的多级流水线，我们的程序就会跑得更快。这一部分的原理如果你已经不太记得了，可以回过头去复习一下<a href="https://time.geekbang.org/column/article/102166">第25讲</a>关于分支预测的内容。</p>
@@ -6814,8 +6814,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

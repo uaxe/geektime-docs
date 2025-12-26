@@ -6165,30 +6165,30 @@
 <p>本节课，我会把全局优化的算法思路讲解清楚，借此引入数据流分析的完整框架。而且在解决多路径情况下，V值的计算问题时，我还会带你学习一个数学工具：半格理论。这样，你会对基于数据流分析的代码优化思路建立清晰的认识，从而有能力根据需要编写自己的优化算法。</p>
 <h2 id="_1">数据流分析的场景：活跃性分析</h2>
 <p><a href="https://time.geekbang.org/column/article/155338">上一讲，</a>我已经讲了本地优化时的活跃性分析，那时，情况比较简单，你不需要考虑多路径问题。<strong>而在做全局优化时，情况就要复杂一些：</strong>代码不是在一个基本块里简单地顺序执行，而可能经过控制流图（CFG）中的多条路径。我们来看一个例子（例子由if语句形成了两条分支语句）：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/16/e2/16486275b06058985190f1a5ae51a6e2.jpg?wh=1142%2A946" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/16/e2/16486275b06058985190f1a5ae51a6e2.jpg?wh=1142%2A946" /></p>
 <p>基于这个CFG，我们可以做全局的活跃性分析，从最底下的基本块开始，倒着向前计算活跃变量的集合（也就是从基本块5倒着向基本块1计算）。</p>
 <p><strong>这里需要注意，</strong>对基本块1进行计算的时候，它的输入是基本块2的输出，也就是{a, b, c}，和基本块3的输出，也就是{a, c}，计算结果是这两个集合的并集{a, b, c}。也就是说，基本块1的后序基本块，有可能用到这三个变量。这里就是与本地优化不同的地方，我们要基于多条路径来计算。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c4/71/c453c9f74802eee6d98bdd813b66a271.jpg?wh=1142%2A955" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c4/71/c453c9f74802eee6d98bdd813b66a271.jpg?wh=1142%2A955" /></p>
 <p>基于这个分析图，我们马上发现y变量可以被删掉（因为它前面的活变量集合{x}不包括y，也就是不被后面的代码所使用），并且影响到了活跃变量的集合。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/19/57/191329a421402539bff0babf41b9de57.jpg?wh=1142%2A992" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/19/57/191329a421402539bff0babf41b9de57.jpg?wh=1142%2A992" /></p>
 <p>删掉y变量以后，再继续优化一轮，会发现d也可以删掉。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c3/7c/c339a2653ab9ce296ada6a3f49c25a7c.jpg?wh=1142%2A978" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c3/7c/c339a2653ab9ce296ada6a3f49c25a7c.jpg?wh=1142%2A978" /></p>
 <p>d删掉以后，2号基本块里面已经没有代码了，也可以被删掉，<strong>最后的CFG是下面这样：</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1d/31/1da42a4e00475f274281ecb1a702be31.jpg?wh=1142%2A954" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1d/31/1da42a4e00475f274281ecb1a702be31.jpg?wh=1142%2A954" /></p>
 <p>到目前为止，我们发现：全局优化总体来说跟本地优化很相似，唯一的不同，就是要基于多个分支计算集合的内容（也就是V值）。在进入基本块1时，2和3两个分支相遇（meet），我们取了2和3V值的并集。<strong>这就是数据流分析的基本特征，你可以记住这个例子，建立直观印象。</strong></p>
 <p>但是，上面这个CFG还是比较简单的，因为它没有循环，属于有向无环图。<strong>这种图的特点是：</strong>针对图中的每一个节点，我们总能找到它的前序节点和后序节点，所以我们只需要按照顺序计算就好了。但是如果加上了环路，就不那么简单了，来看一看下面这张图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a2/6e/a2aa2818e6890db5dc4ca2ee02bad36e.jpg?wh=1142%2A826" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a2/6e/a2aa2818e6890db5dc4ca2ee02bad36e.jpg?wh=1142%2A826" /></p>
 <p>基本块4有两个后序节点，分别是5和1，所以要计算4的活跃变量，就需要知道5和1的输出是什么。5的输出好说，但1的呢？还没计算出来呢。因为要计算1，就要依赖2和3，从而间接地又依赖了4。<strong>这样一来，1和4是循环依赖的。</strong>再进一步探究的话，你发现其实1、2、3、4四个节点之间，都是循环依赖的。</p>
 <p>所以说，一旦在CFG中引入循环回路，严格的前后计算顺序就不存在了。<strong>那你要怎么办呢？</strong></p>
 <p>其实，我们不是第一次面对这个处境了。在前端部分，我们计算First和Follow集合的时候，就会遇到循环依赖的情况，只不过那时候没有像这样展开，细细地分析。不过，你可以回顾一下<a href="https://time.geekbang.org/column/article/138385">17讲</a>和<a href="https://time.geekbang.org/column/article/139628">18讲</a>，那个时候你是用什么算法来破解僵局的呢？是不动点法。<strong>在这里，我们还是要运用不动点法，具体操作是：</strong>给每个基本块的V值都分配初始值，也就是空集合。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ee/ef/eead71f9e3ae1486465e8d6adcfc96ef.jpg?wh=1142%2A862" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ee/ef/eead71f9e3ae1486465e8d6adcfc96ef.jpg?wh=1142%2A862" /></p>
 <p>然后对所有节点进行多次计算，直到所有集合都稳定为止。第一遍的时候，我们按照5-4-3-2-1的顺序计算（实际上，采取任何顺序都可以），计算结果如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9e/63/9e4acf5bd72492306c230b11d6f6fd63.jpg?wh=1142%2A955" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9e/63/9e4acf5bd72492306c230b11d6f6fd63.jpg?wh=1142%2A955" /></p>
 <p>如果现在计算就结束，我们实际上可以把基本块2中的d变量删掉。但如果我们再按照5-4-3-2-1的顺序计算一遍，就会往集合里增加一些新的元素（在图中标的是橙色）。<strong>这是因为，</strong>在计算基本块4的时候，基本块1的输出{b, c, d}也会变成4的输入。这时，我们发现，进入基本块2时，活变量集合里是含有d的，所以d是不能删除的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/54/cc/547bb7c93a63468b854a2b0d7188b7cc.jpg?wh=1142%2A949" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/54/cc/547bb7c93a63468b854a2b0d7188b7cc.jpg?wh=1142%2A949" /></p>
 <p>你再仔细看看，这个d是哪里需要的呢？<strong>是基本块3需要的：</strong>它会跟1去要，1会跟4要，4跟2要。所以，再次证明，1、2、3、4四个节点是互相依赖的。</p>
 <p>我们再来看一下，对于活变量集合的计算，当两个分支相遇的情况下，最终的结果我们取了两个分支的并集。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/28/fc/28c7218ee10c14ce2b121aa527191bfc.jpg?wh=1142%2A741" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/28/fc/28c7218ee10c14ce2b121aa527191bfc.jpg?wh=1142%2A741" /></p>
 <p>在上一讲，我们说一个本地优化分析包含四个元素：方向（D）、值（V）、转换函数（F）和初始值（I）。在做全局优化的时候，我们需要再多加一个元素，就是两个分支相遇的时候，要做一个运算，计算他们相交的值，这个运算我们可以用大写的希腊字母Λ（lambda）表示。包含了D、V、F、I和Λ的分析框架，<strong>就叫做数据流分析。</strong></p>
 <p>那么Λ怎么计算呢？研究者们用了一个数学工具，叫做“半格”（Semilattice），帮助做Λ运算。</p>
 <h2 id="_2">直观地理解半格理论</h2>
@@ -6201,7 +6201,7 @@
 <p>所以，{a, b, c}是比较小的，{a, c}是比较大的。</p>
 <p>当然，{a, b, c}也可以跟{a, b}比较大小，但它没有办法跟{c, d}比较大小。所以把包含了{{a, b, c}、{a, c}、{a, b}、{c, d}…}这样的一个集合，叫做偏序集，它们中只有部分成员之间可以比较大小。哪些成员可以比较呢？就是下面的半格图中，可以通过有方向的线连起来的。</p>
 <p>半格可以画成图形，理解起来更直观，假设我们的程序只有a, b, c三个变量，那么这个半格画成图形是这样的：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d9/85/d9811d73fef1347e92fc3151fdd48485.jpg?wh=1142%2A645" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d9/85/d9811d73fef1347e92fc3151fdd48485.jpg?wh=1142%2A645" /></p>
 <p>沿着上面图中的线，两个值是可以比较大小的，按箭头的方向依次减少：{}&gt;{a}&gt;{a, b}&gt; {a, b, c}。如果两个值之间没有一条路径，那么它们之间就是不能比较大小的，就像{a}和{b}就不能比较大小。</p>
 <p>对于这个半格，我们把{}（空集）叫做Top，Top大于所有的其他的值。而{a, b, c}叫做Bottom，它是最小的值。</p>
 <p>在做活跃性分析时，我们的Λ运算是计算两个值的最大下界（Greatest Lower Bound）。怎么讲呢？就是比两个原始值都小的值中，取最大的那个。{a}和{b}的最大下界是{a, b}，{a, b, c} 和{a, c}的最大下界就是{a, b, c} 。</p>
@@ -6214,7 +6214,7 @@
 <p>我们通过另一个案例来分析一下非集合的半格运算：<strong>常数传播。</strong></p>
 <h2 id="_3">数据流分析的场景：常数传播</h2>
 <p>常数传播，就是如果知道某个变量的值是个常数，那么就把用到这个变量的表达式，都用常数去替换。看看下面的例子，在基本块4中，a的值能否用一个常数替代？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ec/0e/ecf6d32b7428d960654400ddd34be90e.jpg?wh=1142%2A882" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ec/0e/ecf6d32b7428d960654400ddd34be90e.jpg?wh=1142%2A882" /></p>
 <p><strong>答案是不能。</strong>到达基本块4的两条路径，一条a=3，另一条a=4。我们不知道在实际运行的时候，会从哪条路径过来，所以这个时候a的取值是不确定的，基本块4中的a无法用常数替换。</p>
 <p>那么，运用数据流分析的框架怎么来做常数传播分析呢？</p>
 <p>在这种情况下，V不再是一个集合，而是a可能取的常数值，但a有可能不是一个常数啊，所以我们再定义一个特殊的值：Top（T）。</p>
@@ -6225,7 +6225,7 @@
 <li>Bottom：某个语句不会被执行。</li>
 </ul>
 <p><strong>这些值是怎么排序的呢？</strong>最大的是Top，中间各个常数之间是无法比较的，Bottom是最小的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3e/ae/3e7cf0f8d1052d125ada693afee96aae.jpg?wh=1142%2A846" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3e/ae/3e7cf0f8d1052d125ada693afee96aae.jpg?wh=1142%2A846" /></p>
 <p>接下来，我们看看如何计算多个V值相交的值。</p>
 <p>我们再把计算过程形式化一下。在这个分析中，当我们经过每个语句的时候，V值都可能发生变化，我们用下面两个函数来代表不同地方的V值：</p>
 <ul>
@@ -6233,14 +6233,14 @@
 <li>C(a, s, out)。表示在语句s之后a的取值，比如，C(a, a:=4, out) = 4。</li>
 </ul>
 <p>如果s的前序有i条可能的路径，那么多个输出和一个输入“C(a, si, out)和C(a, s, in)”的关系，可以制定一系列规则：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cf/8e/cf28a8e40983204c6d0381197b471e8e.jpg?wh=1142%2A591" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cf/8e/cf28a8e40983204c6d0381197b471e8e.jpg?wh=1142%2A591" /></p>
 <p>1.如果有一条输入路径是Top，或者说C(a, si, out)是Top，那么结果C(a, s, in)就是Top。</p>
 <p>2.如果输入中有两个不同的常数，比如3和4，那么结果也是Top（我们的示例就是这种情况）。</p>
 <p>3.如果所有的输入都是相同的常数或Bottom，那么结果就是该常数。如果所有路径a的值都是3，那么这里就可以安全地认为a的值是3。那些Bottom路径不影响，因为整条路径不会执行。</p>
 <p>4.如果所有的输入都是Bottom，那么结果也是Bottom。</p>
 <p><strong>上面的这4个规则，就是一套半格的计算规则。</strong></p>
 <p>在这里，我们也可以总结一下它的转换规则，也就是F，考虑一下某个Statement的in值和out值的关系，也就是经过该Statement以后，V值会有啥变化：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/03/a2/0344859185c57f3cd6f7bbb83f364fa2.jpg?wh=1142%2A627" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/03/a2/0344859185c57f3cd6f7bbb83f364fa2.jpg?wh=1142%2A627" /></p>
 <p>1.如果输入是Bottom，那么输出也是Bottom。也就是这条路径不会经过。
 2.如果该Statement就是“ a := 常数”，那么输出就是该常数。
 3.如果该Statement是a赋予的一个比较复杂的表达式，而不是常数，那么输出就是Top。
@@ -6396,8 +6396,6 @@ https:&#47;&#47;zhuanlan.zhihu.com&#47;p&#47;678784087
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -14165,12 +14165,12 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>clickhouse-client<span class="w"> </span>--port<span class="w"> </span><span class="m">9002</span><span class="w"> </span>--query<span class="o">=</span><span class="s2">&quot;INSERT INTO cdp.cdp_user_event_all FORMAT CSV&quot;</span><span class="w"> </span>--input_format_allow_errors_ratio<span class="o">=</span><span class="m">0</span>.1<span class="w"> </span>--input_format_allow_errors_num<span class="o">=</span><span class="m">0</span><span class="w"> </span>--format_csv_delimiter<span class="o">=</span><span class="s1">&#39;#&#39;</span><span class="w"> </span>&lt;<span class="w"> </span>cdp_user_event_data_2_3.csv
 </code></pre></div>
 <p>导入完成后，检查一下数据，如下图所示。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/de/c5/de534ff07bec604ab13de2191f903fc5.png?wh=771x539" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/de/c5/de534ff07bec604ab13de2191f903fc5.png?wh=771x539" /></p>
 <h3 id="_2">标签生成</h3>
 <p>你应该还记得基于用户行为，我们为用户生成了一些标签，这里我们同样将标签生成SQL转成了ClickHouse的版本，你可以从<a href="https://github.com/ZHAMoonlight/referencebook/blob/master/script/ls19_cdp_tag_insert.sql">这里</a>下载这些SQL脚本。</p>
 <p>我也整理了一下这些SQL执行的截图，你可以在<a href="https://github.com/ZHAMoonlight/referencebook/blob/master/script/ls19%E6%A0%87%E7%AD%BE%E7%94%9F%E6%88%90%E6%88%AA%E5%9B%BE.docx">这里</a>查看这些SQL执行的时间，基本上这些SQL也是秒级能够执行完成，性能其实比StarRocks稍有优势。</p>
 <p>执行完成之后，同样标签表里，有约1.6亿行标签记录。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/23/71/237a9acdd010ec66b49540ef2b767e71.png?wh=791x268" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/23/71/237a9acdd010ec66b49540ef2b767e71.png?wh=791x268" /></p>
 <h3 id="sql">SQL人群圈选</h3>
 <p>基于同样的基础数据，回到我们CDP的场景，同样以“给浏览过高端手机、女性、中消费、高活跃的用户群体推送一个100无门槛手机抵扣券”为例。</p>
 <p>注意，如果直接用之前在StarRocks中圈人的SQL来在ClickHouse中执行，会有两个问题。</p>
@@ -14210,7 +14210,7 @@
 <a id="__codelineno-5-28" name="__codelineno-5-28" href="#__codelineno-5-28"></a><span class="o">)</span><span class="w"> </span>AS<span class="w"> </span>t2<span class="w"> </span>ON<span class="w"> </span>u.unique_user_id<span class="w"> </span><span class="o">=</span><span class="w"> </span>t2.unique_user_id<span class="p">;</span>
 </code></pre></div>
 <p>改造完成之后的SQL，执行结果如下。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ef/0b/efa5065990c514b76004646fe317c10b.png?wh=1234x914" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ef/0b/efa5065990c514b76004646fe317c10b.png?wh=1234x914" /></p>
 <p>从结果可以发现，相比之前StarRocks圈人不到1秒就能出结果，这里ClickHouse花费了6秒左右的时间，这里也印证了我们之前所说的，ClickHouse在多表Join的情况下表现相对没那么好。</p>
 <p>那么这个场景中，我们还有什么优化手段吗？</p>
 <h2 id="bitmap">使用Bitmap加速人群计算</h2>
@@ -14227,7 +14227,7 @@
 <p>RoaringBitmap是一种高效的压缩位图实现，以32位的int整数为例，RoaringBitmap将数据分成高16位和低16位两部分，高16位作为桶的编号Container，低16位不变，作为数据位Container。</p>
 <p>比如，如果要存储65538这个值，则高位为65538&gt;&gt;16=1，低位为65538-65536*1=2，即存储在1号桶的2号位置。</p>
 <p>就像下面这张图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c4/12/c4d9yy7d65d171b381540f864ae2c712.png?wh=1288x822" title="图片源自网络" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c4/12/c4d9yy7d65d171b381540f864ae2c712.png?wh=1288x822" title="图片源自网络" /></p>
 <p>有没有发现这个其实就是一个进制的表示？给你两个空格，之前一个空格只能填充一个数字，那就只能容纳两个数字。现在将一个空格作为十进制位，另外一个作为个数位，这样最多就能容纳100个数字了。</p>
 <p>在很多数据库，像StarRocks、ClickHouse中，都提供了bitmap的实现。接下来我们就看看，如何用bitmap来在ClickHouse中，加速人群计算。</p>
 <h3 id="clickhousebitmap">ClickHouse使用bitmap加速人群计算</h3>
@@ -14300,7 +14300,7 @@
 <a id="__codelineno-9-28" name="__codelineno-9-28" href="#__codelineno-9-28"></a><span class="o">)</span><span class="w"> </span>AS<span class="w"> </span>t3<span class="w"> </span>ON<span class="w"> </span>t0.join_id<span class="w"> </span><span class="o">=</span><span class="w"> </span>t3.join_id<span class="p">;</span>
 </code></pre></div>
 <p>使用bitmap后的圈人SQL逻辑也很简单，同样按标签分别圈出对应的用户ID列表，最后将所有的用户ID取交集。执行结果如下，可以看到性能有了一个巨大的提升，从原来的6秒左右提升到了300毫秒不到。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a9/c4/a9418d16bf5f2d6c204fd3d2483e7bc4.png?wh=1187x930" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a9/c4/a9418d16bf5f2d6c204fd3d2483e7bc4.png?wh=1187x930" /></p>
 <p>此外，在选择不同的标签构建CDP人群包时，我们也经常需要统计圈选出来人群的数量，使用动态SQL加上bitmap的优化，在ClickHouse中，很容易就可以在亿级数据下实现亚秒级的人群预估与圈人。所以基于ClickHouse，其实已经可以构建一个小型的在线实时CDP平台。</p>
 <h2 id="_3">小结</h2>
 <p>从准备数据与SQL人群圈选过程中，其实可以发现，ClickHouse的数据写入、导入速度，要比StarRocks快很多，但是在多表Join查询中，却又大幅落后于StarRocks。</p>
@@ -14424,8 +14424,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

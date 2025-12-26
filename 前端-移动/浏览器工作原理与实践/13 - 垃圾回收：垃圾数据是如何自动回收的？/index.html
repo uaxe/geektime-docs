@@ -6113,19 +6113,19 @@
 <a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>foo()
 </code></pre></div>
 <p>当执行到第6行代码时，其调用栈和堆空间状态图如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d8/b0/d807ca19c2c8853ef5a38dca0fb79ab0.jpg?wh=6818%2A4327" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d8/b0/d807ca19c2c8853ef5a38dca0fb79ab0.jpg?wh=6818%2A4327" /></p>
 <p>执行到showName函数时的内存模型</p>
 <p>从图中可以看出，原始类型的数据被分配到栈中，引用类型的数据会被分配到堆中。当foo函数执行结束之后，foo函数的执行上下文会从堆中被销毁掉，那么它是怎么被销毁的呢？下面我们就来分析一下。</p>
 <p>在<a href="https://time.geekbang.org/column/article/129596">上篇文章</a>中，我们简单介绍过了，如果执行到showName函数时，那么JavaScript引擎会创建showName函数的执行上下文，并将showName函数的执行上下文压入到调用栈中，最终执行到showName函数时，其调用栈就如上图所示。与此同时，还有一个<strong>记录当前执行状态的指针（称为ESP）</strong>，指向调用栈中showName函数的执行上下文，表示当前正在执行showName函数。</p>
 <p>接着，当showName函数执行完成之后，函数执行流程就进入了foo函数，那这时就需要销毁showName函数的执行上下文了。ESP这时候就帮上忙了，JavaScript会将ESP下移到foo函数的执行上下文，<strong>这个下移操作就是销毁showName函数执行上下文的过程</strong>。</p>
 <p>你可能会有点懵，ESP指针向下移动怎么就能把showName的执行上下文销毁了呢？具体你可以看下面这张移动ESP前后的对比图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b8/f3/b899cb27c0d92c31f9377db59939aaf3.jpg?wh=8000%2A4320" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b8/f3/b899cb27c0d92c31f9377db59939aaf3.jpg?wh=8000%2A4320" /></p>
 <p>从栈中回收showName执行上下文</p>
 <p>从图中可以看出，当showName函数执行结束之后，ESP向下移动到foo函数的执行上下文中，上面showName的执行上下文虽然保存在栈内存中，但是已经是无效内存了。比如当foo函数再次调用另外一个函数时，这块内容会被直接覆盖掉，用来存放另外一个函数的执行上下文。</p>
 <p>所以说，当一个函数执行结束之后，<strong>JavaScript引擎会通过向下移动ESP来销毁该函数保存在栈中的执行上下文</strong>。</p>
 <h2 id="_3">堆中的数据是如何回收的</h2>
 <p>通过上面的讲解，我想现在你应该已经知道，当上面那段代码的foo函数执行结束之后，ESP应该是指向全局执行上下文的，那这样的话，showName函数和foo函数的执行上下文就处于无效状态了，不过保存在堆中的两个对象依然占用着空间，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e8/8c/e80ff553417572f77973b08256b6928c.png?wh=1142%2A773" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e8/8c/e80ff553417572f77973b08256b6928c.png?wh=1142%2A773" /></p>
 <p>foo函数执行结束后的内存状态</p>
 <p>从图中可以看出，1003和1050这两块内存依然被占用。<strong>要回收堆中的垃圾数据，就需要用到JavaScript中的垃圾回收器了</strong>。</p>
 <p>所以，接下来我们就来通过Chrome的JavaScript引擎V8来分析下堆中的垃圾数据是如何回收的。</p>
@@ -6154,7 +6154,7 @@
 <h3 id="_6">副垃圾回收器</h3>
 <p>副垃圾回收器主要负责新生区的垃圾回收。而通常情况下，大多数小的对象都会被分配到新生区，所以说这个区域虽然不大，但是垃圾回收还是比较频繁的。</p>
 <p>新生代中用<strong>Scavenge算法</strong>来处理。所谓Scavenge算法，是把新生代空间对半划分为两个区域，一半是对象区域，一半是空闲区域，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4f/af/4f9310c7da631fa5a57f871099bfbeaf.png?wh=1142%2A550" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4f/af/4f9310c7da631fa5a57f871099bfbeaf.png?wh=1142%2A550" /></p>
 <p>新生区要划分为对象区域和空闲区域</p>
 <p>新加入的对象都会存放到对象区域，当对象区域快被写满时，就需要执行一次垃圾清理操作。</p>
 <p>在垃圾回收过程中，首先要对对象区域中的垃圾做标记；标记完成之后，就进入垃圾清理阶段，副垃圾回收器会把这些存活的对象复制到空闲区域中，同时它还会把这些对象有序地排列起来，所以这个复制过程，也就相当于完成了内存整理操作，复制后空闲区域就没有内存碎片了。</p>
@@ -6166,23 +6166,23 @@
 <p>由于老生区的对象比较大，若要在老生区中使用Scavenge算法进行垃圾回收，复制这些大的对象将会花费比较多的时间，从而导致回收执行效率不高，同时还会浪费一半的空间。因而，主垃圾回收器是采用<strong>标记-清除（Mark-Sweep）</strong>的算法进行垃圾回收的。下面我们来看看该算法是如何工作的。</p>
 <p>首先是标记过程阶段。标记阶段就是从一组根元素开始，递归遍历这组根元素，在这个遍历过程中，能到达的元素称为<strong>活动对象</strong>，没有到达的元素就可以判断为<strong>垃圾数据</strong>。</p>
 <p>比如最开始的那段代码，当showName函数执行退出之后，这段代码的调用栈和堆空间如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6c/69/6c8361d3e52c1c37a06699ed94652e69.png?wh=1142%2A550" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6c/69/6c8361d3e52c1c37a06699ed94652e69.png?wh=1142%2A550" /></p>
 <p>标记过程</p>
 <p>从上图你可以大致看到垃圾数据的标记过程，当showName函数执行结束之后，ESP向下移动，指向了foo函数的执行上下文，这时候如果遍历调用栈，是不会找到引用1003地址的变量，也就意味着1003这块数据为垃圾数据，被标记为红色。由于1050这块数据被变量b引用了，所以这块数据会被标记为活动对象。这就是大致的标记过程。</p>
 <p>接下来就是垃圾的清除过程。它和副垃圾回收器的垃圾清除过程完全不同，你可以理解这个过程是清除掉红色标记数据的过程，可参考下图大致理解下其清除过程：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d0/85/d015db8ad0df7f0ccb1bdb8e31f96e85.png?wh=1142%2A564" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d0/85/d015db8ad0df7f0ccb1bdb8e31f96e85.png?wh=1142%2A564" /></p>
 <p>标记清除过程</p>
 <p>上面的标记过程和清除过程就是标记-清除算法，不过对一块内存多次执行标记-清除算法后，会产生大量不连续的内存碎片。而碎片过多会导致大对象无法分配到足够的连续内存，于是又产生了另外一种算法——<strong>标记-整理（Mark-Compact）</strong>，这个标记过程仍然与标记-清除算法里的是一样的，但后续步骤不是直接对可回收对象进行清理，而是让所有存活的对象都向一端移动，然后直接清理掉端边界以外的内存。你可以参考下图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/65/8c/652bd2df726d0aa5e67fe8489f39a18c.png?wh=1142%2A441" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/65/8c/652bd2df726d0aa5e67fe8489f39a18c.png?wh=1142%2A441" /></p>
 <p>标记整理过程</p>
 <h3 id="_8">全停顿</h3>
 <p>现在你知道了V8是使用副垃圾回收器和主垃圾回收器处理垃圾回收的，不过由于JavaScript是运行在主线程之上的，一旦执行垃圾回收算法，都需要将正在执行的JavaScript脚本暂停下来，待垃圾回收完毕后再恢复脚本执行。我们把这种行为叫做<strong>全停顿（Stop-The-World）</strong>。</p>
 <p>比如堆中的数据有1.5GB，V8实现一次完整的垃圾回收需要1秒以上的时间，这也是由于垃圾回收而引起JavaScript线程暂停执行的时间，若是这样的时间花销，那么应用的性能和响应能力都会直线下降。主垃圾回收器执行一次完整的垃圾回收流程如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/98/0c/9898646a08b46bce4f12f918f3c1e60c.png?wh=1142%2A332" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/98/0c/9898646a08b46bce4f12f918f3c1e60c.png?wh=1142%2A332" /></p>
 <p>全停顿</p>
 <p>在V8新生代的垃圾回收中，因其空间较小，且存活对象较少，所以全停顿的影响不大，但老生代就不一样了。如果在执行垃圾回收的过程中，占用主线程时间过久，就像上面图片展示的那样，花费了200毫秒，在这200毫秒内，主线程是不能做其他事情的。比如页面正在执行一个JavaScript动画，因为垃圾回收器在工作，就会导致这个动画在这200毫秒内无法执行的，这将会造成页面的卡顿现象。</p>
 <p>为了降低老生代的垃圾回收而造成的卡顿，V8将标记过程分为一个个的子标记过程，同时让垃圾回收标记和JavaScript应用逻辑交替进行，直到标记阶段完成，我们把这个算法称为<strong>增量标记（Incremental Marking）算法</strong>。如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/de/e7/de117fc96ae425ed90366e9060aa14e7.png?wh=1142%2A366" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/de/e7/de117fc96ae425ed90366e9060aa14e7.png?wh=1142%2A366" /></p>
 <p>增量标记</p>
 <p>使用增量标记算法，可以把一个完整的垃圾回收任务拆分为很多小的任务，这些小的任务执行时间比较短，可以穿插在其他的JavaScript任务中间执行，这样当执行上述动画效果时，就不会让用户因为垃圾回收任务而感受到页面的卡顿了。</p>
 <h2 id="_9">总结</h2>
@@ -6319,8 +6319,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

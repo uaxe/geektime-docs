@@ -6618,13 +6618,13 @@
 <p>上述机制，就是我们今天要讲解的容器日志收集的基础假设。而如果你的应用是把文件输出到其他地方，比如直接输出到了容器里的某个文件里，或者输出到了远程存储里，那就属于特殊情况了。当然，我在文章里也会对这些特殊情况的处理方法进行讲述。</p>
 <p>而 Kubernetes 本身，实际上是不会为你做容器日志收集工作的，所以为了实现上述cluster-level-logging，你需要在部署集群的时候，提前对具体的日志方案进行规划。而 Kubernetes 项目本身，主要为你推荐了三种日志方案。</p>
 <p><strong>第一种，在 Node 上部署 logging agent，将日志文件转发到后端存储里保存起来。</strong>这个方案的架构图如下所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b5/43/b5515aed076aa6af63ace55b62d36243.jpg?wh=2284%2A1610" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b5/43/b5515aed076aa6af63ace55b62d36243.jpg?wh=2284%2A1610" /></p>
 <p>不难看到，这里的核心就在于 logging agent ，它一般都会以 DaemonSet 的方式运行在节点上，然后将宿主机上的容器日志目录挂载进去，最后由 logging-agent 把日志转发出去。</p>
 <p>举个例子，我们可以通过 Fluentd 项目作为宿主机上的 logging-agent，然后把日志转发到远端的 ElasticSearch 里保存起来供将来进行检索。具体的操作过程，你可以通过阅读<a href="https://kubernetes.io/docs/user-guide/logging/elasticsearch">这篇文档</a>来了解。另外，在很多 Kubernetes 的部署里，会自动为你启用 <a href="https://linux.die.net/man/8/logrotate">logrotate</a>，在日志文件超过10MB 的时候自动对日志文件进行 rotate 操作。</p>
 <p>可以看到，在 Node 上部署 logging agent最大的优点，在于一个节点只需要部署一个 agent，并且不会对应用和 Pod 有任何侵入性。所以，这个方案，在社区里是最常用的一种。</p>
 <p>但是也不难看到，这种方案的不足之处就在于，它要求应用输出的日志，都必须是直接输出到容器的 stdout 和 stderr 里。</p>
 <p>所以，<strong>Kubernetes 容器日志方案的第二种，就是对这种特殊情况的一个处理，即：当容器的日志只能输出到某些文件里的时候，我们可以通过一个 sidecar 容器把这些日志文件重新输出到 sidecar 的 stdout 和 stderr 上，这样就能够继续使用第一种方案了。</strong>这个方案的具体工作原理，如下所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/48/20/4863e3d7d1ef02a5a44e431369ac4120.jpg?wh=2284%2A1610" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/48/20/4863e3d7d1ef02a5a44e431369ac4120.jpg?wh=2284%2A1610" /></p>
 <p>比如，现在我的应用 Pod 只有一个容器，它会把日志输出到容器里的/var/log/1.log 和2.log 这两个文件里。这个 Pod 的 YAML 文件如下所示：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>apiVersion: v1
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>kind: Pod
@@ -6709,7 +6709,7 @@
 <p>由于 sidecar 跟主容器之间是共享 Volume 的，所以这里的 sidecar 方案的额外性能损耗并不高，也就是多占用一点 CPU 和内存罢了。</p>
 <p>但需要注意的是，这时候，宿主机上实际上会存在两份相同的日志文件：一份是应用自己写入的；另一份则是 sidecar 的 stdout 和 stderr 对应的 JSON 文件。这对磁盘是很大的浪费。所以说，除非万不得已或者应用容器完全不可能被修改，否则我还是建议你直接使用方案一，或者直接使用下面的第三种方案。</p>
 <p><strong>第三种方案，就是通过一个 sidecar 容器，直接把应用的日志文件发送到远程存储里面去。</strong>也就是相当于把方案一里的 logging agent，放在了应用 Pod 里。这种方案的架构如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d4/c7/d464401baec60c11f96dfeea3ae3a9c7.jpg?wh=2284%2A998" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d4/c7/d464401baec60c11f96dfeea3ae3a9c7.jpg?wh=2284%2A998" /></p>
 <p>在这种方案里，你的应用还可以直接把日志输出到固定的文件里而不是 stdout，你的 logging-agent 还可以使用 fluentd，后端存储还可以是 ElasticSearch。只不过， fluentd 的输入源，变成了应用的日志文件。一般来说，我们会把 fluentd 的输入源配置保存在一个 ConfigMap 里，如下所示：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>apiVersion: v1
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>kind: ConfigMap
@@ -6785,7 +6785,7 @@
 <p>在本篇文章中，我为你详细讲解了Kubernetes 项目对容器应用日志的收集方式。综合对比以上三种方案，我比较建议你将应用日志输出到 stdout 和 stderr，然后通过在宿主机上部署 logging-agent 的方式来集中处理日志。</p>
 <p>这种方案不仅管理简单，kubectl logs 也可以用，而且可靠性高，并且宿主机本身，很可能就自带了 rsyslogd 等非常成熟的日志收集组件来供你使用。</p>
 <p>除此之外，还有一种方式就是在编写应用的时候，就直接指定好日志的存储后端，如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/13/99/13e8439d9945fea58c9672fc4ca30799.jpg?wh=2284%2A705" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/13/99/13e8439d9945fea58c9672fc4ca30799.jpg?wh=2284%2A705" /></p>
 <p>在这种方案下，Kubernetes 就完全不必操心容器日志的收集了，这对于本身已经有完善的日志处理系统的公司来说，是一个非常好的选择。</p>
 <p>最后需要指出的是，无论是哪种方案，你都必须要及时将这些日志文件从宿主机上清理掉，或者给日志目录专门挂载一些容量巨大的远程盘。否则，一旦主磁盘分区被打满，整个系统就可能会陷入崩溃状态，这是非常麻烦的。</p>
 <h1 id="_2">思考题</h1>
@@ -6794,7 +6794,7 @@
 <li>你还有哪些容器收集的方案，是否可以分享一下？</li>
 </ol>
 <p>感谢你的收听，欢迎你给我留言，也欢迎分享给更多的朋友一起阅读。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/96/25/96ef8576a26f5e6266c422c0d6519725.jpg?wh=1110%2A659" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/96/25/96ef8576a26f5e6266c422c0d6519725.jpg?wh=1110%2A659" /></p>
 <div><strong>精选留言（15）</strong></div>
 <ul>
 <li><span>lovelife</span> 👍（51） 💬（1）<p>如果每秒日志量很大时，直接输出到容器的stdout和stderr,很容易就把系统日志配额用满，因为对系统默认日志工具是针对单服务(例如docker)而不是进程进行限额的，最终导致的结果就是日志被吞掉。解决办法一个是增加配额，一个是给容器挂上存储，将日志输出到存储上。当然日志量大也要考虑写日志时过多的磁盘读写导致整个节点的整体性能下降。</p>2018-12-17</li><br/><li><span>ch_ort</span> 👍（17） 💬（1）<p> Kubernetes项目的监控体系现在已经被Prometheus&quot;一统&quot;，而Prometheus与Kuberentes类似，也是来自Google内部系统的设计理念。
@@ -6953,8 +6953,6 @@ k8s pod 里的容器输出到 stdout、stderr 的日志会被默认写到 &#47;v
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

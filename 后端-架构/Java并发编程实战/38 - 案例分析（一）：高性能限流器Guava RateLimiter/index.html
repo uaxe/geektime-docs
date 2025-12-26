@@ -14621,22 +14621,22 @@
 <p>那还有什么好的实现方式呢？当然有，Guava的实现就没有使用定时器，下面我们就来看看它是如何实现的。</p>
 <h2 id="guava">Guava如何实现令牌桶算法</h2>
 <p>Guava实现令牌桶算法，用了一个很简单的办法，其关键是<strong>记录并动态计算下一令牌发放的时间</strong>。下面我们以一个最简单的场景来介绍该算法的执行过程。假设令牌桶的容量为 b=1，限流速率 r = 1个请求/秒，如下图所示，如果当前令牌桶中没有令牌，下一个令牌的发放时间是在第3秒，而在第2秒的时候有一个线程T1请求令牌，此时该如何处理呢？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/39/ce/391179821a55fc798c9c17a6991c1dce.png?wh=1142%2A478" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/39/ce/391179821a55fc798c9c17a6991c1dce.png?wh=1142%2A478" /></p>
 <p>线程T1请求令牌示意图</p>
 <p>对于这个请求令牌的线程而言，很显然需要等待1秒，因为1秒以后（第3秒）它就能拿到令牌了。此时需要注意的是，下一个令牌发放的时间也要增加1秒，为什么呢？因为第3秒发放的令牌已经被线程T1预占了。处理之后如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1a/87/1a4069c830e18de087ba7f490aa78087.png?wh=1142%2A284" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1a/87/1a4069c830e18de087ba7f490aa78087.png?wh=1142%2A284" /></p>
 <p>线程T1请求结束示意图</p>
 <p>假设T1在预占了第3秒的令牌之后，马上又有一个线程T2请求令牌，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2c/2e/2cf695d0888a93e1e2d020d9514f5a2e.png?wh=1142%2A367" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2c/2e/2cf695d0888a93e1e2d020d9514f5a2e.png?wh=1142%2A367" /></p>
 <p>线程T2请求令牌示意图</p>
 <p>很显然，由于下一个令牌产生的时间是第4秒，所以线程T2要等待两秒的时间，才能获取到令牌，同时由于T2预占了第4秒的令牌，所以下一令牌产生时间还要增加1秒，完全处理之后，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/68/f7/68c09a96049aacda7936c52b801c22f7.png?wh=1142%2A377" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/68/f7/68c09a96049aacda7936c52b801c22f7.png?wh=1142%2A377" /></p>
 <p>线程T2请求结束示意图</p>
 <p>上面线程T1、T2都是在<strong>下一令牌产生时间之前</strong>请求令牌，如果线程在<strong>下一令牌产生时间之后</strong>请求令牌会如何呢？假设在线程T1请求令牌之后的5秒，也就是第7秒，线程T3请求令牌，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e3/5c/e3125d72eb3d84eabf6de6ab987e695c.png?wh=1142%2A342" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e3/5c/e3125d72eb3d84eabf6de6ab987e695c.png?wh=1142%2A342" /></p>
 <p>线程T3请求令牌示意图</p>
 <p>由于在第5秒已经产生了一个令牌，所以此时线程T3可以直接拿到令牌，而无需等待。在第7秒，实际上限流器能够产生3个令牌，第5、6、7秒各产生一个令牌。由于我们假设令牌桶的容量是1，所以第6、7秒产生的令牌就丢弃了，其实等价地你也可以认为是保留的第7秒的令牌，丢弃的第5、6秒的令牌，也就是说第7秒的令牌被线程T3占有了，于是下一令牌的的产生时间应该是第8秒，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ba/fc/baf159d05b2abf650839e29a2399a4fc.png?wh=1142%2A344" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ba/fc/baf159d05b2abf650839e29a2399a4fc.png?wh=1142%2A344" /></p>
 <p>线程T3请求结束示意图</p>
 <p>通过上面简要地分析，你会发现，我们<strong>只需要记录一个下一令牌产生的时间，并动态更新它，就能够轻松完成限流功能</strong>。我们可以将上面的这个算法代码化，示例代码如下所示，依然假设令牌桶的容量是1。关键是<strong>reserve()方法</strong>，这个方法会为请求令牌的线程预分配令牌，同时返回该线程能够获取令牌的时间。其实现逻辑就是上面提到的：如果线程请求令牌的时间在下一令牌产生时间之后，那么该线程立刻就能够获取令牌；反之，如果请求时间在下一令牌产生时间之前，那么该线程是在下一令牌产生的时间获取令牌。由于此时下一令牌已经被该线程预占，所以下一令牌产生的时间需要加上1秒。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>class SimpleLimiter {
@@ -14879,8 +14879,6 @@ storedPermits + newPermits);
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

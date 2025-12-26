@@ -14744,8 +14744,8 @@
 <p>综合查看完近期的留言以后，我的第一篇答疑课堂就顺势诞生了。我将继续讲解I/O优化，对大家在08讲中提到的内容做重点补充，并延伸一些有关I/O的知识点，更多结合实际场景进行分享。话不多说，我们马上切入正题。</p>
 <p>Tomcat中经常被提到的一个调优就是修改线程的I/O模型。Tomcat 8.5版本之前，默认情况下使用的是BIO线程模型，如果在高负载、高并发的场景下，可以通过设置NIO线程模型，来提高系统的网络通信性能。</p>
 <p>我们可以通过一个性能对比测试来看看在高负载或高并发的情况下，BIO和NIO通信性能（这里用页面请求模拟多I/O读写操作的请求）：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3e/4a/3e66a63ce9f0d9722005f78fa960244a.png?wh=934%2A518" /></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3e/74/3e1d942b7e5e09ad6e4757b8d5cbe274.png?wh=935%2A521" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3e/4a/3e66a63ce9f0d9722005f78fa960244a.png?wh=934%2A518" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3e/74/3e1d942b7e5e09ad6e4757b8d5cbe274.png?wh=935%2A521" /></p>
 <p><strong>测试结果：Tomcat在I/O读写操作比较多的情况下，使用NIO线程模型有明显的优势。</strong></p>
 <p>Tomcat中看似一个简单的配置，其中却包含了大量的优化升级知识点。下面我们就从底层的网络I/O模型优化出发，再到内存拷贝优化和线程模型优化，深入分析下Tomcat、Netty等通信框架是如何通过优化I/O来提高系统性能的。</p>
 <h2 id="io">网络I/O模型优化</h2>
@@ -14753,7 +14753,7 @@
 <p>最开始的阻塞式I/O，它在每一个连接创建时，都需要一个用户线程来处理，并且在I/O操作没有就绪或结束时，线程会被挂起，进入阻塞等待状态，阻塞式I/O就成为了导致性能瓶颈的根本原因。</p>
 <p><strong>那阻塞到底发生在套接字（socket）通信的哪些环节呢？</strong></p>
 <p>在《Unix网络编程》中，套接字通信可以分为流式套接字（TCP）和数据报套接字（UDP）。其中TCP连接是我们最常用的，一起来了解下TCP服务端的工作流程（由于TCP的数据传输比较复杂，存在拆包和装包的可能，这里我只假设一次最简单的TCP数据传输）：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/33/41/3310cc063aaf19f2aeb9ea5bc3188e41.jpg?wh=1042%2A1292" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/33/41/3310cc063aaf19f2aeb9ea5bc3188e41.jpg?wh=1042%2A1292" /></p>
 <ul>
 <li>首先，应用程序通过系统调用socket创建一个套接字，它是系统分配给应用程序的一个文件描述符；</li>
 <li>其次，应用程序会通过系统调用bind，绑定地址和端口号，给套接字命名一个名称；</li>
@@ -14764,15 +14764,15 @@
 <h3 id="1io">1.阻塞式I/O</h3>
 <p>在整个socket通信工作流程中，socket的默认状态是阻塞的。也就是说，当发出一个不能立即完成的套接字调用时，其进程将被阻塞，被系统挂起，进入睡眠状态，一直等待相应的操作响应。从上图中，我们可以发现，可能存在的阻塞主要包括以下三种。</p>
 <p><strong>connect阻塞</strong>：当客户端发起TCP连接请求，通过系统调用connect函数，TCP连接的建立需要完成三次握手过程，客户端需要等待服务端发送回来的ACK以及SYN信号，同样服务端也需要阻塞等待客户端确认连接的ACK信号，这就意味着TCP的每个connect都会阻塞等待，直到确认连接。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2a/c9/2a208cf7dddf18d2fe813b75ef2f4ac9.png?wh=1143%2A640" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2a/c9/2a208cf7dddf18d2fe813b75ef2f4ac9.png?wh=1143%2A640" /></p>
 <p><strong>accept阻塞</strong>：一个阻塞的socket通信的服务端接收外来连接，会调用accept函数，如果没有新的连接到达，调用进程将被挂起，进入阻塞状态。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3f/96/3fc5ef2eb6e594fd7d5cbc358cd5dd96.png?wh=1142%2A640" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3f/96/3fc5ef2eb6e594fd7d5cbc358cd5dd96.png?wh=1142%2A640" /></p>
 <p><strong>read、write阻塞</strong>：当一个socket连接创建成功之后，服务端用fork函数创建一个子进程， 调用read函数等待客户端的数据写入，如果没有数据写入，调用子进程将被挂起，进入阻塞状态。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e1/cf/e14386a357185acc39fdc708fb3692cf.png?wh=1142%2A640" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e1/cf/e14386a357185acc39fdc708fb3692cf.png?wh=1142%2A640" /></p>
 <h3 id="2io">2.非阻塞式I/O</h3>
 <p>使用fcntl可以把以上三种操作都设置为非阻塞操作。如果没有数据返回，就会直接返回一个EWOULDBLOCK或EAGAIN错误，此时进程就不会一直被阻塞。</p>
 <p>当我们把以上操作设置为了非阻塞状态，我们需要设置一个线程对该操作进行轮询检查，这也是最传统的非阻塞I/O模型。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ec/62/ec2ec7914b3b86a1965dc98a830a3a62.png?wh=1142%2A640" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ec/62/ec2ec7914b3b86a1965dc98a830a3a62.png?wh=1142%2A640" /></p>
 <h3 id="3-io">3. I/O复用</h3>
 <p>如果使用用户线程轮询查看一个I/O操作的状态，在大量请求的情况下，这对于CPU的使用率无疑是种灾难。 那么除了这种方式，还有其它方式可以实现非阻塞I/O套接字吗？</p>
 <p>Linux提供了I/O复用函数select/poll/epoll，进程将一个或多个读操作通过系统调用函数，阻塞在函数操作上。这样，系统内核就可以帮我们侦测多个读操作是否处于就绪状态。</p>
@@ -14786,11 +14786,11 @@
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>void FD_CLR(int fd, fd_set *fdset);   //将一个给定的文件描述符从集合中删除
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>int FD_ISSET(int fd, fd_set *fdset);   // 检查集合中指定的文件描述符是否可以读写
 </code></pre></div>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d8/dd/d8f4a9cfb8d37d08487a68fc10e31fdd.png?wh=1142%2A640" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d8/dd/d8f4a9cfb8d37d08487a68fc10e31fdd.png?wh=1142%2A640" /></p>
 <p><strong>poll()函数</strong>：在每次调用select()函数之前，系统需要把一个fd从用户态拷贝到内核态，这样就给系统带来了一定的性能开销。再有单个进程监视的fd数量默认是1024，我们可以通过修改宏定义甚至重新编译内核的方式打破这一限制。但由于fd_set是基于数组实现的，在新增和删除fd时，数量过大会导致效率降低。</p>
 <p>poll() 的机制与 select() 类似，二者在本质上差别不大。poll() 管理多个描述符也是通过轮询，根据描述符的状态进行处理，但 poll() 没有最大文件描述符数量的限制。</p>
 <p>poll() 和 select() 存在一个相同的缺点，那就是包含大量文件描述符的数组被整体复制到用户态和内核的地址空间之间，而无论这些文件描述符是否就绪，他们的开销都会随着文件描述符数量的增加而线性增大。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/54/db/54d775cf7df756672b23a1853441d3db.png?wh=1142%2A640" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/54/db/54d775cf7df756672b23a1853441d3db.png?wh=1142%2A640" /></p>
 <p><strong>epoll()函数</strong>：select/poll是顺序扫描fd是否就绪，而且支持的fd数量不宜过大，因此它的使用受到了一些制约。</p>
 <p>Linux在2.6内核版本中提供了一个epoll调用，epoll使用事件驱动的方式代替轮询扫描fd。epoll事先通过epoll_ctl()来注册一个文件描述符，将文件描述符存放到内核的一个事件表中，这个事件表是基于红黑树实现的，所以在大量I/O请求的场景下，插入和删除的性能比select/poll的数组fd_set要好，因此epoll的性能更胜一筹，而且不会受到fd数量的限制。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>int epoll_ctl(int epfd, int op, int fd, struct epoll_event event)
@@ -14799,22 +14799,22 @@
 <p>一旦某个文件描述符就绪时，内核会采用类似callback的回调机制，迅速激活这个文件描述符，当进程调用epoll_wait()时便得到通知，之后进程将完成相关I/O操作。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>int epoll_wait(int epfd, struct epoll_event events,int maxevents,int timeout)
 </code></pre></div>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/36/7a/36ee4e180cb6bb4f1452c0bafbe6f37a.png?wh=1142%2A640" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/36/7a/36ee4e180cb6bb4f1452c0bafbe6f37a.png?wh=1142%2A640" /></p>
 <h3 id="4io">4.信号驱动式I/O</h3>
 <p>信号驱动式I/O类似观察者模式，内核就是一个观察者，信号回调则是通知。用户进程发起一个I/O请求操作，会通过系统调用sigaction函数，给对应的套接字注册一个信号回调，此时不阻塞用户进程，进程会继续工作。当内核数据就绪时，内核就为该进程生成一个SIGIO信号，通过信号回调通知进程进行相关I/O操作。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4c/1f/4c897ce649d3deb609a4f0a9ba7aee1f.png?wh=749%2A411" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4c/1f/4c897ce649d3deb609a4f0a9ba7aee1f.png?wh=749%2A411" /></p>
 <p>信号驱动式I/O相比于前三种I/O模式，实现了在等待数据就绪时，进程不被阻塞，主循环可以继续工作，所以性能更佳。</p>
 <p>而由于TCP来说，信号驱动式I/O几乎没有被使用，这是因为SIGIO信号是一种Unix信号，信号没有附加信息，如果一个信号源有多种产生信号的原因，信号接收者就无法确定究竟发生了什么。而 TCP socket生产的信号事件有七种之多，这样应用程序收到 SIGIO，根本无从区分处理。</p>
 <p>但信号驱动式I/O现在被用在了UDP通信上，我们从10讲中的UDP通信流程图中可以发现，UDP只有一个数据请求事件，这也就意味着在正常情况下UDP进程只要捕获SIGIO信号，就调用recvfrom读取到达的数据报。如果出现异常，就返回一个异常错误。比如，NTP服务器就应用了这种模型。</p>
 <h3 id="5io">5.异步I/O</h3>
 <p>信号驱动式I/O虽然在等待数据就绪时，没有阻塞进程，但在被通知后进行的I/O操作还是阻塞的，进程会等待数据从内核空间复制到用户空间中。而异步I/O则是实现了真正的非阻塞I/O。</p>
 <p>当用户进程发起一个I/O请求操作，系统会告知内核启动某个操作，并让内核在整个操作完成后通知进程。这个操作包括等待数据就绪和数据从内核复制到用户空间。由于程序的代码复杂度高，调试难度大，且支持异步I/O的操作系统比较少见（目前Linux暂不支持，而Windows已经实现了异步I/O），所以在实际生产环境中很少用到异步I/O模型。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/dd/c0/dd4b03afb56a3b7660794ce11fc421c0.png?wh=1142%2A640" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dd/c0/dd4b03afb56a3b7660794ce11fc421c0.png?wh=1142%2A640" /></p>
 <p>在08讲中，我讲到了NIO使用I/O复用器Selector实现非阻塞I/O，Selector就是使用了这五种类型中的I/O复用模型。Java中的Selector其实就是select/poll/epoll的外包类。</p>
 <p>我们在上面的TCP通信流程中讲到，Socket通信中的conect、accept、read以及write为阻塞操作，在Selector中分别对应SelectionKey的四个监听事件OP_ACCEPT、OP_CONNECT、OP_READ以及OP_WRITE。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/85/96/85bcacec92e74c5cb6d6a39669e0d896.png?wh=648%2A253" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/85/96/85bcacec92e74c5cb6d6a39669e0d896.png?wh=648%2A253" /></p>
 <p>在NIO服务端通信编程中，首先会创建一个Channel，用于监听客户端连接；接着，创建多路复用器Selector，并将Channel注册到Selector，程序会通过Selector来轮询注册在其上的Channel，当发现一个或多个Channel处于就绪状态时，返回就绪的监听事件，最后程序匹配到监听事件，进行相关的I/O操作。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e2/15/e27534c5a157d0908d51b806919b1515.jpg?wh=1095%2A676" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e2/15/e27534c5a157d0908d51b806919b1515.jpg?wh=1095%2A676" /></p>
 <p>在创建Selector时，程序会根据操作系统版本选择使用哪种I/O复用函数。在JDK1.5版本中，如果程序运行在Linux操作系统，且内核版本在2.6以上，NIO中会选择epoll来替代传统的select/poll，这也极大地提升了NIO通信的性能。</p>
 <p>由于信号驱动式I/O对TCP通信的不支持，以及异步I/O在Linux操作系统内核中的应用还不大成熟，大部分框架都还是基于I/O复用模型实现的网络通信。</p>
 <h2 id="_1">零拷贝</h2>
@@ -14833,19 +14833,19 @@
 <h3 id="1reactor">1.单线程Reactor线程模型</h3>
 <p>最开始NIO是基于单线程实现的，所有的I/O操作都是在一个NIO线程上完成。由于NIO是非阻塞I/O，理论上一个线程可以完成所有的I/O操作。</p>
 <p>但NIO其实还不算真正地实现了非阻塞I/O操作，因为读写I/O操作时用户进程还是处于阻塞状态，这种方式在高负载、高并发的场景下会存在性能瓶颈，一个NIO线程如果同时处理上万连接的I/O操作，系统是无法支撑这种量级的请求的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/29/f8/29b117cb60bcc8edd6d1fa21981fb9f8.png?wh=1800%2A640" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/29/f8/29b117cb60bcc8edd6d1fa21981fb9f8.png?wh=1800%2A640" /></p>
 <h3 id="2reactor">2.多线程Reactor线程模型</h3>
 <p>为了解决这种单线程的NIO在高负载、高并发场景下的性能瓶颈，后来使用了线程池。</p>
 <p>在Tomcat和Netty中都使用了一个Acceptor线程来监听连接请求事件，当连接成功之后，会将建立的连接注册到多路复用器中，一旦监听到事件，将交给Worker线程池来负责处理。大多数情况下，这种线程模型可以满足性能要求，但如果连接的客户端再上一个量级，一个Acceptor线程可能会存在性能瓶颈。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0d/82/0de0c467036f2973143a620448068a82.png?wh=1767%2A640" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0d/82/0de0c467036f2973143a620448068a82.png?wh=1767%2A640" /></p>
 <h3 id="3reactor">3.主从Reactor线程模型</h3>
 <p>现在主流通信框架中的NIO通信框架都是基于主从Reactor线程模型来实现的。在这个模型中，Acceptor不再是一个单独的NIO线程，而是一个线程池。Acceptor接收到客户端的TCP连接请求，建立连接之后，后续的I/O操作将交给Worker I/O线程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f9/0a/f9d03620ae5c7c82c83f522710a62a0a.png?wh=1800%2A640" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f9/0a/f9d03620ae5c7c82c83f522710a62a0a.png?wh=1800%2A640" /></p>
 <h3 id="tomcat">基于线程模型的Tomcat参数调优</h3>
 <p>Tomcat中，BIO、NIO是基于主从Reactor线程模型实现的。</p>
 <p><strong>在BIO中，</strong>Tomcat中的Acceptor只负责监听新的连接，一旦连接建立监听到I/O操作，将会交给Worker线程中，Worker线程专门负责I/O读写操作。</p>
 <p><strong>在NIO中，</strong>Tomcat新增了一个Poller线程池，Acceptor监听到连接后，不是直接使用Worker中的线程处理请求，而是先将请求发送给了Poller缓冲队列。在Poller中，维护了一个Selector对象，当Poller从队列中取出连接后，注册到该Selector中；然后通过遍历Selector，找出其中就绪的I/O操作，并使用Worker中的线程处理相应的请求。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/13/ba/136315be52782bd88056fb28f3ec60ba.png?wh=1028%2A229" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/13/ba/136315be52782bd88056fb28f3ec60ba.png?wh=1028%2A229" /></p>
 <p>你可以通过以下几个参数来设置Acceptor线程池和Worker线程池的配置项。</p>
 <p><strong>acceptorThreadCount：</strong>该参数代表Acceptor的线程数量，在请求客户端的数据量非常巨大的情况下，可以适当地调大该线程数量来提高处理请求连接的能力，默认值为1。</p>
 <p><strong>maxThreads：</strong>专门处理I/O操作的Worker线程数量，默认是200，可以根据实际的环境来调整该参数，但不一定越大越好。</p>
@@ -14988,8 +14988,6 @@ epoll()方式的优点如下
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

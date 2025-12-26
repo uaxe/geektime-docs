@@ -14187,7 +14187,7 @@
 <p>要想理解分区垃圾回收的原理，还得从它的结构讲起。</p>
 <h2 id="_1">分区算法的堆结构</h2>
 <p>首先，我们来了解一下分区回收算法的堆空间是如何划分的。下图是G1 GC的堆结构：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/aa/bf/aaf7f24a480ca0d292ef267f2bcacdbf.jpg?wh=2284x1161" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/aa/bf/aaf7f24a480ca0d292ef267f2bcacdbf.jpg?wh=2284x1161" /></p>
 <p>G1也是一个分代的垃圾回收算法，不过，和之前介绍的CMS、Scavenge算法不同的是：<strong>G1的老年代和年轻代不再是一块连续的空间，整个堆被划分成若干个大小相同的Region，也就是区</strong>。Region的类型有<strong>Eden、Survivor、Old、Humongous</strong>四种，而且每个Region都可以单独进行管理。</p>
 <p>Humongous是用来存放大对象的，如果一个对象的大小大于一个Region的50%（默认值），那么我们就认为这个对象是一个大对象。为了防止大对象的频繁拷贝，我们可以将大对象直接放到Humongous中。</p>
 <p>而Eden、Survivor、Old三种区域和我们前面课程中介绍的Eden分区、Survivor分区以及老年代的作用是类似的。也就是说，对象会在Eden Regions中分配，当进行年轻代GC时，会将活跃对象拷贝到Survivor Regions；当对象年龄超过晋升阈值时，就把活跃对象复制进Old Regions。如果你不清楚，可以看看<a href="https://time.geekbang.org/column/article/465516">第19节课</a>和<a href="https://time.geekbang.org/column/article/467174">第20节课</a>，这里我就不再啰嗦了。</p>
@@ -14199,7 +14199,7 @@
 <li><strong>在写屏障里使用card table维护跨代引用。</strong></li>
 </ol>
 <p>我们先来看第一个作用，也就是解决活跃对象漏标的问题。上一节课介绍了解决漏标问题的两种方法，分别是<strong>“往前走”和“往后退一步”</strong>。今天这节课，我们就来介绍第三种解法，这个解法呢，是由日本学者汤浅太一提出的，具体的算法如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9f/19/9ff38194b9663fa85f9b5148d6179e19.jpg?wh=2284x1171" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9f/19/9ff38194b9663fa85f9b5148d6179e19.jpg?wh=2284x1171" /></p>
 <p>在这张图中，我们可以看到，当对象B对C的引用关系消失以后，再将C标记为灰色，即便将来A对C的引用消失了，也会在当前GC周期内被视为活跃对象。也就是说，C有可能变成浮动垃圾。我们把这种在删除引用的时候进行维护的屏障叫做<strong>deletion barrier</strong>。</p>
 <p>G1中采用的就是这种做法。这种做法的特点是，在GC标记开始的一瞬间，活跃的对象无论在标记期间发生怎样的变化，都会被认为是活跃的对象。</p>
 <p>我们知道，当一个对象的全部引用被删除时，才会被当做垃圾。而如果使用我们前面讲到的deletion barrier，在并发标记阶段，即便对象的全部引用被删除，也会被当做活跃对象来处理。就好像在GC开始的瞬间，内存管理器为所有活跃对象做了一个快照一样，所以人们给了这种技术一个很形象的名字：<strong>开始时快照（Snapshot At The Beginning，SATB）</strong>。</p>
@@ -14208,7 +14208,7 @@
 <p>我们在讲写屏障时提到，当B对象对C对象的引用消失时，C对象将会被标记为灰色。这个动作的效率是比较低的，如果都放在写屏障中做，会极大地影响程序性能。<strong>因为写屏障的逻辑是由业务线程执行的。</strong></p>
 <p>为了解决这个问题，GC开发者将“C对象标记为灰色”这件事情往后推迟了。业务线程只需要把C对象记录到一个本地队列中就可以了。每个业务线程都有一个这样的线程本地队列，它的名字是<strong>SATB队列</strong>。</p>
 <p>当业务线程发现对象C的引用被删除之后，直接将C放到SATB队列中，并不去做标记，真正做标记的工作交给GC线程去做，这样就减少了写屏障的开销。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c6/cf/c68666025933acfa0c621a01b7bf68cf.jpg?wh=2284x1243" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c6/cf/c68666025933acfa0c621a01b7bf68cf.jpg?wh=2284x1243" /></p>
 <p>如上图所示，每个线程有自己的本地SATB队列，当本地队列满了之后，就把它交给SATB队列集合，然后再领取一个空队列当做线程的本地SATB队列。GC线程则会将SATB队列集合中的对象标记为灰色，至于什么时候标记，并不需要业务线程关心。</p>
 <p>在学习了SATB相关知识后，我们继续来定义G1的两种垃圾回收模式，以方便后面详细地介绍算法的执行过程。</p>
 <h2 id="_3">垃圾回收模式</h2>
@@ -14230,7 +14230,7 @@
 <p>在上面的内容中，我们提到了写屏障的两个功能，第二个功能就是<strong>维护跨区引用</strong>。在<a href="https://time.geekbang.org/column/article/468157">第21节课</a>中，我们已经学习了CMS的跨代引用，实际上，CMS的跨代引用和G1的跨区引用的原理是相同的。不同的是，CMS的跨代引用它的回收空间是固定的，例如young GC只回收年轻代，Concurrent Mark Sweep只回收老年代，这样只需要维护一张卡表就可以了。</p>
 <p>但是像G1这种分区回收算法，有些Region可能被选入CSet，有些则不会。所以，我们需要知道当一个Region需要被回收时，有哪些其他的Region引用了自己。相应地，为了加快定位速度，分区回收算法为每个Region都引入了<strong>记录集（Remembered Set，RSet）</strong>，每个Region都有自己的专属RSet。</p>
 <p>和Card table 不同的是，RSet记录谁引用了我，这种记录集被人们称为<strong>point-in型</strong>的，而Card table则记录我引用了谁，这种记录集被称为<strong>point-out型</strong>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e1/89/e128f9d4b811a9dbbc0ddb1a4b5de789.jpg?wh=2284x976" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e1/89/e128f9d4b811a9dbbc0ddb1a4b5de789.jpg?wh=2284x976" /></p>
 <p>如图所示，图中的左侧展示了一个维护跨区引用的通用记录集，而右侧则展示了只对应于一个Region的专属记录集。</p>
 <p>接下来我们继续分析RSet的维护策略，也就是说哪些引用关系需要加入到RSet：</p>
 <ol>
@@ -14240,12 +14240,12 @@
 </ol>
 <p>总的来说，RSet 需要维护的引用关系只有两种，<strong>非CSet 老年代Region 到年轻代Region的引用，和非CSet 老年代Region到CSet老年代Region的引用。</strong></p>
 <p>那么，RSet具体是何时被记录的呢？答案也是写屏障，写屏障的这个作用，我们在上面的内容中已经提到过。如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ef/53/efd323267e5f1256e272a9fc54244453.jpg?wh=2284x967" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ef/53/efd323267e5f1256e272a9fc54244453.jpg?wh=2284x967" /></p>
 <p>G1在RSet中记录的也是card。比如Region1中的对象A引用了Region2的对象B，那么对象A所对应的card就会被记录在Region2的RSet中（注意！不是Region1的RSet）。</p>
 <p>在G1中，我们把这种card称为dirty card。和SATB相似，业务线程也不是直接将dirty card放到RSet中的。而是在业务线程中引入一个叫做<strong>dirty card queue（DCQ）</strong>的队列，在写屏障中，业务线程只需要将dirty card放入DCQ中，而不做非常细致的检查。</p>
 <p>接下来，GC线程中，有一类特殊的线程，它们会从DCQ中找到这种dirty card，然后再去做更精细的检查，只有确实不属于上面所描述的三种情况的跨区引用，才真正放到专属RSet中去。这一类特殊的线程就是G1 GC中的<strong>Refine线程</strong>。</p>
 <p>下面我们再来继续剖析RSet存放的形式是怎样的。考虑某个Region的RSet，它可能会因为引用关系比较多，而变得很大。根据另一个Region对这个Region的引用数量，可以分为少、中、多三种情况。针对这三种情况，RSet准备了三种不同的数据结构来应对，分别是<strong>稀疏表、细粒度表和粗粒度表</strong>。三种表之间的关系是不断粗化的，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/69/yy/69b112a235d36b564ac825a04ca653yy.jpg?wh=2284x985" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/69/yy/69b112a235d36b564ac825a04ca653yy.jpg?wh=2284x985" /></p>
 <p>从上图中，我们可以看到：</p>
 <ol>
 <li>稀疏表是一个哈希表，当Region A对Region B的引用很少时，就可以将相关的card放到稀疏表里；</li>
@@ -14257,14 +14257,14 @@
 <h2 id="_5">垃圾回收的过程</h2>
 <p>G1的垃圾清理是通过把活跃的对象，从一个Region拷贝到另一个空白Region，这个空白Region隶属于Survivor空间。这个过程在G1 GC中被命名为<strong>转移（Evacuation）</strong>。它和之前讲到的基于copy的GC的最大区别是：<strong>它可以充分利用concurrent mark的结果快速定位到哪些对象需要被拷贝。</strong></p>
 <p>接下来让我们通过一个例子，来看看G1 Evacuation的具体过程吧。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8a/26/8a623b380c0af2110b016e8ea5b86826.jpg?wh=2284x947" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8a/26/8a623b380c0af2110b016e8ea5b86826.jpg?wh=2284x947" /></p>
 <p>在上图中，Region2是一个待回收的Region，隶属于CSet。在它的专属RSet中记录了Region1 的第二个card和Region3的第一个card，说明Region1和Region3有对Region2的对象引用，Region4 是一个被选为Survivor的空白Region。</p>
 <p>假如Region1和Region3都经过了并发标记，识别出A对象是垃圾对象，而E对象是活跃对象。那么，我们就可以从活跃对象E开始进行遍历。注意，这一次遍历的目标是把Region2中的对象搬移到Region4。</p>
 <p>Region1中的A是垃圾对象，这在并发标记阶段就已经发现了，所以在转移阶段就不会再起作用了。进而，Region2中的B、C也不会被标记到，最终只有对象D被拷贝到了Region4，与此同时，原始Region2的RSet也会被维护到Region4。</p>
 <p>因为Evacuation发生的时机是不确定的，在并发标记阶段也可能发生。所以并发标记要使用一个BitMap来记录活跃对象，而Evacuation也需要使用一个BitMap来将活跃的对象进行搬移。这就产生了读和写的冲突：<strong>并发标记需要写BitMap，而Evacuation需要读BitMap</strong>。</p>
 <p>为了解决这个问题，G1维护了两个BitMap，一个名为nextBitMap，一个名为prevBitMap。其中，<strong>prevBitMap是用于搬移活跃对象</strong>，而<strong>nextBitMap则用于并发标记记录活跃对象</strong>。</p>
 <p>当并发标记开始以后，新的对象仍然有可能会被继续分配。内存管理器把这些对象全部认为是活跃对象。我们来看下面的这个示意图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d5/54/d5f0763d397f4097d9633e24281d5d54.png?wh=2284x2362" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d5/54/d5f0763d397f4097d9633e24281d5d54.png?wh=2284x2362" /></p>
 <p>在上图中，TAMS指针，是Top At Mark Start的缩写。初始时，prevTAMS，nextTAMS和top指针都指向一个分区的开始位置。</p>
 <p>随着业务线程的执行，top指针不断向后移动。并发标记开始时（图1），nextTAMS记录下当前的top指针，并且针对nextTAMS之前的对象进行活跃性扫描，扫描的结果就存放在nextBitMap中（图2）。</p>
 <p>当并发标记结束以后，nextTAMS的值就记录在prevTAMS中，并且nextBitMap也赋值给prevBitMap。如果此时发生了Evacuation，则prevBitMap已经可用了。如果没有发生Evacuation，那么nextBitMap就会清空，为下一轮并发标记做准备。这样就可以保证，在任意时刻开启Evacuation的话，prevBitMap总是可用的（图3）。</p>
@@ -14274,7 +14274,7 @@
 <p>好啦，关于G1的算法原理，我们就先介绍到这里吧，下面让我们一起看看G1有哪些常用参数吧，因为掌握G1中重要的参数的意义，才能帮助你对G1 GC进行参数调优。</p>
 <h2 id="g1">G1 常用参数</h2>
 <p>G1的默认参数已经被调整得很好了，大多数情况下，不需要再调整。但是，也不排除特殊情况，因此我们还是需要掌握一些GC参数，具体列表如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5a/68/5a7b129e54bed0ce79604bafa77a0768.jpg?wh=2284x1620" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5a/68/5a7b129e54bed0ce79604bafa77a0768.jpg?wh=2284x1620" /></p>
 <p>这个表格中最重要、也是你平时最有可能用到的参数，就是<strong>MaxGCPauseMillis</strong>。它设置了期望的最大停顿时间。MaxGCPauseMillis设置的越小，可以控制的停顿时间就越短。但是如果设置得太短，可能会引起Full GC，代价十分昂贵。</p>
 <p>其次，比较关键的参数是<strong>InitiatingHeapOccupancyPercent（IHOP）</strong>，它的作用是在老年代的内存空间达到一定百分比之后，启动并发标记。当然，这更进一步是为了触发mixed GC，以此来回收老年代。如果一个应用老年代对象产生速度较快，可以尝试适当调小IHOP。</p>
 <h2 id="_6">总结</h2>
@@ -14287,7 +14287,7 @@
 <p>最后，我还给你讲了在实际工作中需要掌握的几个G1参数，尤其是<strong>MaxGCPauseMillis和IHOP</strong>。MaxGCPauseMillis用来设置期望最大停顿时间，IHOP用来调整并发标记的处理时机，调整老年代回收的及时性。</p>
 <h2 id="_7">思考题</h2>
 <p>请你思考：如何可以进一步减少垃圾回收的最大停顿时间？欢迎在留言区分享你的想法，我在留言区等你。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a9/c4/a9c0bf3dfb5c7d3f0c7b0c3936eba9c4.jpg?wh=2284x1386" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a9/c4/a9c0bf3dfb5c7d3f0c7b0c3936eba9c4.jpg?wh=2284x1386" /></p>
 <p>好啦，这节课到这就结束啦。欢迎你把这节课分享给更多对计算机内存感兴趣的朋友。我是海纳，我们下节课再见！</p>
 <div><strong>精选留言（10）</strong></div>
 <ul>
@@ -14412,8 +14412,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -14448,7 +14448,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>select * from t1 where a&gt;=1 and a&lt;=100;
 </code></pre></div>
 <p>主键索引是一棵B+树，在这棵树上，每次只能根据一个主键id查到一行数据。因此，回表肯定是一行行搜索主键索引的，基本流程如图1所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/97/05/97ae269061192f6d7a632df56fa03605.png?wh=1142%2A880" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/97/05/97ae269061192f6d7a632df56fa03605.png?wh=1142%2A880" /></p>
 <p>图1 基本回表流程</p>
 <p>如果随着a的值递增顺序查询的话，id的值就变成随机的，那么就会出现随机访问，性能相对较差。虽然“按行查”这个机制不能改，但是调整查询的顺序，还是能够加速的。</p>
 <p><strong>因为大多数的数据都是按照主键递增顺序插入得到的，所以我们可以认为，如果按照主键的递增顺序查询的话，对磁盘的读比较接近顺序读，能够提升读性能。</strong></p>
@@ -14461,9 +14461,9 @@
 <p>这里，read_rnd_buffer的大小是由read_rnd_buffer_size参数控制的。如果步骤1中，read_rnd_buffer放满了，就会先执行完步骤2和3，然后清空read_rnd_buffer。之后继续找索引a的下个记录，并继续循环。</p>
 <p>另外需要说明的是，如果你想要稳定地使用MRR优化的话，需要设置<code>set optimizer_switch="mrr_cost_based=off"</code>。（官方文档的说法，是现在的优化器策略，判断消耗的时候，会更倾向于不使用MRR，把mrr_cost_based设置为off，就是固定使用MRR了。）</p>
 <p>下面两幅图就是使用了MRR优化后的执行流程和explain结果。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d5/c7/d502fbaea7cac6f815c626b078da86c7.jpg?wh=1142%2A880" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d5/c7/d502fbaea7cac6f815c626b078da86c7.jpg?wh=1142%2A880" /></p>
 <p>图2 MRR执行流程</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a5/32/a513d07ebaf1ae044d44391c89bc6432.png?wh=1583%2A149" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a5/32/a513d07ebaf1ae044d44391c89bc6432.png?wh=1583%2A149" /></p>
 <p>图3 MRR执行流程的explain结果</p>
 <p>从图3的explain结果中，我们可以看到Extra字段多了Using MRR，表示的是用上了MRR优化。而且，由于我们在read_rnd_buffer中按照id做了排序，所以最后得到的结果集也是按照主键id递增顺序的，也就是与图1结果集中行的顺序相反。</p>
 <p>到这里，我们小结一下。</p>
@@ -14471,14 +14471,14 @@
 <h1 id="batched-key-access">Batched Key Access</h1>
 <p>理解了MRR性能提升的原理，我们就能理解MySQL在5.6版本后开始引入的Batched Key Access(BKA)算法了。这个BKA算法，其实就是对NLJ算法的优化。</p>
 <p>我们再来看看上一篇文章中用到的NLJ算法的流程图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/10/3d/10e14e8b9691ac6337d457172b641a3d.jpg?wh=1142%2A880" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/10/3d/10e14e8b9691ac6337d457172b641a3d.jpg?wh=1142%2A880" /></p>
 <p>图4 Index Nested-Loop Join流程图</p>
 <p>NLJ算法执行的逻辑是：从驱动表t1，一行行地取出a的值，再到被驱动表t2去做join。也就是说，对于表t2来说，每次都是匹配一个值。这时，MRR的优势就用不上了。</p>
 <p>那怎么才能一次性地多传些值给表t2呢？方法就是，从表t1里一次性地多拿些行出来，一起传给表t2。</p>
 <p>既然如此，我们就把表t1的数据取出来一部分，先放到一个临时内存。这个临时内存不是别人，就是join_buffer。</p>
 <p>通过上一篇文章，我们知道join_buffer 在BNL算法里的作用，是暂存驱动表的数据。但是在NLJ算法里并没有用。那么，我们刚好就可以复用join_buffer到BKA算法中。</p>
 <p>如图5所示，是上面的NLJ算法优化后的BKA算法的流程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/68/88/682370c5640244fa3474d26cc3bc0388.png?wh=1142%2A880" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/68/88/682370c5640244fa3474d26cc3bc0388.png?wh=1142%2A880" /></p>
 <p>图5 Batched Key Access流程</p>
 <p>图中，我在join_buffer中放入的数据是P1~P100，表示的是只会取查询需要的字段。当然，如果join buffer放不下P1~P100的所有数据，就会把这100行数据分成多段执行上图的流程。</p>
 <p>那么，这个BKA算法到底要怎么启用呢？</p>
@@ -14523,9 +14523,9 @@
 <li>如果满足t1.b=t2.b, 再判断其他条件，也就是是否满足t2.b处于[1,2000]的条件，如果是，就作为结果集的一部分返回，否则跳过。</li>
 </ol>
 <p>我在上一篇文章中说过，对于表t2的每一行，判断join是否满足的时候，都需要遍历join_buffer中的所有行。因此判断等值条件的次数是1000*100万=10亿次，这个判断的工作量很大。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/92/60/92fbdbfc35da3040396401250cb33f60.png?wh=1776%2A169" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/92/60/92fbdbfc35da3040396401250cb33f60.png?wh=1776%2A169" /></p>
 <p>图6 explain结果</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d8/9c/d862bc3e88305688df2c354a4b26809c.png?wh=550%2A130" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d8/9c/d862bc3e88305688df2c354a4b26809c.png?wh=550%2A130" /></p>
 <p>图7 语句执行时间</p>
 <p>可以看到，explain结果里Extra字段显示使用了BNL算法。在我的测试环境里，这条语句需要执行1分11秒。</p>
 <p>在表t2的字段b上创建索引会浪费资源，但是不创建索引的话这个语句的等值条件要判断10亿次，想想也是浪费。那么，有没有两全其美的办法呢？</p>
@@ -14541,7 +14541,7 @@
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>select * from t1 join temp_t on (t1.b=temp_t.b);
 </code></pre></div>
 <p>图8就是这个语句序列的执行效果。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a8/c7/a80cdffe8173fa0fd8969ed976ac6ac7.png?wh=1130%2A547" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a8/c7/a80cdffe8173fa0fd8969ed976ac6ac7.png?wh=1130%2A547" /></p>
 <p>图8 使用临时表的执行效果</p>
 <p>可以看到，整个过程3个语句执行时间的总和还不到1秒，相比于前面的1分11秒，性能得到了大幅提升。接下来，我们一起看一下这个过程的消耗：</p>
 <ol>
@@ -14780,8 +14780,6 @@ mysql&gt; explain select * from t2
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

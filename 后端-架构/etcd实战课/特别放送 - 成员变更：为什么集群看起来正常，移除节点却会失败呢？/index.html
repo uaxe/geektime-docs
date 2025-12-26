@@ -14148,9 +14148,9 @@
 <p>首先让我们来看一个实际生产环境中遇到的案例。</p>
 <p>某天我收到了一个小伙伴的紧急求助，有一个3节点集群，其中一个节点发生了故障后，由于不规范变更，没有先将节点剔除集群，而是直接删除了数据目录，然后重启了节点。</p>
 <p>之后该节点就不停的panic，此时其他两个节点正常。诡异的是，此时执行member remove操作却报错集群没有Leader，但是用endpoint status命令可以看到集群是有Leader存在的。更加奇怪的是，过了几个小时后，该节点又自动恢复了（如下图）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/47/3b/47e73f39f751f9a9430e8da4d2896f3b.png?wh=1920%2A314" /></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/82/bc/82689859250cayye421a9e4a821799bc.png?wh=1616%2A172" /></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a9/ec/a972a5849409a8c8a2b8fb11880a5fec.png?wh=1920%2A101" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/47/3b/47e73f39f751f9a9430e8da4d2896f3b.png?wh=1920%2A314" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/82/bc/82689859250cayye421a9e4a821799bc.png?wh=1616%2A172" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a9/ec/a972a5849409a8c8a2b8fb11880a5fec.png?wh=1920%2A101" /></p>
 <p>你可以先自己思考下，可能是什么原因导致了这几个问题？有没有办法能够在这种场景下快速恢复集群呢？</p>
 <p>如果暂时没什么思路，不要着急，相信学完这节课的成员变更原理后，你就能够独立分析类似的问题，并快速地提供正确、安全的恢复方式。</p>
 <h2 id="vs">静态配置变更 VS 动态配置变更</h2>
@@ -14165,17 +14165,17 @@
 <li>第一个阶段，通过API提交成员变更信息，在API层进行一系列校验，尽量避免因为人为原因造成的配置错误。如果新的配置通过校验，则通过Raft共识算法将新的配置信息同步到整个集群，等到整个集群达成共识后，再应用新的配置。</li>
 <li>第二个阶段，启动新的节点，并实际加入到集群中（或者移除老的节点，然后老节点自动退出）。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ce/06/ce969a18ea09b228d3e8fa50f2f12b06.png?wh=1200%2A804" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ce/06/ce969a18ea09b228d3e8fa50f2f12b06.png?wh=1200%2A804" /></p>
 <p>接下来我们就先来看下。etcd如何基于Raft来实现成员信息同步。</p>
 <h2 id="raft">如何通过Raft实现成员信息同步</h2>
 <h3 id="_2">成员变更流程</h3>
 <p>在<a href="https://time.geekbang.org/column/article/337604">04节课</a>中，我们已经了解到，Raft将一致性问题拆分成了3个子问题，即Leader选举、日志复制以及安全性。基于日志复制，我们可以将成员变更信息作为一个日志条目，通过日志同步的方式同步到整个集群。那么问题来了，日志同步后，我们应该什么时候应用新的配置呢，直接应用新的配置会造成什么问题吗？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/86/25/867401d323bbac288a0304d43e75f325.png?wh=822%2A736" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/86/25/867401d323bbac288a0304d43e75f325.png?wh=822%2A736" /></p>
 <p>如上图所示（参考自<a href="https://web.stanford.edu/~ouster/cgi-bin/papers/raft-atc14">Raft论文</a>），当我们将3个节点集群扩展到5个节点的时候，我们可以看到，对于老的3节点配置来说，它的多数派是2个节点。而对于新的5节点配置集群来说，它的多数派是3个节点。</p>
 <p>在箭头指向的时刻，新老配置同时生效，老的配置中Server1和Server2组成了多数派，新的配置中Server3、Server4、Server5组成了新的多数派。此时集群中存在两个多数派，可能会选出两个Leader，违背了安全性。</p>
 <p>那么有没有方式能避免这个问题，保证变更的安全性呢？一方面我们可以引入<strong>两阶段提交</strong>来解决这个问题，另一方面我们可以通过增加一定约束条件来达到目标。如下图所示，当我们一次只变更一个节点的时候我们可以发现，无论是从奇数节点扩缩到偶数节点，还是从偶数节点扩缩到奇数节点，扩缩容前后配置中的多数派必然有一个节点存在交叉（既存在于老的配置的多数派中，也存在于新的配置的多数派中）。</p>
 <p>我们知道在Raft里，竞选出的Leader必须获得一半以上节点投票，这就保证了选出的Leader必然会拥有重叠节点的投票。而一个节点在一轮投票中只能投票给一个候选者，这就保证了新老配置最终选出的Leader必然是一致的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/04/6f/047fa5420be1c48b5eacaabb5ff8956f.png?wh=1206%2A920" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/04/6f/047fa5420be1c48b5eacaabb5ff8956f.png?wh=1206%2A920" /></p>
 <p>因此，我们通过增加一次只变更一个成员这个约束，就可以得到一个很简单的成员变更实现方式：</p>
 <ul>
 <li>在一次只变更一个节点的场景下，每个节点只需要应用当前收到的日志条目中最新的成员配置即可（即便该配置当前还没有commit）。</li>
@@ -14199,17 +14199,17 @@
 <li>如果我们采用<strong>先增后减</strong>的形式，先将D加到集群中，此时集群节点数变为了4，法定票数变为了3。如果C，D所在的zone挂掉，则集群只剩下两个可用节点，变为不可用状态。</li>
 <li>如果我们采用<strong>先减后增</strong>的形式，先将C节点移除，此时集群中剩2个节点，法定票数为2。如果A或者B所在的zone挂掉了，集群同样不可用。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/28/f6/285e3e09e32bd26667fe211ddd5601f6.png?wh=1138%2A1284" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/28/f6/285e3e09e32bd26667fe211ddd5601f6.png?wh=1138%2A1284" /></p>
 <p>当然，通过Learner节点可以很大程度上降低这个问题发生的概率。但我们如果能够实现多节点成员变更的话，则可以从根本上解决这个问题。</p>
 <p>多节点成员变更也是Raft论文中最初提到的实现成员变更的方式，为了保证成员变更的安全性，我们可以通过<strong>两阶段提交</strong>来实现同时变更多个成员，两阶段提交的实现方式有多种，在Raft中是通过引入一个过渡配置来实现的，即引入<strong>联合一致性（joint consensus）</strong>来解决这个问题。如下图（引用自<a href="https://web.stanford.edu/~ouster/cgi-bin/papers/OngaroPhD.pdf">Raft论文</a>）所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/26/08/2654729e02a41e416eaf16c0bd27c508.png?wh=1374%2A580" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/26/08/2654729e02a41e416eaf16c0bd27c508.png?wh=1374%2A580" /></p>
 <p>我们可以看到，Raft引入了一个过渡配置：Cold,new。当新的配置提案发起时，Leader会先生成Cold,new状态的配置。当集群处于这个配置时，需要Cold和Cnew的多数派都同意commit，新的提案才能被commit。当Cold,new被commit后，就可以安全切换到新的配置Cnew了，当Cnew被提交后，整个变更操作就完成了。</p>
 <p>通过引入joint consensus，我们可以看到不会存在Cold和Cnew同时独立做决定的情况，保证了成员变更的安全性。</p>
 <p>进一步推广的话，通过引入joint consensus，我们可以在多个成员变更过程中继续提交新的配置。但这么做不仅会带来额外的复杂度，而且基本上不会带来实际的收益。因此在工程实现上我们一般还是只允许同一时间只能进行一次成员变更，并且在变更过程中，禁止提交新的变更。</p>
 <p>etcd 3.4的Raft模块实现了joint consensus，可以允许同时对多个成员或单个成员进行变更。但目前应用层并未支持这个能力，还是只允许一次变更一个节点。它的实现仍然同Raft论文有一定的区别，Raft论文是在配置变更提案追加到Raftlog时就切换配置，而etcd的Raft实现是在apply过程才进行配置切换。当Cold,new配置apply之后，就可以返回给客户端成功了。但此时变更还未完全结束，新的日志条目仍然需要Cold和Cnew多数派都同意才能够提交，Raft模块会通过追加一个空的配置变更条目，将配置从Cold,new切换到Cnew。当Cnew apply后，新的日志条目就只需要Cnew多数派同意即可，整个成员变更信息同步完成。</p>
 <h2 id="_3">集群扩容节点完整流程</h2>
 <p>上边讲完了成员信息同步流程，我们就可以来看下向一个已有集群扩容一个新节点的整体流程是怎样的（整体流程如下图）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/91/a5/9104a0b63c45c97b26103ac47a20a3a5.png?wh=1514%2A1200" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/91/a5/9104a0b63c45c97b26103ac47a20a3a5.png?wh=1514%2A1200" /></p>
 <p>首先，我们可以通过etcdctl或者clientv3库提供的API来向成员管理模块发起一个MemberAdd请求。成员管理模块在收到请求后，会根据你提供的peer-urls地址来构建一个Member成员（注意此时构建的Member成员的Name为空），然后请求etcdserver进行添加操作。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ETCDCTL_API=3 etcdctl --endpoints=http://1.1.1.1:2379
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>member add node-4 --peer-urls=http://4.4.4.4:2380
@@ -14240,7 +14240,7 @@
 <p>我们可以通过etcdctl snapshot save命令或者clientv3库提供的snapshot API来对集群进行备份。备份后的数据除了包含业务数据外，还包含一些集群的元数据信息（例如成员信息）。</p>
 <p>有了备份之后，我们就可以通过etcdctl snapshot restore命令来进行数据恢复。这个命令的参数你一定不要搞错，我建议你对照<a href="https://etcd.io/docs/v3.4.0/op-guide/recovery/">官方文档</a>来。每个节点恢复数据时的name和initial-advertise-peer-urls是有区别的，如果所有节点都用一样的话，最后你可能会恢复成多个独立的集群，我曾经就见到有业务这样搞出过问题。</p>
 <p>我们接着来看下snapshot restore都干了哪些事情（如下图）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f2/f3/f28bf73f76e00b62af659526f09575f3.png?wh=376%2A1316" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f2/f3/f28bf73f76e00b62af659526f09575f3.png?wh=376%2A1316" /></p>
 <p>首先，它会根据你提供的参数进行一系列校验，检查snapshot的hash值等。如果检查通过的话，会创建snap目录并将snapshot拷贝到v3的db文件，设置consistentIndex值为当前提供的initial-cluster参数中包含的成员数量，并从db中删除老的成员信息。</p>
 <p>然后，它会根据你提供的参数信息来构建WAL文件和snap文件。从你提供的配置中来获取peer节点信息，并转换为ConfChangeAddNode类型的ConfChange日志条目写入WAL文件，同时更新commit值，并将term设置为1。</p>
 <p>之后snapshot restore会将peer节点作为Voters写入snapshot metadata的ConfState中，并更新Term和Index。snapshot保存后，WAL会随后保存当前snapshot的Term和Index，用于索引snapshot文件。</p>
@@ -14253,7 +14253,7 @@
 <p>当Leader向Follower节点发送心跳时，会从Match和Leader当前的commit Index中选择一个较小的，伴随心跳消息同步到Follower节点。Follower节点在收到Leader的commit Index时，会更新自己本地的commit Index。</p>
 <p>但Follower节点发现该commit Index比自己当前最新日志的Index还要新（按照我们之前的分析，异常节点当前最新的Index为3（日志也证明了这一点），而Leader发送的commit Index是之前节点正常时的commit值，肯定比3这个值要大），便认为raftlog肯定有损坏或者丢失，于是异常节点就会直接panic退出。最后就出现了我们之前看到的不停重启不停panic的现象。</p>
 <p>那么为什么执行member remove操作会报没有Leader呢？我们之前提到过，执行成员变更前会进行一系列前置检查（如下图）。在移除节点时，etcd首先会检查移除该节点后剩余的活跃节点是否满足集群法定票数要求。满足要求后，会检查该节点是否宕机（连接不通）。如果是宕机节点，则可以直接移除。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8e/39/8edb11c1c268eabda477597ce25e0f39.png?wh=828%2A1352" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8e/39/8edb11c1c268eabda477597ce25e0f39.png?wh=828%2A1352" /></p>
 <p>但由于我们的节点不停重启，每次重启建立peer连接时会激活节点状态，因此没有统计到宕机的节点中。</p>
 <p>最后会统计集群中当前可用的节点，该统计方式要求节点必须在5s前激活，因为节点刚启动5s内认为etcd还没有ready，所以不会统计到可用节点中，即当前可用节点数为2。</p>
 <p>然后再判断移除一个可用节点后，当前剩余节点是否满足法定票数要求，我们这个案例中为 2 - 1 &lt; 1+ ((3-1)/2)，不满足法定票数要求，所以服务端会返回ErrUnhealthy报错给客户端（我们这个场景其实是由于etcd针对不可用节点的判断没有排除异常的要移除节点导致）。</p>
@@ -14263,7 +14263,7 @@
 <p>这个case了解原理后，如果希望快速恢复的话也很简单：完全停掉异常Follower节点后，再执行member remove，然后将节点移除，清理数据再重新加入到集群（或者通过move-leader命令手动触发一次Leader切换，但该方式比较trick，并不通用）。</p>
 <p>以上就是这个案例的完整分析，希望通过这个case，能让你认识到规范变更的重要性，在不了解原理的情况下，一定要按照官方文档来操作，不要凭感觉操作。</p>
 <h2 id="_7">小结</h2>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/yy/1e/yy38094b6be35a476442fd3498eb511e.png?wh=1820%2A1028" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/yy/1e/yy38094b6be35a476442fd3498eb511e.png?wh=1820%2A1028" /></p>
 <p>最后我们来小结下今天的内容，今天我从一个诡异的成员变更故障案例讲起，为你介绍了etcd实现成员变更的原理，分别为你分析了etcd成员变更在Raft层和应用层的实现，并分析了各个实现方案的优缺点。</p>
 <p>其次我带你过了一遍etcd成员变更的演进方案：从只支持Member变更到支持Learner节点（non-voting Member），Raft层从只支持单节点变更到支持多节点变更。成员变更的方案越来越完善、稳定，运维人员在变更期间发生故障的概率也越来越低。</p>
 <p>之后我以新增节点为例，深入为你分析了从配置提交到节点启动对外服务的完整流程，以及新集群启动和恢复过程中涉及到的成员变更原理。</p>
@@ -14390,8 +14390,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -6314,32 +6314,32 @@
 <p>今天，我们就来为视频会议软件设计一套自动化测试方案，用来测试视频会议的会议功能。</p>
 <h2 id="_1">场景还原</h2>
 <p>我们先从视频会议的时序图开始分析，你就明白视频会议的自动化测试有多复杂了。这里我选择了一个迷你demo，但麻雀虽小，五脏俱全。假定会议用户有三位：使用Web端的用户A、桌面用户B，以及手机用户C。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/71/23/71253a39b0e2dec88835edf5efcaee23.jpg?wh=1920x1192" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/71/23/71253a39b0e2dec88835edf5efcaee23.jpg?wh=1920x1192" /></p>
 <p>如图所示，Web用户A先在浏览器创建一个Meeting，发送邀请链接给桌面用户B和手机用户C，然后B和C加入会议，A、B、C三个人同时在线。</p>
 <p>这时，用户A开始演示自己的屏幕，B和C要收到A演示的屏幕；A如果在聊天区里发送一个消息，B和C也要收到这个消息。</p>
 <p>这样一个复杂的场景，我们既要测试视频会议的分布式协作能力，还要测试会议的准确度，另外还要保证效率性能。这三方面的测试目标，我用表格的方式来举例说明，你可以看看。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/64/5c/644a891248a8a9ba0f5b0c8ac0d6c55c.jpg?wh=1920x691" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/64/5c/644a891248a8a9ba0f5b0c8ac0d6c55c.jpg?wh=1920x691" /></p>
 <h2 id="_2">视频会议测试概要设计</h2>
 <p>那么，自动化测试该怎么设计和实现，才能达到上面的目标？我们先从概要设计开始分析。</p>
 <p>还是遵循从顶向下的设计思路，我们先捋出来要完成视频会议测试，需要测试哪几个功能区。</p>
 <p>首先是初始化，初始化的过程，是保证所有的客户端都进入到视频会议里；然后测试演示功能区，也就是完成一个客户端演示，其它客户端观看演示的过程；接着要测试聊天功能区，一个客户端发送聊天，其它客户端接收聊天；最后是退出，测试完毕后，各个客户端依次退出视频会议系统。</p>
 <p>根据这个思路，我们先把视频会议Job切分成4个子Job，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/fb/68/fbc44e98d4aa9d6bb6a04b72e04e4168.jpg?wh=1920x905" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fb/68/fbc44e98d4aa9d6bb6a04b72e04e4168.jpg?wh=1920x905" /></p>
 <p><strong>4个功能首尾衔接，按照依赖关系和重要程度，权值高的排在前面。</strong>如果权值高的失败了，后续的Job就没有必要运行了。根据Job模型层级原则，如果有任何一个子Job失败了，视频会议自动化Job就会失败。</p>
 <p>为了支持分布式，我们还需要在Job模型里加入一个host属性，指明本Job运行的主机环境。</p>
 <p>像这样，host=“10.0.0.1”，就代表着本Job会被发送到10.0.0.1这台机子上去运行。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/20/8b/201b3d53eb2ee00136a97839d7ff268b.jpg?wh=1920x1113" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/20/8b/201b3d53eb2ee00136a97839d7ff268b.jpg?wh=1920x1113" /></p>
 <p>有了这个属性后，后面我们就好建模了。接下来，我们依次来看各个功能区怎么设计。</p>
 <h2 id="_3">初始化功能设计</h2>
 <p>初始化Job，要完成的任务是A、B、C进入会议，同时在线。怎么设计呢？</p>
 <p>我们还是先按操作顺序梳理一下A、B、C都做了什么。</p>
 <p>首先，A要做一个CreateMeeting的操作，把它发到10.0.0.1主机上运行，输出一个MeetingUrl；然后，B和C从Input里取到MeetingUrl，在10.0.0.2主机上执行JoinMeetingDesktop，在10.0.0.3主机上执行JoinMeetingAndroid的Job。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/bf/45/bf5545c0344834010348a8cc13b31b45.jpg?wh=1920x1215" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bf/45/bf5545c0344834010348a8cc13b31b45.jpg?wh=1920x1215" /></p>
 <p>但有一个问题，初始化Job的运行结果是，A，B，C都加入了Meeting。怎么验证A、B和C都加入到会议里了呢？又由谁去做这个验证呢？</p>
 <p>可以这样设计，等A、B、C都执行完操作以后，再运行一个VerifyJoin的Job，来验证ABC是否都已经成功加入Meeting了。</p>
 <p>在Job树上会有这样的结构：把A、B、C聚合成一个ScheduleMeeting的Job，然后VerifyJoinJob的Dependency指向ScheduleMeeting Job。</p>
 <p>在执行的时候，等到ScheduleMeeting Job执行完且结果为通过的情况下，VerifyJob会才会开始执行。如果A、B、C其中有一个失败了，ScheduleMeeting就会失败，VerifyJoin的Job也就没必要再去执行了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a9/c0/a9b000199746d04dbb650fd8eaf87ac0.jpg?wh=1920x1627" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a9/c0/a9b000199746d04dbb650fd8eaf87ac0.jpg?wh=1920x1627" /></p>
 <p>这种设计的好处是，<strong>整体自动化测试的健壮性很强</strong>。按照Job树的运行原理，运行顺序是这样的：CreateMeeting先运行，然后是JoinMeetingDesktop和JoinMeetingAndroid，最后再运行VerifyJoin。任何一个失败，后面都不必运行了。</p>
 <p>不过，这种设计也有一个问题，就是自动化测试运行的效率。VerifyJoin的要等到ScheduleMeeting Job全部执行完了，才能执行，整个自动化测试任务执行时间是这4个Job执行时间的总和。</p>
 <p>time(Total）=time(CreateMeeting)+time(JoinMeetingDesktop)+time(JoinMeetingAndroid)+time(VerifyJoin)</p>
@@ -6357,17 +6357,17 @@
 <h2 id="_5">演示功能设计</h2>
 <p>演示功能又是一个需要多端协作的场景。这是个什么场景呢？简单来说，A开始演示PPT的时候，B和C都要能看到这张PPT。</p>
 <p>我们可以用“初始化功能设计”的思路，来完成这个设计，A要执行presentPPT的Job，然后在B和C上分别执行viewPPT的Job，就可以完成这个任务了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/06/2d/065dca1d511b6fd0895bca85141d7f2d.jpg?wh=1920x1215" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/06/2d/065dca1d511b6fd0895bca85141d7f2d.jpg?wh=1920x1215" /></p>
 <p>但是，相比“初始化功能”，“演示功能”有两个特殊的地方需要考虑，一个是屏幕相似度，另一个是屏幕切换的流畅度。</p>
 <h3 id="_6">屏幕相似度</h3>
 <p>如何验证演示的正确性？当A展示一张PPT的时候，怎么让程序验证，B和C看到的和A演示的是一样的PPT呢？</p>
 <p>比如出现这样的屏幕是正常的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c2/91/c277d037916ab6e87f3dae90a5450591.jpg?wh=1920x626" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c2/91/c277d037916ab6e87f3dae90a5450591.jpg?wh=1920x626" /></p>
 <p>但下面这样，C端出了问题，没有完整显示，下半部分有一块黑色区域。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/97/07/971c136b2c75d8188a13e19832f1a907.jpg?wh=1920x617" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/97/07/971c136b2c75d8188a13e19832f1a907.jpg?wh=1920x617" /></p>
 <p>看到这里，你可能已经想到了，视频会议的屏幕演示，其实就是一帧帧的图片，我们可以采用位图比较的思路，来验证A，B，C所看到的屏幕是不是一致。</p>
 <p>怎么实现位图比较呢？如果自开发的话，可以自己去写图像比较的算法，来计算两张图片之间的相似度。我给你列了一个表，里面提炼了几个经典算法的原理和优缺点。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e8/5e/e856ab2fd7df1fc67b03de02c765655e.jpg?wh=1920x704" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e8/5e/e856ab2fd7df1fc67b03de02c765655e.jpg?wh=1920x704" /></p>
 <p>从上表可以看到，不同的算法，都有各自的优缺点和适用场景。而且，开发和维护这些算法的代码，也是一个不小的工作量。</p>
 <p>那有没有智能对比图片的办法呢？图片识别和比较是AI擅长的领域，它们应用到测试领域就是AI测试。业界有两个比较成熟的两个AI测试工具，Applitools和Sikuli。</p>
 <p>Applitools 是一个AI 赋能的测试工具，通过视觉AI 进行智能功能和视觉测试。具体怎么实现呢？</p>
@@ -6382,7 +6382,7 @@
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">eyes</span><span class="p">.</span><span class="na">close</span><span class="p">();</span>
 </code></pre></div>
 <p>在Applitools的网站可以看到三条成功的记录，A和B和C上传的图片，Applitools经过对比是一致的，所以结果为成功。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/18/a7/180f813b1f260b70d311d928cbc362a7.jpg?wh=1920x1023" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/18/a7/180f813b1f260b70d311d928cbc362a7.jpg?wh=1920x1023" /></p>
 <p>在图片上，还有两个图标，点赞和消赞，分别对应着Accept Diff和Reject Diff。当Applitools发现图片不匹配时，比如在图片中有动态的值（日期，时间，用户名等等），每次运行的值都不一样，你可以通过点击这点赞的图标Accept Diff，来反馈训练Applitools的图片识别算法，反馈次数越多，训练出的识别能力越精准。</p>
 <p>Applitools很好用，但有一个限制，它需要图片上传到Applitool自己的官方服务器进行识别。如果我们对数据有安全的顾虑，Sikuli更适合。Sikuli由美国麻省理工学院研究开发，是一款基于视觉的测试工具，也提供了图片比较函数，代码示例如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">Screen</span><span class="w"> </span><span class="n">screen</span><span class="o">=</span><span class="k">new</span><span class="w"> </span><span class="n">Screen</span><span class="p">();</span>
@@ -6404,23 +6404,23 @@
 <p>现在的问题就变成了——怎么来截取这个时间差？这就涉及到一个分布式事务的概念，如果我们定义的Transaction是timeBetweenPresentAndView，那么Transaction Start是在A端开始Present的时候，而Transaction End是在B端看到PPT的时候。</p>
 <p>分布式事务怎么实现？在Job模型里，我们可以用Input和Output来实现。A的Job在Present之后就立刻记录下当前的时间戳，输出一个TR_START_timeBetweenPresentAndView=1342629206455，而B的Job在看到PPT之后，也立刻记录下时间戳，输出一个TR_END_timeBetweenPresentAndView=1342629276772。</p>
 <p>那它们怎么聚合成最后的事务呢？这时候，我们可以创建一个aggreateTransaction的Job，专门负责从Input里拿到这些数据，然后计算输出TR_timeBetweenPresentAndView的时间。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/07/9d/07bb7223c7d2dc9d3a6c240fc78b1a9d.jpg?wh=1920x620" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/07/9d/07bb7223c7d2dc9d3a6c240fc78b1a9d.jpg?wh=1920x620" /></p>
 <p>聊天功能和演示功能类似，由A发送一个Message，B和C都要接收它。这里也有准确性和时效性的问题。解决方案和演示功能相似，你可以自己梳理一下Job树，巩固前面学到的内容。</p>
 <h2 id="_8">实现与扩展</h2>
 <p>到这里，我们把刚才的设计整理一下，整体成果Job树如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/88/b1/88cde599cfcd1c26af0ed42cb768d9b1.jpg?wh=1920x890" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/88/b1/88cde599cfcd1c26af0ed42cb768d9b1.jpg?wh=1920x890" /></p>
 <p>从图里可以看到，我们一共用15个Job完成了这个视频会议自动化测试场景的设计。接下来，我们对照Job树，继续推演需要实现的子Job和适合的工具。</p>
 <h3 id="_9">实现</h3>
 <p>所有的叶子结点Job，都是后面测试实现阶段中，测试开发同学需要开发实现的实体Job，把它列成一个Job树叶子工作表：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c8/2f/c8fe5e9563fyy279266940e722d4f52f.jpg?wh=1920x839" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c8/2f/c8fe5e9563fyy279266940e722d4f52f.jpg?wh=1920x839" /></p>
 <p>然后就到了每个Job选型工具的确定。工具的列表可以参考我为本专栏准备的 <a href="https://github.com/atinfo/awesome-test-automation/blob/master/java-test-automation.md">Gitub地址</a>。选型遵循3KU法则，寻找合适的测试层面和成熟的工具。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ae/af/ae158cca355d8f23f0989c3455dd67af.jpg?wh=1920x824" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ae/af/ae158cca355d8f23f0989c3455dd67af.jpg?wh=1920x824" /></p>
 <h3 id="_10">扩展</h3>
 <p>在刚才的Job设计中，视频会议的Desktop端是Windows，所以JoinMeetingDesktop Job的实现用WinAppDriver。</p>
 <p>如果未来有一天，我们的视频会议有了Mac端，这个时候Job设计怎么变化？</p>
 <p>我们可以想一下，不论是Mac还是Windows、Linux，它们都只是视频会议的不同载体，但上面实现的业务是一样的。也就是说，我们上面基于业务做的Job设计依然有效。</p>
 <p>这时，可以把JoinMeetingDesktop变成抽象Job，增加3个子Job：JoinMeetingWindows、JoinMeetingMac、JoinMeetingLinux，它们是对JoinMeetingDesktop的实现。当JoinMeetingDesktop运行的时候，会把子Job都运行一遍，Windows、Linux、Mac就都得到了测试验证。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1a/7e/1a01495793cf2a01b5ee4057bc93937e.jpg?wh=1920x1300" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1a/7e/1a01495793cf2a01b5ee4057bc93937e.jpg?wh=1920x1300" /></p>
 <h2 id="_11">小结</h2>
 <p>今天我们通过视频会议的Job设计，把一个分布式多端协作的交互场景，分解成一个个简单可开发任务，并且分析了子任务的Input和Output。其实，这个分解过程就是我们的自动化测试设计要做的工作。不难发现，用好我们的Job模型，这个分解工作就能迎刃而解了。</p>
 <p>不过，之前我们的Job模型不支持分布式，所以，我们对Job模型又做了扩展，增加了Host属性，支持分派Job到不同的主机上运行。在Host属性可以增加多台主机名，那么就可以实现一个Job发送到多台机子上运行。</p>
@@ -6553,8 +6553,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

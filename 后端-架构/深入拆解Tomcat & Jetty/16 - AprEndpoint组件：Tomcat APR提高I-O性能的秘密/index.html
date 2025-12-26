@@ -14439,7 +14439,7 @@
 <p>在今天这一期文章，首先我会讲AprEndpoint组件的工作过程，接着我会在原理的基础上分析APR提升性能的一些秘密。在今天的学习过程中会涉及到一些操作系统的底层原理，毫无疑问掌握这些底层知识对于提高你的内功非常有帮助。</p>
 <h2 id="aprendpoint">AprEndpoint工作过程</h2>
 <p>下面我还是通过一张图来帮你理解AprEndpoint的工作过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/37/93/37117f9fd6ed5523a331ac566a906893.jpg?wh=1518%2A1044" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/37/93/37117f9fd6ed5523a331ac566a906893.jpg?wh=1518%2A1044" /></p>
 <p>你会发现它跟NioEndpoint的图很像，从左到右有LimitLatch、Acceptor、Poller、SocketProcessor和Http11Processor，只是Acceptor和Poller的实现和NioEndpoint不同。接下来我分别来讲讲这两个组件。</p>
 <p><strong>Acceptor</strong></p>
 <p>Accpetor的功能就是监听连接，接收并建立连接。它的本质就是调用了四个操作系统API：Socket、Bind、Listen和Accept。那Java语言如何直接调用C语言API呢？答案就是通过JNI。具体来说就是两步：先封装一个Java类，在里面定义一堆用<strong>native关键字</strong>修饰的方法，像下面这样。</p>
@@ -14483,7 +14483,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>java my.class
 </code></pre></div>
 <p>这个命令行中的<code>java</code>其实是<strong>一个可执行程序，这个程序会创建JVM来加载和运行你的Java类</strong>。操作系统会创建一个进程来执行这个<code>java</code>可执行程序，而每个进程都有自己的虚拟地址空间，JVM用到的内存（包括堆、栈和方法区）就是从进程的虚拟地址空间上分配的。请你注意的是，JVM内存只是进程空间的一部分，除此之外进程空间内还有代码段、数据段、内存映射区、内核空间等。从JVM的角度看，JVM内存之外的部分叫作本地内存，C程序代码在运行过程中用到的内存就是本地内存中分配的。下面我们通过一张图来理解一下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/83/80/839bfab2636634d47477cbd0920b5980.jpg?wh=1428%2A944" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/83/80/839bfab2636634d47477cbd0920b5980.jpg?wh=1428%2A944" /></p>
 <p>Tomcat的Endpoint组件在接收网络数据时需要预先分配好一块Buffer，所谓的Buffer就是字节数组<code>byte[]</code>，Java通过JNI调用把这块Buffer的地址传给C代码，C代码通过操作系统API读取Socket并把数据填充到这块Buffer。Java NIO API提供了两种Buffer来接收数据：HeapByteBuffer和DirectByteBuffer，下面的代码演示了如何创建两种Buffer。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>//分配HeapByteBuffer
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>ByteBuffer buf = ByteBuffer.allocate(1024);
@@ -14512,14 +14512,14 @@
 <li>最后还需要把文件从内核缓冲区拷贝到网卡缓冲区。</li>
 </ul>
 <p>从下面的图你会发现这个过程有6次内存拷贝，并且read和write等系统调用将导致进程从用户态到内核态的切换，会耗费大量的CPU和内存资源。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2b/0e/2b902479c36647142ccd413320b3900e.jpg?wh=1154%2A934" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2b/0e/2b902479c36647142ccd413320b3900e.jpg?wh=1154%2A934" /></p>
 <p>而Tomcat的AprEndpoint通过操作系统层面的sendfile特性解决了这个问题，sendfile系统调用方式非常简洁。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>sendfile(socket, file, len);
 </code></pre></div>
 <p>它带有两个关键参数：Socket和文件句柄。将文件从磁盘写入Socket的过程只有两步：</p>
 <p>第一步：将文件内容读取到内核缓冲区。</p>
 <p>第二步：数据并没有从内核缓冲区复制到Socket关联的缓冲区，只有记录数据位置和长度的描述符被添加到Socket缓冲区中；接着把数据直接从内核缓冲区传递给网卡。这个过程你可以看下面的图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/19/00/193df268fccb59a09195810e34080a00.jpg?wh=590%2A908" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/19/00/193df268fccb59a09195810e34080a00.jpg?wh=590%2A908" /></p>
 <h2 id="_1">本期精华</h2>
 <p>对于一些需要频繁与操作系统进行交互的场景，比如网络通信，Java的效率没有C语言高，特别是TLS协议握手过程中需要多次网络交互，这种情况下使用APR本地库能够显著提升性能。</p>
 <p>除此之外，APR提升性能的秘密还有：通过DirectByteBuffer避免了JVM堆与本地内存之间的内存拷贝；通过sendfile特性避免了内核与应用之间的内存拷贝以及用户态和内核态的切换。其实很多高性能网络通信组件，比如Netty，都是通过DirectByteBuffer来收发网络数据的。由于本地内存难于管理，Netty采用了本地内存池技术，感兴趣的同学可以深入了解一下。</p>
@@ -14656,8 +14656,6 @@ IO读写都需要拷贝两次。
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

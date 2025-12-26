@@ -14238,12 +14238,12 @@ private T createAdaptiveExtension() {
 <p>所以我们可以推测，普通实现类的实例化过程，应该和自适应扩展点对象差不多，可是怎么验证这个猜想呢？我们不妨从代码层面去仔细挖掘一下，看看源码层面有没有相似性的逻辑。</p>
 <p>先顺着已知的代码看，发现创建自适应扩展点方法（createAdaptiveExtension）中有前置处理等逻辑，我们不如反向寻找下，看看这个前置的方法有没有被其他地方调用？<strong>一般，相似的功能点，源码层面大概率会进行抽象封装来共用代码，避免重复冗余代码，所以我们反向寻找，也是为了找到调用该方法的相似功能点。</strong></p>
 <p>按照这个思路，我们认真反向排查一下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3b/5f/3b0b58f407970e623881fc686ec77c5f.jpg?wh=4203x2049" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3b/5f/3b0b58f407970e623881fc686ec77c5f.jpg?wh=4203x2049" /></p>
 <p>还真发现有两个地方调用了，看对应的代码位置行数，1232 行落在创建自适应扩展点方法中，那另外的 761 行，想必就是普通实现类被实例化的地方了吧。我们进到 761 行看看。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/60/88/60eb0d35yy22407a560eeec0ca6ee788.jpg?wh=1920x696" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/60/88/60eb0d35yy22407a560eeec0ca6ee788.jpg?wh=1920x696" /></p>
 <p>发现了一些意想不到的情况，761 行位于一个 createExtension 方法中，翻译一下方法名就是创建扩展点的意思，我们结合方法入参看，看起来应该是给定一个扩展点名称，然后创建出对应的实现类对象。</p>
 <p>从这里的代码看是这么回事，至于真实情况是不是，我们要验证一下，继续反向查找，看看又是谁调用了 createExtension 创建扩展点的方法。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/10/39/109267a1f35b3a61182eebc4cc016e39.jpg?wh=4356x1689" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/10/39/109267a1f35b3a61182eebc4cc016e39.jpg?wh=4356x1689" /></p>
 <p>从众多的调用来源中，站在使用者的角度来看，调用方是拿着 getExtension 方法，传入指定的扩展名，来拿对应的实现类，这不就是“SPI 机制”中 Dubbo SPI 获取指定实现类的写法么？拿到实现类就可以使用了。</p>
 <blockquote>
 <p>图中还可以看到 synchronized 关键字包裹住了扩展点的创建，synchronized 是 JVM 为解决多线程并发竞争问题而设计的一个关键字，这说明 Dubbo 在创建指定扩展点的实现类时，充分考虑了线程安全的问题因素。</p>
@@ -14337,14 +14337,14 @@ private T createAdaptiveExtension() {
 </code></pre></div>
 <p>首先，每个扩展点名称都会对应一个 class 类信息，每个类信息都会对应一个实例对象，而且实例对象都会以线程安全的形式保存到缓存中。</p>
 <p>刚反射创建出来的扩展点对象，都会经历前置初始化前置处理（postProcessBeforeInitialization）、注入扩展点（injectExtension）、初始化后置处理（postProcessAfterInitialization）三个阶段，经过三段处理的对象，我们暂且称为“原始对象”。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a7/c4/a7edfe0d35fd834d4e14b1ed086dd7c4.jpg?wh=1920x596" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a7/c4/a7edfe0d35fd834d4e14b1ed086dd7c4.jpg?wh=1920x596" /></p>
 <p>然后，根据传入的 wrap 变量，决定是否需要将原始对象再次进行包裹处理，若需要包裹，会将该 SPI 接口的所有包装类排序好，以套娃的形式，将原始对象层层包裹。而包装类上可以设置 @Wrapper 注解，结合注解有 3 种情况来决定是否需要包装：</p>
 <ul>
 <li>无 @Wrapper 注解，则需要包装。</li>
 <li>有 @Wrapper 注解，但是注解中的 matches 字段值为空，则需要包装。</li>
 <li>有 @Wrapper 注解，但是注解中的 matches 字段值包含入参的扩展点名称，并且 mismatches 字段值不包含入参的扩展点名称，则需要包装。</li>
 </ul>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0a/e8/0a756a8682344f10b7b17cb1583380e8.jpg?wh=5415x1545" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0a/e8/0a756a8682344f10b7b17cb1583380e8.jpg?wh=5415x1545" /></p>
 <h3 id="_2">拓展点对象的三个处理阶段</h3>
 <p>大致通读了创建扩展点的代码，你可能已经注意到了，刚反射创建出来的扩展点对象要经历的三个阶段应该挺重要的，毕竟一个刚反射出来的对象就像一个婴儿，个头没长全，没多大能力，关键得靠后续加工变成有能力的成年人。我们重点进入这 3 个方法。</p>
 <p>先看第一个初始化前置处理的方法。</p>
@@ -14496,14 +14496,14 @@ private T createAdaptiveExtension() {
 <p>关键就是这个 cachedWrapperClasses 成员变量，它是怎么来的呢，又是在哪里被赋值的呢？</p>
 <p>对现在的你来说相信这不是什么难题，还是逆向追踪，看这个变量在哪个小方法里面赋值的，如果小方法看不出，就继续逆向寻找小方法的调用方，总能理清思路，最终搞清楚 cachedWrapperClasses 变量怎么被赋值的。</p>
 <p>我们继续开启源码逆向查找。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3d/06/3db61a5bfde17682b1d0088d61183f06.jpg?wh=4182x2079" />
-<img alt="图片" src="https://static001.geekbang.org/resource/image/fc/90/fc4aa0a1fa567c30d7ee8eed522a6390.jpg?wh=4176x2394" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3d/06/3db61a5bfde17682b1d0088d61183f06.jpg?wh=4182x2079" />
+<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fc/90/fc4aa0a1fa567c30d7ee8eed522a6390.jpg?wh=4176x2394" /></p>
 <p>一直找到了被赋值的地方，我们可以发现实现类构造方法的入参是对应的 SPI 接口，那么这样的实现类就是一个包装类。答案水落石出，有没有觉得其实看源码也不是很难。</p>
 <p>我们简单小结一下，创建扩展点对象的时候，<strong>不但会通过 setter 方法进行实例注入，而且还会通过包装类层层包裹</strong>，就像这样。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/2e/89/2ec0ab7c8967e4493f6d798345820689.jpg?wh=5706x1503" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2e/89/2ec0ab7c8967e4493f6d798345820689.jpg?wh=5706x1503" /></p>
 <h2 id="dubbo">Dubbo 实例注入验证</h2>
 <p>了解了实例注入的核心原理，我们还是得现学现用，验证下通过源码推断的结论到底是不是对的。老规矩，先设计一下验证的大体代码结构：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d6/9a/d694e49b90b8d0b693c3868a97f45e9a.jpg?wh=5118x1884" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d6/9a/d694e49b90b8d0b693c3868a97f45e9a.jpg?wh=5118x1884" /></p>
 <p>先定义一个 Geek 接口，有 4 个实现类，分别是 Dubbo、SpringCloud 、AppleWrapper 和 GeekWrapper，但是 AppleWrapper、GeekWrapper 包装类上有 @Wrapper 注解。然后定义了一个 Animal 接口，只有 1 个实现类 Monkey。</p>
 <p>我们需要验证3个功能点：</p>
 <ul>
@@ -14867,8 +14867,6 @@ private T createAdaptiveExtension() {
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

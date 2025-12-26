@@ -14681,7 +14681,7 @@
 <p>这跟Redis的持久化机制有关系。在使用RDB进行持久化时，Redis会fork子进程来完成，fork操作的用时和Redis的数据量是正相关的，而fork在执行时会阻塞主线程。数据量越大，fork操作造成的主线程阻塞的时间越长。所以，在使用RDB对25GB的数据进行持久化时，数据量较大，后台运行的子进程在fork创建时阻塞了主线程，于是就导致Redis响应变慢了。</p>
 <p>看来，第一个方案显然是不可行的，我们必须要寻找其他的方案。这个时候，我们注意到了Redis的切片集群。虽然组建切片集群比较麻烦，但是它可以保存大量数据，而且对Redis主线程的阻塞影响较小。</p>
 <p>切片集群，也叫分片集群，就是指启动多个Redis实例组成一个集群，然后按照一定的规则，把收到的数据划分成多份，每一份用一个实例来保存。回到我们刚刚的场景中，如果把25GB的数据平均分成5份（当然，也可以不做均分），使用5个实例来保存，每个实例只需要保存5GB数据。如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/79/26/793251ca784yyf6ac37fe46389094b26.jpg?wh=2501%2A1342" title="切片集群架构图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/79/26/793251ca784yyf6ac37fe46389094b26.jpg?wh=2501%2A1342" title="切片集群架构图" /></p>
 <p>那么，在切片集群中，实例在为5GB数据生成RDB时，数据量就小了很多，fork子进程一般不会给主线程带来较长时间的阻塞。采用多个实例保存数据切片后，我们既能保存25GB数据，又避免了fork子进程阻塞主线程而导致的响应突然变慢。</p>
 <p>在实际应用Redis时，随着用户或业务规模的扩展，保存大量数据的情况通常是无法避免的。而切片集群，就是一个非常好的解决方案。这节课，我们就来学习一下。</p>
 <h2 id="_1">如何保存更多数据？</h2>
@@ -14690,7 +14690,7 @@
 <li><strong>纵向扩展</strong>：升级单个Redis实例的资源配置，包括增加内存容量、增加磁盘容量、使用更高配置的CPU。就像下图中，原来的实例内存是8GB，硬盘是50GB，纵向扩展后，内存增加到24GB，磁盘增加到150GB。</li>
 <li><strong>横向扩展</strong>：横向增加当前Redis实例的个数，就像下图中，原来使用1个8GB内存、50GB磁盘的实例，现在使用三个相同配置的实例。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7a/1a/7a512fec7eba789c6d098b834929701a.jpg?wh=2745%2A1365" title="纵向扩展和横向扩展对比图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7a/1a/7a512fec7eba789c6d098b834929701a.jpg?wh=2745%2A1365" title="纵向扩展和横向扩展对比图" /></p>
 <p>那么，这两种方式的优缺点分别是什么呢？</p>
 <p>首先，纵向扩展的好处是，<strong>实施起来简单、直接</strong>。不过，这个方案也面临两个潜在的问题。</p>
 <p>第一个问题是，当使用RDB对数据进行持久化时，如果数据量增加，需要的内存也会增加，主线程fork子进程时就可能会阻塞（比如刚刚的例子中的情况）。不过，如果你不要求持久化保存Redis数据，那么，纵向扩展会是一个不错的选择。</p>
@@ -14712,7 +14712,7 @@
 <p>当然， 我们也可以使用cluster meet命令手动建立实例间的连接，形成集群，再使用cluster addslots命令，指定每个实例上的哈希槽个数。</p>
 <p>举个例子，假设集群中不同Redis实例的内存大小配置不一，如果把哈希槽均分在各个实例上，在保存相同数量的键值对时，和内存大的实例相比，内存小的实例就会有更大的容量压力。遇到这种情况时，你可以根据不同实例的资源配置情况，使用cluster addslots命令手动分配哈希槽。</p>
 <p>为了便于你理解，我画一张示意图来解释一下，数据、哈希槽、实例这三者的映射分布情况。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7d/ab/7d070c8b19730b308bfaabbe82c2f1ab.jpg?wh=2486%2A1266" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7d/ab/7d070c8b19730b308bfaabbe82c2f1ab.jpg?wh=2486%2A1266" /></p>
 <p>示意图中的切片集群一共有3个实例，同时假设有5个哈希槽，我们首先可以通过下面的命令手动分配哈希槽：实例1保存哈希槽0和1，实例2保存哈希槽2和3，实例3保存哈希槽4。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>redis-cli -h 172.16.19.3 –p 6379 cluster addslots 0,1
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>redis-cli -h 172.16.19.4 –p 6379 cluster addslots 2,3
@@ -14739,7 +14739,7 @@
 </code></pre></div>
 <p>其中，MOVED命令表示，客户端请求的键值对所在的哈希槽13320，实际是在172.16.19.5这个实例上。通过返回的MOVED命令，就相当于把哈希槽所在的新实例的信息告诉给客户端了。这样一来，客户端就可以直接和172.16.19.5连接，并发送操作请求了。</p>
 <p>我画一张图来说明一下，MOVED重定向命令的使用方法。可以看到，由于负载均衡，Slot 2中的数据已经从实例2迁移到了实例3，但是，客户端缓存仍然记录着“Slot 2在实例2”的信息，所以会给实例2发送命令。实例2给客户端返回一条MOVED命令，把Slot 2的最新位置（也就是在实例3上），返回给客户端，客户端就会再次向实例3发送请求，同时还会更新本地缓存，把Slot 2与实例的对应关系更新过来。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/35/09/350abedefcdbc39d6a8a8f1874eb0809.jpg?wh=2818%2A2250" title="客户端MOVED重定向命令" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/35/09/350abedefcdbc39d6a8a8f1874eb0809.jpg?wh=2818%2A2250" title="客户端MOVED重定向命令" /></p>
 <p>需要注意的是，在上图中，当客户端给实例2发送命令时，Slot 2中的数据已经全部迁移到了实例3。在实际应用时，如果Slot 2中的数据比较多，就可能会出现一种情况：客户端向实例2发送请求，但此时，Slot 2中的数据只有一部分迁移到了实例3，还有部分数据没有迁移。在这种迁移部分完成的情况下，客户端就会收到一条ASK报错信息，如下所示：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>GET hello:key
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>(error) ASK 13320 172.16.19.5:6379
@@ -14748,7 +14748,7 @@
 <p>看起来好像有点复杂，我再借助图片来解释一下。</p>
 <p>在下图中，Slot 2正在从实例2往实例3迁移，key1和key2已经迁移过去，key3和key4还在实例2。客户端向实例2请求key2后，就会收到实例2返回的ASK命令。</p>
 <p>ASK命令表示两层含义：第一，表明Slot数据还在迁移中；第二，ASK命令把客户端所请求数据的最新实例地址返回给客户端，此时，客户端需要给实例3发送ASKING命令，然后再发送操作命令。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e9/b0/e93ae7f4edf30724d58bf68yy714eeb0.jpg?wh=3000%2A2250" title="客户端ASK重定向命令" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e9/b0/e93ae7f4edf30724d58bf68yy714eeb0.jpg?wh=3000%2A2250" title="客户端ASK重定向命令" /></p>
 <p>和MOVED命令不同，<strong>ASK命令并不会更新客户端缓存的哈希槽分配信息</strong>。所以，在上图中，如果客户端再次请求Slot 2中的数据，它还是会给实例2发送请求。这也就是说，ASK命令的作用只是让客户端能给新实例发送一次请求，而不像MOVED命令那样，会更改本地缓存，让后续所有命令都发往新实例。</p>
 <h2 id="_4">小结</h2>
 <p>这节课，我们学习了切片集群在保存大量数据方面的优势，以及基于哈希槽的数据分布机制和客户端定位键值对的方法。</p>
@@ -15016,8 +15016,6 @@ b、负载均衡
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -6949,56 +6949,56 @@
 <p>对于桌面虚拟化软件，我们多采用VirtualBox，如果使用服务器的虚拟化软件，则有另外的选型。</p>
 <p>服务器上的虚拟化软件，多使用qemu，其中关键字emu，全称是emulator，模拟器。所以，单纯使用qemu，采用的是完全虚拟化的模式。</p>
 <p>qemu向Guest OS模拟CPU，也模拟其他的硬件，GuestOS认为自己和硬件直接打交道，其实是同qemu模拟出来的硬件打交道，qemu会将这些指令转译给真正的硬件。由于所有的指令都要从qemu里面过一手，因而性能就会比较差。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/05/fa/058be86de5a43a782392aff3cb8a1ffa.png?wh=1063%2A1303" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/05/fa/058be86de5a43a782392aff3cb8a1ffa.png?wh=1063%2A1303" /></p>
 <p>按照上面的介绍，完全虚拟化是非常慢的，所以要使用硬件辅助虚拟化技术Intel-VT，AMD-V，所以需要CPU硬件开启这个标志位，一般在BIOS里面设置。</p>
 <p>当确认开始了标志位之后，通过KVM，GuestOS的CPU指令不用经过Qemu转译，直接运行，大大提高了速度。</p>
 <p>所以，KVM在内核里面需要有一个模块，来设置当前CPU是Guest OS在用，还是Host OS在用。</p>
 <p>下面，我们来查看内核模块中是否含有kvm, lsmod | grep kvm。</p>
 <p>KVM内核模块通过/dev/kvm暴露接口，用户态程序可以通过ioctl来访问这个接口。例如，你可以通过下面的流程编写程序。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f5/62/f5ee1a44d7c4890e411c2520507ddc62.png?wh=1147%2A1783" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f5/62/f5ee1a44d7c4890e411c2520507ddc62.png?wh=1147%2A1783" /></p>
 <p>Qemu将KVM整合进来，将有关CPU指令的部分交由内核模块来做，就是qemu-kvm (qemu-system-XXX)。</p>
 <p>qemu和kvm整合之后，CPU的性能问题解决了。另外Qemu还会模拟其他的硬件，如网络和硬盘。同样，全虚拟化的方式也会影响这些设备的性能。</p>
 <p>于是，qemu采取半虚拟化的方式，让Guest OS加载特殊的驱动来做这件事情。</p>
 <p>例如，网络需要加载virtio_net，存储需要加载virtio_blk，Guest需要安装这些半虚拟化驱动，GuestOS知道自己是虚拟机，所以数据会直接发送给半虚拟化设备，经过特殊处理（例如排队、缓存、批量处理等性能优化方式），最终发送给真正的硬件。这在一定程度上提高了性能。</p>
 <p>至此，整个关系如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f7/22/f748fd6b6b84fa90a1044a92443c3522.png?wh=2203%2A1393" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f7/22/f748fd6b6b84fa90a1044a92443c3522.png?wh=2203%2A1393" /></p>
 <h2 id="_2">创建虚拟机</h2>
 <p>了解了qemu-kvm的工作原理之后，下面我们来看一下，如何使用qemu-kvm创建一个能够上网的虚拟机。</p>
 <p>如果使用VirtualBox创建过虚拟机，通过界面点点就能创建一个能够上网的虚拟机。如果使用qemu-kvm，就没有这么简单了。一切都得自己来做，不过这个过程可以了解KVM虚拟机的创建原理。</p>
 <p>首先，我们要给虚拟机起一个名字，在KVM里面就是-name ubuntutest。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/93/a8/93d2df627d6dfb09cf1c13fee16629a8.png?wh=445%2A371" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/93/a8/93d2df627d6dfb09cf1c13fee16629a8.png?wh=445%2A371" /></p>
 <p>设置一个内存大小，在KVM里面就是-m 1024。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/db/76/db13672936d08b2c2c28115f16937876.png?wh=445%2A371" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/db/76/db13672936d08b2c2c28115f16937876.png?wh=445%2A371" /></p>
 <p>创建一个虚拟硬盘，对于VirtualBox是VDI格式，对于KVM则不同。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/13/dd/136d17009a7481cbd472036e4ee83ddd.png?wh=467%2A417" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/13/dd/136d17009a7481cbd472036e4ee83ddd.png?wh=467%2A417" /></p>
 <p>硬盘有两种格式，一个是动态分配，也即开始创建的时候，看起来很大，其实占用的空间很少，真实有多少数据，才真的占用多少空间。一个是固定大小，一开始就占用指定的大小。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c2/66/c201a260cb24b2f39d6ba0ac7b548a66.png?wh=467%2A417" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c2/66/c201a260cb24b2f39d6ba0ac7b548a66.png?wh=467%2A417" /></p>
 <p>比如，我这台电脑，硬盘的大小为8G。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9e/6d/9ed4e7712a6fe9f43dae5d1c1ecb9e6d.png?wh=467%2A417" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9e/6d/9ed4e7712a6fe9f43dae5d1c1ecb9e6d.png?wh=467%2A417" /></p>
 <p>在KVM中，创建一个虚拟机镜像，大小为8G，其中qcow2格式为动态分配，raw格式为固定大小。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>qemu-img create -f qcow2 ubuntutest.img 8G
 </code></pre></div>
 <p>我们将Ubuntu的ISO挂载为光盘，在KVM里面-cdrom <a href="http://ubuntu-xxx-server-amd64.iso">ubuntu-xxx-server-amd64.iso</a>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/09/b0/091d934004d10550a87b4d635546d5b0.png?wh=732%2A432" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/09/b0/091d934004d10550a87b4d635546d5b0.png?wh=732%2A432" /></p>
 <p>创建一个网络，有时候会选择桥接网络，有时候会选择NAT网络，这个在KVM里面只有自己配置了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6d/5b/6d8733d73192bd1b114df03f01c6275b.png?wh=652%2A398" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6d/5b/6d8733d73192bd1b114df03f01c6275b.png?wh=652%2A398" /></p>
 <p>接下来Virtualbox就会有一个界面，可以看到安装的整个过程，在KVM里面，我们用VNC来做。参数为-vnc :19</p>
 <p>于是，我们也可以创建KVM虚拟机了，可以用下面的命令：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>qemu-system-x86_64 -enable-kvm -name ubuntutest  -m 2048 -hda ubuntutest.img -cdrom ubuntu-14.04-server-amd64.iso -boot d -vnc :19
 </code></pre></div>
 <p>启动了虚拟机后，连接VNC，我们也能看到安装的过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6a/1e/6afde27eb9bf29b566c47bf60fd56f1e.png?wh=985%2A539" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6a/1e/6afde27eb9bf29b566c47bf60fd56f1e.png?wh=985%2A539" /></p>
 <p>按照普通安装Ubuntu的流程安装好Ubuntu，然后shutdown -h now，关闭虚拟机。</p>
 <p>接下来，我们可以对KVM创建桥接网络了。这个要模拟virtualbox的桥接网络模式。</p>
 <p>如果在桌面虚拟化软件上选择桥接网络，在你的笔记本电脑上，就会形成下面的结构。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2b/47/2b49867c473162d4706553e8cbb5f247.png?wh=1003%2A1303" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2b/47/2b49867c473162d4706553e8cbb5f247.png?wh=1003%2A1303" /></p>
 <p>每个虚拟机都会有虚拟网卡，在你的笔记本电脑上，会发现多了几个网卡，其实是虚拟交换机。这个虚拟交换机将虚拟机连接在一起。在桥接模式下，物理网卡也连接到这个虚拟交换机上。物理网卡在桌面虚拟化软件的“界面名称”那里选定。</p>
 <p>如果使用桥接网络，当你登录虚拟机里看IP地址时会发现，你的虚拟机的地址和你的笔记本电脑的地址，以及你旁边的同事的电脑的网段是一个网段。这是为什么呢？这其实相当于将物理机和虚拟机放在同一个网桥上，相当于这个网桥上有三台机器，是一个网段的，全部打平了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/78/47/7899a96aaa0b91c165f867d3ec42e947.png?wh=1252%2A1063" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/78/47/7899a96aaa0b91c165f867d3ec42e947.png?wh=1252%2A1063" /></p>
 <p>在数据中心里面，采取的也是类似的技术，连接方式如下图所示，只不过是Linux在每台机器上都创建网桥br0，虚拟机的网卡都连到br0上，物理网卡也连到br0上，所有的br0都通过物理网卡连接到物理交换机上。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/da/a7/da83bb01b7ed63ac0062b5cc835099a7.png?wh=1843%2A1243" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/da/a7/da83bb01b7ed63ac0062b5cc835099a7.png?wh=1843%2A1243" /></p>
 <p>同样我们换一个角度看待这个拓扑图。同样是将网络打平，虚拟机会和物理网络具有相同的网段，就相当于两个虚拟交换机、一个物理交换机，一共三个交换机连在一起。两组四个虚拟机和两台物理机都是在一个二层网络里面的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8e/c6/8e471a287e0181f1b7af56b60b84adc6.png?wh=2143%2A1063" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8e/c6/8e471a287e0181f1b7af56b60b84adc6.png?wh=2143%2A1063" /></p>
 <p>qemu-kvm如何才能创建一个这样的桥接网络呢？</p>
 <p>1.在Host机器上创建bridge br0。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>brctl addbr br0
@@ -7241,8 +7241,6 @@ machdep.cpu.features: FPU VME DE PSE TSC MSR PAE MCE CX8 APIC SEP MTRR PGE MCA C
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

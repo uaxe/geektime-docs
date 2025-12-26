@@ -14224,7 +14224,7 @@
 <p>通过上一讲的学习，你已经知道使用两阶段提交协议（2PC）可以保证分布式事务的原子性，但是，2PC的性能始终是一个绕不过去的坎儿。</p>
 <p>那么，它到底有多慢呢？</p>
 <p>我们来看一组具体数据。2013年的MySQL技术大会上（Percona Live MySQL C&amp;E 2013），Randy Wigginton等人在一场名为“Distributed Transactions in MySQL”的演讲中公布了一组XA事务与单机事务的对比数据。XA协议是2PC在数据库领域的具体实现，而MySQL（InnoDB存储引擎）正好就支持XA协议。我把这组数据转换为下面的折线图，这样看起来会更加直观些。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/72/ya/7227f5f6b32f6d9bb4cafefa96ac8yya.jpg?wh=2700%2A1481" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/72/ya/7227f5f6b32f6d9bb4cafefa96ac8yya.jpg?wh=2700%2A1481" /></p>
 <p>其中，横坐标是并发线程数量，纵坐标是事务延迟，以毫秒为单位；蓝色的折线表示单机事务，红色的折线式表示跨两个节点的XA事务。我们可以清晰地看到，无论并发数量如何，XA事务的延迟时间总是在单机事务的10倍以上。</p>
 <p>这绝对是一个巨大的性能差距，所以这个演讲最终的建议是“不要使用分布式事务”。</p>
 <p>很明显，今天，任何计划使用分布式数据库的企业，都不可能接受10倍于单体数据库的事务延迟。如果仍旧存在这样大的差距，那分布式数据库也必然是无法生存的，所以它们一定是做了某些优化。</p>
@@ -14247,21 +14247,21 @@
 <p>$$L_{txn} = (W + 1) * L_{c}$$</p>
 <p>我们把这个公式带入具体例子里来看一下。</p>
 <p>这次还是小明给小红转账，金额是500元。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e7/a3/e70f3cbc6ef1637f7b3feb81d8ba33a3.jpg?wh=2700%2A1277" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e7/a3/e70f3cbc6ef1637f7b3feb81d8ba33a3.jpg?wh=2700%2A1277" /></p>
 <p>在这个转账事务中，包含两条写操作SQL，分别是扣减小明账户余额和增加小红账户余额，W等于2。再加上提交操作，一共有3个$L_{c}$。我们可以看到，这个公式里事务的延迟是与写操作SQL的数量线性相关的，而真实场景中通常都会包含多个写操作，那事务延迟肯定不能让人满意。</p>
 <h2 id="_2">优化方法</h2>
 <h3 id="buffering-writes-until-commit">缓存写提交（Buffering Writes until Commit）</h3>
 <p>怎么缩短写操作的延迟呢？</p>
 <p>第一个办法是将所有写操作缓存起来，直到commit语句时一起执行，这种方式称为Buffering Writes until Commit，我把它翻译为<strong>“缓存写提交”</strong>。而TiDB的事务处理中就采用这种方式，我借用TiDB官网的一张交互图来说明执行过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/73/60/73yy16e27a530e0079yyc077623d7460.jpg?wh=2700%2A1322" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/73/60/73yy16e27a530e0079yyc077623d7460.jpg?wh=2700%2A1322" /></p>
 <p>所有从Client端提交的SQL首先会缓存在TiDB节点，只有当客户端发起Commit时，TiDB节点才会启动两阶段提交，将SQL被转换为TiKV的操作。这样，显然可以压缩第一阶段的延迟，把多个写操作SQL压缩到大约一轮共识算法的时间。那么整个事务延迟就是：</p>
 <p>$$L_{txn} = 2 * L_{c}$$</p>
 <p>但缓存写提交存在两个明显的缺点。</p>
 <p>首先是在客户端发送Commit前，SQL要被缓存起来，如果某个业务场景同时存在长事务和海量并发的特点，那么这个缓存就可能被撑爆或者成为瓶颈。</p>
 <p>其次是客户端看到的SQL交互过程发生了变化，在MySQL中如果出现事务竞争，判断优先级的规则是First Write Win，也就是对同一条记录先执行写操作的事务获胜。而TiDB因为缓存了所有写SQL，所以就变成了First Commit Win，也就是先提交的事务获胜。我们用一个具体的例子来演示这两种情况。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/22/d5/224a8afff7b76200b5db9ae4949218d5.jpg?wh=2700%2A1378" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/22/d5/224a8afff7b76200b5db9ae4949218d5.jpg?wh=2700%2A1378" /></p>
 <p>在MySQL中同时执行T1，T2两个事务，T1先执行了update，所以获得优先权成功提交。而T2被阻塞，等待T1提交后才完成提交。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4b/41/4b3df90a47a28339e0f47717ea3fd041.jpg?wh=2700%2A1388" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4b/41/4b3df90a47a28339e0f47717ea3fd041.jpg?wh=2700%2A1388" /></p>
 <p>在TiDB中执行同样的T1、T2，虽然T2晚于T1执行update，但却先执行了commit，所以T2获胜，T1失败。</p>
 <p>First Write Win与First Commit Win在交互上是显然不同的，这虽然不是大问题，但对于开发者来说，还是有一定影响的。可以说，TiDB的“缓存写提交”方式已经不是完全意义上的交互事务了。</p>
 <h3 id="pipeline">管道（Pipeline）</h3>
@@ -14271,14 +14271,14 @@
 <p>那么，加上提交阶段的一轮共识算法开销：</p>
 <p>$$L_{txn} = 2 * L_{c}$$</p>
 <p>我们再回到小明转账的例子来看一下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c9/d1/c9e61yy462e8ceb27dbdb0ddb2157bd1.jpg?wh=2700%2A1270" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c9/d1/c9e61yy462e8ceb27dbdb0ddb2157bd1.jpg?wh=2700%2A1270" /></p>
 <p>同样的操作，按照Pipeline方式，增加小红账户余额时并不等待小明扣减账户的动作结束，两条SQL的执行时间约等于1个$L_{c}$。加上提交阶段的1个$L_{c}$，一共是2个$L_{c}$，并且延迟也不再随着SQL数量增加而延长。</p>
 <p>2个$L_{c}$是多久呢？我们带入真实场景，来计算一下 。</p>
 <p>首先，我们评估一下期望值。对于联机交易来说，延迟通常不超过1秒，如果用户体验良好，则要控制在500毫秒以内。其中留给数据库的处理时间不会超过一半，也就是250-500毫秒。这样推算，$L_{c}$应该控制在125-250毫秒之间。</p>
 <p>再来看看真实的网络环境。我们知道人类现有的科技水平是不能超越光速的，这个光速是指光在真空中的传播速度，大约是30万千米每秒。而光纤由于传播介质不同和折线传播的关系，传输速度会降低30%，大致是20万千米每秒。但是，这仍然是一个比较理想的速度，因为还要考虑网络上的各种设备、协议处理、丢包重传等等情况，实际的网络延迟还要长很多。</p>
 <p>为了让你有一个更直观的感受。我这里引用了论文“<a href="https://amplab.cs.berkeley.edu/wp-content/uploads/2013/10/hat-vldb2014.pdf">Highly Available Transactions: Virtues and Limitations</a>“中的一些数据，这篇论文发表在VLDB2014上，在部分章节中初步探讨了系统全球化部署面临的延迟问题。论文作者在亚马逊EC2上，使用Ping包的方式进行了实验，并统计了一周时间内7个不同地区机房之间的RTT（Round-Rip Time，往返延迟）数据。</p>
 <p>简单来说，RTT就是数据在两个节点之间往返一次的耗时。在讨论网络延迟的时候，为了避免歧义，我们通常使用RTT这个概念。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/37/10/37be4540d53b39372dd5ef7e623ef210.jpg?wh=2700%2A1026" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/37/10/37be4540d53b39372dd5ef7e623ef210.jpg?wh=2700%2A1026" /></p>
 <p>实验中，地理跨度较大两个机房是巴西圣保罗和新加坡，两地之间的理论RTT是106.7毫秒（使用光速测算），而实际测试的RTT均值为362.8毫秒，P95（95%）RTT均值为649毫秒。将649毫秒代入公式，那$L_{txn}$就是接近1.3秒，这显然太长了。而考虑到共识算法的数据包更大，这个延迟还会更长。</p>
 <h3 id="parallel-commits">并行提交（Parallel Commits）</h3>
 <p>但是，像CockroachDB、YugabyteDB这样分布式数据库，它们的目标就是全球化部署，所以还要努力去压缩事务延迟。</p>
@@ -14299,7 +14299,7 @@
 </code></pre></div>
 <p>Writes部分是意向写的Key。这是留给异步进程的线索，通过这些Key是否写成功，可以倒推出事务是否提交成功。</p>
 <p>而客户端得到所有意向写的成功反馈后，可以直接返回调用方事务提交成功。<strong>注意！这个地方就是关键了</strong>，客户端只在当前进程内判断事务提交成功后，不维护事务状态，而直接返回调用方；事后由异步线程根据事务表中的线索，再次确认事务的状态，并落盘维护状态记录。这样事务操作中就减少了一轮共识算法开销。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cf/78/cf8be2fc332e664edde17be516e9f578.jpg?wh=2700%2A1262" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cf/78/cf8be2fc332e664edde17be516e9f578.jpg?wh=2700%2A1262" /></p>
 <p>你有没有发现，并行提交的优化思路其实和Percolator很相似，那就是不要纠结于在一次事务中搞定所有事情，可以只做最少的工作，留下必要的线索，就可以达到极致的速度。而后续的异步进程，只要根据线索，完成收尾工作就可以了。</p>
 <h2 id="_3">小结</h2>
 <p>好了，这讲的内容到这里就该结束了。那么，让我们再回顾一下今日的内容吧。</p>
@@ -14310,7 +14310,7 @@
 <li>使用并行提交，可以进一步将整体延迟压缩到一轮共识算法开销。CockroachDB使用了管道和并行提交这两种优化手段。</li>
 </ol>
 <p>今天我们分析了分布式事务高延迟的原因和一些优化的手段，理想的情况下，事务延迟可以缩小到一轮共识算法开销。你看，是不是对分布式数据库更有信心了。当然，在测算事务延迟时我们还是预设了一些前提，比如读操作成本趋近于零，这仅在特定情况下对CockroachDB适用，很多时候是不能忽略的，其他产品则更是不能无视这个成本。那么，在全球化部署下，执行读操作时，如何获得满意延迟呢？或者还有什么其他难题，我们在第24讲中会继续探讨。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/02/a6/023b197d9e33858572d4daeafb8612a6.jpg?wh=2700%2A2696" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/02/a6/023b197d9e33858572d4daeafb8612a6.jpg?wh=2700%2A2696" /></p>
 <h2 id="_4">思考题</h2>
 <p>最后，我们的思考题还是关于2PC的。第9讲和第10讲中，我们介绍了2PC的各种优化手段，今天最后介绍的“并行提交”方式将延迟压缩达到的一轮共识算法开销，应该是现阶段比较极致的方法了。不过，在工程实现中其实还有一些其他的方法，也很有趣，我想请你也介绍下自己了解的2PC优化方法。</p>
 <p>欢迎你在评论区留言和我一起讨论，我会在答疑篇和你继续讨论这个问题。如果你身边的朋友也对如何优化分布式事务性能这个话题感兴趣，你也可以把今天这一讲分享给他，我们一起讨论。</p>
@@ -14437,8 +14437,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

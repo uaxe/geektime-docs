@@ -6078,17 +6078,17 @@
 <h2 id="_1">问题再现</h2>
 <p>我们可以自己先启动一个容器，一起试试不断地往容器文件系统中写入数据，看看是一个什么样的情况。</p>
 <p>用Docker启动一个容器后，我们看到容器的根目录(/)也就是容器文件系统OverlayFS，它的大小是160G，已经使用了100G。其实这个大小也是宿主机上的磁盘空间和使用情况。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d3/3e/d32c83e404a81b301fbf8bdfd7a9c23e.png?wh=1264%2A586" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d3/3e/d32c83e404a81b301fbf8bdfd7a9c23e.png?wh=1264%2A586" /></p>
 <p>这时候，我们可以回到宿主机上验证一下，就会发现宿主机的根目录(/)的大小也是160G，同样是使用了100G。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b5/0b/b54deb08e46ff1155303581e9d1c8f0b.png?wh=1242%2A366" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b5/0b/b54deb08e46ff1155303581e9d1c8f0b.png?wh=1242%2A366" /></p>
 <p>好，那现在我们再往容器的根目录里写入10GB的数据。</p>
 <p>这里我们可以看到容器的根目录使用的大小增加了，从刚才的100G变成现在的110G。而多写入的10G大小的数据，对应的是test.log这个文件。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c0/46/c04dcff3aa4773302495113dd2a8d546.png?wh=1704%2A472" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c0/46/c04dcff3aa4773302495113dd2a8d546.png?wh=1704%2A472" /></p>
 <p>接下来，我们再回到宿主机上，可以看到宿主机上的根目录(/)里使用的大小也是110G了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/15/9d/155d30bc20b72c0678d1948f25cbe29d.png?wh=1220%2A366" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/15/9d/155d30bc20b72c0678d1948f25cbe29d.png?wh=1220%2A366" /></p>
 <p>我们还是继续看宿主机，看看OverlayFS里upperdir目录中有什么文件？</p>
 <p>这里我们仍然可以通过/proc/mounts这个路径，找到容器OverlayFS对应的lowerdir和upperdir。因为写入的数据都在upperdir里，我们就只要看upperdir对应的那个目录就行了。果然，里面存放着容器写入的文件test.log，它的大小是10GB。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4d/7d/4d32334dc0f1ba69881c686037f6577d.png?wh=1920%2A461" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4d/7d/4d32334dc0f1ba69881c686037f6577d.png?wh=1920%2A461" /></p>
 <p>通过这个例子，我们已经验证了在容器中对于OverlayFS中写入数据，<strong>其实就是往宿主机的一个目录（upperdir）里写数据。</strong>我们现在已经写了10GB的数据，如果继续在容器中写入数据，结果估计你也知道了，就是会写满宿主机的磁盘。</p>
 <p>那遇到这种情况，我们该怎么办呢？</p>
 <h2 id="_2">知识详解</h2>
@@ -6107,7 +6107,7 @@
 <p>首先我们要使用XFS Quota特性，必须在文件系统挂载的时候加上对应的Quota选项，比如我们目前需要配置Project Quota，那么这个挂载参数就是"pquota"。</p>
 <p>对于根目录来说，<strong>这个参数必须作为一个内核启动的参数"rootflags=pquota"，这样设置就可以保证根目录在启动挂载的时候，带上XFS Quota的特性并且支持Project模式。</strong></p>
 <p>我们可以从/proc/mounts信息里，看看根目录是不是带"prjquota"字段。如果里面有这个字段，就可以确保文件系统已经带上了支持project模式的XFS quota特性。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/72/3d/72d653f67717fe047c98fce37156da3d.png?wh=1230%2A112" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/72/3d/72d653f67717fe047c98fce37156da3d.png?wh=1230%2A112" /></p>
 <p>下一步，我们还需要给一个指定的目录打上一个Project ID。这个步骤我们可以使用XFS文件系统自带的工具 <a href="https://linux.die.net/man/8/xfs_quota">xfs_quota</a> 来完成，然后执行下面的这个命令就可以了。</p>
 <p>执行命令之前，我先对下面的命令和输出做两点解释，让你理解这个命令的含义。</p>
 <p>第一点，新建的目录/tmp/xfs_prjquota，我们想对它做Quota限制。所以在这里要对它打上一个Project ID。</p>
@@ -6146,7 +6146,7 @@
 <p>我们在用 <code>docker run</code> 启动容器的时候，加上一个参数 <code>--storage-opt size= &lt;SIZE&gt;</code> ，就能限制住容器OverlayFS文件系统可写入的最大数据量了。</p>
 <p>我们可以一起试一下，这里我们限制的size是10MB。</p>
 <p>进入容器之后，先运行 <code>df -h</code> 命令，这时候你可以看到根目录(/)overlayfs文件系统的大小就10MB，而不是我们之前看到的160GB的大小了。这样容器在它的根目录下，最多只能写10MB数据，就不会把宿主机的磁盘给写满了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a7/8a/a7906f56d9d107f0a290e610b8cd6f8a.png?wh=1194%2A210" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a7/8a/a7906f56d9d107f0a290e610b8cd6f8a.png?wh=1194%2A210" /></p>
 <p>完成了上面这个小试验之后，我们可以再看一下Docker的代码，看看它的实现是不是和我们想的一样。</p>
 <p>Docker里<a href="https://github.com/moby/moby/blob/19.03/daemon/graphdriver/quota/projectquota.go#L155">SetQuota()</a>函数就是用来实现XFS Quota 限制的，我们可以看到它里面最重要的两步，分别是 <code>setProjectID</code> 和 <code>setProjectQuota</code> 。</p>
 <p>其实，这两步做的就是我们在基本概念中提到的那两步：</p>
@@ -6192,7 +6192,7 @@
 <p>你可以进入到这两个函数里看一下，<strong>它们分别调用了ioctl()和quotactl()这两个系统调用来修改内核中XFS的数据结构，从而完成project ID的设置和Quota值的设置。</strong>具体的细节，我不在这里展开了，如果你有兴趣，可以继续去查看内核中对应的代码。</p>
 <p>好了，Docker里XFS Quota操作的步骤完全和我们先前设想的一样，那么还有最后一个问题要解决，XFS Quota限制的目录是哪一个？</p>
 <p>这个我们可以根据/proc/mounts中容器的OverlayFS Mount信息，再结合Docker的<a href="https://github.com/moby/moby/blob/19.03/daemon/graphdriver/overlay2/overlay.go#L335">代码</a>，就可以知道限制的目录是"/var/lib/docker/overlay2/&lt;docker_id&gt;"。那这个目录下有什么呢？果然upperdir目录中有对应的"diff"目录，就在里面！</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4d/9f/4d4d995f052c9a8e3ff3e413c0e1199f.png?wh=1920%2A646" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4d/9f/4d4d995f052c9a8e3ff3e413c0e1199f.png?wh=1920%2A646" /></p>
 <p>讲到这里，我想你已经清楚了对于使用OverlayFS的容器，我们应该如何去防止它把宿主机的磁盘给写满了吧？<strong>方法就是对OverlayFS的upperdir目录做XFS Quota的限流。</strong></p>
 <h2 id="_4">重点总结</h2>
 <p>我们这一讲的问题是，容器写了大量数据到OverlayFS文件系统的根目录，在这个情况下，就会把宿主机的磁盘写满。</p>
@@ -6352,8 +6352,6 @@ Project ID   Used   Soft   Hard Warn&#47;Grace
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -7215,12 +7215,12 @@
 <p>并行计算任务则不同，它指的是在任一时刻整个集群能够同时计算的任务数量。换句话说，<strong>它的出发点是计算任务、是CPU，由与CPU有关的三个参数共同决定</strong>。具体说来，Executor中并行计算任务数的上限是spark.executor.cores与spark.task.cpus的商，暂且记为#Executor-tasks，整个集群的并行计算任务数自然就是#Executor-tasks乘以集群内Executors的数量，记为#Executors。因此，最终的数值是：#Executor-tasks * #Executors。</p>
 <p>我们不难发现，<strong>并行度决定了数据粒度，数据粒度决定了分区大小，分区大小则决定着每个计算任务的内存消耗</strong>。在同一个Executor中，多个同时运行的计算任务“基本上”是平均瓜分可用内存的，每个计算任务能获取到的内存空间是有上限的，因此并行计算任务数会反过来制约并行度的设置。你看，这两个家伙还真是一对相爱相杀的冤家！</p>
 <p>至于，到底该怎么平衡并行度与并行计算任务两者之间的关系，我们留到后面的课程去展开。这里，咱们只要记住和CPU设置有关配置项的含义、区别与作用就行了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/23/ff/234e6b62ff32394f99055c9385988aff.jpeg?wh=1711%2A783" title="与CPU有关的配置项" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/23/ff/234e6b62ff32394f99055c9385988aff.jpeg?wh=1711%2A783" title="与CPU有关的配置项" /></p>
 <h2 id="_2">哪些配置项与内存设置有关？</h2>
 <p>说完CPU，咱们接着说说与内存管理有关的配置项。我们知道，在管理模式上，Spark分为堆内内存与堆外内存。</p>
 <p>堆外内存又分为两个区域，Execution Memory和Storage Memory。要想要启用堆外内存，我们得先把参数spark.memory.offHeap.enabled置为true，然后用spark.memory.offHeap.size指定堆外内存大小。堆内内存也分了四个区域，也就是Reserved Memory、User Memory、Execution Memory和Storage Memory。</p>
 <p>内存的基础配置项主要有5个，它们的含义如下表所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/67/50/67528832632c392d7e2e4c89a872b350.jpeg?wh=1920%2A872" title="与内存有关的配置项" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/67/50/67528832632c392d7e2e4c89a872b350.jpeg?wh=1920%2A872" title="与内存有关的配置项" /></p>
 <p>简单来说，<strong>这些配置项决定了我们刚才说的这些区域的大小</strong>，这很好理解。工具有了，但很多同学在真正设置内存区域大小的时候还会有各种各样的疑惑，比如说：</p>
 <ul>
 <li>内存空间是有限的，该把多少内存划分给堆内，又该把多少内存留给堆外呢？</li>
@@ -7231,13 +7231,13 @@
 <h3 id="_3">堆外与堆内的平衡</h3>
 <p>相比JVM堆内内存，off heap堆外内存有很多优势，如更精确的内存占用统计和不需要垃圾回收机制，以及不需要序列化与反序列化。你可能会说：“既然堆外内存这么厉害，那我们干脆把所有内存都划分给它不就得了？”先别急着下结论，我们先一起来看一个例子。</p>
 <p>用户表1记录着用户数据，每个数据条目包含4个字段，整型的用户ID、String类型的姓名、整型的年龄和Char类型的性别。如果现在要求你用字节数组来存储每一条用户记录，你该怎么办呢？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/13/83/136d2f0618d374f2622e1985984ca783.jpeg?wh=1706%2A696" title="用户表1：简单数据模式" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/13/83/136d2f0618d374f2622e1985984ca783.jpeg?wh=1706%2A696" title="用户表1：简单数据模式" /></p>
 <p>我们一起来做一下。首先，除姓名外其它3个字段都是定长数据类型，因此可以直接安插到字节数组中。对于变长数据类型如String，由于我们事先并不知道每个用户的名字到底有多长，因此，为了把name字段也用字节数组的形式存储，我们只能曲线救国：先记录name字段的在整个字节数组内的偏移量，再记录它的长度，最后把完整的name字符串安插在字节数组的末尾，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/51/2c/516c0e41e6757193533c8dfa33f9912c.jpg?wh=3549%2A1251" title="用字节数组存储用户记录" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/51/2c/516c0e41e6757193533c8dfa33f9912c.jpg?wh=3549%2A1251" title="用字节数组存储用户记录" /></p>
 <p>尽管存储String类型的name字段麻烦一些，但我们总算成功地用字节数组容纳了每一条用户记录。OK，大功告成！</p>
 <p>你可能会问：“做这个小实验的目的是啥呢？”事实上，Spark开辟的堆外内存就是以这样的方式来存储应用数据的。<strong>正是基于这种紧凑的二进制格式，相比JVM堆内内存，Spark通过Java Unsafe API在堆外内存中的管理，才会有那么多的优势。</strong></p>
 <p>不过，成也萧何败也萧何，字节数组自身的局限性也很难突破。比如说，如果用户表1新增了兴趣列表字段，类型为List[String]，如用户表2所示。这个时候，如果我们仍然采用字节数据的方式来存储每一条用户记录，不仅越来越多的指针和偏移地址会让字段的访问效率大打折扣，而且，指针越多，内存泄漏的风险越大，数据访问的稳定性就值得担忧了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/07/92/07d010f82edf0bec630fd9ed57ba8892.png?wh=1460%2A666" title="用户表2：复杂数据模式" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/07/92/07d010f82edf0bec630fd9ed57ba8892.png?wh=1460%2A666" title="用户表2：复杂数据模式" /></p>
 <p>因此，当数据模式（Data Schema）开始变得复杂时，Spark直接管理堆外内存的成本将会非常高。</p>
 <p>那么，针对有限的内存资源，我们该如何平衡JVM堆内内存与off heap堆外内存的划分，我想你心中也该有了答案。<strong>对于需要处理的数据集，如果数据模式比较扁平，而且字段多是定长数据类型，就更多地使用堆外内存。相反地，如果数据模式很复杂，嵌套结构或变长字段很多，就更多采用JVM堆内内存会更加稳妥。</strong></p>
 <h3 id="user-memoryspark">User Memory与Spark可用内存如何分配？</h3>
@@ -7290,7 +7290,7 @@
 <h2 id="_5">小结</h2>
 <p>掌握硬件资源类的配置项是我们打破性能瓶颈，以及平衡不同硬件资源利用率的必杀技。具体来说，我们可以分成两步走。</p>
 <p><strong>第一步，理清CPU、内存和磁盘这三个方面的性能配置项都有什么，以及它们的含义。</strong>因此，我把硬件资源类配置项的含义都汇总在了一个表格中，方便你随时查看。有了这份手册，在针对硬件资源进行配置项调优时，你就能够做到不重不漏。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c9/0a/c9cfdb17e3ec6e8d022ff8e91e4a170a.jpg?wh=1873%2A1255" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c9/0a/c9cfdb17e3ec6e8d022ff8e91e4a170a.jpg?wh=1873%2A1255" /></p>
 <p><strong>第二步，重点理解这些配置项的作用，以及可以解决的问题。</strong></p>
 <p>首先，对于CPU类配置项，我们要重点理解并行度与并行计算任务数的区别。并行度从数据的角度出发，明确了数据划分的粒度，并行度越高，数据粒度越细，数据越分散，CPU资源利用越充分，但同时要提防数据粒度过细导致的调度系统开销。</p>
 <p>并行计算任务数则不同，它从计算的角度出发，强调了分布式集群在任一时刻并行处理的能力和容量。并行度与并行计算任务数之间互相影响、相互制约。</p>
@@ -7436,8 +7436,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

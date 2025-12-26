@@ -7808,24 +7808,24 @@
 </ul>
 <h2 id="mapreduce">使用硬盘来“容错”的MapReduce</h2>
 <p>在深入到Spark的论文之前，我们先来简单回顾一下MapReduce的整个流程。我把我们在讲解<a href="https://time.geekbang.org/column/article/423595">MapReduce的论文</a>中用到的数据流程图放到了这里，你可以再复习下。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/26/a8/26c9fe6a96ec705c81f171b4ab373aa8.jpg?wh=1920x1080" title="来自第6讲的MapReduce的数据流程图" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/26/a8/26c9fe6a96ec705c81f171b4ab373aa8.jpg?wh=1920x1080" title="来自第6讲的MapReduce的数据流程图" /></p>
 <p>MapReduce的过程并不复杂，Map函数的输出结果会输出到所在节点的本地硬盘上。Reduce函数会从Map函数所在的节点里拉取它所需要的数据，然后再写入本地。接着通过一个外部排序的过程，把数据进行分组。最后将排序分完组的数据，通过Reduce函数进行处理。</p>
 <p>你会发现，<strong>在这个过程里，任何一个中间环节，我们都需要去读写硬盘。</strong>Map函数的处理结果，并不会直接通过网络发送给Reduce所在的Worker节点，Reduce也不会直接在内存中做数据排序。</p>
 <p>这还只是单个的MapReduce任务，如果我们要通过MapReduce来跑一些机器学习任务，比如通过L-BFGS这样的算法，来进行大规模的逻辑回归的模型训练，我们需要跑上百个MapReduce的任务。其中每一个MapReduce的任务都差不多，都是把所有日志读入，然后和一个梯度向量做计算，算出新的梯度。接着下一轮计算要再读入一遍原来的日志数据，再和新的梯度做计算。在这个过程中，我们原始的日志，会被重复读取上百遍。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e5/df/e5d0af96b2f60b75f135e065b83013df.jpg?wh=1780x1125" title="在迭代式的机器学习算法中，每一轮迭代我们都需要利用输入数据做一次计算[br]如果采用MapReduce，那么海量的输入数据会被重复读取100遍" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e5/df/e5d0af96b2f60b75f135e065b83013df.jpg?wh=1780x1125" title="在迭代式的机器学习算法中，每一轮迭代我们都需要利用输入数据做一次计算[br]如果采用MapReduce，那么海量的输入数据会被重复读取100遍" /></p>
 <p>而我们知道，内存的读写速度是远远快于硬盘的，这里我放了《深入浅出计算机组成原理》专栏里的一张<a href="https://time.geekbang.org/column/article/107422">数据表</a>。可以看到，无论你在用机械硬盘还是SSD硬盘，访问数据的延时和内存比都有1000倍以上的差距。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/fe/ae/feea266bdde0b303d13d7cab078d6fae.png?wh=1142x588" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fe/ae/feea266bdde0b303d13d7cab078d6fae.png?wh=1142x588" /></p>
 <p>之所以MapReduce把所有数据都往硬盘里一写，是因为它追求的是设计上的“简单”，以及在大规模集群下的“容错”能力。把Map节点的输出数据，直接通过网络发送给Reduce的确是一个很直观的想法，让Reduce节点在内存里就直接处理数据，也的确可以提升性能。</p>
 <p>但是，如果在这个过程中，<strong>Map或者Reduce的节点出现故障了怎么办？</strong></p>
 <p>因为Reduce对于前面的Map函数有依赖关系，所以任何一个Map节点故障，意味着Reduce只收到了部分数据，而且它还不知道是哪一部分。那么Reduce任务只能失败掉，然后等Map节点重新来过。而且，Reduce的失败，还会导致其他的Map节点计算的数据也要重来一遍，引起连锁反应，最终等于是整个任务重来一遍。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8f/91/8ff7621bd9afcaa06d0d9cbd8d87d691.jpg?wh=1920x1080" title="如果数据没有在Map本地落地，那么故障会导致我们丢失掉中间的计算结果[br]并且整个Reduce的计算也要完全重新进行[br]Reduce重新计算，需要其他Map也重新发送数据过来，最终导致整个任务重算一遍" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8f/91/8ff7621bd9afcaa06d0d9cbd8d87d691.jpg?wh=1920x1080" title="如果数据没有在Map本地落地，那么故障会导致我们丢失掉中间的计算结果[br]并且整个Reduce的计算也要完全重新进行[br]Reduce重新计算，需要其他Map也重新发送数据过来，最终导致整个任务重算一遍" /></p>
 <p>这只是我们尝试让数据不需要落地到硬盘处理中，会遇到的一种情况，我们还可能遇到网络拥塞、内存不足以处理传输的数据等种种情况。</p>
 <p>事实上，你可以认为传统的MPI分布式计算系统就是这样，让一个节点直接往另外一个节点发送消息来传递数据的，但是这样的系统，容错能力很差，所以集群的规模往往也上不去。</p>
 <p>而MapReduce针对这个问题的解决方案非常简单粗暴，那就是<strong>把整个数据处理的环节完全拆分开来，然后把一个个阶段的中间数据都落地到硬盘上</strong>。这样，针对单个节点的故障，我们只需要重新运行对应节点分配的任务就好了，其他已经完成的工作不会“半途而废”。</p>
 <h2 id="_1">分布式系统里的“函数式”数据集</h2>
 <p>但是，这样的方式真的是效率最高的吗？</p>
 <p>虽然因为整个GFS和MapReduce系统规模很大，节点很多，我们的各个节点必然会出现故障。但是，毕竟硬件也好、系统也好，出现故障是小概率事件。我们在<a href="https://time.geekbang.org/column/article/423600">第8讲</a>里看过，一个数据中心里的18万块硬盘，90天坏了439块，算到年度的损坏率也就是1%左右。我们为了这1%的错误，却要把99%的数据都反复从硬盘里读出来写进去，感觉的确有点划不来。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a4/91/a45141963bbc84db14d212b201509a91.png?wh=720x810" title="来自第8讲的数据中心硬盘损坏率的统计数据" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a4/91/a45141963bbc84db14d212b201509a91.png?wh=720x810" title="来自第8讲的数据中心硬盘损坏率的统计数据" /></p>
 <p>所以，很自然地，我们需要有一个更有效率的容错方式。一个很直观的想法自然也就冒出来了，那就是我们是否可以做这三件事情：</p>
 <ul>
 <li>第一个，是我们<strong>是否可以把数据缓存在内存里</strong>。如果是计算的中间结果，我们不一定要把它写到硬盘上。如果是反复读取的输入数据，我们可以缓存在内存里而不是每个迭代重新读取一遍。</li>
@@ -7857,7 +7857,7 @@
 </blockquote>
 <p>按照这个定义，我们可以看到这个是对于数据的一个<strong>抽象</strong>。我们的任何一个数据集，进行一次转换就是一个新的RDD，但是这个RDD并不需要实际输出到硬盘上。实际上，这个数据都不会作为一个完整的数据集缓存在内存中，而只是一个RDD的“抽象概念”。只有当我们对某一个RDD实际调用persistent函数的时候，这个RDD才会实际作为一个完整的数据集，缓存在内存中。</p>
 <p>一旦被缓存到内存里，这个RDD就能够再次被下游的其他数据转换反复使用。一方面，<strong>这个数据不需要写入到硬盘</strong>，所以我们减少了一次数据写。另一方面，<strong>下游的其他转化也不需要再从硬盘读数据</strong>，于是，我们就节省了大量的硬盘I/O的开销。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/05/5d/05194e7605c386536043ec4042a8215d.jpg?wh=1920x1080" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/05/5d/05194e7605c386536043ec4042a8215d.jpg?wh=1920x1080" /></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">lines</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">spark</span><span class="p">.</span><span class="n">textFile</span><span class="p">(</span><span class="s">&quot;hdfs://...&quot;</span><span class="p">)</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">errors</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">lines</span><span class="p">.</span><span class="n">filter</span><span class="p">(</span><span class="n">_</span><span class="p">.</span><span class="n">startsWith</span><span class="p">(</span><span class="s">&quot;ERROR&quot;</span><span class="p">))</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">errors</span><span class="p">.</span><span class="n">persist</span><span class="p">()</span>
@@ -7882,7 +7882,7 @@
 <p>所以，在Spark里，会对整个数据计算的拓扑图在分布式系统下的依赖关系做一个分类。如果一个RDD的一个分区，只会影响到下游的一个节点，那么我们就称这样的上下游依赖关系为<strong>窄依赖</strong>。而如果一个RDD的一个分区，会影响到下游的多个节点，那么我们就称这样的上下游关系为<strong>宽依赖</strong>。</p>
 <p>对于窄依赖，即使重算一遍，也只是影响一条线上的少数几个节点，所以对应的中间数据结果，并不需要输出到硬盘上。而对于宽依赖，一旦上游的一个节点失效了，需要重新计算。那么它对应的多个下游节点，都需要重新从这个节点拉取数据并重新计算，需要占用更多的网络带宽和计算资源。</p>
 <p>换句话说，在宽依赖下，一个上游节点的失效，会以几倍的影响在下游得到放大。所以，在宽依赖的场景下，上游会像MapReduce里的Map一样，<strong>把输出结果序列化到硬盘上</strong>，以减少故障后的恢复成本。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/56/04/562dyyf05772f8ba0990670b8ed96c04.jpg?wh=1920x1080" title="宽依赖，会放大上游节点故障对下游节点的影响" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/56/04/562dyyf05772f8ba0990670b8ed96c04.jpg?wh=1920x1080" title="宽依赖，会放大上游节点故障对下游节点的影响" /></p>
 <p>同样的，对于有多轮迭代，或者是整个拓扑图很长的数据处理任务，Spark在persistent的时候，支持你添加一个<strong>REPLICATE参数</strong>，把当前的计算结果作为一个检查点存储下来。一旦添加了这个参数，数据就不只是存储在内存中，而是会序列化到硬盘里。这样，同样可以减少你在出现故障时候的重新计算的时间。</p>
 <p>可以看到，无论是persistent、宽依赖下的数据会被持久化存储，还是允许用户去自己通过检查点存储中间步骤的计算结果，<strong>都是为了在日常情况下的性能，和容错情况下的性能做一个平衡。</strong></p>
 <p>如果不做任何持久化存储，那么平时系统会跑得很快，但是一旦某个节点出错就要从头再来。而如果都做持久化存储，那么节点出错的时候，计算可以恢复得很快，但是没有问题的时候会有很多浪费。</p>
@@ -8016,8 +8016,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

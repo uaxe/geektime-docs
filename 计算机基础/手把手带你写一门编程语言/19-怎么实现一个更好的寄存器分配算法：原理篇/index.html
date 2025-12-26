@@ -6327,13 +6327,13 @@
 <p><strong>那现在这14个寄存器都被占满了，接下来的变量i，是不是就只能放在内存里了呢？</strong></p>
 <p>不是的。因为并不是每个寄存器都需要被我们的变量一直占据的。每个变量其实有不同的生存期，在生存期之后，程序就再也不会访问这个变量了。</p>
 <p>我这里画了一张图，显示了我们这块代码中前13个寄存器的生存期。在图中，我用r1~r13代表了13个寄存器，方便我们分析。不过，实际代码中，你可要换成edi、esi这些具体的寄存器名称。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d2/48/d20ccf140cd6009a5d766f1190910a48.jpg?wh=1920x823" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d2/48/d20ccf140cd6009a5d766f1190910a48.jpg?wh=1920x823" /></p>
 <p>你可以看到，在运行第一行代码以后，p1对应的寄存器（r1）就被释放出来了，同时，x7对应的寄存器（r7）就开始投入使用。</p>
 <p>随着代码的运行，r2<sub>r6逐步被释放，而r8</sub>r12也逐步被启用。最后，当我们给sum赋值完毕以后，前13个寄存器就都被释放出来了。所以，对于后面的i变量，我们其实有很多寄存器可以使用，根本不用使用内存。</p>
 <p>在前面的分析过程中，我们着重计算了每个变量的生存期。<strong>总的来说，只要两个变量的生存期是不交叉的，那就可以共享同一个物理寄存器。</strong></p>
 <p>所以，p1和x7可以共用寄存器r1，p2和x8可以共用寄存器r2，等等。最后，t1、sum和i这三个变量，也是复用已有的寄存器就可以了。</p>
 <p>我把这个优化后的寄存器使用情况画在了下面这张图中：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/97/b8/970f91706981734eb1bc795d7eb202b8.jpg?wh=1920x823" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/97/b8/970f91706981734eb1bc795d7eb202b8.jpg?wh=1920x823" /></p>
 <p>你现在算一下，基于这个优化的分配算法，我们的示例程序最多的时候只需要占用6个寄存器（不算rsp和rbp），而且大部分运行时间，都是在循环中做1万次计算，只占用了两个寄存器。</p>
 <p>那么，你现在已经明白我们这次算法优化的思路了吗？其实就是<strong>多个变量可以复用相同的寄存器，只要它们的生存期不重叠就行</strong>。这具体怎么实现呢？</p>
 <h2 id="_3">线性扫描算法</h2>
@@ -6342,9 +6342,9 @@
 <p>线性扫描算法是很容易理解的，这里面的关键就是<strong>计算出每个变量的生存期</strong>。计算生存期可以用数据流分析算法，分析出每个变量的活跃状态，这个我们等会儿再说。</p>
 <p>我们再把前面这个示例程序，用线性扫描算法的思路来描述分析一遍。</p>
 <p>首先，在程序刚开始执行时，p1~p6这6个变量都是活跃的，分别占用了1个寄存器。每个寄存器我们用了一个颜色来表示，以便区分。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/55/df/557980c2e63a884106cb350e488393df.jpg?wh=1265x1215" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/55/df/557980c2e63a884106cb350e488393df.jpg?wh=1265x1215" /></p>
 <p>接着在第二个时间段，我们把p1赋给x7，这时p1不再活跃，而x7变得活跃起来。这个时候，让x7代替p1来使用r1寄存器就可以了，不需要再增加新的寄存器。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c1/31/c1c013947bca0068c9b6d89fb060a331.jpg?wh=1265x1215" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c1/31/c1c013947bca0068c9b6d89fb060a331.jpg?wh=1265x1215" /></p>
 <p>这样继续往下执行。在给x12赋值的时候，其实是会引入一个临时变量，形成下面一系列计算步骤：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>t1 = p6;
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>t1 += x7;
@@ -6355,24 +6355,24 @@
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>x12 = t1;
 </code></pre></div>
 <p>这样，随着计算过程的推进，x7~x11的生存期逐步结束，相应的寄存器也会被释放出来。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/33/1a/334d36fc06ea3ee18b962e7eafbca91a.jpg?wh=1265x1215" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/33/1a/334d36fc06ea3ee18b962e7eafbca91a.jpg?wh=1265x1215" /></p>
 <p>等到给x12赋值的这个表达式完全计算完毕，在这个时间点上，你会发现只有x12需要占用一个寄存器，前面11个变量的生存期都已经结束了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/79/15/795fd0cc51eb4145fe89d429549d8815.jpg?wh=1265x1215" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/79/15/795fd0cc51eb4145fe89d429549d8815.jpg?wh=1265x1215" /></p>
 <p>最后，我们要执行for循环的代码。在这个过程中，只需要占据两个寄存器。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/66/3e/6644c02a5ff134d2d148bda11af0e83e.jpg?wh=1265x1215" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/66/3e/6644c02a5ff134d2d148bda11af0e83e.jpg?wh=1265x1215" /></p>
 <p>好了，刚才的分析就是示例程序执行线性扫描算法的过程。在这个例子中，我们只用了6个寄存器，少于X86-64架构中通用寄存器的数量。所以，整个程序运行过程都使用寄存器就可以了。</p>
 <p><strong>但事情总有例外。如果一个程序写得特别复杂，用到的变量特别多，每个变量的生存期又很长，那物理寄存器的数量还是有可能不够的。那这个时候，算法又该如何处理呢？</strong></p>
 <p>这个时候，我们需要选择一个寄存器，把它的数据保存到内存中，把这个寄存器腾出来。比如说，在前面的例子中，假设我们使用的CPU只有5个寄存器，应该怎样分配呢？</p>
 <p>在一开始，p1~p5还可以每个变量占据一个寄存器。但p6就没有可用的寄存器了，那么我们就先把它放在内存里。因为p6还不会马上被使用，直到给t1赋值的时候，才会用到p6。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d2/4c/d2f11844bc2519f21cedac35e6bf254c.jpg?wh=1265x1215" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d2/4c/d2f11844bc2519f21cedac35e6bf254c.jpg?wh=1265x1215" /></p>
 <p>接着，程序开始一步步地运行，寄存器的使用权也被陆续转移。比如，执行完毕x7=p1以后，寄存器r1从p1转移给了x7。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/89/88/892a9a5ac8b06fdd831f1e61abf33488.jpg?wh=1265x1215" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/89/88/892a9a5ac8b06fdd831f1e61abf33488.jpg?wh=1265x1215" /></p>
 <p>程序继续执行。在执行t1=p6之前，我们要先把p6加载到寄存器。这个时候，我们需要把另一个变量保存到内存，腾出一个寄存器。这次，我们把x11保存到内存，当然你选另几个变量也是可以的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/80/97/8030429d6cf7ab500650f3c71yy9bc97.jpg?wh=1265x1215" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/80/97/8030429d6cf7ab500650f3c71yy9bc97.jpg?wh=1265x1215" /></p>
 <p>再然后，t1接替p6，占据r5寄存器。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/26/f8/266b31cca17c9e0dc8e764d68fa9d1f8.jpg?wh=1265x1215" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/26/f8/266b31cca17c9e0dc8e764d68fa9d1f8.jpg?wh=1265x1215" /></p>
 <p>接下来，和前面一样，在执行t1+=x11之前，我们要把x11装载到内存中。这个时候，其实我们已经有很多空闲的寄存器可用了，我们选择了r1。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/61/75/61b0e9e75b6d6c8d3055c2b378363675.jpg?wh=1265x1215" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/61/75/61b0e9e75b6d6c8d3055c2b378363675.jpg?wh=1265x1215" /></p>
 <p>到这里，我们把寄存器溢出的场景也分析完了。这两个分析过程，我主要是用图来直观地表示的。所以，你要多看几遍这些图，体会寄存器分配的过程，就能够充分理解线性扫描算法了。</p>
 <p>通过这个线性扫描算法，我们已经解决了我们上节课初级寄存器算法的第一点不足，也就是我们已经把参数和本地变量都放在寄存器上去访问了，优化了我们生成的本地代码的性能。而第二点的不足呢，我们也会在实现线性扫描算法的过程中，顺道解决，这就要归功于我们接下来要学习的变量活跃性分析。</p>
 <p>从前面这个例子你也能看出来，<strong>实现线性扫描算法的关键，是要知道每个变量的生存期</strong>。要知道这个，我们就需要进行<strong>变量活跃性分析</strong>了。</p>
@@ -6380,7 +6380,7 @@
 <h2 id="_4">变量活跃性分析</h2>
 <p>我们还是针对我们前面的示例程序，来演示一下怎么来做变量活跃性分析。</p>
 <p>下面这张图，是我针对这个程序整理的变量活跃性分析图。每一行语句的前方都有一个集合，这个集合中的元素指的是当前位置活跃的变量。也就是说，在这个位置上，我们要给这些变量分配寄存器。而其他变量，由于它们并不活跃，所以也就不需要占据寄存器了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1e/d9/1e8be774a1abcf2a8f8a066de0ec19d9.jpg?wh=1920x1080" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1e/d9/1e8be774a1abcf2a8f8a066de0ec19d9.jpg?wh=1920x1080" /></p>
 <p>现在我们直接来看具体的分析过程。不同的数据流分析，它的分析方向是不同的。有的是自上向下分析，有的是自下向上分析，变量活跃性分析是就是从下往上进行的。</p>
 <p>一开始，活跃变量的集合是一个空集。</p>
 <p>然后算法遇到最底下的一条语句，也就是return语句。由于return语句使用了sum变量，所以这个时候sum变量必须是活跃的。所以现在我们活跃变量的集合就有了第一个元素：sum。</p>
@@ -6529,8 +6529,6 @@ if (...) {
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

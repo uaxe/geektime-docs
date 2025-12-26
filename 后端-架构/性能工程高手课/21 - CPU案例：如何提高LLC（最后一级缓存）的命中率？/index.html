@@ -14387,7 +14387,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>perf stat -e LLC-loads,LLC-load-misses,LLC-stores,LLC-store-misses
 </code></pre></div>
 <p>下图显示的是一次Perf执行结果。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/15/1e/15211eb7e1e6da1d46b66e7cebdf1e1e.png?wh=2361%2A596" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/15/1e/15211eb7e1e6da1d46b66e7cebdf1e1e.png?wh=2361%2A596" /></p>
 <p>我们可以看到，在这段取样时间内，有1951M（19.51亿）次LLC的读取，大约16%是不命中。有313M（3.13亿）次LLC的写入，差不多24%是不命中。</p>
 <h2 id="llc_2">如何降低LLC的不命中率？</h2>
 <p>那么如何降低LLC的不命中率，也就是提高它的命中率呢？根据具体的问题，至少有三个解决方案。而且，这三个方案也不是互相排斥的，完全可以同时使用。</p>
@@ -14418,7 +14418,7 @@
 <p>我们都知道，内存缓存系统中，一般是以缓存行（Cache Line）为单位存储的。最常见的缓存行大小是64个字节。现代CPU为了保证缓存相对于内存的一致性，必须实时监测每个核对缓存相对应的内存位置的修改。如果不同核所对应的缓存，其实是对应内存的同一个位置，那么对于这些缓存位置的修改，就必须轮流有序地执行，以保证内存一致性。</p>
 <p>但是，这将导致核与核之间产生竞争关系，因为一个核对内存的修改，将导致另外的核在该处内存上的缓存失效。在多线程的场景下就会导致这样的问题。当多线程修改看似互相独立的变量时，如果这些变量共享同一个缓存行，就会在无意中影响彼此的性能，这就是<strong>伪共享</strong>。</p>
 <p>你可以参考下面这张Intel公司提供的图，两个线程运行在不同的核上，每个核都有自己单独的缓存，并且两个线程访问同一个缓存行。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/42/c9/42be053ba1c46fece881b97b1f328ac9.png?wh=2427%2A2052" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/42/c9/42be053ba1c46fece881b97b1f328ac9.png?wh=2427%2A2052" /></p>
 <p>如果线程0修改了缓存行的一部分，比如一个字节，那么为了保证缓存一致性，这个核上的整个缓存行的64字节，都必须写回到内存；这就导致其他核的对应缓存行失效。其他核的缓存就必须从内存读取最新的缓存行数据。这就造成了其他线程（比如线程1）相对较大的停顿。</p>
 <p>这个问题就是<strong>伪共享缓存</strong>。之所以称为“伪共享”，是因为，单单从程序代码上看，好像线程间没有冲突，可以完美共享内存，所以看不出什么问题。由于这种冲突性共享导致的问题不是程序本意，而是由于底层缓存按块存取和缓存一致性的机制导致的，所以才称为“伪共享”。</p>
 <p>我工作中也观察到好多次这样的伪共享缓存问题。经常会有产品组来找我们，说他们的产品吞吐量上不去，后来发现就是这方面的问题。所以，我们开发程序时，不同线程的数据要尽量放到不同的缓存行，避免多线程同时频繁地修改同一个缓存行。</p>
@@ -14427,7 +14427,7 @@
 <p>这个问题的解决方案，是<strong>让每个元素单独占用一个缓存行</strong>，比如64字节，也就是按缓存行的大小来对齐（Cache Line Alignment）。具体方法怎么实现呢？其实就是插入一些无用的字节（Padding）。这样的好处，是多个线程可以修改各自的元素和对应的缓存行，不会存在缓存行竞争，也就避免了“伪共享”问题。</p>
 <h2 id="_3">总结</h2>
 <p>这一讲，我们介绍了CPU方面的优化案例，重点讨论了<strong>如何降低LLC的缓存不命中率</strong>。我们提出了三个方案，分别是紧凑化数据、软件指令预取和去除伪共享缓存。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fc/ba/fc86555b197673e40096980571af44ba.png?wh=2573%2A2059" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fc/ba/fc86555b197673e40096980571af44ba.png?wh=2573%2A2059" /></p>
 <p>尤其是第三个方案解决的伪共享缓存问题，对大多数程序员和运维人员而言，不太容易理解。为什么难理解？是因为它牵扯了软件（比如多线程）和硬件（比如缓存一致性和缓存行的大小）的交互。</p>
 <p>当多线程共用同一个缓存行，并且各自频繁访问时，会导致严重的称为“伪共享”的性能问题。这种问题，恰如清代词人朱彝尊的两句词，“共眠一舸听秋雨，小簟轻衾各自寒”。所以需要我们狠狠心，把它们强行分开；“棒打鸳鸯”，让它们“大难临头各自飞”，其实呢，是为了它们都好。</p>
 <h2 id="_4">思考题</h2>
@@ -14566,8 +14566,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

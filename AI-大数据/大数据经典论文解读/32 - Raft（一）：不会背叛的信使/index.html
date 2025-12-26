@@ -7854,7 +7854,7 @@
 <p>在具体讲解Raft算法之前，我们先做一个小小的复习，那就是我们之前讲到过的Paxos算法，到底是在帮助我们解决一个什么样的问题。</p>
 <p>无论是在Chubby还是Spanner里，我们通过Paxos算法想要解决的问题，其实都是一个“<strong>状态机复制</strong>（State Machine Replication）”问题，简称SMR问题。</p>
 <p>我们可以把一个数据库的写入操作，看成是一系列的顺序操作日志，也就是把对于数据库的写入，变成了一个状态机。而对于这个状态机的更新，我们需要保障高可用性和容错能力。这个需要我们对于某一个服务器上的日志追加写入，能够做到同步复制到多个服务器上。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/25/55/25bfb6283e0e26cf621ed5f00a5c4855.jpg?wh=1920x1480" title="论文中的图1，理解基于分布式共识算法的“状态机复制”过程是怎么样的" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/25/55/25bfb6283e0e26cf621ed5f00a5c4855.jpg?wh=1920x1480" title="论文中的图1，理解基于分布式共识算法的“状态机复制”过程是怎么样的" /></p>
 <p>这样，在当前我们写入的节点挂掉的时候，我们的数据并不会丢失。为了避免单点故障，我们希望可以从多台服务器都能写入数据，但是又不能要求所有服务器都同步复制成功。前者，是为了确保某个服务器挂掉的时候，我们可以快速切换到另一台备用服务器；后者，是避免我们写入的时候，因为某一台服务器挂掉了就无法写入成功。</p>
 <p>所以，Paxos这样的分布式共识算法的基本思路，就是这样几点：</p>
 <ul>
@@ -7906,7 +7906,7 @@
 <p>第三种，是过了一段时间，无人获胜。我们会为这种情况设置一个超时时间，如果到了超时时间，我们既没有赢也没有输，那么我们会对任期自增1，再发起一轮新的投票。</p>
 <p>你会发现这个选举过程，会遇到一种尴尬的情况。那就是当Leader挂掉的时候，很多个Follower都会成为Candidate。他们都会先给自己投票，然后向其他人发起RequestVote。这样，就会导致<strong>票被很多人“瓜分”</strong>，没有人能拿到超过半数的票。然后我们就会陷入前面的第三种情况，无限循环出不来了。</p>
 <p>Raft对于这个问题的解决方案，是让选举的超时时间在一个区间之内<strong>随机化</strong>。这样，不同的服务器会在不同的时间点超时，最先超时的那个服务器，大概率会在其他服务器发现超时之前，就赢得投票。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/30/34/305576332d769a0e1e595b6f15aac034.jpg?wh=1920x1613" title="投票选举Leader的三种情况" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/30/34/305576332d769a0e1e595b6f15aac034.jpg?wh=1920x1613" title="投票选举Leader的三种情况" /></p>
 <h3 id="_3">日志复制</h3>
 <p>Leader选出来了，那我们自然就可以向Leader发送写入数据的请求。既然是一个“状态机复制”的方案，写入请求其实就是<strong>一条操作日志的追加写</strong>。在Raft里，就是通过一个<strong>AppendEntries的RPC调用实现的</strong>。</p>
 <p>整个数据写入，就是一个前面我们说的两阶段提交的过程，只不过这个两阶段提交只需要“半数”通过，就可以发起第二阶段的提交操作，而不需要等待所有服务器都确认可以提交。当然，我们可能会遇到某些节点挂掉了，和两阶段提交里一样，我们要做的就是无限重试。</p>
@@ -7916,7 +7916,7 @@
 <li>第二个，是日志的具体内容，也就是具体的状态机更新的操作是什么。</li>
 <li>第三个，就是这一次数据写入，来自Leader的哪一个任期。</li>
 </ul>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/75/95/759fe561139a9f9558a83d444b114895.jpg?wh=1920x1480" title="论文中的图6，可以看到Raft里面，追加写入的数据结构" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/75/95/759fe561139a9f9558a83d444b114895.jpg?wh=1920x1480" title="论文中的图6，可以看到Raft里面，追加写入的数据结构" /></p>
 <p>我们在追加写入日志的时候，不只是单单追加最新的一条日志，还需要做一个<strong>校验</strong>，确保对应的Follower的数据和Leader是一致的：</p>
 <ul>
 <li>首先，在发起追加写入日志的复制请求的时候，Leader的AppendEntries的RPC里，不仅会有最新的一条日志，还会有上一条日志里的日志索引和任期信息。</li>
@@ -7930,7 +7930,7 @@
 <li>Leader会不断重复这个过程，确保找到和Follower的同步点，找到了之后，就会把这个位置之后的日志都删除掉，然后把同步点之后的日志一条条复制过去。</li>
 </ul>
 <p>本质上，Raft的复制操作，是让Leader为每一个Follower都从Leader的尾部往头部循环，找到Follower最新同步到哪里的日志。然后从这个位置开始，往后复制Leader的日志，直到最新一条的日志。通过这个过程，我们把每一次Leader的日志复制，都变成了一次<strong>强制所有Follower和当前Leader日志同步</strong>的过程。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c4/7b/c41b9a56fe8c9501dac3ae9d47ea1f7b.jpg?wh=1920x1480" title="论文中的图7，可以看到，其他服务器中可能有未提交的脏日志，也会因为没有来得及同步数据而相比于Leader落后较多" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c4/7b/c41b9a56fe8c9501dac3ae9d47ea1f7b.jpg?wh=1920x1480" title="论文中的图7，可以看到，其他服务器中可能有未提交的脏日志，也会因为没有来得及同步数据而相比于Leader落后较多" /></p>
 <p>之所以需要这个过程，是因为我们不同服务器的日志，可能因为网络延时还没有同步，也可能因为硬件故障还包含未提交的日志。我在这里放上了论文里的图7，你可以看到：</p>
 <ul>
 <li>我们的Leader，此时此刻已经到了第10条日志；</li>
@@ -8079,8 +8079,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

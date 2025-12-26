@@ -6218,7 +6218,7 @@
 <p>经过对网络上的传言、某网约车公司官方声明及相关技术资料的综合分析，这里我们可以得出初步结论：这家网约车公司在Kubernetes系统升级过程中，可能采取了原地升级的方式。然而，不幸的是，在升级过程中使用了与现有系统不兼容的版本，这一技术失误最终导致了服务的大规模中断。</p>
 <p><strong>Kubernetes架构简述</strong></p>
 <p>首先我简单说一下Kubernetes的架构，这样方便你后续理解。Kubernetes分为master节点和node节点。master节点就是中心控制节点，node节点就是单机控制节点。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/03/19/03c8dc5c2b2d78a951174dd05314c719.png?wh=2700x884" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/03/19/03c8dc5c2b2d78a951174dd05314c719.png?wh=2700x884" /></p>
 <p>master节点包括了四个部分：etcd 负责元信息的记录和保存 ；kube-apiserver 负责对外提供 Kubernetes API 的接口和核心交互点，本次出问题的就是这个模块；kube-scheduler是负责资源调度；controller负责日常运维的交互。</p>
 <p>node节点上，kube-proxy负责实现集群内部的网络代理和负载均衡功能；kubelet负责维护和管理单个节点上的容器。</p>
 <h3 id="_3">升级方案</h3>
@@ -6229,7 +6229,7 @@
 <p>我们无法看到官方给出的具体解释，所以就不深入探讨背后的具体的技术原因，下面我们重点讨论一下如何避免这种类似的问题发生。</p>
 <h2 id="_4">如何避免类似的故障？</h2>
 <p>这次的问题现在看来也是一次非常简单的故障，就是有人把版本号选错了，但越是简单的故障往往越是需要重视。结合基础变更篇中的内容，我整理了整体的变更思路和规范，你可以在变更前、变更中、变更后三个阶段作出反应。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/50/7f/503f4abc7369278e21e90c3954f89e7f.png?wh=2154x1118" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/50/7f/503f4abc7369278e21e90c3954f89e7f.png?wh=2154x1118" /></p>
 <h3 id="_5"><strong>变更前</strong></h3>
 <p><strong>实施双人审核机制：</strong>为防止版本兼容性问题，关键系统升级任务必须经过两名专业审核员的双重审批和核实，确保升级流程的精确性和安全性。其实双人审核是我接触过的既简单又实用的方式，能避免大量人工失误导致的故障。</p>
 <p><strong>平台管控策略：</strong>在升级过程中，我们可以设计一个变更的原则，就是绝对不允许出现master版本低于node版本的操作。这一点可以放到变更自动检查里面。如果发现就自动停止操作。</p>
@@ -6240,12 +6240,12 @@
 <p>如果在升级过程中发现任何问题，就必须迅速采取措施，对出现问题的master节点进行隔离，并执行必要的回滚操作。通过这种谨慎的升级流程，可以最大限度地减少升级带来的风险，同时保持服务的高可用性。</p>
 <p>然后需要<strong>仔细观察我们关注的指标</strong>，比如升级一台master节点，升级完成后进行观察的指标除了master本身的指标，还需要包括整个集群的node和业务实例。更需要特别关注业务指标，观察是否存在大量重启的情况，以及业务指标是否产生波动。一旦发现异常，就应该马上停止升级，并采取屏蔽措施。如果没有问题可以继续，我们可以看到这次Kubernetes的升级过程中可能存在观察时间不够或者观察指标不全的问题。</p>
 <p>如果能在上线第一台master节点时候，仔细观察，其实是可以发现问题的，这个时候你一定能够发现有大量服务做了重启或者挂掉，就应该及时停下来。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3b/34/3bdb47fcf4e2de770e89235cf8269b34.png?wh=1964x926" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3b/34/3bdb47fcf4e2de770e89235cf8269b34.png?wh=1964x926" /></p>
 <h2 id="_7">如何控制影响？</h2>
 <p>这里我们从技术角度和公关角度来看。 首先看技术角度，核心的原则就是，故障域的控制和细分，把master控制的一个超级大集群可以划分成多个小集群，来避免一个master故障之后对整个业务的核心业务都有影响。</p>
 <p>在升级过程中，应该对master的不同节点执行严格的隔离措施。例如，对正在升级的节点进行操作范围的限制。比如将负载均衡算法设置为hash模式，可以简化隔离过程。你可以根据你的基础平台能力，制定相应的隔离策略，以确保单台机器的升级不会波及整个集群。</p>
 <p>此外我们还可以跟业务联动，可以让核心业务提前把流量切走，升级完成后再切回来。当然这个会受限于容量情况需要业务的配合的支持，需要根据自己实际情况来定。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a9/ea/a9b7a9d6d69b9bed1yy5e159ea0c7dea.png?wh=1784x1328" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a9/ea/a9b7a9d6d69b9bed1yy5e159ea0c7dea.png?wh=1784x1328" /></p>
 <p><strong>应急响应机制</strong>：面对重大故障，必须迅速启动一套全面的对外应急响应机制，其核心内容包括：</p>
 <ul>
 <li><strong>用户安抚</strong>：迅速采取措施安抚受影响的用户，通过清晰、透明地沟通，向用户说明故障情况、正在采取的措施以及预计的恢复时间。</li>
@@ -6258,11 +6258,11 @@
 <p>在故障恢复阶段，单靠平台去做恢复是远远不够的，也需要业务层做容灾和逃生。</p>
 <p>在业务层面，可以实施流量切换策略，将当前受影响的流量从一个受影响的地域转移到另一个正常的地域，以减少故障对用户的影响。启用逃生机制，通过智能路由或负载均衡策略，自动将请求导向稳定可靠的服务实例，从而提高系统的可用性和弹性。</p>
 <p>在Kubernetes层面，可以主动执行服务迁移操作，将受影响的服务从故障区域迁移到健康区域，以恢复服务的正常运行。对于受到影响的Pod或服务实例，快速进行迁移，确保它们在健康的节点上重新启动并提供服务。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3f/85/3f86ee7ed8a8c53ff964933716d6aa85.png?wh=2870x1090" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3f/85/3f86ee7ed8a8c53ff964933716d6aa85.png?wh=2870x1090" /></p>
 <p>服务快速重启的能力建设，当平台无法自动重启的时候有工具和预案进行一键启动，这样也可以加速恢复的速度。</p>
 <h2 id="_9">小结</h2>
 <p>基础服务的变更影响巨大，因此我们需要做好充分的准备，主要包括变更前的充分检测、严格执行分级发布，还有可靠的升级方案、集群拆分以及快速止损方案，具体的操作我整理在表格里了，你可以参考。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f5/fd/f5fb61d72956f89972ffcb9e562b29fd.png?wh=1662x850" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f5/fd/f5fb61d72956f89972ffcb9e562b29fd.png?wh=1662x850" /></p>
 <h3 id="_10">思考题</h3>
 <p>针对Kubernetes的升级，除了刚刚我们说的措施，你还有什么手段保障不出现问题，或者说当出现问题的时候如何快速做出相关的止损动作。欢迎你把你的答案分享到评论区，也欢迎你把这节课的内容分享给其他朋友，我们下节课再见！</p>
 <div><strong>精选留言（1）</strong></div>
@@ -6380,8 +6380,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -14172,12 +14172,12 @@
 <p>etcd v3的Watch机制的设计实现并非凭空出现，它正是吸取了etcd v2的经验、教训而重构诞生的。</p>
 <p>在etcd v3中，为了解决etcd v2的以上缺陷，使用的是基于HTTP/2的gRPC协议，双向流的Watch API设计，实现了连接多路复用。</p>
 <p>HTTP/2协议为什么能实现多路复用呢？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/be/74/be3a019beaf1310d214e5c9948cc9c74.png?wh=1784%2A534" title="引用自Google开发者文档" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/be/74/be3a019beaf1310d214e5c9948cc9c74.png?wh=1784%2A534" title="引用自Google开发者文档" /></p>
 <p>在HTTP/2协议中，HTTP消息被分解独立的帧（Frame），交错发送，帧是最小的数据单位。每个帧会标识属于哪个流（Stream），流由多个数据帧组成，每个流拥有一个唯一的ID，一个数据流对应一个请求或响应包。</p>
 <p>如上图所示，client正在向server发送数据流5的帧，同时server也正在向client发送数据流1和数据流3的一系列帧。一个连接上有并行的三个数据流，HTTP/2可基于帧的流ID将并行、交错发送的帧重新组装成完整的消息。</p>
 <p>通过以上机制，HTTP/2就解决了HTTP/1的请求阻塞、连接无法复用的问题，实现了多路复用、乱序发送。</p>
 <p>etcd基于以上介绍的HTTP/2协议的多路复用等机制，实现了一个client/TCP连接支持多gRPC Stream， 一个gRPC Stream又支持多个watcher，如下图所示。同时事件通知模式也从client轮询优化成server流式推送，极大降低了server端socket、内存等资源。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f0/be/f08d1c50c6bc14f09b5028095ce275be.png?wh=1804%2A1076" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f0/be/f08d1c50c6bc14f09b5028095ce275be.png?wh=1804%2A1076" /></p>
 <p>当然在etcd v3 watch性能优化的背后，也带来了Watch API复杂度上升, 不过你不用担心，etcd的clientv3库已经帮助你搞定这些棘手的工作了。</p>
 <p>在clientv3库中，Watch特性被抽象成Watch、Close、RequestProgress三个简单API提供给开发者使用，屏蔽了client与gRPC WatchServer交互的复杂细节，实现了一个client支持多个gRPC Stream，一个gRPC Stream支持多个watcher，显著降低了你的开发复杂度。</p>
 <p>同时当watch连接的节点故障，clientv3库支持自动重连到健康节点，并使用之前已接收的最大版本号创建新的watcher，避免旧事件回放等。</p>
@@ -14202,7 +14202,7 @@
 <p>再看第三个问题，当client和server端出现短暂网络波动等异常因素后，导致事件堆积时，server端会丢弃事件吗？若你监听的历史版本号server端不存在了，你的代码该如何处理？</p>
 <p>第三个问题的本质是<strong>可靠事件推送机制</strong>，要搞懂它，我们就得弄懂etcd Watch特性的整体架构、核心流程，下图是Watch特性整体架构图。</p>
 <h3 id="_2">整体架构</h3>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/42/bf/42575d8d0a034e823b8e48d4ca0a49bf.png?wh=1920%2A1075" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/42/bf/42575d8d0a034e823b8e48d4ca0a49bf.png?wh=1920%2A1075" /></p>
 <p>我先通过上面的架构图，给你简要介绍下一个watch请求流程，让你对全流程有个整体的认识。</p>
 <p>当你通过etcdctl或API发起一个watch key请求的时候，etcd的gRPCWatchServer收到watch请求后，会创建一个serverWatchStream, 它负责接收client的gRPC Stream的create/cancel watcher请求(recvLoop goroutine)，并将从MVCC模块接收的Watch事件转发给client(sendLoop goroutine)。</p>
 <p>当serverWatchStream收到create watcher请求后，serverWatchStream会调用MVCC模块的WatchStream子模块分配一个watcher id，并将watcher注册到MVCC的WatchableKV模块。</p>
@@ -14218,7 +14218,7 @@
 <p>下面是第一个子问题，最新事件推送机制。</p>
 <h3 id="_3">最新事件推送机制</h3>
 <p>当etcd收到一个写请求，key-value发生变化的时候，处于syncedGroup中的watcher，是如何获取到最新变化事件并推送给client的呢？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5y/48/5yy0cbf2833c438812086287d2ebf948.png?wh=1920%2A1060" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5y/48/5yy0cbf2833c438812086287d2ebf948.png?wh=1920%2A1060" /></p>
 <p>当你创建完成watcher后，此时你执行put hello修改操作时，如上图所示，请求经过KVServer、Raft模块后Apply到状态机时，在MVCC的put事务中，它会将本次修改的后的mvccpb.KeyValue保存到一个changes数组中。</p>
 <p>在put事务结束时，如下面的精简代码所示，它会将KeyValue转换成Event事件，然后回调watchableStore.notify函数（流程5）。notify会匹配出监听过此key并处于synced watcherGroup中的watcher，同时事件中的版本号要大于等于watcher监听的最小版本号，才能将事件发送到此watcher的事件channel中。</p>
 <p>serverWatchStream的sendLoop goroutine监听到channel消息后，读出消息立即推送给client（流程6和7），至此，完成一个最新修改事件推送。</p>
@@ -14245,7 +14245,7 @@
 <p>若推送成功，watcher监听的最小版本号(minRev)小于等于server当前版本号(currentRev)，说明可能还有历史事件未推送，需加入到unsynced watcherGroup中，由下面介绍的历史事件推送机制，推送minRev到currentRev之间的事件。</p>
 <p>若watcher的最小版本号大于server当前版本号，则加入到synced watcher集合中，进入上面介绍的最新事件通知机制。</p>
 <p>下面我给你画了一幅图总结各类watcher状态转换关系，希望能帮助你快速厘清之间关系。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/40/8e/40ec1087113edfc9f7yy0f32394b948e.png?wh=1920%2A1065" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/40/8e/40ec1087113edfc9f7yy0f32394b948e.png?wh=1920%2A1065" /></p>
 <p>介绍完最新事件推送、异常场景重试机制后，那历史事件推送机制又是怎么工作的呢？</p>
 <h3 id="_5">历史事件推送机制</h3>
 <p>WatchableKV模块的另一个goroutine，syncWatchersLoop，正是负责unsynced watcherGroup中的watcher历史事件推送。</p>
@@ -14254,14 +14254,14 @@
 <p>syncWatchersLoop，它会遍历处于unsynced watcherGroup中的每个watcher，为了优化性能，它会选择一批unsynced watcher批量同步，找出这一批unsynced watcher中监听的最小版本号。</p>
 <p>因boltdb的key是按版本号存储的，因此可通过指定查询的key范围的最小版本号作为开始区间，当前server最大版本号作为结束区间，遍历boltdb获得所有历史数据。</p>
 <p>然后将KeyValue结构转换成事件，匹配出监听过事件中key的watcher后，将事件发送给对应的watcher事件接收channel即可。发送完成后，watcher从unsynced watcherGroup中移除、添加到synced watcherGroup中，如下面的watcher状态转换图黑色虚线框所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a7/b4/a7a04846de2be66f1162af8845b13ab4.png?wh=1920%2A1098" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a7/b4/a7a04846de2be66f1162af8845b13ab4.png?wh=1920%2A1098" /></p>
 <p>若watcher监听的版本号已经小于当前etcd server压缩的版本号，历史变更数据就可能已丢失，因此etcd server会返回ErrCompacted错误给client。client收到此错误后，需重新获取数据最新版本号后，再次Watch。你在业务开发过程中，使用Watch API最常见的一个错误之一就是未处理此错误。</p>
 <h2 id="_6">高效的事件匹配</h2>
 <p>介绍完可靠的事件推送机制后，最后我们再看第四个问题，如果你创建了上万个watcher监听key变化，当server端收到一个写请求后，etcd是如何根据变化的key快速找到监听它的watcher呢？一个个遍历watcher吗？</p>
 <p>显然一个个遍历watcher是最简单的方法，但是它的时间复杂度是O(N)，在watcher数较多的场景下，会导致性能出现瓶颈。更何况etcd是在执行一个写事务结束时，同步触发事件通知流程的，若匹配watcher开销较大，将严重影响etcd性能。</p>
 <p>那使用什么数据结构来快速查找哪些watcher监听了一个事件中的key呢？</p>
 <p>也许你会说使用map记录下哪些watcher监听了什么key不就可以了吗？ etcd的确使用map记录了监听单个key的watcher，但是你要注意的是Watch特性不仅仅可以监听单key，它还可以指定监听key范围、key前缀，因此etcd还使用了如下的区间树。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5a/88/5ae0a99629021e4a05c08yyd0df92f88.png?wh=1920%2A1040" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5a/88/5ae0a99629021e4a05c08yyd0df92f88.png?wh=1920%2A1040" /></p>
 <p>当收到创建watcher请求的时候，它会把watcher监听的key范围插入到上面的区间树中，区间的值保存了监听同样key范围的watcher集合/watcherSet。</p>
 <p>当产生一个事件时，etcd首先需要从map查找是否有watcher监听了单key，其次它还需要从区间树找出与此key相交的所有区间，然后从区间的值获取监听的watcher集合。</p>
 <p>区间树支持快速查找一个key是否在某个区间内，时间复杂度O(LogN)，因此etcd基于map和区间树实现了watcher与事件快速匹配，具备良好的扩展性。</p>
@@ -14410,8 +14410,6 @@ watch 通过 raft 通讯模块，传播到各个节点，也就是给个节点�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

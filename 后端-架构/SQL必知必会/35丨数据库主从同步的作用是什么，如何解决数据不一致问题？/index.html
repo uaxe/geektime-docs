@@ -14843,7 +14843,7 @@
   <h1>35丨数据库主从同步的作用是什么，如何解决数据不一致问题？</h1>
 
 <p>我们之前讲解了Redis，它是一种高性能的内存数据库；而MySQL是基于磁盘文件的关系型数据库，相比于Redis来说，读取速度会慢一些，但是功能强大，可以用于存储持久化的数据。在实际工作中，我们常常将Redis作为缓存与MySQL配合来使用，当有数据访问请求的时候，首先会从缓存中进行查找，如果存在就直接取出，如果不存在再访问数据库，这样就提升了读取的效率，也减少了对后端数据库的访问压力。可以说使用Redis这种缓存架构是高并发架构中非常重要的一环。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/96/ad/968bc668e91383a203cbd811021fb9ad.jpg?wh=509%2A514" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/96/ad/968bc668e91383a203cbd811021fb9ad.jpg?wh=509%2A514" />
 当然我们也可以对MySQL做主从架构并且进行读写分离，让主服务器（Master）处理写请求，从服务器（Slave）处理读请求，这样同样可以提升数据库的并发处理能力。不过主从架构的作用不止于此，我们今天就从以下几个方面了解一下它：</p>
 <ol>
 <li>为什么需要主从同步，设置主从同步有什么样的作用？</li>
@@ -14865,28 +14865,28 @@
 <p>二进制日志转储线程（Binlog dump thread）是一个主库线程。当从库线程连接的时候，主库可以将二进制日志发送给从库，当主库读取事件的时候，会在Binlog上加锁，读取完成之后，再将锁释放掉。</p>
 <p>从库I/O线程会连接到主库，向主库发送请求更新Binlog。这时从库的I/O线程就可以读取到主库的二进制日志转储线程发送的Binlog更新部分，并且拷贝到本地形成中继日志（Relay log）。</p>
 <p>从库SQL线程会读取从库中的中继日志，并且执行日志中的事件，从而将从库中的数据与主库保持同步。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/63/31/637d392dbcdacf14cbb2791085a62b31.jpg?wh=1026%2A540" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/63/31/637d392dbcdacf14cbb2791085a62b31.jpg?wh=1026%2A540" />
 所以你能看到主从同步的内容就是二进制日志（Binlog），它虽然叫二进制日志，实际上存储的是一个又一个事件（Event），这些事件分别对应着数据库的更新操作，比如INSERT、UPDATE、DELETE等。另外我们还需要注意的是，不是所有版本的MySQL都默认开启服务器的二进制日志，在进行主从同步的时候，我们需要先检查服务器是否已经开启了二进制日志。</p>
 <p>进行主从同步的内容是二进制日志，它是一个文件，在进行网络传输的过程中就一定会存在延迟（比如500ms），这样就可能造成用户在从库上读取的数据不是最新的数据，也就是主从同步中的数据不一致性问题。比如我们对一条记录进行更新，这个操作是在主库上完成的，而在很短的时间内（比如100ms）又对同一个记录进行了读取，这时候从库还没有完成数据的更新，那么我们通过从库读到的数据就是一条旧的记录。</p>
 <p>这种情况下该怎么办呢？</p>
 <h2 id="_3">如何解决主从同步的数据一致性问题</h2>
 <p>可以想象下，如果我们想要操作的数据都存储在同一个数据库中，那么对数据进行更新的时候，可以对记录加写锁，这样在读取的时候就不会发生数据不一致的情况，但这时从库的作用就是备份，并没有起到读写分离，分担主库读压力的作用。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5e/47/5ec767c975f834a494596f1640e9fa47.jpg?wh=262%2A430" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5e/47/5ec767c975f834a494596f1640e9fa47.jpg?wh=262%2A430" />
 因此我们还需要继续想办法，在进行读写分离的同时，解决主从同步中数据不一致的问题，也就是解决主从之间数据复制方式的问题，如果按照数据一致性从弱到强来进行划分，有以下3种复制方式。</p>
 <h3 id="1">方法1：异步复制</h3>
 <p>异步模式就是客户端提交COMMIT之后不需要等从库返回任何结果，而是直接将结果返回给客户端，这样做的好处是不会影响主库写的效率，但可能会存在主库宕机，而Binlog还没有同步到从库的情况，也就是此时的主库和从库数据不一致。这时候从从库中选择一个作为新主，那么新主则可能缺少原来主服务器中已提交的事务。所以，这种复制模式下的数据一致性是最弱的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/16/85/1664bdb81d017359a126030ee08e0a85.png?wh=1730%2A590" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/16/85/1664bdb81d017359a126030ee08e0a85.png?wh=1730%2A590" /></p>
 <h3 id="2">方法2：半同步复制</h3>
 <p>MySQL5.5版本之后开始支持半同步复制的方式。原理是在客户端提交COMMIT之后不直接将结果返回给客户端，而是等待至少有一个从库接收到了Binlog，并且写入到中继日志中，再返回给客户端。这样做的好处就是提高了数据的一致性，当然相比于异步复制来说，至少多增加了一个网络连接的延迟，降低了主库写的效率。</p>
 <p>在MySQL5.7版本中还增加了一个<code>rpl_semi_sync_master_wait_for_slave_count</code>参数，我们可以对应答的从库数量进行设置，默认为1，也就是说只要有1个从库进行了响应，就可以返回给客户端。如果将这个参数调大，可以提升数据一致性的强度，但也会增加主库等待从库响应的时间。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/08/a1/08566325d0933775d13196330596a1a1.jpg?wh=858%2A480" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/08/a1/08566325d0933775d13196330596a1a1.jpg?wh=858%2A480" /></p>
 <h3 id="3">方法3：组复制</h3>
 <p>组复制技术，简称MGR（MySQL Group Replication）。是MySQL在5.7.17版本中推出的一种新的数据复制技术，这种复制技术是基于Paxos协议的状态机复制。</p>
 <p>我刚才介绍的异步复制和半同步复制都无法最终保证数据的一致性问题，半同步复制是通过判断从库响应的个数来决定是否返回给客户端，虽然数据一致性相比于异步复制有提升，但仍然无法满足对数据一致性要求高的场景，比如金融领域。MGR很好地弥补了这两种复制模式的不足。</p>
 <p>下面我们来看下MGR是如何工作的（如下图所示）。</p>
 <p>首先我们将多个节点共同组成一个复制组，在执行读写（RW）事务的时候，需要通过一致性协议层（Consensus层）的同意，也就是读写事务想要进行提交，必须要经过组里“大多数人”（对应Node节点）的同意，大多数指的是同意的节点数量需要大于（N/2+1），这样才可以进行提交，而不是原发起方一个说了算。而针对只读（RO）事务则不需要经过组内同意，直接COMMIT即可。</p>
 <p>在一个复制组内有多个节点组成，它们各自维护了自己的数据副本，并且在一致性协议层实现了原子消息和全局有序消息，从而保证组内数据的一致性。（具体原理<a href="https://dev.mysql.com/doc/refman/5.7/en/group-replication-summary.html">点击这里</a>可以参考。）</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/39/ab/39cc2dd2a96e27dbdef3dc87aa8d15ab.png?wh=1728%2A736" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/39/ab/39cc2dd2a96e27dbdef3dc87aa8d15ab.png?wh=1728%2A736" />
 MGR将MySQL带入了数据强一致性的时代，是一个划时代的创新，其中一个重要的原因就是MGR是基于Paxos协议的。Paxos算法是由2013年的图灵奖获得者Leslie Lamport于1990年提出的，有关这个算法的决策机制你可以去网上搜一下。或者<a href="http://lamport.azurewebsites.net/pubs/lamport-paxos.pdf">点击这里</a>查看具体的算法，另外作者在2001年发布了一篇<a href="http://lamport.azurewebsites.net/pubs/paxos-simple.pdf">简化版的文章</a>，你如果感兴趣的话，也可以看下。</p>
 <p>事实上，Paxos算法提出来之后就作为分布式一致性算法被广泛应用，比如Apache的ZooKeeper也是基于Paxos实现的。</p>
 <h2 id="_4">总结</h2>
@@ -14894,7 +14894,7 @@ MGR将MySQL带入了数据强一致性的时代，是一个划时代的创新，
 <p>在主从架构的配置中，如果想要采取读写分离的策略，我们可以自己编写程序，也可以通过第三方的中间件来实现。</p>
 <p>自己编写程序的好处就在于比较自主，我们可以自己判断哪些查询在从库上来执行，针对实时性要求高的需求，我们还可以考虑哪些查询可以在主库上执行。同时，程序直接连接数据库，减少了中间件层，相当于减少了性能损耗。</p>
 <p>采用中间件的方法有很明显的优势，功能强大，使用简单。但因为在客户端和数据库之间增加了中间件层会有一些性能损耗，同时商业中间件也是有使用成本的。我们也可以考虑采取一些优秀的开源工具，比如MaxScale。它是MariaDB开发的MySQL数据中间件。比如在下图中，使用MaxScale作为数据库的代理，通过路由转发完成了读写分离。同时我们也可以使用MHA工具作为强一致的主从切换工具，从而完成MySQL的高可用架构。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/39/94/392a43c1d483392349c165f9f9f1d994.jpg?wh=970%2A379" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/39/94/392a43c1d483392349c165f9f9f1d994.jpg?wh=970%2A379" /></p>
 <p>今天讲的概念有点多，你能说一下主从复制、读写分离、负载均衡的概念吗？另外你不妨用自己的话说一下你对MGR的理解。</p>
 <p>欢迎你在评论区写下你的思考，也欢迎把这篇文章分享给你的朋友或者同事，一起交流一下。</p>
 <div><strong>精选留言（14）</strong></div>
@@ -15021,8 +15021,6 @@ MGR将MySQL带入了数据强一致性的时代，是一个划时代的创新，
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

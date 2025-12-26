@@ -14357,7 +14357,7 @@
 <p>你好，我是王磊，你也可以叫我Ivan。我们今天的话题要从多版本并发控制开始。</p>
 <p>多版本并发控制（Multi-Version Concurrency Control，MVCC）就是<strong>通过记录数据项历史版本的方式，来提升系统应对多事务访问的并发处理能力</strong>。今天，几乎所有主流的单体数据库都实现了MVCC，它已经成为一项非常重要也非常普及的技术。</p>
 <p>MVCC为什么这么重要呢？我们通过下面例子来回顾一下MVCC出现前的读写冲突场景。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f2/fc/f2dfc3915ed8f39f4eec8d73bf1b80fc.jpg?wh=2700%2A916" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f2/fc/f2dfc3915ed8f39f4eec8d73bf1b80fc.jpg?wh=2700%2A916" /></p>
 <p>图中事务T1、T2先后启动，分别对数据库执行写操作和读操作。写操作是一个过程，在过程中任意一点，数据的变更都是不完整的，所以T2必须在数据写入完成后才能读取，也就形成了读写阻塞。反之，如果T2先启动，T1也要等待T2将数据完全读取后，才能执行写入。</p>
 <p>早期数据库的设计和上面的例子一样，读写操作之间是互斥的，具体是通过锁机制来实现的。</p>
 <p>你可能会觉得这个阻塞也没那么严重，磁盘操作应该很快吧?</p>
@@ -14369,7 +14369,7 @@
 <p>那么，就让我们先看下单体数据库的MVCC是怎么设计的。开头我们说了实现MVCC要记录数据的历史版本，这就涉及到存储的问题。</p>
 <h3 id="mvcc_1">MVCC的存储方式</h3>
 <p>MVCC有三类存储方式，一类是将历史版本直接存在数据表中的，称为Append-Only，典型代表是PostgreSQL。另外两类都是在独立的表空间存储历史版本，它们区别在于存储的方式是全量还是增量。增量存储就是只存储与版本间变更的部分，这种方式称为Delta，也就是数学中常作为增量符号的那个Delta，典型代表是MySQL和Oracle。全量存储则是将每个版本的数据全部存储下来，这种方式称为Time-Travle，典型代表是HANA。我把这三种方式整理到了下面的表格中，你看起来会更直观些。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/93/5f/93a030347f0a93c9a97739f0a82b515f.jpg?wh=2700%2A848" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/93/5f/93a030347f0a93c9a97739f0a82b515f.jpg?wh=2700%2A848" /></p>
 <p>下面，我们来看看每种方式的优缺点。</p>
 <h4 id="append-only">Append-Only方式</h4>
 <p>优点</p>
@@ -14407,7 +14407,7 @@
 <p>当然，无论采用三种存储方式中的哪一种，都需要进行历史版本清理。</p>
 <p>好了，以上就是单体数据库MVCC的三种存储方式，同时也是PGXC的实现方式。而NewSQL底层使用分布式键值系统来存储数据，MVCC的存储方式与PostgreSQL类似，采用Append方式追加新版本。我觉得你应该比较容易理解，就不再啰嗦了。</p>
 <p>为了便于你记忆，我把三种存储方式的优缺点提炼了一下放到下面表格中，其实说到底这些特点就是由“是否独立存储”和“存储全量还是存储增量变更”这两个因素决定的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ae/e3/aec7c3224af50fe8551697c10be430e3.jpg?wh=2700%2A1052" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ae/e3/aec7c3224af50fe8551697c10be430e3.jpg?wh=2700%2A1052" /></p>
 <h3 id="mvcc_2">MVCC的工作过程</h3>
 <p>历史版本存储下来后又是如何发挥作用的呢？这个，我们开头时也说过了，是要解决多事务的并发控制问题，也就是保证事务的隔离性。在<a href="https://time.geekbang.org/column/article/272999">第3讲</a>，我们介绍了隔离性的多个级别，其中可接受的最低隔离级别就是“已提交读”（Read Committed，RC）。</p>
 <p>那么，我们先来看RC隔离级别下MVCC的工作过程。</p>
@@ -14417,17 +14417,17 @@
 <li>当前事务启动前，已经提交事务更新的数据。</li>
 </ol>
 <p>我们用一个例子来说明。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bc/01/bc504c1f630657a17734380def013c01.jpg?wh=2700%2A1018" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bc/01/bc504c1f630657a17734380def013c01.jpg?wh=2700%2A1018" /></p>
 <p>T1到T7是七个数据库事务，它们先后运行，分别操作数据库表的记录R1到R7。事务T6要读取R1到R6这六条记录，在T6启动时（T6-1）会向系统申请一个活动事务列表，活动事务就是已经启动但尚未提交的事务，这个列表中会看到T3、T4、T5等三个事务。</p>
 <p>T6查询到R3、R4、R5时，看到它们最新版本的事务ID刚好在活动事务列表里，就会读取它们的上一版本。而R1、R2最新版本的事务ID小于活动事务列表中的最小事务ID（即T3），所以T6可以看到R1、R2的最新版本。</p>
 <p>这个例子中MVCC的收益非常明显，T6不会被正在执行写入操作的三个事务阻塞，而如果按照原来的锁方式，T6要在T3、T4、T5三个事务都结束后，才能执行。</p>
 <h3 id="_1">快照的工作原理</h3>
 <p>MVCC在RC级别的效果还不错。那么，如果隔离级别是更严格一些的 “可重复读”（RR）呢？我们继续往下看。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/03/7d/03ecd79c93d3c1cd3a40af813yy7507d.jpg?wh=2700%2A1001" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/03/7d/03ecd79c93d3c1cd3a40af813yy7507d.jpg?wh=2700%2A1001" /></p>
 <p>还是继续刚才的例子，当T6执行到下一个时间点（T6-2），T1到T4等4个事务都已经提交，此时T6再次向系统申请活动事务列表，列表包含T5和T7。遵循同样的规则，这次T6可以看到R1到R4等四条记录的最新版本，同时看到R5的上一版本。</p>
 <p>很明显，T6刚才和现在这两次查询得到了不同的结果集，这是不符合RR要求的。</p>
 <p>实现RR的办法也很简单，我们只需要记录下T6-1时刻的活动事务列表，在T6-2时再次使用就行了。那么，这个反复使用的活动事务列表就被称为“快照”（Snapshot）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/86/ac/86d3436e8ca462202b8d9ebde33fabac.jpg?wh=2700%2A1010" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/86/ac/86d3436e8ca462202b8d9ebde33fabac.jpg?wh=2700%2A1010" /></p>
 <p>快照是基于MVCC实现的一个重要功能，从效果上看， 快照就是快速地给数据库拍照片，数据库会停留在你拍照的那一刻。所以，用“快照”来实现RR是很方便的。</p>
 <p>从上面的例子可以发现，RC与RR的区别在于RC下每个SQL语句会有一个自己的快照，所以看到的数据库是不同的，而RR下，所有SQL语句使用同一个快照，所以会看到同样的数据库。</p>
 <p>为了提升效率，快照不是单纯的事务ID列表，它会统计最小活动事务ID，还有最大已提交事务ID。这样，多数事务ID通过比较边界值就能被快速排除掉，如果事务ID恰好在边界范围内，再进一步查找是否与活跃事务ID匹配。</p>
@@ -14441,7 +14441,7 @@
 <p>讲完PGXC的快照，再来看看NewSQL如何处理读写冲突。这里，我要向你介绍TiDB和CockroachDB两种实现方式，因为它们是比较典型的两种情况。至于它们哪里典型呢？我先不说，你可以在阅读过程中仔细体会。</p>
 <h3 id="tidb">TiDB</h3>
 <p>首先来说TiDB，我们看图说话。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e9/d9/e991e0cbf84a02aa5c3851fa083f24d9.jpg?wh=2700%2A888" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e9/d9/e991e0cbf84a02aa5c3851fa083f24d9.jpg?wh=2700%2A888" /></p>
 <p>TiDB底层是分布式键值系统，我们假设两个事务操作同一个数据项。其中，事务T1执行写操作，由Prewrite和Commit两个阶段构成，对应了我们之前介绍的两阶段提交协议（2PC），如果你还不熟悉可以重新阅读<a href="https://time.geekbang.org/column/article/278949">第9讲</a>复习一下。这里你也可以简单理解为T1的写操作分成了两个阶段，T2在这两个阶段之间试图执行读操作，但是T2会被阻塞，直到T1完成后，T2才能继续执行。</p>
 <p>你肯定会非常惊讶，这不是MVCC出现前的读写阻塞吗？</p>
 <p>TiDB为什么没有使用快照读取历史版本呢？ TiDB官方文档并没有说明背后的思路，我猜问题出在全局事务列表上，因为TiDB根本没有设计全局事务列表。当然这应该不是设计上的疏忽，我更愿意把它理解为一种权衡，是在读写效率和全局事务列表的维护代价之间的选择。</p>
@@ -14449,14 +14449,14 @@
 <h3 id="cockroachdb">CockroachDB</h3>
 <p>那么如果有全局事务列表，又会怎么操作呢？说来也巧，CockroachDB真的就设计了这么一张全局事务列表。它是否照搬了单体数据库的“快照”呢？答案也是否定的。</p>
 <p>我们来看看它的处理过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e6/68/e6c49739eb9b6ayy030698013e685f68.jpg?wh=2700%2A968" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e6/68/e6c49739eb9b6ayy030698013e685f68.jpg?wh=2700%2A968" /></p>
 <p>依旧是T1事务先执行写操作，中途T2事务启动，执行读操作，此时T2会被优先执行。待T2完成后，T1事务被重启。重启的意思是T1获得一个新的时间戳（等同于事务ID）并重新执行。</p>
 <p>又是一个不可思议的过程，还是会产生读写阻塞，这又怎么解释呢？</p>
 <p>CockroachDB没有使用快照，不是因为没有全局事务列表，而是因为它的隔离级别目标不是RR，而是SSI，也就是可串行化。</p>
 <p>你可以回想一下第3讲中黑白球的例子。对于串行化操作来说，没有与读写并行操作等价的处理方式，因为先读后写和先写后读，读操作必然得到两个不同结果。更加学术的解释是，先读后写操作会产生一个<strong>读写反向依赖</strong>，可能影响串行化事务调度。这个概念有些不好理解，你也不用着急，在14讲中我会有更详细的介绍。总之，CockroachDB对于读写冲突、写写冲突采用了几乎同样的处理方式。</p>
 <p>在上面的例子中，为了方便描述，我简化了读写冲突的处理过程。事实上，被重启的事务并不一定是执行写操作的事务。CockroachDB的每个事务都有一个优先级，出现事务冲突时会比较两个事务的优先级，高优先级的事务继续执行，低优先级的事务则被重启。而被重启事务的优先级也会提升，避免总是在竞争中失败，最终被“饿死”。</p>
 <p>TiDB和CockroachDB的实现方式已经讲完了，现在你该明白它们典型在哪里了吧？对，那就是全局事务列表是否存在和实现哪种隔离级别，这两个因素都会影响最终的设计。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fa/91/fa07956ea5ddb076eefa32ae7affa191.jpg?wh=2700%2A2532" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fa/91/fa07956ea5ddb076eefa32ae7affa191.jpg?wh=2700%2A2532" /></p>
 <h2 id="_2">小结</h2>
 <p>好了，今天的话题就谈到这了，让我们一起回顾下这一讲的内容。</p>
 <ol>
@@ -14608,8 +14608,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

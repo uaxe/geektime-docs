@@ -6403,19 +6403,19 @@
 <p>在之前的课程中，我们了解到，RAG（检索增强生成）系统的首要步骤是索引（Indexing）流程中的文档解析。文档解析技术的本质在于将<strong>格式各异、版式多样、元素多种</strong>的文档数据，包括段落、表格、标题、公式、多列、图片等文档区块，转化为阅读顺序正确的字符串信息。“<strong>Quality in, Quality out</strong>” 是大模型技术的典型特征，高质量的文档解析能够从各种复杂格式的非结构化数据中提取出高精准度的信息，对RAG系统最终的效果起决定性的作用。</p>
 <p>RAG系统的应用场景主要集中在专业领域和企业场景。这些场景中，除了关系型和非关系型数据库，更多的数据以 <strong>PDF、TXT、Word、PPT、Excel、CSV、Markdown、XML、HTML</strong> 等多种格式存储。尤其是PDF文件，凭借其统一的排版和多样化的结构形式，成为了最为常见的文档数据存储与交换格式。文档解析技术不仅需要支持上述所有常见格式，还需要特别强化对于PDF的解析能力，包括对电子档和扫描档的处理，支持多种版面形式的解析、不同类型版面元素的识别，并能够还原正确的阅读顺序。</p>
 <p>此外，由于PDF文档往往篇幅巨大、页数众多，且企业及专业领域PDF文件数据量庞大，因此文档解析技术还需具备极高的处理性能，以确保知识库的高效构建和实时更新。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/fd/4c/fd5d33293b17f99d68d50e0805101b4c.jpg?wh=1920x780" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fd/4c/fd5d33293b17f99d68d50e0805101b4c.jpg?wh=1920x780" /></p>
 <p>这节课我会先为你讲解各种文档格式的解析方法，并演示相关的代码。接下来，我将深入讲解PDF文件的解析，并提供针对性的技术方案分析。这节课的所有代码和示例文档将公开发布在Gitee项目中，rag_app_lesson3.py 代码基于<a href="https://time.geekbang.org/column/article/803829">第 02 讲中的 rag_app_lesson2.py</a> 进行迭代更新。</p>
 <h2 id="langchain-document-loaders">LangChain Document Loaders 文档加载器</h2>
 <p>本课程示例RAG项目基于 LangChain 架构，提供在实际应用场景中常见文档格式的解析方案，涵盖 PDF、TXT、Word、PPT、Excel、CSV、Markdown、XML 和 HTML 格式。鉴于 PDF 格式在实际应用中的使用占比最高，这节课的后半部分我们将对其进行深入讲解。</p>
 <p>LangChain 提供了一套功能强大的<strong>文档加载器（Document Loaders）</strong>，帮助开发者轻松地将数据源中的内容加载为文档对象。LangChain 定义了 <strong>BaseLoader</strong> 类和 <strong>Document</strong> 类，其中 BaseLoader 类负责定义如何从不同数据源加载文档，而 Document 类则统一描述了不同文档类型的元数据。</p>
 <p>开发者可以基于 BaseLoader 类为特定数据源创建自定义加载器，并将其内容加载为 Document 对象。使用预构建的加载器比自行编写更加便捷。例如，PyPDF 加载器能够处理 PDF 文件，将多页文档分解为独立的、可分析的单元，并附带内容及诸如源信息、页码等重要元数据。</p>
 <p><strong>langchain_community</strong> 是 LangChain 与常用第三方库相结合的拓展库。各类开源库和企业库基于 BaseLoader 类在 langchain_community 库中扩展了不同文档类型的加载器，这些加载器被归类于 langchain_community.document_loaders 模块中。每个加载器都可以输入对应的参数，如指定文档解析编码、解析特定元素等，以及对 Document 类进行提取或检索等操作。目前，已有超过 160 种数据加载器，覆盖了本地文件、云端文件、数据库、互联网平台、Web 服务等多种数据源。详情可以在 <a href="https://python.langchain.com/v0.2/docs/integrations/document_loaders">LangChain 官网</a>查看。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/2a/12/2a85d51a7cf45dedf05fafc4488bb712.png?wh=1920x874" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2a/12/2a85d51a7cf45dedf05fafc4488bb712.png?wh=1920x874" /></p>
 <p>Document Loader 模块是封装好的各种文档解析库集成SDK，项目中使用还需要安装对应的文档解析库。例如，当我们项目中使用 from langchain_community.document_loaders import PDFPlumberLoader 时，需要先通过命令行 pip install pdfplumber 安装 pdfplumber 库。某些特殊情况下，还需要额外的依赖库，比如使用 UnstructuredMarkdownLoader 时，需要安装 unstructured 库来提供底层文档解析，还需要 markdown 库来支持 Markdown 文档格式更多能力。此外，对于像 .doc 这种早期的文档类型，还需要安装 libreoffice 软件库才能进行解析。</p>
 <p>实际研发场景中，使用 Document Loader 文档加载器模块时，需要根据具体的业务需求编写自定义的文档后处理逻辑。针对业务需求，开发者可以自行编写和实现对不同文档内容的解析，例如对标题、段落、表格、图片等元素的特殊处理。在本课程的案例中，我们将从 Document 类中提取所有文本内容，进行下一步的文档分块处理。</p>
 <h2 id="_1">多格式文档解析</h2>
 <p>本次实战我们将解析不同类型的文档，其对应的 Document Loader 和所需的文档解析依赖库如下表所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c6/83/c60419a3c73f3090651a4c2761e05583.png?wh=1918x1542" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c6/83/c60419a3c73f3090651a4c2761e05583.png?wh=1918x1542" /></p>
 <p>关于开发环境以及 langchain 和 langchain_community 等库的安装和配置，我们已经在第 02 课中详细说明了。在执行以下指令之前，需要先完成第 02 课的实战内容。下面实战的代码更新在托管项目的 <strong>rag_app_lesson3.py</strong> 代码文件中。</p>
 <p><strong>在使用 Document Loader 之前，先在命令行中执行以下安装命令</strong>：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>source rag_env/bin/activate  # 激活虚拟环境
@@ -6521,15 +6521,15 @@
 <p><strong>data_lesson3</strong> 文件夹内置了本课程涉及的所有格式的测试文档文件，所有文件的信息保持一致，旨在观察不同格式文档的解析效果。测试代码通过 main 函数串联各个步骤，索引流程将 data_lesson3 中所有的文档文件进行解析，准确完成“下面报告中涉及了哪几个行业的案例以及总结各自面临的挑战？”的RAG问答任务。</p>
 <h2 id="pdf">PDF文档解析</h2>
 <p><strong>PDF文件</strong>在我们的业务场景中占有最高的比例，广泛应用于商业、学术和个人领域。尽管PDF文件的内容在表达图像、文字和表格信息，但其本质上是一系列显示和打印指令的集合。如下图所示，即使是一个仅包含 “Hello World” 文字的简单PDF，其文件内容也是一长串的打印指令。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8c/2e/8c8a7606519e3137b687392yyfbe812e.jpg?wh=1920x1249" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8c/2e/8c8a7606519e3137b687392yyfbe812e.jpg?wh=1920x1249" /></p>
 <p>PDF文件的显示效果不受设备、软件或系统的影响，但对计算机而言，它是一种非数据结构化的格式，储存的信息无法直接被理解。此外，大模型的训练数据中不包含直接的PDF文件，无法直接理解。</p>
 <p>PDF解析，对于纯文本格式可以转换为文本字符串，而对于包含多种元素的复杂格式，选择 <strong>MarkDown 文件</strong>作为统一的输出格式最为合适。这是因为MarkDown文件关注内容本身，而非打印格式，能够表示多种文档元素内容。MarkDown格式被广泛接受于互联网世界，其信息能够被大模型理解。</p>
 <p>PDF文件分为电子版和扫描版。PDF电子版可以<strong>通过规则解析</strong>，提取出文本、表格等文档元素。目前，有许多开源库可以支持，例如 <strong>pyPDF2、PyMuPDF、pdfminer、pdfplumber和papermage</strong> 等。这些库在 langchain_community.document_loaders 中基本都有对应的加载器，方便在不同场景下切换使用。</p>
 <p>在基于规则的开源库中，pdfplumber对中文支持较好，且在表格解析方面表现优秀，但对双栏文本的解析能力较差；pdfminer和PyMuPDF对中文支持良好，但表格解析效果较弱；pyPDF2对英文支持较好，但中文支持较差；papermage集成了pdfminer和其他工具，特别适合处理论文场景。开发者可以根据实际业务场景的测试结果选择合适的工具，pdfplumber或pdfminer都是当前不错的选择。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/2c/8f/2ce37e8a03fa9170abd06f7673d3878f.jpg?wh=1920x1080" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2c/8f/2ce37e8a03fa9170abd06f7673d3878f.jpg?wh=1920x1080" /></p>
 <p>PDF扫描版需要经过文本识别和表格识别PDF扫描图像，才能提取出文档中的各类元素。同时要真正实现文档解析的目标，无论扫描版还是电子版均需进行版面分析和阅读顺序的还原，将内容解析为一个包含所有文档元素并且具有正确阅读顺序的MarkDown文件。单纯依赖规则解析是无法实现这一目标的，目前支持这些功能的多为<strong>基于深度学习的开源库，如 Layout-parser、PP-StructureV2、PDF-Extract-Kit、pix2text、MinerU、marker等</strong>。</p>
 <p>然而，由于深度学习模型的部署复杂性以及对显卡配置的要求，这些库尚未集成在 langchain_community.document_loaders 中，使用时需要进行独立部署。我在下面列出了模型相关信息和GitHub链接，你可以根据业务需求进行选择和安装。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/09/8d/09fc408d1158186389a40c755bc4088d.png?wh=1902x1502" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/09/8d/09fc408d1158186389a40c755bc4088d.png?wh=1902x1502" /></p>
 <p>由于PDF文档解析整体流程用到了多个深度学习模型组合，真正在生产场景中会遇到效率问题。<strong>商业闭源库</strong>由于其部署的云端集群可以做并行处理和工程效率优化，所以在精度和效率上都能做到生产中的级别，比如TextIn.com、Doc2x、mathpix、庖丁PDFlux、腾讯云文档识别等，当然商业库会存在成本问题，你可以按需选择。</p>
 <p>此外，还需要进一步探索PDF中的图像内容理解，不仅限于文字模态，还包括对图片中非文字内容的解析，如常见的折线图、柱状图等，也包含重要的内容信息。将这些内容转换为文字形式并嵌入到MarkDown文件中，通常需要依赖<strong>端到端的多模态大模型</strong>，如GPT-4o或Gemini。然而，目前这些模型在效率和成本方面仍存在挑战，但其未来潜力巨大，值得期待。</p>
 <h2 id="_2">总结</h2>
@@ -6713,8 +6713,6 @@ AWS Textract, Google Vision API, Nougat, Texify, Tesseract&#47;pytesseract</p>20
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

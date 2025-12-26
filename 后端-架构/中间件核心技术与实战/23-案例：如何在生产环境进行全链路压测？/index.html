@@ -14121,11 +14121,11 @@
 <p>那什么是全链路压测呢？网上关于它的定义有很多，所以我在这里只给出一个可能不太全面，但是比较简单易懂的我的版本：<strong>全链路压测就是在生产环境对我们的系统进行压测，压测流量的行进方向和真实用户的请求流量是一致的，也就是说压测流量会完全覆盖真实的业务请求链路。</strong></p>
 <p>全链路压测的核心目的是高保真地检测系统的当前容量，方便在大促时科学合理地扩缩容，为合理规划资源提供可视化的数据支撑。</p>
 <p>在介绍全链路压测之前，我们先来看一张简易的数据流向图，感受一下我们公司需要落地全链路压测的底层系统的布局情况：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ed/19/ed00e492cfbe446276731fe4874a8719.jpg?wh=1920x607" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ed/19/ed00e492cfbe446276731fe4874a8719.jpg?wh=1920x607" /></p>
 <p>首先，压测端通常采用JMeter构建压测请求（HTTP请求），全链路压测系统需要提供一种机制对真实的业务流量与测试流量加以区分，然后压测流量与真实流量分别进入接入层的负载均衡组件，最终进入接口网关。接口网关再发起HTTP或者Dubbo等RPC请求，进入到内部的业务系统。</p>
 <p>内部系统A可能会访问MySQL数据库或者Redis，同时存在一些数据同步组件将MySQL的数据抽取到Elasticsearch中。接着，内部应用B可能会继续调用内部应用C，让C发送消息到MQ集群。下游的消费者应用消费数据，并访问Es、MySQL等存储组件。</p>
 <p>我们可以用一张图概括一套完整的全链路压测的基本功能需求：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/89/8a/89b4fb53af663f2ccd76251920c09e8a.jpg?wh=1920x985" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/89/8a/89b4fb53af663f2ccd76251920c09e8a.jpg?wh=1920x985" /></p>
 <p>简单解释一下不同阶段的内涵。</p>
 <ul>
 <li>压测前
@@ -14139,20 +14139,20 @@
 <h3 id="_2">流量染色与透传机制</h3>
 <p>我们首先来介绍流量染色与透传机制。其中，流量染色的目的就是正确地标记压测流量，确保在系统内部之间进行RPC调用、发送MQ等操作之后，能够顺利传递压测流量及其标记，确保整个过程中流量标记不丢失。</p>
 <p>流量染色与透传机制的设计概要如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/29/e5/29716f5edfb5a72acef66949f05a6ee5.jpg?wh=1920x713" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/29/e5/29716f5edfb5a72acef66949f05a6ee5.jpg?wh=1920x713" /></p>
 <p>这个机制主要包含三部分，本地线程上下文管理、二次路由支持，还有实现RPC透传过滤器。先看第一部分，本地线程上下文管理。</p>
 <p>由于流量染色标记需要在整个调用链中传播，在进行数据存储或查询时，都需要根据该标记来路由。所以，为了不侵入代码，把流量染色标记存储在本地线程上下文中是最合适的。</p>
 <p>说起本地线程变量，我相信你首先想到的就是JDK默认提供的ThreadLocal，它可以存储整个调用链中都需要访问的数据，而且它的线程是安全的。</p>
 <p>但ThreadLocal在多线程环境中并不友好，举个例子，在执行线程A的过程中，要创建另外一个线程B进行并发调用时，存储在线程A中的本地环境变量并不会传递到线程B，这会导致染色标记丢失，带来严重的数据污染问题：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8f/2f/8fe444a3a2b788267b9eaeea926b622f.jpg?wh=1920x777" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8f/2f/8fe444a3a2b788267b9eaeea926b622f.jpg?wh=1920x777" /></p>
 <p>为了解决线程本地变量在线程之间传递的问题，阿里巴巴开源了transmittable-thread-local类库，它支持线程本地变量在线程之间、线程池之间进行传递，可以确保多线程环境下本地变量不丢失。</p>
 <p>关于本地线程变量的详细调研情况、示例代码，你可以参考我的另一篇文章<a href="https://mp.weixin.qq.com/s/a6IGrOtn1mi0r05355L5Ng">《线程本地上下文调研实践》</a>。</p>
 <p>流量染色与透传机制的第二部分是两次路由支持，它又细分为两级。</p>
 <p>第一级路由主要是根据本地线程变量中是否存储了压测标记而进行的路由选择。但在全链路压测的一些场景中，某些服务（特别是像查询基础数据、地址解析这类基础服务）不需要走测试流量。而且测试流量也可以、并且也应该走生产流量，这样可以节省一大笔资源，这就说到了第二级路由。它指的是除了根据压测标记进行路由选择外，我们还需要提供另外一层的路由，即根据配置进行的路由选择，第二级路由的设计图如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/fy/b0/fyyca6fcefc516ab07de44941261fcb0.jpg?wh=1734x981" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fy/b0/fyyca6fcefc516ab07de44941261fcb0.jpg?wh=1734x981" /></p>
 <p>流量染色标记存储到本地线程变量之后，第三步就是要对流量进行透传了。目前，RPC调用通常指的是HTTP请求与Dubbo远程调用。</p>
 <p>我们来看一个远程RPC的服务调用。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d9/04/d994567102ef0ca215279879bce61404.jpg?wh=1920x610" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d9/04/d994567102ef0ca215279879bce61404.jpg?wh=1920x610" /></p>
 <p>我们要分别针对HTTP、Dubbo实现请求标记的透传。</p>
 <p>先来说HTTP。HTTP中提供了Web过滤器机制，它允许我们在真正执行Controller层代码之前先执行过滤器。所以我们可以单独定义一个过滤器，从请求中将压测标记存储到本地线程变量中。然后，请求在真正执行业务代码时，就可以非常方便地从本地线程上下文获取染色标记了。示例代码如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>public class PtWebFilter implements Filter {
@@ -14286,11 +14286,11 @@
 <p>了解了流量染色和透传机制，接下来我们重点看看各主流中间件的数据存储隔离机制，它是全链路压测的核心基石。</p>
 <p>目前常用的数据存储中间件包括：关系型数据库（MySQL/Oracle）、Redis、MQ、Elasticsearch、HBase。</p>
 <p>那压测数据和正式请求数据要采用哪种存储方式来避免数据访问混淆呢？这也是数据隔离要重点解决的问题。针对各种存储类中间件，业界已经给出了存储隔离的最佳实践，我总结了一下，画了下面这张思维导图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6c/60/6c3db9d4ae2b20c8b8f0584bec0da960.jpg?wh=1920x965" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6c/60/6c3db9d4ae2b20c8b8f0584bec0da960.jpg?wh=1920x965" /></p>
 <p>接下来，我们就挑选最具代表性，也是我们这个专栏重点介绍过的数据库、MQ这两个中间件来介绍一下具体的实现细节。其他的中间件也可以基于这种思路来实现。你可以根据不同中间件提供的客户端API，对数据请求进行拦截，并根据本地环境变量的值进行路由选择，确保正式请求访问正式资源，测试请求访问影子资源。</p>
 <p>数据库层面，通常有两种数据隔离机制，一种是影子库，另外一种是影子表。</p>
 <p>我们借着数据库这种场景简单来介绍一下什么是影子库和影子表。你可以先看看下面这张示意图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b6/74/b6e51aff1a9e300ff0c4e6a479ec0a74.jpg?wh=1920x945" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b6/74/b6e51aff1a9e300ff0c4e6a479ec0a74.jpg?wh=1920x945" /></p>
 <p>影子表是在同一个Schema下为每一个表再创建一个相同结构的表，测试请求访问的是shadow开头的表。</p>
 <p>影子表的实现非常复杂，一般团队难以驾驭，因为它涉及到复杂的SQL语句解析和改写。例如，创建订单，最终写入数据库的SQL语句是下面的样子：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>insert into t_order(id,order_no,...) values ();
@@ -14298,11 +14298,11 @@
 <p>如果判断出是测试请求，我们首先需要解析这条SQL语句中的所有表，并将表转化为影子表，再执行这条SQL语句。要是碰上连接、多层嵌套SQL，要正确解析语句会非常困难。</p>
 <p>受到团队规模的限制，加上我对SQL解析还没有十足的把握，所以我们在实践全链路压测时并没有选择影子表，而是使用了影子库。</p>
 <p>无论是MySQL，还是像Oracle这种关系型数据库，基本都是基于JDBC的数据源进行数据读写的。在JDBC中，每一个Schema对应一个数据源（Datasource），根据影子库的设计理念，我们通常需要创建两个数据源对象。如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7e/74/7ea8aea08ea9fbc99d63e054e4188674.jpg?wh=1920x826" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7e/74/7ea8aea08ea9fbc99d63e054e4188674.jpg?wh=1920x826" /></p>
 <p>建好两个数据源之后，我们只需要根据当前线程本地环境中存储的流量标记，在需要执行SQL语句时选择相对应的数据源，创建对应的数据库连接，再执行SQL，就可以实现数据的隔离机制了。</p>
 <p>那如何优雅地进行路由选择呢？</p>
 <p>我们可以借助Spring-JDBC提供的AbstractRoutingDataSource路由选择机制。它的核心机制如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ca/c7/cac407e536a82f38d2871ee27ae670c7.jpg?wh=1920x966" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ca/c7/cac407e536a82f38d2871ee27ae670c7.jpg?wh=1920x966" /></p>
 <p>首先，我们会为项目中每一个正式数据源创建一个影子数据源。例如使用HikariCPDatasource，然后为它创建一个对应的影子数据源，把两个数据源存入到targetDataSources集合中，然后再根据本地线程上下文中的流量标记，选择对应的数据源。实现代码如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>private static final String ORIGIN_KEY = &quot;originKey&quot;;
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>private static final String SHARD_KEY = &quot;shardowkey&quot;;
@@ -14317,11 +14317,11 @@
 <p>通过这种方法，我们就轻松实现了数据源的选择，完成了根据流量标记选择对应数据源的任务。
 <strong>不过，这种方式会带来一个问题。那就是，在压测过程中，每一个正式的数据源会再对应生成一个相同配置的影子消费组，这样数据库服务端的连接数会翻倍。</strong></p>
 <p>我们再来看看MQ方面如何进行数据隔离。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e7/4b/e7befa68fdf7466c3e01758538a3f24b.jpg?wh=1920x701" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e7/4b/e7befa68fdf7466c3e01758538a3f24b.jpg?wh=1920x701" /></p>
 <p>在消息发送端，我们通常通过对原生SDK进行封装，通过AOP等方法拦截消息发送API，根据当前流量标记来判断是否需要改写主题名称。如果当前流量标记为压测流量，我们要把主题的名称修改为压测主题，把消息发送到同一消息集群的不同主题中。</p>
 <p>当消费端启动时，要为每一个正式消费组再额外创建一个影子消费组，订阅的主题为影子主题。这样，我们就在消费端实现了线程级别的隔离。影子消费组的线程本地变量默认为测试流量，然后沿着消息的消费传递影子标记。</p>
 <p>在全链路压测这个场景，为了不影响没有接入全链路压测的应用，使用影子主题与消费组基本是唯一的解法。因为没有接入全链路的消费组是无法感知到影子主题中的消息的，这就把边界控制在了合理的范围中：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6c/1c/6cb991f1a40272ed3fe3fbd36e5f061c.jpg?wh=1920x786" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6c/1c/6cb991f1a40272ed3fe3fbd36e5f061c.jpg?wh=1920x786" /></p>
 <p>当上游消息发送接入全链路压测时，如果流量是测试请求，消息会发送到影子主题。但是下游如果有应用暂时未接入全链路压测，应用就不会自动创建影子消费组，也不会去订阅影子主题，避免了多余的影响。</p>
 <h3 id="_4">总结</h3>
 <p>好了，我们这节课就讲到这里了。</p>
@@ -14447,8 +14447,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -6498,14 +6498,14 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>clang++ -Xclang -ast-dump min.cpp
 </code></pre></div>
 <p>下图中展示的是min函数对应的AST。你能发现AST节点的命名都很直观，一下子就能看明白每个节点的含义。其中，函数声明的节点是FunctionDecl，也就是Function Declaration的缩写。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/50/a8/50e994b96ef6fbc57f8afd0969yy6ba8.jpg?wh=1846%2A504" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/50/a8/50e994b96ef6fbc57f8afd0969yy6ba8.jpg?wh=1846%2A504" /></p>
 <p>min函数是一个普通的函数，只适用于参数为浮点型的情况。那么我们再增加一个使用模板的版本，并且函数名称一样，这样就可以支持用多种数据类型来比较大小，比如整型、双精度型等。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>template &lt;typename T&gt; T min(T a, T b){
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>return a&lt;b ? a : b;
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>}
 </code></pre></div>
 <p>这时，顶层的AST节点是FunctionTemplateDecl，也就是函数模板声明。它有两个子节点，一个是模板类型参数声明（TemplateTypeParmDecl），也就是尖括号里面的部分；第二个子节点其实是一个普通的函数声明节点，其AST的结构几乎跟普通的min函数版本是一样的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a6/51/a65d293573d52eyy6b69894dbda6f851.jpg?wh=1846%2A468" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a6/51/a65d293573d52eyy6b69894dbda6f851.jpg?wh=1846%2A468" /></p>
 <p>这样，通过查看AST，你就能了解函数模板和普通函数的联系和区别了。接下来就要进入重点了：<strong>函数模板是如何变成一个具体的函数的？</strong></p>
 <p>为此，我们在main函数里调用一下min函数，并传入两个整型的参数min(2,3)：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>int main(){
@@ -6513,21 +6513,21 @@
 <a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>}
 </code></pre></div>
 <p>这个时候，我们再看一下它生成的AST，就会发现函数模板声明之下，增加了一个新的函数声明。这个函数的名称仍然是min，但是参数类型具体化了，是整型。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f9/39/f9b26cbab65beca0eab565cdfcf93c39.jpg?wh=1920%2A981" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f9/39/f9b26cbab65beca0eab565cdfcf93c39.jpg?wh=1920%2A981" /></p>
 <p>这说明，当编译器发现有一个min(2,3)这样的函数调用的时候，就会根据参数的类型，在函数模板的基础上生成一个参数类型确定的函数，然后编译成目标代码。<strong>这个过程叫做特化（Specialization），也就是从一般到具体的过程。</strong>函数模板可以支持各种类型，而特化后的版本只针对某个具体的数据类型。</p>
 <p>那么，特化过程是怎样发生的呢？我们目前只看到了AST，AST反映了编译的结果，但它并没有揭示编译的过程。而只有搞清楚这个过程，我们才能真正理解模板函数的编译机制。</p>
 <p><strong>要揭示编译过程，最快的方法是用调试器来跟踪程序的执行过程。</strong>最常用的调试器就是LLDB和GDB。这里我使用的是LLDB，你可以参考我给出的命令来设置断点、调试程序。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/11/71/117d0c937bd8c0dacdf1f98f2b54d671.jpg?wh=1141%2A575" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/11/71/117d0c937bd8c0dacdf1f98f2b54d671.jpg?wh=1141%2A575" /></p>
 <blockquote>
 <p>小提示：如果你像我一样，是在macOS中运行LLDB，可能会遇到报错信息，即操作系统不让LLDB附加到被调试的程序上。这是出于安全上的考虑。你需要重启macOS，并在启动时按住command-R键进入系统恢复界面，然后在命令行窗口里输入“csrutil disable”来关闭这个安全选项。</p>
 </blockquote>
 <p>不过，在跟踪clang++执行的时候，你会发现，clang++只是一个壳，真正的编译工作不是在这个可执行文件里完成的。实际上，clang++启动了一个子进程来完成编译工作，这个子进程执行的是clang-10。所以，你需要另外启动一个LLDB，来调试新启动的进程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/03/27/03b9199c070ea23955493f331bcc8927.jpg?wh=1141%2A601" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/03/27/03b9199c070ea23955493f331bcc8927.jpg?wh=1141%2A601" /></p>
 <p>在使用LLDB的时候，你会发现，确定好在什么位置上设置断点是特别重要的，这能大大节省单步跟踪所花费的时间。</p>
 <p><strong>那么现在，我们想要探究函数模板是什么时候被特化的，应该在哪里设置断点呢？</strong></p>
 <p>在研究前面示例程序的AST的时候，我们发现编译器会在函数特化的时候，创建一棵新的函数声明的子树，这就需要建立一个新的FunctionDecl节点。因此，我们可以监控FunctionDecl的构建函数都是什么时候被调用的，就可以快速得到整个调用过程。</p>
 <p>那怎么查看调用过程呢？当clang-10在FunctionDecl断点停下以后，你可以用“bt”命令打印出调用栈。我把这个调用栈整理了一下，并加了注释，你可以很容易看清楚编译器的运行过程：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bb/1b/bb0afc7e0e9ab5d4b2021d3cc0b6301b.jpg?wh=1692%2A1614" title="图1：模板函数特化时的调用栈" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bb/1b/bb0afc7e0e9ab5d4b2021d3cc0b6301b.jpg?wh=1692%2A1614" title="图1：模板函数特化时的调用栈" /></p>
 <p>接着，分析这个调用栈，你会发现其主要的处理过程是这样的：</p>
 <ul>
 <li>第一，语法分析器在解析表达式“min(2,3)”的时候，会去做引用消解，弄清楚这个min()函数是在哪里定义的。在这里，你又一次看到语法分析和语义分析交错起来的情况。在这个点上，编译器并没有做完所有的语法分析工作，但是语义分析的功能会被按需调用。</li>
@@ -6541,11 +6541,11 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>(lldb) expr Function-&gt;dump()
 </code></pre></div>
 <p>这个时候，在父进程的LLDB窗口中会显示出被dump出的信息，输出格式跟我们在编译的时候使用-ast-dump参数显示的AST是一样的。从输出的信息中，你会看到当前的函数声明是缺少函数体的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/12/72/12b70df96e84a6f55a0fdbb0cdd6d372.jpg?wh=1450%2A144" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/12/72/12b70df96e84a6f55a0fdbb0cdd6d372.jpg?wh=1450%2A144" /></p>
 <p><strong>那么，函数体是什么时候被添加进来的呢？</strong>这个也不难，你仍然可以用调试器来找到答案。</p>
 <p>从前面函数模板的AST中你已经知道，函数体中包含了一个ConditionalOperator节点。所以，我们可以故技重施，在ConditionalOperator()上设置断点来等着。因为编译器要实例化函数体，就一定会新创建一个ConditionalOperator节点。</p>
 <p>事实证明，这个策略是成功的。程序会按照你的预期在这个断点停下，然后你会得到下面的调用栈：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4c/a5/4c86365e55460021fc40b5d005c41aa5.jpg?wh=1512%2A960" title="图2：创建函数体的过程" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4c/a5/4c86365e55460021fc40b5d005c41aa5.jpg?wh=1512%2A960" title="图2：创建函数体的过程" /></p>
 <p>研究这个调用栈，你会得到两个信息：</p>
 <ol>
 <li>从函数模板实例化出具体的函数，是被延后执行的，程序是在即将解析完毕AST之后才去执行这项任务的。</li>
@@ -6584,7 +6584,7 @@
 <p>在Fact这个结构体中，value是一个静态的常量。在运行时，你可以用Fact&lt;3&gt;::value这样的表达式，直接使用一个阶乘值，不需要进行计算。而这个值，其实是在编译期计算出来的。</p>
 <p><strong>那编译期具体的计算过程是怎样的呢？</strong>你可以像我们在前面研究函数模板那样如法炮制，马上就能探究清楚。</p>
 <p>比如，你可以先看一下示例程序在编译过程中形成的AST，我在其中做了一些标注，方便你理解：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7a/d6/7a1884bd2b01ccf65c42e80acc55ecd6.jpg?wh=1920%2A1158" /><img alt="" src="https://static001.geekbang.org/resource/image/66/dd/66376b3d937aeba74e7bf33b6ba94fdd.jpg?wh=1920%2A1252" /></p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/7a/d6/7a1884bd2b01ccf65c42e80acc55ecd6.jpg?wh=1920%2A1158" /><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/66/dd/66376b3d937aeba74e7bf33b6ba94fdd.jpg?wh=1920%2A1252" />}{:referrerpolicy="no-referrer"</p>
 <p>可以看到，在AST中，首先声明了一个结构体的模板，其AST节点的类型是ClassTemplateDecl。</p>
 <p>接着，是针对这个模板做的特化。由于在main函数中引用了Fact&lt;3&gt;::value，所以编译器必须把Fact&lt;3&gt;特化。特化的结果，是生成了一棵ClassTemplateSpecializationDecl子树，此时模板参数为3。而这个特化版本又引用了Fact&lt;2&gt;::value。</p>
 <p>那么，编译器需要再把Fact&lt;2&gt;特化。进一步，这个特化版本又引用了Fact&lt;1&gt;::value。</p>
@@ -6729,8 +6729,6 @@ Aaaaaaaaaaayou同学请看这里。
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

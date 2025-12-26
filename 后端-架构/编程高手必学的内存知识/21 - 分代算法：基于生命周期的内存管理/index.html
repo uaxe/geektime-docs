@@ -14226,10 +14226,10 @@
 <p>Mark-Sweep算法和malloc相似的地方是，都是用一个链表将所有的空闲空间维护起来，这个链表就是<strong>空闲链表（freelist）</strong>。当内存管理器需要申请内存空间时，便向这个链表查询，如果找到了合适大小的空闲块，就把空闲块分配出去，同时将它从空闲链表中移除。如果空闲块比较大，就把空闲块进行分割，一部分用于分配，剩余的部分重新加到空闲链表中。</p>
 <p>Hotspot虚拟机的Mark-Sweep算法与malloc实现的不同之处在于：在Hotspot里，当一个空闲块分配给一个新对象后，如果剩余空间大于24字节，便将剩余的空间加入到空闲链表，当剩余空间不足24字节的话，就做为碎片空间填充一些无效值。而malloc则会分成多个空闲链表进行管理，更具体的实现可以参考<a href="https://time.geekbang.org/column/article/440452">第9节课</a>。</p>
 <p>Hotspot中的Mark-Sweep的算法运行过程示意图如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/18/2b/18ca325ee2db6bdedd94485e2e1c782b.jpg?wh=2284x1188" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/18/2b/18ca325ee2db6bdedd94485e2e1c782b.jpg?wh=2284x1188" /></p>
 <p>图中的A、C、D、F是空间中的活跃对象，B、 E、G三块区域是空闲区域，假设B的大小是20，E是36，G是60。它们由空闲链表统一管理。</p>
 <p>假设现在有两个分配请求，都要分配大小为30的空间，按照上面内容中的算法描述，具体的分配过程如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3b/8f/3b6ecfda2971d6462541259909194d8f.jpg?wh=2284x1113" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3b/8f/3b6ecfda2971d6462541259909194d8f.jpg?wh=2284x1113" /></p>
 <p>E的大小为36，可以满足分配，但是E所剩下的区域已经比较小了，分配器不再将它加回到空闲链表，E和F之间就产生了一块内存碎片。第二个请求，则会在G区域进行分配，在分配完以后，G区域剩下的空闲区域还比较大，所以分配器会把分割后的空闲区域，也就是H区域再挂回空闲链表。上图中显示了分配完以后，堆里的最终结果。</p>
 <p>介绍完空闲链表结构以后，我们来学习算法的原理。Mark-Sweep算法主要包含Mark和Sweep两个阶段。按照先后顺序，我们先从第一阶段，也就是Mark阶段开始讲起。</p>
 <p>Mark阶段的核心任务是<strong>从根引用出发，根据引用关系进行遍历，所有可以遍历到的对象就是活跃对象</strong>。我们需要一边遍历，一边将哪些对象是活跃的记录下来。当遍历完成以后，我们就找到了所有的活跃对象。遍历的方法可以采用深度优先和广度优先两种策略。这一点和上一节课所讲的对象遍历的方法是一样的。</p>
@@ -14244,14 +14244,14 @@
 <p>当对象的age值到达一个上限以后，就可以将它搬移到由Mark-Sweep算法所管理的空间了。与“年轻代”相对应，我们称这个空间为“老年代”。而对象从年轻代到老年代的搬移过程，就称为<strong>晋升(Promotion)。</strong></p>
 <h3 id="_2">记录集：维护跨代引用</h3>
 <p>可以想象，把对象放到两个空间，肯定会有跨空间的对象引用。如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d6/94/d66a5bcd75599a42cc85221f8de1a794.jpg?wh=2284x934" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d6/94/d66a5bcd75599a42cc85221f8de1a794.jpg?wh=2284x934" /></p>
 <p>上图中左边代表年轻代在GC之前，在幸存者空间S0中一共有6个对象，其中4个对象是活跃对象，两个白色框代表非活跃对象。假如此时发生年轻代GC，垃圾回收器就会把A、B、D、F四个对象尝试向另外一个幸存者空间，也就是S1进行搬移。</p>
 <p>在搬移的过程还会将对象的age加一，如果刚好A对象和F对象的age大于晋升阈值，那么这两个对象就会被搬到老年代中。如上图中的右侧所示，在年轻代的幸存者空间中，对象都是紧密排列的，所以B和D会靠在一起。而在老年代空间，由于对象是从空闲区域中分配的，所以A和F不一定是靠在一起的。</p>
 <p>显然，这就会带来一个问题，在以后年轻代GC执行时，我们就要考虑从老年代到年轻代的引用了，也就是图中，A指向B和D对象的引用。反过来说，当老年代GC执行时，也同样要考虑从年轻代到老年代的引用，也就是图中的D指向F的引用。</p>
 <p>在进行年轻代垃圾回收时，为了找出从老年代到年轻代的引用，可以考虑对老年代对象进行遍历。但如果这么做的话，年轻代GC执行时，就会对全部对象进行遍历，分代就没意义了。</p>
 <p>为了解决这个问题，我们可以想办法把这种跨代引用记录下来，<strong>记录跨代引用的集合就是记录集（Remember Set，RS）。</strong></p>
 <p>最直观的思路是，记录集里记录被引用到的新生代对象，如下图中的左侧所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/86/0d/8611a2d63be51e24b6d421544a9a3b0d.jpg?wh=2284x1179" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/86/0d/8611a2d63be51e24b6d421544a9a3b0d.jpg?wh=2284x1179" /></p>
 <p>记录集中记下了被跨代引用的B和D两个对象，那么当发生年轻代GC时，就能正确地找到B和D对象是根对象。但是这样做的问题是，当B和D再经过一轮年轻代GC，位置发生变化以后，A对象对它们的引用却无法正确维护。</p>
 <p>为了解决这个问题，我们可以再进一步将A放到记录集中，也就是上图中右侧所示，记录集中指向了A对象。这样，在做年轻代GC时，我们对A进行遍历，就可以访问到B和D了。因为B和D在年轻代中，它们的位置会发生变化，变化的地址也能正确地更新到对象A中。A在老年代，所以它不会被搬移，我们只是借用它去访问B和D。</p>
 <p>搞清楚了记录集的作用，我来接着看如何维护记录集呢？</p>
@@ -14292,7 +14292,7 @@
 <h3 id="card-table">Card table：提升写屏障效率</h3>
 <p>随着对象的增多，记录集会变得很大，而且每次对老年代做GC，正确地维护记录集也是一件复杂的事情。另外，写屏障的效率也不高，为了解决这个问题，可以借鉴位图的思路，这就是Card table。</p>
 <p>Hotspot的分代垃圾回收将老年代空间的512bytes映射为一个byte，当该byte置位，则代表这512bytes的堆空间中包含指向年轻代的引用；如果未置位，就代表不包含。这个byte其实就和位图中标记位的概念很相似，人们称它为card。多个card组成的表就是Card table。一个card对应512字节，压缩比达到五百分之一，Card table的空间消耗还是可以接受的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/68/5e/6885cac6d70539140c63a5a514f6c05e.jpg?wh=2284x1217" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/68/5e/6885cac6d70539140c63a5a514f6c05e.jpg?wh=2284x1217" /></p>
 <p>如上图所示，图的下方就是Card table，因为A对象包含指向年轻代的引用，所以A对象所对应的card就被置位，而F对象不存在指向年轻代的引用，所以它所对应的card就未被置位。</p>
 <p>在明白了分代式垃圾回收是如何维护跨代引用的以后，我们就可以转向研究Hotspot中分代式垃圾回收的典型算法：<strong>并发标记清除算法（Concurrent Mark Sweep，CMS）</strong>。标记清除的概念我们已经介绍过了，并发又是什么意思呢？接下来，我们一起来研究一下。</p>
 <h2 id="_4">并发标记算法</h2>
@@ -14309,15 +14309,15 @@
 <p>这里要注意，三色标记并不意味着对象真的要为自己增加一个color属性，它只是一种抽象的概念，在不同的GC算法中，它代表不同的状态。</p>
 <p>我们以广度优先搜索的标记算法为例，白色对象就是未被标记的对象；灰色则是已经被标记，但还没有完成扩展的对象，也就是还在队列中的对象；黑色则是已经扩展完的对象，即从队列中出队的对象。</p>
 <p>你要注意的是，并发标记中最严重的问题就是<strong>漏标</strong>。如果一个对象是活跃对象，但它没有被标记，这就是漏标。这就会出现活跃对象被回收的情况。例如下图中所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9f/68/9fcc7712d1429e4f41cf89866433ef68.jpg?wh=2284x1020" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9f/68/9fcc7712d1429e4f41cf89866433ef68.jpg?wh=2284x1020" /></p>
 <p>在上图中的最左边，标号（a）的子图中，一切都还是正常的，B尚未扩展，在B扩展的时候，C自然可以被标记。在（b）中，A出发的引用指向了C，这时由于B指向C的引用还存在，仍然没有什么问题。但在（c）中，B指向C的引用消失了，因为A已经变成黑色，不会再被扩展了，所以C就没有机会再被标记了。这就产生了漏标。</p>
 <p>总的来说，黑色对象引用了白色对象，而白色对象又没有其他机会再被访问到，所以白色对象就被漏标了。</p>
 <p>漏标问题的解决方案主要有三种，我们这节课会介绍两种，第三种我们会在下一节课再详细介绍。第一种解决方案是<strong>往前进</strong>的方案，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0c/de/0c8ac88d114ef4b944161859f69310de.jpg?wh=2284x1012" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0c/de/0c8ac88d114ef4b944161859f69310de.jpg?wh=2284x1012" /></p>
 <p>解决漏标问题，还是要从写屏障入手。荷兰计算机科学家Dijkstra提出一种写屏障：<strong>当黑色对象引用白色对象时，把白色对象直接标灰，也就是说将C对象直接标记，然后放入队列中待扩展</strong>。这个过程的伪代码我建议你自己写一下，作为练习。</p>
 <p>往前走的方案是比较符合直觉的，但是假如在C对象被标记以后，A对C的引用又消失了，C实际上是被多标了。多标并不会带来严重的后果，它只会导致原本应该被回收的对象没有被及时回收，这种对象被称为<strong>浮动垃圾</strong>。</p>
 <p>为了解决浮动垃圾这个问题，我们可以使用第二种方案，那就是<strong>往后退一步</strong>：把黑色对象重新扩展一次，也就是说黑色结点变成灰色。如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/13/7f/130e8301018f99a1fc1808e47147677f.jpg?wh=2284x1087" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/13/7f/130e8301018f99a1fc1808e47147677f.jpg?wh=2284x1087" /></p>
 <p>如果对象修改比较频繁，那么后退一步的方案会比前进一步的方案更好，因为它不会产生浮动垃圾。Lua虚拟机中就采用了方案二，这是因为Lua中的Table结构的修改是比较频繁的。</p>
 <p>在Hotspot中，CMS的实现和上面的两种思路有关系，但又不完全一样，接下来，我们全面地分析一下在Hotspot中，CMS是如何实现的。</p>
 <h2 id="hotspotcms">Hotspot中CMS的实现</h2>
@@ -14335,7 +14335,7 @@
 <p>但是如果每一轮都有card置位，应该怎么办呢？CMS也会在预清理达到一定次数以后停止，进入重标记阶段。重标记的作用是遍历新生代和card置位的对象，对老年代对象做一次重新标记。这一次是需要停顿的，因为这一次垃圾回收器将不允许card再被置位了。</p>
 <p>一般来说，新生代指向老年代的引用不会太多，但是偶尔也会发生这种引用很多的情况，如果出现了这种情况，可以在重标记之前，进行一次年轻代GC，这样可以减少年轻代中的对象数量，减少重标记的停顿时间。这个功能可以使用参数-XX:+CMSScavengeBeforeReMark来打开。</p>
 <p>这个过程的示意图如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2c/09/2cc6a95f48e5c54b0c2f3685da57d109.jpg?wh=2284x1026" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2c/09/2cc6a95f48e5c54b0c2f3685da57d109.jpg?wh=2284x1026" /></p>
 <p>因为card table有两个功能：维护跨代引用和标记灰色结点，所以，Hotspot又引入了另外一个数据结构mod union table（MUT）来用于维护跨代引用。在并发标记开始之前，card table中的内容就会被复制到MUT里，如果在Concurrent Mark阶段，发生了年轻代的垃圾回收，则可以使用MUT来进行跨代扫描。</p>
 <p>上图中展示了，A对象在引用B对象时，A对象所对应的card被置位。因为D对象所对应的card和A对象所对应的card是同一个card，所以，GC在清理card的过程中仍然会把D对象进行标记。所以D就是一个被多标记了的垃圾对象，也就是浮动垃圾。</p>
 <p>到这时，Hotspot中的具体实现我们就搞清楚了。</p>
@@ -14346,7 +14346,7 @@
 <p>在分代垃圾回收算法里，<strong>用于管理老年代的是CMS算法</strong>。这种算法的主要挑战来自于垃圾回收线程在标记的过程中，业务线程还在不断地修改对象之间的引用关系。我们介绍了三色标记算法，并且介绍了两种解决漏标问题的手段：<strong>“往前走”和“往后退一步”</strong>。</p>
 <h2 id="_6">思考题</h2>
 <p>我们已经知道标记的过程就是图遍历的过程，那你觉得在Mark-Sweep算法中，应该采用广度优先还是深度优先进行遍历呢？为什么呢？考虑到对象不必搬移，你还能不能想到更省空间的做法？欢迎在留言区分享你的想法，我在留言区等你。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b9/64/b9d7165fba7871ef37af60999de84564.jpg?wh=2284x1551" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b9/64/b9d7165fba7871ef37af60999de84564.jpg?wh=2284x1551" /></p>
 <p>好啦，这节课到这就结束啦。欢迎你把这节课分享给更多对计算机内存感兴趣的朋友。我是海纳，我们下节课再见！</p>
 <div><strong>精选留言（10）</strong></div>
 <ul>
@@ -14472,8 +14472,6 @@ card table，记录着 old 到 young 到引用中的 old 对象。主要用在 y
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

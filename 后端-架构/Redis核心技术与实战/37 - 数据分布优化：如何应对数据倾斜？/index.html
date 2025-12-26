@@ -14743,7 +14743,7 @@
 <h2 id="_1">数据量倾斜的成因和应对方法</h2>
 <p>首先，我们来看数据量倾斜的成因和应对方案。</p>
 <p>当数据量倾斜发生时，数据在切片集群的多个实例上分布不均衡，大量数据集中到了一个或几个实例上，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2c/85/2cb89b2d1b319fb43a5d1b94d7929685.jpg?wh=2104%2A1455" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2c/85/2cb89b2d1b319fb43a5d1b94d7929685.jpg?wh=2104%2A1455" /></p>
 <p>那么，数据量倾斜是怎么产生的呢？这主要有三个原因，分别是某个实例上保存了bigkey、Slot分配不均衡以及Hash Tag。接下来，我们就一个一个来分析，同时我还会给你讲解相应的解决方案。</p>
 <h4 id="bigkey">bigkey导致倾斜</h4>
 <p>第一个原因是，某个实例上正好保存了bigkey。bigkey的value值很大（String类型），或者是bigkey保存了大量集合元素（集合类型），会导致这个实例的数据量增加，内存资源消耗也相应增加。</p>
@@ -14805,7 +14805,7 @@
 <p>举个例子，假设key是user:profile:3231，我们把其中的3231作为Hash Tag，此时，key就变成了user:profile:{3231}。当客户端计算这个key的CRC16值时，就只会计算3231的CRC16值。否则，客户端会计算整个“user:profile:3231”的CRC16值。</p>
 <p>使用Hash Tag的好处是，如果不同key的Hash Tag内容都是一样的，那么，这些key对应的数据会被映射到同一个Slot中，同时会被分配到同一个实例上。</p>
 <p>下面这张表就显示了使用Hash Tag后，数据被映射到相同Slot的情况，你可以看下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d5/36/d560b0161f1f786328dbd8a1df66d036.jpg?wh=2654%2A659" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d5/36/d560b0161f1f786328dbd8a1df66d036.jpg?wh=2654%2A659" /></p>
 <p>其中，user:profile:{3231}和user:order:{3231}的Hash Tag一样，都是3231，它们的CRC16计算值对16384取模后的值也是一样的，所以就对应映射到了相同的Slot 1024中。user:profile:{5328}和user:order:{5328}也是相同的映射结果。</p>
 <p>那么，Hash Tag一般用在什么场景呢？其实，它主要是用在Redis Cluster和Codis中，支持事务操作和范围查询。因为Redis Cluster和Codis本身并不支持跨实例的事务操作和范围查询，当业务应用有这些需求时，就只能先把这些数据读取到业务层进行事务处理，或者是逐个查询每个实例，得到范围查询的结果。</p>
 <p>这样操作起来非常麻烦，所以，我们可以使用Hash Tag把要执行事务操作或是范围查询的数据映射到同一个实例上，这样就能很轻松地实现事务或范围查询了。</p>
@@ -14815,7 +14815,7 @@
 <h2 id="_2">数据访问倾斜的成因和应对方法</h2>
 <p>发生数据访问倾斜的根本原因，就是实例上存在热点数据（比如新闻应用中的热点新闻内容、电商促销活动中的热门商品信息，等等）。</p>
 <p>一旦热点数据被存在了某个实例中，那么，这个实例的请求访问量就会远高于其它实例，面临巨大的访问压力，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/94/20/94b1ca50143db1d09c60475fa7b41820.jpg?wh=1972%2A1497" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/94/20/94b1ca50143db1d09c60475fa7b41820.jpg?wh=1972%2A1497" /></p>
 <p>那么，我们该如何应对呢？</p>
 <p>和数据量倾斜不同，热点数据通常是一个或几个数据，所以，直接重新分配Slot并不能解决热点数据的问题。</p>
 <p>通常来说，热点数据以服务读操作为主，在这种情况下，我们可以采用<strong>热点数据多副本</strong>的方法来应对。</p>
@@ -14832,7 +14832,7 @@
 </ol>
 <p>而数据访问倾斜的主要原因就是有热点数据存在，导致大量访问请求集中到了热点数据所在的实例上。</p>
 <p>为了应对数据倾斜问题，我给你介绍了四个方法，也分别对应了造成数据倾斜的四个原因。我把它们总结在下表中，你可以看下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/09/6f/092da1ee7425d20b1af4900ec8e9926f.jpg?wh=2926%2A1350" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/09/6f/092da1ee7425d20b1af4900ec8e9926f.jpg?wh=2926%2A1350" /></p>
 <p>当然，如果已经发生了数据倾斜，我们可以通过数据迁移来缓解数据倾斜的影响。Redis Cluster和Codis集群都提供了查看Slot分配和手工迁移Slot的命令，你可以把它们应用起来。</p>
 <p>最后，关于集群的实例资源配置，我再给你一个小建议：在构建切片集群时，尽量使用大小配置相同的实例（例如实例内存配置保持相同），这样可以避免因实例资源不均衡而在不同实例上分配不同数量的Slot。</p>
 <h2 id="_4">每课一问</h2>
@@ -14965,8 +14965,6 @@ Redis 的很多性能问题，例如导致 Redis 阻塞的场景：bigkey、集�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

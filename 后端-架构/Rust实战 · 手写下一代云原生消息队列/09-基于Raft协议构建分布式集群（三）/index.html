@@ -13614,12 +13614,12 @@
 <p>所以我们构建状态机也是围绕这六点展开的。最开始先来记住一个定义，就是：<strong>Raft 状态机本质上是一个 Tokio 的任务（也就是 Tokio Task）</strong>。接下来我们简单聊一下 Raft 状态机的运行原理。</p>
 <h2 id="_1">状态机运行原理</h2>
 <p>先来看下面这张图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/93/fe/930210fc45f6d88e476be0ccc05ec8fe.jpeg?wh=1920x1080" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/93/fe/930210fc45f6d88e476be0ccc05ec8fe.jpeg?wh=1920x1080" /></p>
 <p>如上图所示，Raft Node 主要由 gRPC Server、Raft 状态机、Raft Storage 三部分组成。其中最关键的是 Raft 状态机，它驱动了 Raft Node 向前运行。从启动流程的角度看，服务启动后，会先启动 gRPC Server、初始化 RawNode，然后启动 Raft 状态机。Raft 状态机本质上是一个 Loop 线程，它会不间断地运行去驱动 RawNode 向前运行。</p>
 <p>那什么叫做 RawNode 向前运行呢？</p>
 <p>是指每个 RawNode 初始化后，需要根据自己的角色不断地做一些事情。比如，如果是 Leader 节点，那么就需要检测是否有新的用户数据写入，并将用户数据分发给多个 Follower，同时需要定时给 Follower 节点发送心跳信息。如果是 Follower 节点，则需要定时查看是否有心跳，如果有心跳则继续等待下一次心跳，如果心跳过期则发起新的选举。而这些操作都是由 Raft 状态机来驱动的。</p>
 <p>不管是 Leader 还是 Follower 的信息，当 Raft 状态机生成消息后，都会通过 Tokio Channel 将消息从网络层发送给其他节点。从而完成发起选举、投票选举 Leader、心跳发送等行为。所以，从集群的角度来看，整体架构图如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a1/22/a17c5a8fa9441a5a10340838ea90cf22.jpg?wh=2736x680" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a1/22/a17c5a8fa9441a5a10340838ea90cf22.jpg?wh=2736x680" /></p>
 <p>基于上面集群的架构图，我们来讲一下上面的 Raft 算法中的六个核心流程。</p>
 <ol>
 <li><strong>节点发现</strong>：如下代码所示，Raft Node 之间相互发现是在启动时通过 ConfState 中的voters变量来配置的。</li>
@@ -13634,7 +13634,7 @@
 <li><strong>心跳过期</strong> <strong>&amp;</strong> <strong>重新发起选举</strong>：当 Follower 状态机向前驱动时，如果检测到心跳过期，那么则生成 MsgType 为MsgRequestVote的消息，发起一次新的选举。</li>
 </ol>
 <p>接下来看一段单机 RaftNode 运行，并将自己选举为 Leader 的日志信息，这段日志展示了RaftNode 从运行到选举为 Leader 的过程（日志就不展开讲了，每一行还是比较容易看懂的）。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3a/d5/3a0883d48ccfaf0ac4042c8afdf343d5.png?wh=1920x497" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3a/d5/3a0883d48ccfaf0ac4042c8afdf343d5.png?wh=1920x497" /></p>
 <p>讲到这里你就会发现：<strong>Raft 集群的运行是依靠 Raft 状态机不断地向前驱动去生成不同类型的消息，从而完成不同的操作</strong>。</p>
 <p>那接下来我们就来实现 Raft 状态机。开发 Raft 状态机的第一步是初始化 raft-rs 中的 RawNode 对象。</p>
 <h2 id="rawnode">初始化 RawNode</h2>
@@ -13709,7 +13709,7 @@
 <a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>}
 </code></pre></div>
 <p>当然如果只有一个 RawNode，那么它会被自动选举为 Leader，运行日志如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/81/b1/81e4a4ceb7c970e9b2ae5cc0e24775b1.png?wh=1920x502" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/81/b1/81e4a4ceb7c970e9b2ae5cc0e24775b1.png?wh=1920x502" /></p>
 <p>初始化后 RawNode后，接下来我们来看状态机的具体逻辑实现。</p>
 <p>从实现来看，状态机的代码由<strong>驱动代码</strong>和<strong>逻辑代码</strong>两部分组成。由于篇幅原因，我们这里只讲代码的主要实现逻辑，完整代码请看 Demo 示例中的<a href="https://github.com/robustmq/robustmq-geek/blob/main/src/placement-center/src/raft/machine.rs">《machine.rs》</a>。接下来先来看状态机驱动代码。</p>
 <h2 id="_2">状态机驱动代码</h2>
@@ -13911,7 +13911,7 @@
 <li>基于 Tokio 的 Raft 状态机的开发。</li>
 </ol>
 <p>这三个工作都是指单个Raft Node 维度的实现。而从集群的角度看，就是多个Raft Node 就可以组成集群。因此只要我们启动多个 Raft Node，它就会自动组建成集群。那它是怎么组建集群的呢？ 来看下图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/63/7c/6392b987c8d0c89eb66fa20cb14bdc7c.jpeg?wh=1900x808" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/63/7c/6392b987c8d0c89eb66fa20cb14bdc7c.jpeg?wh=1900x808" /></p>
 <p>组建集群的代码运行逻辑如下：</p>
 <ol>
 <li>单个 Raft Node 启动，会尝试从本地 RocksDB 的数据目录恢复数据，如果 RocksDB 目录不存在，则会创建一个新的数据目录，否则就恢复Raft Node 的状态数据。主要是通过 Storate Trait 的 initial_state 方法读取 HardState 和 ConfState 数据。</li>
@@ -14044,8 +14044,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

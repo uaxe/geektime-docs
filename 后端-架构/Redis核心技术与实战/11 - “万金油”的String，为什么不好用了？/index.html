@@ -14699,7 +14699,7 @@
 <p>那么，String类型具体是怎么保存数据的呢？我来解释一下。</p>
 <p>当你保存64位有符号整数时，String类型会把它保存为一个8字节的Long类型整数，这种保存方式通常也叫作int编码方式。</p>
 <p>但是，当你保存的数据中包含字符时，String类型就会用简单动态字符串（Simple Dynamic String，SDS）结构体来保存，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/37/57/37c6a8d5abd65906368e7c4a6b938657.jpg?wh=1926%2A1400" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/37/57/37c6a8d5abd65906368e7c4a6b938657.jpg?wh=1926%2A1400" /></p>
 <ul>
 <li><strong>buf</strong>：字节数组，保存实际数据。为了表示字节数组的结束，Redis会自动在数组最后加一个“\0”，这就会额外占用1个字节的开销。</li>
 <li><strong>len</strong>：占4个字节，表示buf的已用长度。</li>
@@ -14709,17 +14709,17 @@
 <p>另外，对于String类型来说，除了SDS的额外开销，还有一个来自于RedisObject结构体的开销。</p>
 <p>因为Redis的数据类型有很多，而且，不同数据类型都有些相同的元数据要记录（比如最后一次访问的时间、被引用的次数等），所以，Redis会用一个RedisObject结构体来统一记录这些元数据，同时指向实际数据。</p>
 <p>一个RedisObject包含了8字节的元数据和一个8字节指针，这个指针再进一步指向具体数据类型的实际数据所在，例如指向String类型的SDS结构所在的内存地址，可以看一下下面的示意图。关于RedisObject的具体结构细节，我会在后面的课程中详细介绍，现在你只要了解它的基本结构和元数据开销就行了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/34/57/3409948e9d3e8aa5cd7cafb9b66c2857.jpg?wh=2214%2A1656" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/34/57/3409948e9d3e8aa5cd7cafb9b66c2857.jpg?wh=2214%2A1656" /></p>
 <p>为了节省内存空间，Redis还对Long类型整数和SDS的内存布局做了专门的设计。</p>
 <p>一方面，当保存的是Long类型整数时，RedisObject中的指针就直接赋值为整数数据了，这样就不用额外的指针再指向整数了，节省了指针的空间开销。</p>
 <p>另一方面，当保存的是字符串数据，并且字符串小于等于44字节时，RedisObject中的元数据、指针和SDS是一块连续的内存区域，这样就可以避免内存碎片。这种布局方式也被称为embstr编码方式。</p>
 <p>当然，当字符串大于44字节时，SDS的数据量就开始变多了，Redis就不再把SDS和RedisObject布局在一起了，而是会给SDS分配独立的空间，并用指针指向SDS结构。这种布局方式被称为raw编码模式。</p>
 <p>为了帮助你理解int、embstr和raw这三种编码模式，我画了一张示意图，如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ce/e3/ce83d1346c9642fdbbf5ffbe701bfbe3.jpg?wh=3072%2A1938" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ce/e3/ce83d1346c9642fdbbf5ffbe701bfbe3.jpg?wh=3072%2A1938" /></p>
 <p>好了，知道了RedisObject所包含的额外元数据开销，现在，我们就可以计算String类型的内存使用量了。</p>
 <p>因为10位数的图片ID和图片存储对象ID是Long类型整数，所以可以直接用int编码的RedisObject保存。每个int编码的RedisObject元数据部分占8字节，指针部分被直接赋值为8字节的整数了。此时，每个ID会使用16字节，加起来一共是32字节。但是，另外的32字节去哪儿了呢？</p>
 <p>我在<a href="https://time.geekbang.org/column/article/268253">第2讲</a>中说过，Redis会使用一个全局哈希表保存所有键值对，哈希表的每一项是一个dictEntry的结构体，用来指向一个键值对。dictEntry结构中有三个8字节的指针，分别指向key、value以及下一个dictEntry，三个指针共24字节，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b6/e7/b6cbc5161388fdf4c9b49f3802ef53e7.jpg?wh=2219%2A1371" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b6/e7/b6cbc5161388fdf4c9b49f3802ef53e7.jpg?wh=2219%2A1371" /></p>
 <p>但是，这三个指针只有24字节，为什么会占用了32字节呢？这就要提到Redis使用的内存分配库jemalloc了。</p>
 <p>jemalloc在分配内存时，会根据我们申请的字节数N，找一个比N大，但是最接近N的2的幂次数作为分配的空间，这样可以减少频繁分配的次数。</p>
 <p>举个例子。如果你申请6字节空间，jemalloc实际会分配8字节空间；如果你申请24字节空间，jemalloc则会分配32字节。所以，在我们刚刚说的场景里，dictEntry结构就占用了32字节。</p>
@@ -14728,7 +14728,7 @@
 <h2 id="_1">用什么数据结构可以节省内存？</h2>
 <p>Redis有一种底层数据结构，叫压缩列表（ziplist），这是一种非常节省内存的结构。</p>
 <p>我们先回顾下压缩列表的构成。表头有三个字段zlbytes、zltail和zllen，分别表示列表长度、列表尾的偏移量，以及列表中的entry个数。压缩列表尾还有一个zlend，表示列表结束。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f6/9f/f6d4df5f7d6e80de29e2c6446b02429f.jpg?wh=3457%2A972" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f6/9f/f6d4df5f7d6e80de29e2c6446b02429f.jpg?wh=3457%2A972" /></p>
 <p>压缩列表之所以能节省内存，就在于它是用一系列连续的entry保存数据。每个entry的元数据包括下面几部分。</p>
 <ul>
 <li><strong>prev_len</strong>，表示前一个entry的长度。prev_len有两种取值情况：1字节或5字节。取值1字节时，表示上一个entry的长度小于254字节。虽然1字节的值能表示的数值范围是0到255，但是压缩列表中zlend的取值默认是255，因此，就默认用255表示整个压缩列表的结束，其他表示长度的地方就不能再用255这个值了。所以，当上一个entry长度小于254字节时，prev_len取值为1字节，否则，就取值为5字节。</li>
@@ -15019,8 +15019,6 @@ encoding取值规则：https:&#47;&#47;github.com&#47;zpoint&#47;Redis-Internals
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

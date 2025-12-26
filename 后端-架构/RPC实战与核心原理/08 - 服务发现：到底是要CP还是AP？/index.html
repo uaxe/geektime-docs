@@ -14030,7 +14030,7 @@
 <p>先举个例子，假如你要给一位以前从未合作过的同事发邮件请求帮助，但你却没有他的邮箱地址。这个时候你会怎么办呢？如果是我，我会选择去看公司的企业“通信录”。</p>
 <p>同理，为了高可用，在生产环境中服务提供方都是以集群的方式对外提供服务，集群里面的这些IP随时可能变化，我们也需要用一本“通信录”及时获取到对应的服务节点，这个获取的过程我们一般叫作“服务发现”。</p>
 <p>对于服务调用方和服务提供方来说，其契约就是接口，相当于“通信录”中的姓名，服务节点就是提供该契约的一个具体实例。服务IP集合作为“通信录”中的地址，从而可以通过接口获取服务IP的集合来完成服务的发现。这就是我要说的RPC框架的服务发现机制，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/51/5d/514dc04df2b8b2f3130b7d44776a825d.jpg?wh=2746%2A1445" title="RPC服务发现原理图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/51/5d/514dc04df2b8b2f3130b7d44776a825d.jpg?wh=2746%2A1445" title="RPC服务发现原理图" /></p>
 <ol>
 <li>服务注册：在服务提供方启动的时候，将对外暴露的接口注册到注册中心之中，注册中心将这个服务节点的IP和接口保存下来。</li>
 <li>服务订阅：在服务调用方启动的时候，去注册中心查找并订阅服务提供方的IP，然后缓存到本地，并用于后续的远程调用。</li>
@@ -14038,7 +14038,7 @@
 <h2 id="dns">为什么不使用DNS？</h2>
 <p>既然服务发现这么“厉害”，那是不是很难实现啊？其实类似机制一直在我们身边，我们回想下服务发现的本质，就是完成了接口跟服务提供者IP的映射。那我们能不能把服务提供者IP统一换成一个域名啊，利用已经成熟的DNS机制来实现？</p>
 <p>好，先带着这个问题，简单地看下DNS的流程：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3b/18/3b6a23f392b9b8d6fcf31803a5b4ef18.jpg?wh=5273%2A1884" title="DNS查询流程" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3b/18/3b6a23f392b9b8d6fcf31803a5b4ef18.jpg?wh=5273%2A1884" title="DNS查询流程" /></p>
 <p>如果我们用DNS来实现服务发现，所有的服务提供者节点都配置在了同一个域名下，调用方的确可以通过DNS拿到随机的一个服务提供者的IP，并与之建立长连接，这看上去并没有太大问题，但在我们业界为什么很少用到这种方案呢？不知道你想过这个问题没有，如果没有，现在可以停下来想想这样两个问题：</p>
 <ul>
 <li>如果这个IP端口下线了，服务调用者能否及时摘除服务节点呢？</li>
@@ -14046,7 +14046,7 @@
 </ul>
 <p>这两个问题的答案都是：“不能”。这是因为为了提升性能和减少DNS服务的压力，DNS采取了多级缓存机制，一般配置的缓存时间较长，特别是JVM的默认缓存是永久有效的，所以说服务调用者不能及时感知到服务节点的变化。</p>
 <p>这时你可能会想，我是不是可以加一个负载均衡设备呢？将域名绑定到这台负载均衡设备上，通过DNS拿到负载均衡的IP。这样服务调用的时候，服务调用方就可以直接跟VIP建立连接，然后由VIP机器完成TCP转发，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d8/b9/d8549f6069a8ca5bd1012a0baf90f6b9.jpg?wh=2553%2A1299" title="VIP方案" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d8/b9/d8549f6069a8ca5bd1012a0baf90f6b9.jpg?wh=2553%2A1299" title="VIP方案" /></p>
 <p>这个方案确实能解决DNS遇到的一些问题，但在RPC场景里面也并不是很合适，原因有以下几点：</p>
 <ul>
 <li>搭建负载均衡设备或TCP/IP四层代理，需求额外成本；</li>
@@ -14058,7 +14058,7 @@
 <h2 id="zookeeper">基于ZooKeeper的服务发现</h2>
 <p>那么在RPC里面我们该如何实现呢？我们还是要回到服务发现的本质，就是完成接口跟服务提供者IP之间的映射。这个映射是不是就是一种命名服务？当然，我们还希望注册中心能完成实时变更推送，是不是像开源的ZooKeeper、etcd就可以实现？我很肯定地说“确实可以”。下面我就来介绍下一种基于ZooKeeper的服务发现方式。</p>
 <p>整体的思路很简单，就是搭建一个ZooKeeper集群作为注册中心集群，服务注册的时候只需要服务节点向ZooKeeper节点写入注册信息即可，利用ZooKeeper的Watcher机制完成服务订阅与服务下发功能，整体流程如下图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/50/75/503fabeeae226a722f83e9fb6c0d4075.jpg?wh=4214%2A1803" title="基于ZooKeeper服务发现结构图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/50/75/503fabeeae226a722f83e9fb6c0d4075.jpg?wh=4214%2A1803" title="基于ZooKeeper服务发现结构图" /></p>
 <ol>
 <li>服务平台管理端先在ZooKeeper中创建一个服务根路径，可以根据接口名命名（例如：/service/com.demo.xxService），在这个路径再创建服务提供方目录与服务调用方目录（例如：provider、consumer），分别用来存储服务提供方的节点信息和服务调用方的节点信息。</li>
 <li>当服务提供方发起注册时，会在服务提供方目录中创建一个临时节点，节点中存储该服务提供方的注册信息。</li>
@@ -14073,7 +14073,7 @@
 <p>而RPC框架的服务发现，在服务节点刚上线时，服务调用方是可以容忍在一段时间之后（比如几秒钟之后）发现这个新上线的节点的。毕竟服务节点刚上线之后的几秒内，甚至更长的一段时间内没有接收到请求流量，对整个服务集群是没有什么影响的，所以我们可以牺牲掉CP（强制一致性），而选择AP（最终一致），来换取整个注册中心集群的性能和稳定性。</p>
 <p>那么是否有一种简单、高效，并且最终一致的更新机制，能代替ZooKeeper那种数据强一致的数据更新机制呢？</p>
 <p>因为要求最终一致性，我们可以考虑采用消息总线机制。注册数据可以全量缓存在每个注册中心内存中，通过消息总线来同步数据。当有一个注册中心节点接收到服务节点注册时，会产生一个消息推送给消息总线，再通过消息总线通知给其它注册中心节点更新数据并进行服务下发，从而达到注册中心间数据最终一致性，具体流程如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/73/ff/73b59c7949ebed2903ede474856062ff.jpg?wh=4256%2A2276" title="流程图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/73/ff/73b59c7949ebed2903ede474856062ff.jpg?wh=4256%2A2276" title="流程图" /></p>
 <ul>
 <li>当有服务上线，注册中心节点收到注册请求，服务列表数据发生变化，会生成一个消息，推送给消息总线，每个消息都有整体递增的版本。</li>
 <li>消息总线会主动推送消息到各个注册中心，同时注册中心也会定时拉取消息。对于获取到消息的在消息回放模块里面回放，只接受大于本地版本号的消息，小于本地版本号的消息直接丢弃，从而实现最终一致性。</li>
@@ -14236,8 +14236,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

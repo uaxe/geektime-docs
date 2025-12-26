@@ -6491,9 +6491,9 @@
 </code></pre></div>
 <p>编译完毕以后，进入v8/out/x64.debug目录，你可以运行./d8，这就是编译好的V8的命令行工具。如果你用过Node.js，那么d8的使用方法，其实跟它几乎是完全一样的，因为Node.js就封装了一个V8引擎。你还可以用GDB或LLDB工具来调试d8，这样你就可以知道，它是怎么编译和运行JavaScript程序了。</p>
 <p>而v8/src目录下的，就是V8的源代码了。V8是用C++编写的。你可以重点关注这几个目录中的代码，它们是与编译有关的功能，而别的代码主要是运行时功能：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ce/ee/ce80ee2ace64988a8d332e0e545ef0ee.jpg?wh=2284%2A917" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ce/ee/ce80ee2ace64988a8d332e0e545ef0ee.jpg?wh=2284%2A917" /></p>
 <p>V8的编译器的构成跟Java的编译器很像，它们都有从源代码编译到字节码的编译器，也都有解释器（叫Ignition），也都有JIT编译器（叫TurboFan）。你可以看下V8的编译过程的图例。在这个图中，你能注意到两个陌生的节点：<strong>流处理节点（Stream）和预解析器（PreParser）</strong>，这是V8编译过程中比较有特色的两个处理阶段。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/09/fb/095613e2515fc6d6cc36705e6d952afb.jpg?wh=2284%2A1007" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/09/fb/095613e2515fc6d6cc36705e6d952afb.jpg?wh=2284%2A1007" /></p>
 <p>图1：V8的编译过程</p>
 <p>注意：这是比较新的V8版本的架构。在更早的版本里，有时会用到两个JIT编译器，类似于HotSpot的C1和C2，分别强调编译速度和优化效果。在更早的版本里，还没有字节码解释器。现在的架构，引入了字节码解释器，其速度够快，所以就取消了其中一级的JIT编译器。</p>
 <p>下面我们就进入到V8编译过程中的各个阶段，去了解一些编译器的细节。</p>
@@ -6526,17 +6526,17 @@
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>//add(1,2)    //一开始，先不调用add函数
 </code></pre></div>
 <p>得到的输出结果是：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/58/b0/58491fc107d5227fbdaa2ab996ed9bb0.jpg?wh=626%2A314" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/58/b0/58491fc107d5227fbdaa2ab996ed9bb0.jpg?wh=626%2A314" /></p>
 <p>里面有一个没有名字的函数（也就是程序的顶层函数），并且它记录了一个add函数的声明，仅此而已。你可以看到，Preparser的解析结果确实够粗略。</p>
 <p>而如果你把foo.js中最后一行的注释去掉，调用一下add函数，再次让d8运行一下foo.js，就会输出完整解析后的AST，你可以看看二者相差有多大：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6e/75/6ec0dc2aedc384d34924848a1eeab575.jpg?wh=1920%2A1759" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6e/75/6ec0dc2aedc384d34924848a1eeab575.jpg?wh=1920%2A1759" /></p>
 <p>最后，你可以去看看正式的Parser（在parser.h、parser-base.h、parser.cc代码中）。学完了这么多编译器的实现机制以后，以你现在的经验，打开一看，你就能知道，这又是用手写的递归下降算法实现的。</p>
 <p>在看算法的过程中，我一般第一个就会去看它是如何处理二元表达式的。因为二元表达式看上去很简单，但它需要解决一系列难题，包括左递归、优先级和结合性。</p>
 <p>V8的Parser中，对于二元表达式的处理，采取的也是一种很常见的算法：<strong>操作符优先级解析器</strong>（Operator-precedence parser）。这跟Java的Parser也很像，它本质上是自底向上的一个LR(1)算法。所以我们可以得出结论，在手写语法解析器的时候，遇到二元表达式，采用操作符优先级的方法，算是最佳实践了！</p>
 <p>好了，现在我们了解了V8的解析过程，那V8是如何把AST编译成字节码和机器码并运行的呢？我们接着来看看它的编译过程。</p>
 <h2 id="_2">编译成字节码</h2>
 <p>我们在执行刚才的foo.js文件时，加上“–print-bytecode”参数，就能打印出生成的字节码了。其中，add函数的字节码如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4a/4e/4afe3a33df386d66b4dc7838ef7a304e.jpg?wh=1470%2A392" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4a/4e/4afe3a33df386d66b4dc7838ef7a304e.jpg?wh=1470%2A392" /></p>
 <p>怎么理解这几行字节码呢？我来给你解释一下：</p>
 <ul>
 <li>Ldar a1：把参数1从寄存器加载到累加器（Ld=load，a=accumulator, r=register）。</li>
@@ -6545,7 +6545,7 @@
 </ul>
 <p>不过，要想充分理解这几行简单的字节码，你还需要真正理解Ignition的设计。因为这些字节码是由Ignition来解释执行的。</p>
 <p>Ignition是一个基于寄存器的解释器。它把函数的参数、变量等保存在寄存器里。不过，这里的寄存器并不是物理寄存器，而是指栈帧中的一个位置。下面是一个示例的栈帧：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ea/3f/ea627032db67ea4yy0898897707f273f.jpg?wh=2284%2A546" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ea/3f/ea627032db67ea4yy0898897707f273f.jpg?wh=2284%2A546" /></p>
 <p>图2：Ignition的栈帧</p>
 <p>这个栈帧里包含了执行函数所需要的所有信息：</p>
 <ul>
@@ -6571,7 +6571,7 @@
 </ol>
 <p>当然，Ignition没有像生成机器码那样，用一个寄存器分配算法，让本地变量、参数等也都尽量采用物理寄存器。这样做的原因，一方面是因为，寄存器分配算法会增加编译的时间；另一方面，这样不利于代码在解释器和TurboFan生成的机器代码之间来回切换（因为它要在调用约定之间做转换）。采用固定格式的栈帧，Ignition就能够在从机器代码切换回来的时候，很容易地设置正确的解释器栈帧状态。</p>
 <p>我把更多的字节码指令列在了下面，你可以仔细看一看Ignition都有哪些指令，从而加深对Ignition解释运行机制的理解。同时，你也可以跟我们已经学过的Java和Python的字节码做个对比。这样呀，你对字节码、解释器的了解就更丰富了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e1/01/e1ee2400d3447088156959068f4bef01.jpg?wh=1336%2A1698" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e1/01/e1ee2400d3447088156959068f4bef01.jpg?wh=1336%2A1698" /></p>
 <p>来源：<a href="https://docs.google.com/document/d/11T2CRex9hXxoJwbYqVQ32yIPMh0uouUZLdyrtmMoL44/mobilebasic">Ignition Design Doc</a></p>
 <h2 id="_3">编译成机器码</h2>
 <p>好，前面我提到了，V8也有自己的JIT编译器，叫做TurboFan。在学过Java的JIT编译器以后，你可以预期到，TurboFan也会有一些跟Java JIT编译器类似的特性，比如它们都是把字节码编译生成机器码，都是针对热点代码才会启动即时编译的。那接下来，我们就来验证一下自己的想法，并一起来看看TurboFan的运行效果究竟如何。</p>
@@ -6603,7 +6603,7 @@
 –code-comment：在汇编代码里输出注释</p>
 <p>程序一开头是解释执行的。在循环了24000次以后，V8认为这是热点代码，于是启动了Turbofan做即时编译。</p>
 <p>最后生成的汇编代码有好几十条指令。不过你可以看到，大部分指令是用于初始化栈帧，以及处理逆优化的情况。真正用于计算的指令，是下面几行指令：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/42/63/42623960a371d97b95540343f5bf4363.jpg?wh=696%2A194" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/42/63/42623960a371d97b95540343f5bf4363.jpg?wh=696%2A194" /></p>
 <p>对这些汇编代码的解读，以及这些指令的产生和优化过程，我会在下一讲继续给你讲解。</p>
 <h2 id="_4">课程小结</h2>
 <p>今天这讲，我们从总体上考察了V8的编译过程，我希望你记住几个要点：</p>
@@ -6613,7 +6613,7 @@
 <li>最后，我们初步使用了一下V8的<strong>即时编译器TurboFan</strong>。在下一讲中，我们会更细致地探讨TurboFan的特性。</li>
 </ul>
 <p>按照惯例，这一讲的思维导图我也给你整理出来了，供你参考：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/07/ae/07771c2c05ab77f1d01268cee44a36ae.jpg?wh=2284%2A2410" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/07/ae/07771c2c05ab77f1d01268cee44a36ae.jpg?wh=2284%2A2410" /></p>
 <h2 id="_5">一课一思</h2>
 <p>你能否把Ignition的字节码和Java、Python的字节码对比一下。看看它们有哪些共同之处，有哪些不同之处？</p>
 <p>欢迎在留言区分享你的答案，也欢迎你把今天的内容分享给更多的朋友。</p>
@@ -6741,8 +6741,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

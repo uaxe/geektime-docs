@@ -6633,10 +6633,10 @@
 <p>你平时用的电脑，应该都是多核的CPU。多核CPU有很多好处，其中最重要的一个就是，它使得我们在不能提升CPU的主频之后，找到了另一种提升CPU吞吐率的办法。</p>
 <p>不知道上一讲的内容你还记得多少？上一节，我们讲到，多核CPU里的每一个CPU核，都有独立的属于自己的L1 Cache和L2 Cache。多个CPU之间，只是共用L3 Cache和主内存。</p>
 <p>我们说，CPU Cache解决的是内存访问速度和CPU的速度差距太大的问题。而多核CPU提供的是，在主频难以提升的时候，通过增加CPU核心来提升CPU的吞吐率的办法。我们把多核和CPU Cache两者一结合，就给我们带来了一个新的挑战。因为CPU的每个核各有各的缓存，互相之间的操作又是各自独立的，就会带来<a href="https://en.wikipedia.org/wiki/Cache_coherence"><strong>缓存一致性</strong></a>（Cache Coherence）的问题。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/07/41/0723f72f3016fede96b545e2898c0541.jpeg?wh=1546%2A1126" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/07/41/0723f72f3016fede96b545e2898c0541.jpeg?wh=1546%2A1126" /></p>
 <h2 id="_1">缓存一致性问题</h2>
 <p>那什么是缓存一致性呢？我们拿一个有两个核心的CPU，来看一下。你可以看这里这张图，我们结合图来说。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a6/da/a6146ddd5c78f2cbc1af56b0ee3292da.jpeg?wh=2236%2A1066" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a6/da/a6146ddd5c78f2cbc1af56b0ee3292da.jpeg?wh=2236%2A1066" /></p>
 <p>在这两个CPU核心里，1号核心要写一个数据到内存里。这个怎么理解呢？我拿一个例子来给你解释。</p>
 <p>比方说，iPhone降价了，我们要把iPhone最新的价格更新到内存里。为了性能问题，它采用了上一讲我们说的写回策略，先把数据写入到L2 Cache里面，然后把Cache Block标记成脏的。这个时候，数据其实并没有被同步到L3 Cache或者主内存里。1号核心希望在这个Cache Block要被交换出去的时候，数据才写入到主内存里。</p>
 <p>如果我们的CPU只有1号核心这一个CPU核，那这其实是没有问题的。不过，我们旁边还有一个2号核心呢！这个时候，2号核心尝试从内存里面去读取iPhone的价格，结果读到的是一个错误的价格。这是因为，iPhone的价格刚刚被1号核心更新过。但是这个更新的信息，只出现在1号核心的L2 Cache里，而没有出现在2号核心的L2 Cache或者主内存里面。<strong>这个问题，就是所谓的缓存一致性问题，1号核心和2号核心的缓存，在这个时候是不一致的。</strong></p>
@@ -6645,7 +6645,7 @@
 <p>第二点叫<strong>事务的串行化</strong>（Transaction Serialization），事务串行化是说，我们在一个CPU核心里面的读取和写入，在其他的节点看起来，顺序是一样的。</p>
 <p>第一点写传播很容易理解。既然我们数据写完了，自然要同步到其他CPU核的Cache里。但是第二点事务的串行化，可能没那么好理解，我这里仔细解释一下。</p>
 <p>我们还拿刚才修改iPhone的价格来解释。这一次，我们找一个有4个核心的CPU。1号核心呢，先把iPhone的价格改成了5000块。差不多在同一个时间，2号核心把iPhone的价格改成了6000块。这里两个修改，都会传播到3号核心和4号核心。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fe/6c/fe0c449e71800c5ad2e4b84af0d6e46c.jpeg?wh=2236%2A2686" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fe/6c/fe0c449e71800c5ad2e4b84af0d6e46c.jpeg?wh=2236%2A2686" /></p>
 <p>然而这里有个问题，3号核心先收到了2号核心的写传播，再收到1号核心的写传播。所以3号核心看到的iPhone价格是先变成了6000块，再变成了5000块。而4号核心呢，是反过来的，先看到变成了5000块，再变成6000块。虽然写传播是做到了，但是各个Cache里面的数据，是不一致的。</p>
 <p>事实上，我们需要的是，从1号到4号核心，都能看到相同顺序的数据变化。比如说，都是先变成了5000块，再变成了6000块。这样，我们才能称之为实现了事务的串行化。</p>
 <p>事务的串行化，不仅仅是缓存一致性中所必须的。比如，我们平时所用到的系统当中，最需要保障事务串行化的就是数据库。多个不同的连接去访问数据库的时候，我们必须保障事务的串行化，做不到事务的串行化的数据库，根本没法作为可靠的商业数据库来使用。</p>
@@ -6658,7 +6658,7 @@
 <p>MESI协议，是一种叫作<strong>写失效</strong>（Write Invalidate）的协议。在写失效协议里，只有一个CPU核心负责写入数据，其他的核心，只是同步读取到这个写入。在这个CPU核心写入Cache之后，它会去广播一个“失效”请求告诉所有其他的CPU核心。其他的CPU核心，只是去判断自己是否也有一个“失效”版本的Cache Block，然后把这个也标记成失效的就好了。</p>
 <p>相对于写失效协议，还有一种叫作<strong>写广播</strong>（Write Broadcast）的协议。在那个协议里，一个写入请求广播到所有的CPU核心，同时更新各个核心里的Cache。</p>
 <p>写广播在实现上自然很简单，但是写广播需要占用更多的总线带宽。写失效只需要告诉其他的CPU核心，哪一个内存地址的缓存失效了，但是写广播还需要把对应的数据传输给其他CPU核心。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4e/59/4ed6d05049cbbc8603346f617206cd59.jpeg?wh=1762%2A3526" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4e/59/4ed6d05049cbbc8603346f617206cd59.jpeg?wh=1762%2A3526" /></p>
 <p>MESI协议的由来呢，来自于我们对Cache Line的四个不同的标记，分别是：</p>
 <ul>
 <li>M：代表已修改（Modified）</li>
@@ -6673,7 +6673,7 @@
 <p>而在共享状态下，因为同样的数据在多个CPU核心的Cache里都有。所以，当我们想要更新Cache里面的数据的时候，不能直接修改，而是要先向所有的其他CPU核心广播一个请求，要求先把其他CPU核心里面的Cache，都变成无效的状态，然后再更新当前Cache里面的数据。这个广播操作，一般叫作RFO（Request For Ownership），也就是获取当前对应Cache Block数据的所有权。</p>
 <p>有没有觉得这个操作有点儿像我们在多线程里面用到的读写锁。在共享状态下，大家都可以并行去读对应的数据。但是如果要写，我们就需要通过一个锁，获取当前写入位置的所有权。</p>
 <p>整个MESI的状态，可以用一个有限状态机来表示它的状态流转。需要注意的是，对于不同状态触发的事件操作，可能来自于当前CPU核心，也可能来自总线里其他CPU核心广播出来的信号。我把对应的状态机流转图放在了下面，你可以对照着<a href="https://zh.wikipedia.org/wiki/MESI%E5%8D%8F%E8%AE%AE">Wikipedia里面MESI的内容</a>，仔细研读一下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fa/d1/fa98835c78c879ab69fd1f29193e54d1.jpeg?wh=2296%2A2068" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fa/d1/fa98835c78c879ab69fd1f29193e54d1.jpeg?wh=2296%2A2068" /></p>
 <p><a href="https://commons.wikimedia.org/wiki/File:Diagrama_MESI.GIF">图片来源</a></p>
 <h2 id="_2">总结延伸</h2>
 <p>好了，关于CPU Cache的内容，我们介绍到这里就结束了。我们来总结一下。这一节，我们其实就讲了两块儿内容，一个是缓存一致性，另一个是MESI协议。</p>
@@ -6842,8 +6842,6 @@ RFO 的目的是要先获得要修改的 cache block 的所有权，那就要先
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

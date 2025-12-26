@@ -6291,60 +6291,60 @@
 </ul>
 <p>接着我们执行场景，希望结果能好。</p>
 <p>可是，在我查看了TPS和RT曲线后，很遗憾地发现，结果并没有改善。TPS依然很低并且动荡非常大：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/db/b3/dba0181c5de1efcec5108e01cd87bbb3.png?wh=1826%2A530" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/db/b3/dba0181c5de1efcec5108e01cd87bbb3.png?wh=1826%2A530" /></p>
 <p>看来我们的努力并没有什么效果，悲剧！就这样，命运让我们不得不来到第四个阶段。</p>
 <h3 id="tps">第四阶段：硬件资源耗尽，但TPS仍然很低</h3>
 <p>这个阶段我们查什么呢？仍然是全局监控的数据。我们来看一下所有主机的Overview资源：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/20/c9/206a269a9c10f063f8443f1c01cbb1c9.png?wh=1886%2A480" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/20/c9/206a269a9c10f063f8443f1c01cbb1c9.png?wh=1886%2A480" /></p>
 <p>从上图中可以看到，虚拟机k8s-worker-8的CPU使用率已经很高了，达到了95.95%。那我们就登录到这台虚拟机上，看看更详细的全局监控数据：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/83/6b/832e0138e97ba668d8d0b45bcde9ac6b.png?wh=1612%2A596" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/83/6b/832e0138e97ba668d8d0b45bcde9ac6b.png?wh=1612%2A596" /></p>
 <p>因为CPU不超分了，所以我们可以很明显地看到，k8s-worker-8中的CPU被耗尽。从进程上来看，CPU是被我们当前正在测试的接口服务消耗的。并且在这台虚拟机上，不止有Portal这一个进程，还有很多其他的服务。</p>
 <p>那我们就把Portal服务调度到一个不忙的worker上去，比如移到worker-3（6C16G）上:</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a5/62/a5143ba93ce9c3408e55d895ebd66e62.png?wh=1601%2A58" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a5/62/a5143ba93ce9c3408e55d895ebd66e62.png?wh=1601%2A58" /></p>
 <p>得到如下结果：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ca/38/ca170482d341132a44ebce12byy99238.png?wh=1826%2A538" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ca/38/ca170482d341132a44ebce12byy99238.png?wh=1826%2A538" /></p>
 <p>我们看到，TPS已经有所上升了，达到了近300，性能确实变好了一些。但是，这个数据还不如我们一开始不优化的结果，毕竟一开始还能达到300TPS呢。那我们就接着分析当前的瓶颈在哪里。</p>
 <p>我们先来看一下主机的性能数据：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3d/01/3d41ef530a6a40c23a35ab1819ca6701.png?wh=1873%2A421" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3d/01/3d41ef530a6a40c23a35ab1819ca6701.png?wh=1873%2A421" /></p>
 <p>其中，worker-8的CPU使用率达到了90.12%。为什么这个CPU还是如此之高呢？我们继续来top一下，看看worker-8的性能数据：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/34/d8/34156e85f0724e47b23fcb9a1fcf93d8.png?wh=1566%2A445" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/34/d8/34156e85f0724e47b23fcb9a1fcf93d8.png?wh=1566%2A445" /></p>
 <p>你看，在process table中，排在最上面的是Gateway服务，说明是Gateway进程消耗的CPU最多。既然如此，我们自然要看看这个进程中的线程是不是都在干活。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/93/17/932490a19dda4bc2f562030e3f393417.png?wh=1655%2A343" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/93/17/932490a19dda4bc2f562030e3f393417.png?wh=1655%2A343" /></p>
 <p>我们看到上图中全是绿色的，也就是说Gateway中的线程一直处于Runnable状态，看来工作线程确实挺忙的了。而在前面的worker-8性能数据中，si cpu已经达到了16%左右。所以结合这一点，我们来看一下实时的软中断数据：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ab/30/abd026dd456e01d21a81b520f99ae430.png?wh=818%2A324" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ab/30/abd026dd456e01d21a81b520f99ae430.png?wh=818%2A324" /></p>
 <p>可以看到网络软中断一直在往上跳，这说明确实是网络软中断导致si cpu变高的。网络软中断的变化是我们根据证据链找下来的。证据链如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c3/03/c37f2f51cfe057f3f071be1d14079703.jpg?wh=2000%2A724" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c3/03/c37f2f51cfe057f3f071be1d14079703.jpg?wh=2000%2A724" /></p>
 <p>我们再看一下网络带宽有多大：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/eb/0f/eb6d22ae621874c387130a3d8144550f.png?wh=1904%2A909" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/eb/0f/eb6d22ae621874c387130a3d8144550f.png?wh=1904%2A909" /></p>
 <p>可以看到，网络带宽倒是不大。</p>
 <p>从上述Gateway的工作线程、软中断数据和网络带宽情况来看，Gateway只负责转发，并没有什么业务逻辑，也没有什么限制。所以，针对TPS上不去的原因，似乎除了网络转发能力比较差之外，我们再找不到其他解释了。</p>
 <p>这个思路其实是需要一些背景知识的，因为我们通常用网络带宽来判断网络是不是够用，但是这是不够的。你要知道，在网络中当小包过多的时候，网络带宽是难以达到线性流量的。所以，我们这里的网络带宽即便不会很高，也会导致网络软中断的增加和队列的出现。</p>
 <p>既然如此，那我们就把这个Gateway也从worker-8移到worker-2（6C16G）上去，做这一步是为了减少网络软中断的争用。我们再看一下集群的整体性能：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0f/f2/0f62326941b30e6d88f89f00f4da1ff2.png?wh=1879%2A404" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0f/f2/0f62326941b30e6d88f89f00f4da1ff2.png?wh=1879%2A404" /></p>
 <p>看起来不错哦，worker-8 的 CPU 使用率降到了 56.65%，同时worker-3 的 CPU 使用率升到了 70.78%。不过网络带宽有几个地方变红了，这个我们后面再分析。至少我们从这里看到，压力是起来了。</p>
 <p>我们回来看一下压力的情况：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/98/82/98d7f4b019633ce9593e5bce84f1d182.png?wh=1826%2A527" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/98/82/98d7f4b019633ce9593e5bce84f1d182.png?wh=1826%2A527" /></p>
 <p>TPS已经达到1000左右了！棒棒的，有没有！我们画一个TPS对比图庆祝一下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fa/20/fae84b95ea49bbc4f43a2af83bb05f20.jpg?wh=2000%2A942" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fa/20/fae84b95ea49bbc4f43a2af83bb05f20.jpg?wh=2000%2A942" /></p>
 <p>其实到这里，打开首页这个接口的基准场景就可以结束了，因为我们已经优化到了比需求还要高的程度。只是从技术角度来说，一个系统优化到最后是会有上限的，所以，我们仍然需要知道这个上限在哪里。</p>
 <h3 id="_1">第五阶段：硬件资源还是要用完</h3>
 <p>现在压力把worker-3的CPU资源用得最高，用到了70.78%。那么，下面我们就要把这个机器的硬件资源给用完，因为只有将资源都用尽，我们才能判断系统容量的最上限。这也就是我一直强调的，要将<strong>性能优化分为两个阶段：一是把资源用起来；二是把容量调上去。</strong>就算不是CPU资源，把其他的资源用完也可以。</p>
 <p>既然这时候压力已经把worker-3的CPU资源用到了70.78%，那我们就到这个应用中看一下线程把CPU用得怎么样。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e1/a5/e1343ee1e86979dd7008cfbaf9db1da5.png?wh=1637%2A840" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e1/a5/e1343ee1e86979dd7008cfbaf9db1da5.png?wh=1637%2A840" /></p>
 <p>你看，这里面的线程确实都忙起来了。</p>
 <p>既然如此，那我们把Tomcat和JDBC连接的最大值都改到80，再来看一下TPS的表现（请你注意，这里只是一个尝试，所以改大即可，并没有什么道理。在后续的测试过程中，我们还要根据实际情况来做调整，就是不能让线程太大，也不能不够用）。</p>
 <p>为了让压力能直接压到一个节点上，我们跳过Ingress，用分段的测法直接把压力发到服务上。然后，我们去Pod里设置一个node port把服务代理出来，再修改一下压力脚本。得到结果如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/74/cd/74ac70cc7f3ab33ec90c63fd860d27cd.png?wh=1811%2A523" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/74/cd/74ac70cc7f3ab33ec90c63fd860d27cd.png?wh=1811%2A523" /></p>
 <p>TPS还是抖动大。那我们接着看全局监控：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/69/41/6978eefe6bd9acd46c836c46c54f3141.png?wh=1886%2A404" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/69/41/6978eefe6bd9acd46c836c46c54f3141.png?wh=1886%2A404" /></p>
 <p>看上图就可以知道，有几个主机的带宽都飘红了，而其他的资源使用率并没有特别高。前面我们有说过，分析网络问题，不应该只看网络带宽，还要分析其他的内容，下面我们就得分析一下网络带宽。</p>
 <p>我们到监控工具中看一下网络的流量，你可以看到确实有一些非被测应用在占用带宽，并且占得还不小：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b0/f6/b04997c487a298bc5eb54a3cc8c7ebf6.png?wh=1753%2A723" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b0/f6/b04997c487a298bc5eb54a3cc8c7ebf6.png?wh=1753%2A723" /></p>
 <p>我们再看总体带宽，发现已经用了4G多：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5f/e3/5f21e2761a71550b572145b785e79ee3.png?wh=666%2A280" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5f/e3/5f21e2761a71550b572145b785e79ee3.png?wh=666%2A280" /></p>
 <p>为了弄清楚那些与被测系统无关的应用，会对带宽消耗产生影响进而影响TPS，我们现在先把影响带宽的应用都删除了，比如Weave Scope、Monitoring的监控工具等，从列表中来看这些应用占了不小的带宽。</p>
 <p>然后我们再次测试，发现TPS有所上升，关键是稳定了很多：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e5/1f/e55f8dcf308c762226d68a450789a51f.png?wh=1823%2A537" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e5/1f/e55f8dcf308c762226d68a450789a51f.png?wh=1823%2A537" /></p>
 <p>我们可以看到，TPS已经上升到了1200左右，可见带宽对TPS还是造成了不小的影响。</p>
 <p>接着，我们查一下网络的队列，发现应用所在的服务器上面已经出现了不小的 Recv_Q。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name     Timer
@@ -6366,7 +6366,7 @@
 <p>从这里来看，网络已经成为了下一个瓶颈（关于这一点，我们在后续的课程里会讲）。</p>
 <p>如果你想接着调优，还可以从应用代码下手，让应用处理得更快。不过，对于基准测试来说，一个没有走任何缓存的接口，在一个6C16G的单节点虚拟机上能达到这么高的TPS，我觉得差不多了。</p>
 <p>接下来，我们还要去折腾其他的接口，所以，我们对这个接口的优化到这里就结束了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/29/34/29beca35bbf7d689bebf27fcf8397634.jpg?wh=2000%2A942" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/29/34/29beca35bbf7d689bebf27fcf8397634.jpg?wh=2000%2A942" /></p>
 <h2 id="_2">总结</h2>
 <p>在打开首页这个接口的基准场景中，涉及到了很多方面的内容。从一开始的信息整理，比如访问路径、查看代码逻辑、场景试运行等，都是在为后面的分析做准备。</p>
 <p>而当我们看到响应时间高，然后做拆分时间这一步，就是我一直在RESAR性能工程中强调的“<strong>分析的起点</strong>”。因为在此之前，我们用的都是压力工具上的数据，只是把它们罗列出来就好了，没有任何分析的部分。</p>
@@ -6529,8 +6529,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

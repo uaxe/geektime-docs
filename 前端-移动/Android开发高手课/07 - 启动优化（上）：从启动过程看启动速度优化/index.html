@@ -6391,7 +6391,7 @@
 <h2 id="_1">启动分析</h2>
 <p>在真正动手开始优化之前，我们应该先搞清楚从用户点击图标开始，整个启动过程经过哪几个关键阶段，又会给用户带来哪些体验问题。</p>
 <p><strong>1. 启动过程分析</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0d/43/0da2051f1f8d182a531063eb202abf43.png?wh=1368%2A560" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0d/43/0da2051f1f8d182a531063eb202abf43.png?wh=1368%2A560" /></p>
 <p>我以微信为例，用户从桌面点击图标开始，会经过4个关键阶段。</p>
 <ul>
 <li><strong>T1预览窗口显示</strong>。系统在拉起微信进程之前，会先根据微信的Theme属性创建预览窗口。当然如果我们禁用预览窗口或者将预览窗口指定为透明，用户在这段时间依然看到的是桌面。</li>
@@ -6476,9 +6476,9 @@
 <a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>被动上下文切换次数，线程被系统强制调度导致上下文切换，例如大量线程在抢占CPU。
 </code></pre></div>
 <p>另一方面是检查线程间的锁。为了提高启动过程任务执行的速度，有一次我们把主线程内的一个耗时任务放到线程中并发执行，但是发现这样做根本没起作用。仔细检查后发现线程内部会持有一个锁，主线程很快就有其他任务因为这个锁而等待。通过systrace可以看到锁等待的事件，我们需要排查这些等待是否可以优化，特别是防止主线程出现长时间的空转。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/36/b2/36316813548502f6cf241189e2a73cb2.png?wh=1272%2A688" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/36/b2/36316813548502f6cf241189e2a73cb2.png?wh=1272%2A688" /></p>
 <p>特别是现在有很多启动框架，会使用Pipeline机制，根据业务优先级规定业务初始化时机。比如微信内部使用的<a href="http://mp.weixin.qq.com/s/6Q818XA5FaHd7jJMFBG60w">mmkernel</a>、阿里最近开源的<a href="http://github.com/alibaba/alpha">Alpha</a>启动框架，它们为各个任务建立依赖关系，最终构成一个有向无环图。对于可以并发的任务，会通过线程池最大程度提升启动速度。如果任务的依赖关系没有配置好，很容易出现下图这种情况，即主线程会一直等待taskC结束，空转2950毫秒。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/86/db/868a5f4c47224be920e97b82d03905db.png?wh=908%2A376" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/86/db/868a5f4c47224be920e97b82d03905db.png?wh=908%2A376" /></p>
 <ul>
 <li>GC优化</li>
 </ul>
@@ -6486,7 +6486,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>python systrace.py dalvik -b 90960 -a com.sample.gc
 </code></pre></div>
 <p>对于GC各个事件的具体含义，你可以参考<a href="http://developer.android.com/studio/profile/investigate-ram?hl=zh-cn">《调查RAM使用情况》</a>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d9/93/d9b93eb8de70426f9a487b006d335093.png?wh=1920%2A446" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d9/93/d9b93eb8de70426f9a487b006d335093.png?wh=1920%2A446" /></p>
 <p>不知道你是否还记得我在“内存优化”中提到Debug.startAllocCounting，我们也可以使用它来监控启动过程总GC的耗时情况，特别是阻塞式同步GC的总次数和耗时。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>// GC使用的总耗时，单位是毫秒
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>Debug.getRuntimeStat(&quot;art.gc.gc-time&quot;);
@@ -6510,7 +6510,7 @@
 <h2 id="_4">课后练习</h2>
 <p>“工欲善其事必先利其器”，我多次提到“systrace + 函数插桩”是一个非常不错的卡顿排查工具，那么通过今天的<a href="http://github.com/AndroidAdvanceWithGeektime/Chapter07">Sample</a>，我们一起来看一下它是如何实现的。需要注意的是Sample选择了ASM插桩的方式，感兴趣的同学可以课后学习一下它的使用方法，在后续我们也会有关于插桩的专门课程。</p>
 <p>我们可以将Sample运用到自己的应用中，虽然它过滤了大部分的函数，但是我们还是需要注意白名单的配置。例如log、加解密等在底层非常频繁调用的函数，都要在白名单中配置过滤掉，不然可能会出现类似下面这样大量的毛刺。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6e/92/6e217938a569f32adffa84ff4eedc492.png?wh=1440%2A190" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6e/92/6e217938a569f32adffa84ff4eedc492.png?wh=1440%2A190" /></p>
 <p>欢迎你点击“请朋友读”，把今天的内容分享给好友，邀请他一起学习。最后别忘了在评论区提交今天的作业，我也为认真完成作业的同学准备了丰厚的“学习加油礼包”，期待与你一起切磋进步哦。</p>
 <div><strong>精选留言（15）</strong></div>
 <ul>
@@ -6632,8 +6632,6 @@ python $ANDROID_HOME&#47;platform-tools&#47;systrace&#47;systrace.py gfx view wm
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

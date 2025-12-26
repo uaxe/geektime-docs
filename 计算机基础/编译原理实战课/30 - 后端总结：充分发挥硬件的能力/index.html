@@ -6469,12 +6469,12 @@
 <p>回顾一下，我们主要是在<a href="https://time.geekbang.org/column/article/258162">Graal</a>和<a href="https://time.geekbang.org/column/article/266379">Go语言</a>的编译器中，分析了与指令选择有关的算法。它们都采用了一种模式匹配的DSL，只要找到了符合模式的指令组合，编译器就生成一条低端的、对应于机器码的指令。</p>
 <p><strong>那为什么这种算法是有效的呢？这种算法的原理是什么呢？都有哪些不同的算法实现？</strong>接下来，我就给你揭晓一下答案。</p>
 <p>我先给你举个例子。针对表达式“a[i]=b”，它是对数组a的第i个元素赋值。假设a是一个整数数组，那么地址的偏移量就是<code>a+4*i</code>，所以，这个赋值表达式用C语言可以写成“<code>*(a+4*i)=b</code>”，把它表达成AST的话，就是下图所示的样子。其中，赋值表达式的左子树的计算结果，是一个内存地址。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a2/d3/a234b0a6b2bb153f2857989e16106bd3.jpg?wh=1842%2A668" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a2/d3/a234b0a6b2bb153f2857989e16106bd3.jpg?wh=1842%2A668" /></p>
 <p>图1：a[i]=b的AST</p>
 <p>那么，我们要如何给这个表达式生成指令呢？</p>
 <p>如果你熟悉x86汇编，你就会知道，上述语句可以非常简单地表达出来，因为x86的指令对数组寻址做了优化（参见第8讲的内容）。</p>
 <p>不过，这里为了让你更容易理解算法的原理，我设计了一个新的指令集。这个指令集中的每条指令，都对应了一棵AST的子树，我们把它叫做<strong>模式树（Pattern Tree）</strong>。在有的算法里，它们也被叫做<strong>瓦片（Tiling）</strong>。对一个AST生成指令，就是用这样的模式树或瓦片来覆盖整个AST的过程。所以，这样的算法也叫做<strong>基于模式匹配的指令生成算法</strong>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4b/e9/4ba05f685d18635767a7f8f3924b90e9.jpg?wh=3029%2A2250" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4b/e9/4ba05f685d18635767a7f8f3924b90e9.jpg?wh=3029%2A2250" /></p>
 <p>图2：指令集中的指令和对应的模式树</p>
 <p>你可以看到，在图2中，对于每棵模式树，它的根节点是这个指令产生的结果的存放位置。比如，Load_Const指令执行完毕以后，常数会被保存到一个寄存器里。这个寄存器，又可以作为上一级AST节点的操作数来使用。</p>
 <p>图2中的指令包含：把常数和内存中的值加载到寄存器、加法运算、乘法运算等。其中有两个指令是特殊设计的，目的就是为了让你更容易理解接下来要探究的各种算法。</p>
@@ -6491,7 +6491,7 @@
 <li>第6步，采用模式#2，把内存中b的值加载到寄存器。</li>
 <li>第7步，采用模式#3，把寄存器中b的值写入a[i]的地址。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8a/5e/8afb39c83db4de7c6758f486ca27395e.jpg?wh=1939%2A873" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8a/5e/8afb39c83db4de7c6758f486ca27395e.jpg?wh=1939%2A873" /></p>
 <p>图3：用比较幼稚的算法做模式匹配</p>
 <p>最后形成的汇编代码是这样的：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Load_Mem a, R1
@@ -6516,7 +6516,7 @@
 <li>第4步，处理常量4。因为上级节点在这里需要一个寄存器作为操作数，所以我们采用了模式#1，把常量加载到寄存器。</li>
 <li>第5步，处理变量b。这里也要把它加载到寄存器，因此采用了模式#2。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a4/1b/a4aac19471190a449bab1b947ae5711b.jpg?wh=1996%2A863" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a4/1b/a4aac19471190a449bab1b947ae5711b.jpg?wh=1996%2A863" /></p>
 <p>图4：Maximal Munch算法的匹配结果</p>
 <p>到此为止，我们用了5条指令就做完了所有的运算，生成的汇编代码是：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Load_Mem a, R1
@@ -6528,7 +6528,7 @@
 <p>这5条指令总的Cost是18（3+1+6+3+5）。</p>
 <p>上述算法的特点，是在每一步都采用了<strong>贪婪策略</strong>，这种算法策略有时候也叫做“Maximal Munch”，意思就是每一步都去咬最大的一口。</p>
 <p>贪婪策略会生成比幼稚的算法更优化的代码，但它不一定是最优的。你看下图中的匹配策略，它也是用了5条指令。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/69/3b/69ffa14568a9f85654a92074458bb43b.jpg?wh=2066%2A877" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/69/3b/69ffa14568a9f85654a92074458bb43b.jpg?wh=2066%2A877" /></p>
 <p>图5：最优的匹配策略</p>
 <p>生成的汇编代码如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Lead_Mem a, R1
@@ -6561,7 +6561,7 @@
 <p>所以你能看出，通过动态规划方法，也能像凑纸币一样，求出树覆盖的最优解。</p>
 <p>BURS算法在具体执行的时候，需要进行三遍的扫描。</p>
 <p><strong>第一遍扫描</strong>是自底向上做遍历，也就是后序遍历，识别出每个节点可以进行的转换。我在图6中给你标了出来。以a节点为例，我们可以对它做两个操作，第一个操作是保持一个mem节点不动，第二个操作是按照模式#1把它转换成一个reg节点。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/dd/2d/dddd87f278c8111d4787756380e08b2d.jpg?wh=2088%2A925" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dd/2d/dddd87f278c8111d4787756380e08b2d.jpg?wh=2088%2A925" /></p>
 <p>图6：识别AST的每个节点可以进行的转换</p>
 <p><strong>第二遍扫描</strong>是自顶向下的，运用动态规划的方法找出最优解。</p>
 <p><strong>第三遍扫描</strong>又是自底向上的，用于生成指令。</p>
@@ -6577,26 +6577,26 @@
 <p><strong>那么，线性扫描算法的原理是什么呢？</strong>总的来说，线性扫描算法理解起来其实相当简单。我用一个例子来带你了解下。</p>
 <p>假设我们的程序里有从a到g共7个变量。通过数据流分析中的变量活跃性分析，你其实可以知道每个变量的生存期。现在，我们已知有4个物理寄存器可用，那么我们来看一下要怎么分配这几个物理寄存器。</p>
 <p><strong>在第1个时间段</strong>，a、b、c和d是活跃的，那我们刚好把4个物理寄存器分配给这四个变量就行了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/39/75/39dc35a5b607cd3066017c08d0191975.jpg?wh=994%2A576" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/39/75/39dc35a5b607cd3066017c08d0191975.jpg?wh=994%2A576" /></p>
 <p><strong>在第2个时间段</strong>，a的生存期结束，而一个新的变量e变得活跃，那么我们就把a原来占用的寄存器刚好给到e就可以了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b6/4a/b64ae2b4cfd318f9eeeeaa54ab83984a.jpg?wh=994%2A576" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b6/4a/b64ae2b4cfd318f9eeeeaa54ab83984a.jpg?wh=994%2A576" /></p>
 <p><strong>在第3个时间段</strong>，我们把c占用的寄存器给到f，目前仍然是使用4个寄存器。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/48/63/48fb912ba5c59f8c04373a91510b5563.jpg?wh=994%2A576" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/48/63/48fb912ba5c59f8c04373a91510b5563.jpg?wh=994%2A576" /></p>
 <p><strong>在第4个时间段</strong>，b的生存期结束。这时候只需要用到3个寄存器。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ca/04/ca60eb79fedac105f3cbfd6f8c509404.jpg?wh=994%2A576" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ca/04/ca60eb79fedac105f3cbfd6f8c509404.jpg?wh=994%2A576" /></p>
 <p><strong>在最后一个时间段</strong>，只有变量d和g是活跃的，占用两个寄存器。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/04/0a/04b2d9a8cyy51a6916cc286b29ea9a0a.jpg?wh=994%2A576" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/04/0a/04b2d9a8cyy51a6916cc286b29ea9a0a.jpg?wh=994%2A576" /></p>
 <p>可以看到，在上面这个例子中，所有的变量都可以分配到物理寄存器。而且你也会发现，这个例子中存在多个变量因为生存期是错开的，因此也可以共享同一个寄存器。</p>
 <p>但是，如果没有足够的物理寄存器的话，我们要怎么办呢？那就需要把某个变量溢出到内存里了。也就是说，当用到这个变量的时候，才把这个变量加载到寄存器，或者有一些指令可以直接用内存地址作为操作数。</p>
 <p>给你举另一个例子，我们来看看物理寄存器不足的情况会是什么样子。在这个例子中，我们有三个物理寄存器。</p>
 <p><strong>在第1个时间段</strong>，物理寄存器是够用的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0b/d1/0b511374c86b9a14c1bec1d52c718cd1.jpg?wh=938%2A638" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0b/d1/0b511374c86b9a14c1bec1d52c718cd1.jpg?wh=938%2A638" /></p>
 <p><strong>在第2个时间段</strong>，变量d变得活跃，现在有4个活跃变量，所以必须选择一个溢出到内存。我们选择了a。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b8/cf/b81c0a71067d26f68f6902e26f1040cf.jpg?wh=938%2A638" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b8/cf/b81c0a71067d26f68f6902e26f1040cf.jpg?wh=938%2A638" /></p>
 <p><strong>在第3个时间段</strong>，e和f变得活跃，现在又需要溢出一个变量才可以。这次选择了c。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3c/88/3c6f242389253e6f5e9dc43f62a4fa88.jpg?wh=938%2A638" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3c/88/3c6f242389253e6f5e9dc43f62a4fa88.jpg?wh=938%2A638" /></p>
 <p><strong>在第4个时间段</strong>，g也变得活跃，这次把d溢出了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c6/64/c6a906528d9d8331bb7de9b87163cc64.jpg?wh=938%2A638" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c6/64/c6a906528d9d8331bb7de9b87163cc64.jpg?wh=938%2A638" /></p>
 <p>以上就是<strong>线性扫描算法的思路：线性扫描整个代码，并给活跃变量分配寄存器。如果物理寄存器不足，那么就选择一个变量，溢出到内存中。</strong>你看，是不是很简单？</p>
 <p>在掌握了线性扫描算法的思路以后，我再给你补充一点信息：</p>
 <ul>
@@ -6632,7 +6632,7 @@
 <li><strong>关于编译器后端的设计</strong>：我们要考虑编译速度和优化程度的平衡，要考虑都能支持哪些硬件。因为要支持多种硬件，通常要涉及后端的DSL，以便让算法尽量中立于具体的硬件架构。</li>
 </ul>
 <p>我把本讲的知识点也整理成了思维导图，供你复习和参考：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/82/93/82c8e25b80368f16cfb2173b4f00a193.jpg?wh=2284%2A1502" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/82/93/82c8e25b80368f16cfb2173b4f00a193.jpg?wh=2284%2A1502" /></p>
 <h2 id="_5">一课一思</h2>
 <p>动态规划算法是这节课的一个重要知识点。在学过了这个知识点以后，你能否发现它还可以被用于解决哪些问题？欢迎分享你的经验和看法。</p>
 <h2 id="_6">参考资料</h2>
@@ -6757,8 +6757,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

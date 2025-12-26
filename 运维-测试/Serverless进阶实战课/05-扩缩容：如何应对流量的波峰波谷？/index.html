@@ -5988,7 +5988,7 @@
 <p>由于云厂商的函数计算通常是基于容器服务的底座来进行的，接下来，我就从Node和Pod两个形态，分别来跟你讲一讲它们的调度方式。</p>
 <h2 id="node">Node维度</h2>
 <p>首先，我们来看Node调度形态下，函数计算框架是如何进行动态扩缩容的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e5/cc/e5e522a27a3ca1a2135f922c142996cc.jpeg?wh=1292x984" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e5/cc/e5e522a27a3ca1a2135f922c142996cc.jpeg?wh=1292x984" /></p>
 <p>如上图所示，这是一张基于容器PaaS服务和云服务Node的扩缩容调度示意图，我来解释一下它的各个部分都有着什么样的作用。</p>
 <ul>
 <li><strong>Scheduler</strong>：调度模块负责将请求打到指定的函数实例上（Pod），同时负责为集群中的Node标记状态，记录在etcd中；</li>
@@ -6012,9 +6012,9 @@
 <p>不用非要看懂，这里说的，大体可以理解为这个扩缩容控制器做了两件事：</p>
 <p>第一件事，定期从k8s控制面获取资源的各项指标数据（CPU利用率、内存使用率等）；</p>
 <p>第二件事，根据这些指标数据将资源数量控制在一个目标范围内。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d9/ed/d90346cb4d6c8b0e14fbe71c139882ed.jpeg?wh=1252x998" title="HPA架构图（官方）" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d9/ed/d90346cb4d6c8b0e14fbe71c139882ed.jpeg?wh=1252x998" title="HPA架构图（官方）" /></p>
 <p>从K8s的官方文档中，你基本可以看到HPA的雏形：HPA通过控制Deployment或者RC来实现对Pod实际数量的控制。官方给出的HPA架构图可能还不太好理解，我们把指标（metric）数据的收集过程加上再看看：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/98/b4/98df9603d6e8e925c1e04548335d10b4.jpeg?wh=1469x978" title="HPA的工作流程" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/98/b4/98df9603d6e8e925c1e04548335d10b4.jpeg?wh=1469x978" title="HPA的工作流程" /></p>
 <p>具体的工作流程是什么样呢？你可以对照着示意图来理解我下面说的流程。</p>
 <p>在K8s中，不同的Metric会由对应的Metrics Server持续采集（Heapster 或自定义 Metrics Server），HPA会定期通过Metrics Server的API或者聚合的API Server 获取到这些Metric指标数据（CPU 和 内存使用情况），从而<strong>根据你自己定义的扩缩容规则计算出Pod的期望个数</strong>，最后，根据Pod当前的实际数量对RC/Deployment做出调整，使Pod达到期望的数量。</p>
 <p>讲到这里，你应该能很快地回答出来，HPA形态的扩缩容还不能直接用于Serverless。</p>
@@ -6022,7 +6022,7 @@
 <h3 id="_3">极致扩缩容</h3>
 <p>正因为如此，从0到1的扩缩容过程，是需要额外的机制来加持的。由于目前社区和各大云厂商都非常重视Knative，部分的传统企业在转型过程中也选择Knative作为私有化部署方案的底座首选。所以，我这里同样选择以Knative的KPA来做说明。</p>
 <p>Knative的扩缩容主要包括三个方面：流量指标的收集、实例数量的调整、从0到1的过程。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/cc/35/cc24df8f8965ccd481a6a27cb90bf435.png?wh=882x617" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cc/35/cc24df8f8965ccd481a6a27cb90bf435.png?wh=882x617" /></p>
 <ul>
 <li><strong>流量指标的收集</strong></li>
 </ul>
@@ -6042,13 +6042,13 @@
 </ul>
 <p>看到这，可能你会有个疑问：我们能够确定的，是当Revision存在实例时流量接收的情况，那么如果Revision实例缩容到了0，流量又是怎么被接收的呢？是直接丢弃，还是暂存在某个地方呢？</p>
 <p>为了解决这一问题，Knative专门引入了一个叫做Activator的组件来做流量暂存和代理负载。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3c/da/3c86f4fef4ea7fe85df86dfbd048d0da.jpeg?wh=1561x1063" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3c/da/3c86f4fef4ea7fe85df86dfbd048d0da.jpeg?wh=1561x1063" /></p>
 <p>我们还是来看这张图。事实上，当AutoScaler将函数实例缩容为0时，会控制Activator作为实例为0时的流量接收入口，也就是图中红线的部分。Activator在收到流量后，会将请求和信息暂时缓存，并主动告知AutoScaler进行扩容，直至成功扩容出函数实例，Activator才会将暂存的流量转发到新生成的函数实例上。</p>
 <p>这里带来一个问题：流量什么时候会切换到Activator或者Knative的Pod上呢？我们会在流量转发一节中仔细讲此类问题。当然，你也可以提前关注<a href="https://github.com/knative/serving/blob/main/docs/scaling/SYSTEM.md">ServerlessServices（SKS）</a>和 <a href="https://knative.dev/docs/serving/load-balancing/target-burst-capacity/#setting-the-target-burst-capacity">TBC (target-burst-capacity)</a>等关键组件和参数的相关设置。</p>
 <h1 id="_4">扩缩容模型设计思路</h1>
 <p>到这里，我们已经从Node和Pod 两个不同的维度学习了Serverless比较典型的扩缩容机制方案了。那么，思考一下，如果让你来设计一个扩缩容系统，该怎么去实现呢？</p>
 <p>Node和Pod的方案一定给了你不小的启发。下面，我将从指标、决策、数量三个核心点，来给你讲一总体的设计思路。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/20/fc/20ca367c90faa6a790c3cfda9ccc82fc.jpeg?wh=1378x455" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/20/fc/20ca367c90faa6a790c3cfda9ccc82fc.jpeg?wh=1378x455" /></p>
 <ul>
 <li><strong>指标</strong></li>
 </ul>
@@ -6067,7 +6067,7 @@
 <p>决策结果出来之后就简单了。你可以根据结果来让资源数量处于一个预期值，这一步完全不需要你操心，不论是Node或者Pod维度，K8s的HPA都会来做好。</p>
 <h1 id="_5">为服务引入预测能力</h1>
 <p>最后，还记得我们最开始说的场景1的日志处理情况吗？日志的流量出现了明显的波浪式浮动，比如晚上23点之后流量减少，上午6点之后流量增加。那么，为了应对流量的波峰到来比较迅猛的情况，我们还可以提前预测预扩，让系统的扩容更平滑。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/bb/4a/bbe3c7ce79b0d80ffa0c31c880609a4a.jpeg?wh=1671x1004" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bb/4a/bbe3c7ce79b0d80ffa0c31c880609a4a.jpeg?wh=1671x1004" /></p>
 <p>这里还是以Node级别的扩缩容为例。我们可以在扩缩容模块的基础上，以旁路的方式额外增加一个预测模块。定期统计Node状态和数量的信息，同时根据历史信息对外进行周期预测。当然，历史的信息时间窗口和预测周期都需要经过大量的数据训练以及人工干预因子，才可以在生产环境用得比较顺手。</p>
 <p>但我们也要知道，它不是“万金油”，并不是什么情况都能预测准确，只能说在一定阈值范围内起到一定的辅助作用。</p>
 <p>同时，这是一个性能和成本博弈的过程，尤其对于云厂商来说，极致的优化成本是我们每个研发人员追求的目标。</p>
@@ -6197,8 +6197,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

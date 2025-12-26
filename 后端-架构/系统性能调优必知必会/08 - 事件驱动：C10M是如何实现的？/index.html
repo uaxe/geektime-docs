@@ -14498,12 +14498,12 @@
 <p>事件并没有你想象中那么复杂，它只有两种类型：读事件与写事件，其中，读事件表示有到达的消息需要处理，而写事件表示可以发送消息（TCP连接的写缓冲区中有可用空间）。我们先从三次握手建立连接说起，这一过程会产生一读、一写两个事件。</p>
 <p>由于TCP允许双向传输，所以<strong>建立连接时，会依次在连接的两个方向上建立通道。</strong>主动发起连接的一方叫做客户端，被动监听端口等待连接的一方叫做服务器。</p>
 <p>客户端首先发送SYN报文给服务器，而服务器收到后回复ACK和SYN（这里我们只需要知道产生事件的过程即可，下一讲会详细介绍这两个报文的含义），<strong>当它们到达客户端时，双向连接中由客户端到服务器的通道就建立好了，此时客户端就已经可以发送请求了，因此客户端会产生写事件。</strong>接着，<strong>客户端发送ACK报文，到达服务器后，服务器上会产生读事件</strong>，因为进程原本在监听80等端口，此时有新连接建立成功，应当调用accept函数读取这个连接，所以这是一个读事件。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/73/98/73b9d890c7087531b51180ada6e65f98.png?wh=909%2A628" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/73/98/73b9d890c7087531b51180ada6e65f98.png?wh=909%2A628" /></p>
 <p>在建立好的TCP连接上收发消息时，读事件对应着接收到对方的消息，这很好理解。写事件则稍微复杂些，我们举个例子加以说明。假设要发送一个2MB的请求，<strong>当调用write函数发送时，会先把内存中的数据拷贝到写缓冲区中后，再发送到网卡上。</strong></p>
 <p>为何要多此一举呢？这是因为在对方没有明确表示收到前，TCP会通过定时器重发写缓冲区中的数据，保证消息能够到达对方。写缓冲区是有大小限制的，我在[第10讲]中会详细介绍。这里假设写缓冲区只有1MB，所以调用write发送2MB数据时，write函数的返回值只有1MB，表示写缓冲区已用尽。当收到对方发来的ACK报文后，缓冲区中的数据才能释放，就会产生写事件通知进程发送剩余的那1MB数据。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c5/7a/c524965bee6407bd716c7dc33bdd437a.png?wh=903%2A477" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c5/7a/c524965bee6407bd716c7dc33bdd437a.png?wh=903%2A477" /></p>
 <p>如同建立连接需要双向建立一样，关闭连接也需要双方各自关闭每个方向的通道。主动关闭的一方发送FIN报文，到达被动方后，内核自动回复ACK报文，这表示从主动方到被动方的通道已经关闭。<strong>但被动方到主动方的通道也需要关闭，所以此时被动方会产生读事件，提醒被动方调用close函数关闭连接。</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b7/96/b73164fd504cc2574066f526ebee7596.png?wh=893%2A627" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b7/96/b73164fd504cc2574066f526ebee7596.png?wh=893%2A627" /></p>
 <p>这样，我们就清楚了TCP报文如何产生事件，也明白回调函数何时执行了。然而，同步代码拆分成多个异步函数成本并不低，咱们手里拿着事件驱动这个锤子，可不能看到什么都像是钉子。</p>
 <p>什么样的代码值得基于事件来做拆分呢？还得回到高性能这个最终目标上来。我们知道，做性能优化一定要找出性能瓶颈，针对瓶颈做优化性价比才最高。对于服务器来说，对最慢的操作做异步化改造，才能值回开发效率的损失。而服务里对资源的操作速度由快到慢，依次是CPU、内存、磁盘和网络。CPU和内存的执行速度都是纳秒级的，无须考虑事件驱动，而磁盘和网络都可以采用事件驱动的异步方式处理。</p>
 <p>相对而言，网络不只速度慢，而且波动很大，既受制于连接对端的性能，也受制于网络传输路径。把操作网络的同步API改为事件驱动的异步API收益最大。而磁盘（特别是机械硬盘）访问速度虽然不快，但它最慢时也不过几十毫秒，是可控的。而且目前磁盘异步IO技术（参见<a href="https://time.geekbang.org/column/article/232676">[第4讲]</a>）还不成熟，它绕过了PageCache性能损失很大。所以当下的事件驱动，主要就是指网络事件。</p>
@@ -14685,8 +14685,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

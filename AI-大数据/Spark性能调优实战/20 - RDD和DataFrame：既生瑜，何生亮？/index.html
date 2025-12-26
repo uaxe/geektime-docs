@@ -7155,18 +7155,18 @@
 <p>你好，我是吴磊。</p>
 <p>从今天开始，我们进入Spark SQL性能调优篇的学习。在这一篇中，我会先带你学习Spark SQL已有的优化机制，如Catalyst、Tungsten这些核心组件，以及AQE、DPP等新特性。深入理解这些内置的优化机制，会让你在开发应用之初就有一个比较高的起点。然后，针对数据分析中的典型场景，如数据关联，我们再去深入探讨性能调优的方法和技巧。</p>
 <p>今天这一讲，我们先来说说RDD和DataFrame的渊源。这也是面试的时候，面试官经常会问的。比如说：“Spark 3.0大版本发布，Spark SQL的优化占比将近50%；而像PySpark、Mllib和Streaming的优化占比都不超过10%，Graph的占比几乎可以忽略不计。这是否意味着Spark社区逐渐放弃了其他计算领域，只专注于数据分析？”</p>
-<p><a href="https://databricks.com/blog/2020/06/18/introducing-apache-spark-3-0-now-available-in-databricks-runtime-7-0.html"><img alt="" src="https://static001.geekbang.org/resource/image/47/75/479cd67e687a3a7cdc805b55b5bdef75.jpg?wh=1600%2A1358" /></a></p>
+<p><a href="https://databricks.com/blog/2020/06/18/introducing-apache-spark-3-0-now-available-in-databricks-runtime-7-0.html" referrerpolicy="no-referrer"><img alt="" src="https://static001.geekbang.org/resource/image/47/75/479cd67e687a3a7cdc805b55b5bdef75.jpg?wh=1600%2A1358" /></a></p>
 <p>这个问题的标准答案是：“Spark SQL取代Spark Core，成为新一代的引擎内核，所有其他子框架如Mllib、Streaming和Graph，都可以共享Spark SQL的性能优化，都能从Spark社区对于Spark SQL的投入中受益。”不过，面试官可没有那么好对付，一旦你这么说，他/她可能会追问：“为什么需要Spark SQL这个新一代引擎内核？Spark Core有什么问题吗？Spark SQL解决了Spark Core的哪些问题？怎么解决的？”</p>
 <p>面对这一连串“箭如雨发”的追问，你还能回答出来吗？接下来，我就从RDD的痛点说起，一步一步带你探讨DataFrame出现的必然性，Spark Core的局限性，以及它和Spark SQL的关系。</p>
 <h2 id="rdd">RDD之痛：优化空间受限</h2>
 <p>自从Spark社区在1.3版本发布了DataFrame，它就开始代替RDD，逐渐成为开发者的首选。我们知道，新抽象的诞生一定是为了解决老抽象不能搞定的问题。那么，这些问题都是什么呢？下面，我们就一起来分析一下。</p>
 <p>在RDD的开发框架下，我们调用RDD算子进行适当的排列组合，就可以很轻松地实现业务逻辑。我把这些使用频繁的RDD算子总结到了下面的表格里，你可以看一看。</p>
-<p><a href="https://spark.apache.org/docs/latest/rdd-programming-guide.html"><img alt="" src="https://static001.geekbang.org/resource/image/79/d3/790eaa488a4db5950a11da89643232d3.jpeg?wh=1442%2A1080" /></a></p>
+<p><a href="https://spark.apache.org/docs/latest/rdd-programming-guide.html" referrerpolicy="no-referrer"><img alt="" src="https://static001.geekbang.org/resource/image/79/d3/790eaa488a4db5950a11da89643232d3.jpeg?wh=1442%2A1080" /></a></p>
 <p>表格中高亮显示的就是RDD转换和聚合算子，它们都是高阶函数。高阶函数指的是形参包含函数的函数，或是返回结果包含函数的函数。为了叙述方便，我们把那些本身是高阶函数的RDD算子，简称“高阶算子”。</p>
 <p><strong>对于这些高阶算子，开发者需要以Lambda函数的形式自行提供具体的计算逻辑。</strong>以map为例，我们需要明确对哪些字段做映射，以什么规则映射。再以filter为例，我们需要指明以什么条件在哪些字段上过滤。</p>
 <p>但这样一来，Spark只知道开发者要做map、filter，但并不知道开发者打算怎么做map和filter。也就是说，<strong>在RDD的开发模式下，Spark Core只知道“做什么”，而不知道“怎么做”。</strong>这会让Spark Core两眼一抹黑，除了把Lambda函数用闭包的形式打发到Executors以外，实在是没有什么额外的优化空间。</p>
 <p><strong>对于Spark Core来说，优化空间受限最主要的影响，莫过于让应用的执行性能变得低下。</strong>一个典型的例子，就是相比Java或者Scala，PySpark实现的应用在执行性能上相差悬殊。原因在于，在RDD的开发模式下，即便是同一个应用，不同语言实现的版本在运行时也会有着天壤之别。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/09/f0/095e9191b93b911c463ca88dba6755f0.jpg?wh=3079%2A1016" title="不同语言的运行时计算过程" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/09/f0/095e9191b93b911c463ca88dba6755f0.jpg?wh=3079%2A1016" title="不同语言的运行时计算过程" /></p>
 <p>当我们使用Java或者Scala语言做开发时，所有的计算都在JVM进程内完成，如图中左侧的Spark计算节点所示。</p>
 <p>而当我们在PySpark上做开发的时候，只能把由RDD算子构成的计算代码，一股脑地发送给Python进程。Python进程负责执行具体的脚本代码，完成计算之后，再把结果返回给Executor进程。由于每一个Task都需要一个Python进程，如果RDD的并行度为#N，那么整个集群就需要#N个这样的Python进程与Executors交互。不难发现，其中的任务调度、数据计算和数据通信等开销，正是PySpark性能低下的罪魁祸首。</p>
 <h2 id="dataframe">DataFrame应运而生</h2>
@@ -7182,20 +7182,20 @@
 <h3 id="catalyst">Catalyst：执行过程优化</h3>
 <p>我们先来说说Catalyst的优化过程。当开发者通过Actions算子触发DataFrame的计算请求时，Spark内部会发生一系列有趣的事情。</p>
 <p>首先，基于DataFrame确切的计算逻辑，Spark会使用第三方的SQL解析器ANTLR来生成抽象语法树（AST，Abstract Syntax Tree）。既然是树，就会有节点和边这两个基本的构成元素。节点记录的是标量算子（如select、filter）的处理逻辑，边携带的是数据信息：关系表和数据列，如下图所示。这样的语法树描述了从源数据到DataFrame结果数据的转换过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1c/6f/1c0a5e8c1ccdc5eb6ecc29cc45d3f96f.jpg?wh=1396%2A1382" title="AST语法树示意图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1c/6f/1c0a5e8c1ccdc5eb6ecc29cc45d3f96f.jpg?wh=1396%2A1382" title="AST语法树示意图" /></p>
 <p>在Spark中，语法树还有个别名叫做“Unresolved Logical Plan”。它正是Catalyst优化过程的起点。之所以取名“Unresolved”，是因为边上记录的关系表和数据列仅仅是一些字符串，还没有和实际数据对应起来。举个例子，Filter之后的那条边，输出的数据列是joinKey和payLoad。这些字符串的来源是DataFrame的DSL查询，Catalyst并不确定这些字段名是不是有效的，更不知道每个字段都是什么类型。</p>
 <p>因此，<strong>Catalyst做的第一步优化，就是结合DataFrame的Schema信息，确认计划中的表名、字段名、字段类型与实际数据是否一致</strong>。这个过程也叫做把“Unresolved Logical Plan”转换成“Analyzed Logical Plan”。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f3/72/f3ffb5fc43ae3c9bca44c1f4f8b7e872.jpg?wh=6539%2A1200" title="Spark SQL的端到端优化过程" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f3/72/f3ffb5fc43ae3c9bca44c1f4f8b7e872.jpg?wh=6539%2A1200" title="Spark SQL的端到端优化过程" /></p>
 <p>基于解析过后的“Analyzed Logical Plan”，Catalyst才能继续做优化。利用启发式的规则和执行策略，Catalyst最终把逻辑计划转换为可执行的物理计划。总之，Catalyst的优化空间来源DataFrame的开发模式。</p>
 <h3 id="tungsten">Tungsten：数据结构优化</h3>
 <p>说完Catalyst，我接着再来说说Tungsten。在开发原则那一讲，我们提到过Tungsten使用定制化的数据结构Unsafe Row来存储数据，Unsafe Row的优点是存储效率高、GC效率高。Tungsten之所以能够设计这样的数据结构，仰仗的也是DataFrame携带的Schema。Unsafe Row我们之前讲过，这里我再带你简单回顾一下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/75/23/75ab3ca00411e1aa3933f3b0b1b3de23.jpeg?wh=1162%2A715" title="结构化的二维表" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/75/23/75ab3ca00411e1aa3933f3b0b1b3de23.jpeg?wh=1162%2A715" title="结构化的二维表" /></p>
 <p>Tungsten是用二进制字节序列来存储每一条用户数据的，因此在存储效率上完胜Java Object。比如说，如果我们要存储上表中的数据，用Java Object来存储会消耗100个字节数，而使用Tungsten仅需要不到20个字节，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/20/02/20230c764200cfde05dedec1cae6b702.jpg?wh=3497%2A1191" title="二进制字节序列" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/20/02/20230c764200cfde05dedec1cae6b702.jpg?wh=3497%2A1191" title="二进制字节序列" /></p>
 <p>但是，要想实现上图中的二进制序列，Tungsten必须要知道数据条目的Schema才行。也就是说，它需要知道每一个字段的数据类型，才能决定在什么位置安放定长字段、安插Offset，以及存放变长字段的数据值。DataFrame刚好能满足这个前提条件。</p>
 <p>我们不妨想象一下，如果数据是用RDD封装的，Tungsten还有可能做到这一点吗？当然不可能。这是因为，虽然RDD也带类型，如RDD[Int]、RDD[(Int, String)]，但如果RDD中携带的是开发者自定义的数据类型，如RDD[User]或是RDD[Product]，Tungsten就会两眼一抹黑，完全不知道你的User和Product抽象到底是什么。成也萧何、败也萧何，RDD的通用性是一柄双刃剑，在提供开发灵活性的同时，也让引擎内核的优化变得无比困难。</p>
 <p><strong>总的来说，基于DataFrame简单的标量算子和明确的Schema定义，借助Catalyst优化器和Tungsten，Spark SQL有能力在运行时构建起一套端到端的优化机制。这套机制运用启发式的规则与策略，以及运行时的执行信息，将原本次优、甚至是低效的查询计划转换为高效的执行计划，从而提升端到端的执行性能。</strong>因此，在DataFrame的开发框架下，不论你使用哪种开发语言，开发者都能共享Spark SQL带来的性能福利。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/50/fc/505dbb1462dbc1f927fa1f4a2daabcfc.jpg?wh=3385%2A1032" title="不同开发模式下的分布式执行过程" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/50/fc/505dbb1462dbc1f927fa1f4a2daabcfc.jpg?wh=3385%2A1032" title="不同开发模式下的分布式执行过程" /></p>
 <p>最后，我们再来回顾最开始提到的面试题：“从2.0版本至今，Spark对于其他子框架的完善与优化，相比Spark SQL占比很低。这是否意味着，Spark未来的发展重心是数据分析，其他场景如机器学习、流计算会逐渐边缘化吗？”</p>
 <p>最初，Spark SQL确实仅仅是运行SQL和DataFrame应用的子框架，但随着优化机制的日趋完善，Spark SQL逐渐取代Spark Core，演进为新一代的引擎内核。到目前为止，所有子框架的源码实现都已从RDD切换到DataFrame。因此，和PySpark一样，像Streaming、Graph、Mllib这些子框架实际上都是通过DataFrame API运行在Spark SQL之上，它们自然可以共享Spark SQL引入的种种优化机制。</p>
 <p>形象地说，Spark SQL就像是Spark的智能大脑，凡是通过DataFrame这双“眼睛”看到的问题，都会经由智能大脑这个指挥中心，统筹地进行分析与优化，优化得到的行动指令，最终再交由Executors这些“四肢”去执行。</p>
@@ -7333,8 +7333,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

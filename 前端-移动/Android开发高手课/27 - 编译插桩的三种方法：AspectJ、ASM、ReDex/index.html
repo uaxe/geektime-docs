@@ -6383,7 +6383,7 @@
   <h1>27   编译插桩的三种方法：AspectJ、ASM、ReDex</h1>
 
 <p>只要简单回顾一下前面课程的内容你就会发现，在启动耗时分析、网络监控、耗电监控中已经不止一次用到编译插桩的技术了。那什么是编译插桩呢？顾名思义，所谓的编译插桩就是在代码编译期间修改已有的代码或者生成新代码。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/be/75/be872dd6d12ab22879fbec9414fb2d75.png?wh=1920%2A296" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/be/75/be872dd6d12ab22879fbec9414fb2d75.png?wh=1920%2A296" /></p>
 <p>如上图所示，请你回忆一下Java代码的编译流程，思考一下插桩究竟是在编译流程中的哪一步工作？除了我们之前使用的一些场景，它还有哪些常见的应用场景？在实际工作中，我们应该怎样更好地使用它？现在都有哪些常用的编译插桩方法？今天我们一起来解决这些问题。</p>
 <h2 id="_1">编译插桩的基础知识</h2>
 <p>不知道你有没有注意到，在编译期间修改和生成代码其实是很常见的行为，无论是Dagger、ButterKnife这些APT（Annotation Processing Tool）注解生成框架，还是新兴的Kotlin语言<a href="https://github.com/JetBrains/kotlin/tree/v1.2.30/compiler/backend/src/org/jetbrains/kotlin/codegen">编译器</a>，它们都用到了编译插桩的技术。</p>
@@ -6403,11 +6403,11 @@
 </ul>
 <!--THE END-->
 
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c7/76/c7f5fb2696906585f13f89eb3ac42c76.png?wh=1920%2A305" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c7/76/c7f5fb2696906585f13f89eb3ac42c76.png?wh=1920%2A305" /></p>
 <ul>
 <li><strong>字节码（Bytecode）</strong>。对于代码监控、代码修改以及代码分析这三个场景，一般采用操作字节码的方式。可以操作“.class”的Java字节码，也可以操作“.dex”的Dalvik字节码，这取决于我们使用的插桩方法。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c1/db/c1208262168a3686bd5d48c1080b6edb.png?wh=1920%2A298" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c1/db/c1208262168a3686bd5d48c1080b6edb.png?wh=1920%2A298" /></p>
 <p>相对于Java文件方式，字节码操作方式功能更加强大，应用场景也更广，但是它的使用复杂度更高，所以今天我主要来讲如何通过操作字节码实现编译插桩的功能。</p>
 <p><strong>2. 字节码</strong></p>
 <p>对于Java平台，Java虚拟机运行的是Class文件，内部对应的是Java字节码。而针对Android这种嵌入式平台，为了优化性能，Android虚拟机运行的是<a href="https://source.android.com/devices/tech/dalvik/dex-format">Dex文件</a>，Google专门为其设计了一种Dalvik字节码，虽然增加了指令长度但却缩减了指令的数量，执行也更为快速。</p>
@@ -6428,19 +6428,19 @@
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>dexdump -d Sample.dex   // 查看Sample.dex的Dalvik的字节码
 </code></pre></div>
 <p>你可以直观地看到Java字节码和Dalvik字节码的差别。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8c/50/8c9a2f2a6bfe9e2d42b9f1ea3a642250.png?wh=1920%2A1030" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8c/50/8c9a2f2a6bfe9e2d42b9f1ea3a642250.png?wh=1920%2A1030" /></p>
 <p>它们的格式和指令都有很明显的差异。关于Java字节码的介绍，你可以参考<a href="https://docs.oracle.com/javase/specs/jvms/se11/html/index.html">JVM文档</a>。对于Dalvik字节码来说，你可以参考Android的<a href="https://source.android.com/devices/tech/dalvik/dalvik-bytecode">官方文档</a>。它们的主要区别有：</p>
 <ul>
 <li><strong>体系结构</strong>。Java虚拟机是基于栈实现，而Android虚拟机是基于寄存器实现。在ARM平台，寄存器实现性能会高于栈实现。</li>
 </ul>
 <!--THE END-->
 
-<p><img alt="" src="https://static001.geekbang.org/resource/image/33/1c/3357723f90b34af2717e320b61dca01c.png?wh=1920%2A1076" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/33/1c/3357723f90b34af2717e320b61dca01c.png?wh=1920%2A1076" /></p>
 <ul>
 <li><strong>格式结构</strong>。对于Class文件，每个文件都会有自己单独的常量池以及其他一些公共字段。对于Dex文件，整个Dex中的所有Class共用同一个常量池和公共字段，所以整体结构更加紧凑，因此也大大减少了体积。</li>
 <li><strong>指令优化</strong>。Dalvik字节码对大量的指令专门做了精简和优化，如下图所示，相同的代码Java字节码需要100多条，而Dalvik字节码只需要几条。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/35/4f/359817cf20201f045eef60a31f45ff4f.png?wh=1822%2A1234" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/35/4f/359817cf20201f045eef60a31f45ff4f.png?wh=1822%2A1234" /></p>
 <p>关于Java字节码和Dalvik字节码的更多介绍，你可以参考下面的资料：</p>
 <ul>
 <li><a href="https://github.com/AndroidAdvanceWithGeektime/Chapter27/blob/master/doucments/Dalvik%20and%20ART.pdf">Dalvik and ART</a></li>
@@ -6448,7 +6448,7 @@
 </ul>
 <h2 id="_2">编译插桩的三种方法</h2>
 <p>AspectJ和ASM框架的输入和输出都是Class文件，它们是我们最常用的Java字节码处理框架。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7d/2c/7d428fcc675b9308d4059a855295692c.png?wh=1920%2A308" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7d/2c/7d428fcc675b9308d4059a855295692c.png?wh=1920%2A308" /></p>
 <p><strong>1. AspectJ</strong></p>
 <p><a href="https://www.eclipse.org/aspectj/">AspectJ</a>是Java中流行的AOP（aspect-oriented programming）编程扩展框架，网上很多文章说它处理的是Java文件，其实并不正确，它内部也是通过字节码处理技术实现的代码注入。</p>
 <p>从底层实现上来看，AspectJ内部使用的是<a href="https://github.com/apache/commons-bcel">BCEL</a>框架来完成的，不过这个库在最近几年没有更多的开发进展，官方也建议切换到ObjectWeb的ASM框架。关于BCEL的使用，你可以参考<a href="https://www.ibm.com/developerworks/cn/java/j-dyn0414/index.html">《用BCEL设计字节码》</a>这篇文章。</p>
@@ -6488,7 +6488,7 @@
 <a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>}
 </code></pre></div>
 <p>但你可以看到经过AspectJ的字节码处理，它并不会直接把Trace函数直接插入到代码中，而是经过一系列自己的封装。如果想针对所有的函数都做插桩，AspectJ会带来不少的性能影响。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3c/9b/3cc968bb9654fbabbcc26d212ad7719b.png?wh=1920%2A848" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3c/9b/3cc968bb9654fbabbcc26d212ad7719b.png?wh=1920%2A848" /></p>
 <p>不过大部分情况，我们可能只会插桩某一小部分函数，这样AspectJ带来的性能影响就可以忽略不计了。如果想在Android中直接使用AspectJ，还是比较麻烦的。这里我推荐你直接使用沪江的<a href="https://github.com/HujiangTechnology/gradle_plugin_android_aspectjx">AspectJX</a>框架，它不仅使用更加简便一些，而且还扩展了排除某些类和JAR包的能力。如果你想通过Annotation注解方式接入，我推荐使用Jake Wharton大神写的<a href="https://github.com/JakeWharton/hugo">Hugo</a>项目。</p>
 <p>虽然AspectJ使用方便，但是在使用的时候不注意的话还是会产生一些意想不到的异常。比如使用Around Advice需要注意方法返回值的问题，在Hugo里的处理方法是将joinPoint.proceed()的返回值直接返回，同时也需要注意<a href="https://www.eclipse.org/aspectj/doc/released/progguide/semantics-advice.html">Advice Precedence</a>的情况。</p>
 <p><strong>2. ASM</strong></p>
@@ -6499,16 +6499,16 @@
 </ul>
 <p>为了使用简单，相比于BCEL框架，ASM的优势是提供了一个Visitor模式的访问接口（Core API），使用者可以不用关心字节码的格式，只需要在每个Visitor的位置关心自己所修改的结构即可。但是这种模式的缺点是，一般只能在一些简单场景里实现字节码的处理。</p>
 <p>事实上，专栏第7期启动耗时的Sample内部就是使用ASM的Core API，具体你可以参考<a href="https://github.com/AndroidAdvanceWithGeektime/Chapter07/blob/master/systrace-gradle-plugin/src/main/java/com/geektime/systrace/MethodTracer.java#L259">MethodTracer</a>类的实现。从最终效果上来看，ASM字节码处理后的效果如下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/51/2d/51f13d88cebf089fee2e90154206852d.png?wh=1920%2A501" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/51/2d/51f13d88cebf089fee2e90154206852d.png?wh=1920%2A501" /></p>
 <p>相比AspectJ，ASM更加直接高效。但是对于一些复杂情况，我们可能需要使用另外一种Tree API来完成对Class文件更直接的修改，因此这时候你要掌握一些必不可少的Java字节码知识。</p>
 <p>此外，我们还需要对Java虚拟机的运行机制有所了解，前面我就讲到Java虚拟机是基于栈实现。那什么是Java虚拟机的栈呢？，引用《Java虚拟机规范》里对Java虚拟机栈的描述：</p>
 <blockquote>
 <p>每一条Java虚拟机线程都有自己私有的Java虚拟机栈，这个栈与线程同时创建，用于存储栈帧（Stack Frame）。</p>
 </blockquote>
 <p>正如这句话所描述的，每个线程都有自己的栈，所以在多线程应用程序中多个线程就会有多个栈，每个栈都有自己的栈帧。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/49/9a/49f6179e747be98e6b36119d3151839a.png?wh=596%2A261" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/49/9a/49f6179e747be98e6b36119d3151839a.png?wh=596%2A261" /></p>
 <p>如下图所示，我们可以简单认为栈帧包含3个重要的内容：本地变量表（Local Variable Array）、操作数栈（Operand Stack）和常量池引用（Constant Pool Reference）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/42/00/426fb987bed676f448ebf8e938df2a00.png?wh=421%2A248" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/42/00/426fb987bed676f448ebf8e938df2a00.png?wh=421%2A248" /></p>
 <ul>
 <li><strong>本地变量表</strong>。在使用过程中，可以认为本地变量表是存放临时数据的，并且本地变量表有个很重要的功能就是用来传递方法调用时的参数，当调用方法的时候，参数会依次传递到本地变量表中从0开始的位置上，并且如果调用的方法是实例方法，那么我们可以通过第0个本地变量中获取当前实例的引用，也就是this所指向的对象。</li>
 <li><strong>操作数栈</strong>。可以认为操作数栈是一个用于存放指令执行所需要的数据的位置，指令从操作数栈中取走数据并将操作结果重新入栈。</li>
@@ -6517,7 +6517,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>ClassWriter(ClassWriter.COMPUTE_MAXS)
 </code></pre></div>
 <p>下面以一个简单的“1+2“为例，它的操作数以LIFO（后进先出）的方式进行操作。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/89/eb/89dd2ea472be03aff9bfddba5b5ff3eb.png?wh=1086%2A151" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/89/eb/89dd2ea472be03aff9bfddba5b5ff3eb.png?wh=1086%2A151" /></p>
 <p>ICONST_1将int类型1推送栈顶，ICONST_2将int类型2推送栈顶，IADD指令将栈顶两个int类型的值相加后将结果推送至栈顶。操作数栈的最大深度也是由编译期决定的，很多时候ASM修改后的代码会增加操作数栈最大深度。不过ASM已经提供了动态计算的方法，但同时也会带来一些性能上的损耗。</p>
 <p>在具体的字节码处理过程中，特别需要注意的是本地变量表和操作数栈的数据交换和try catch blcok的处理。</p>
 <ul>
@@ -6525,11 +6525,11 @@
 </ul>
 <!--THE END-->
 
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f6/e2/f6db02fcc40462ad054f37ff36bcf1e2.png?wh=570%2A451" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f6/e2/f6db02fcc40462ad054f37ff36bcf1e2.png?wh=570%2A451" /></p>
 <ul>
 <li><strong>异常处理</strong>。在字节码操作过程中需要特别注意异常处理对操作数栈的影响，如果在try和catch之间抛出了一个可捕获的异常，那么当前的操作数栈会被清空，并将异常对象压入这个空栈中，执行过程在catch处继续。幸运的是，如果生成了错误的字节码，编译器可以辨别出该情况并导致编译异常，ASM中也提供了<a href="https://asm.ow2.io/javadoc/org/objectweb/asm/util/CheckClassAdapter.html">字节码Verify</a>的接口，可以在修改完成后验证一下字节码是否正常。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ac/f5/ac268beb15b325d380097f64eb1eabf5.png?wh=958%2A621" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ac/f5/ac268beb15b325d380097f64eb1eabf5.png?wh=958%2A621" /></p>
 <p>如果想在一个方法执行完成后增加代码，ASM相对也要简单很多，可以在字节码中出现的每一条RETURN系或者ATHROW的指令前，增加处理的逻辑即可。</p>
 <p><strong>3. ReDex</strong></p>
 <p>ReDex不仅只是作为一款Dex优化工具，它也提供了很多的小工具和文档里没有提到的一些新奇功能。比如在ReDex里提供了一个简单的Method Tracing和Block Tracing工具，这个工具可以在所有方法或者指定方法前面插入一段跟踪代码。</p>
@@ -6764,8 +6764,6 @@ mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, &quot;java&#47;lang&#47;StringBuilder&
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

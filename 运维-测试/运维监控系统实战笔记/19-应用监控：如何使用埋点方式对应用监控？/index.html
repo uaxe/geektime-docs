@@ -6072,10 +6072,10 @@
 <h2 id="statsd">StatsD</h2>
 <p>StatsD 开始被熟知是因为<a href="https://www.etsy.com/codeascraft/measure-anything-measure-everything/">《Measure Anything, Measure Everything》</a>这篇文章，Etsy 的工程师使用 NodeJS 开源了这个<a href="https://github.com/statsd/statsd">项目</a>。</p>
 <p>StatsD 有个很大的特点是使用 UDP 传输协议，大部分计算逻辑都挪到了 StatsD 的 Server，SDK 层面的工作非常轻量。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/94/0d/94e9f7d2251d6241bb0f83308810230d.png?wh=2396x824" title="StatsD 架构图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/94/0d/94e9f7d2251d6241bb0f83308810230d.png?wh=2396x824" title="StatsD 架构图" /></p>
 <p>StatsD SDK 与 StatsD Server 之间通信使用的是UDP 协议，UDP 协议是 fire-and-forget，无需建立连接，即使 StatsD Server 挂了，也不影响应用程序，而对于延迟分布区间这样的计算逻辑，是在 StatsD Server 里计算的，也不会影响应用程序，所以整个 StatsD 的设计是非常轻量的，对应用程序基本没有影响。</p>
 <p>由于 StatsD 相当知名，所以很多采集器都实现了 StatsD 的协议，比如 Telegraf、Datadog-agent，也就是说，图上的 StatsD Server 是可以换成 Telegraf 或 Datadog-agent 的。这样就不用部署太多进程，一个采集器包打天下，就拿 Telegraf 来说吧，替换后架构就变成了这样。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e4/fb/e45a7a5926bb491c5560bc16a5189cfb.png?wh=2126x1350" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e4/fb/e45a7a5926bb491c5560bc16a5189cfb.png?wh=2126x1350" /></p>
 <p>下面我来演示一下，用一个小程序做个埋点，让你有个感性的认识。我们就把 Telegraf 当做 StatsD Server 来接收埋点数据，Telegraf 是 InfluxData 主导开源的监控采集器，我之前做过一次调研，调研笔记我也放在<a href="https://mp.weixin.qq.com/s/JeBa_YOJdsv_QOlCVDHdtw">这里</a>，供你参考。</p>
 <p>Telegraf 提供 StatsD 的 input 插件，在配置文件中搜索 inputs.statsd 就能找到相关的配置段了，里边有详尽的注释，我就不再赘述了，直接上配置样例。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p p-Indicator">[[</span><span class="nv">inputs.statsd</span><span class="p p-Indicator">]]</span>
@@ -6224,11 +6224,11 @@
 <p>无论是StatsD，还是使用Prometheus，总之通过埋点我们采集到了监控指标。接下来这些数据如何进入监控服务端呢？我们看一下这个通路典型的构建方式。</p>
 <h2 id="_2">数据传输通路</h2>
 <p>使用 StatsD 的埋点方式，数据通过 UDP 推给 Telegraf，Telegraf 推给后端监控系统。如果是通过 Prometheus 的方式来埋点，就是暴露 <code>/metrics</code> 接口，等待监控系统来拉。如果应用是部署在物理机或虚拟机上，直接通过本地的监控 agent 来拉取即可。如果应用是部署在 Kubernetes 的 Pod 里，则有两种办法来拉取数据，一个是 Sidecar 模式，一个是中心端服务发现的模式。下面这个示意图展示的是 Sidecar 模式。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/13/d1/1309313e94e9a9f8a88344d74d3762d1.png?wh=2256x1232" title="Sidecar 模式" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/13/d1/1309313e94e9a9f8a88344d74d3762d1.png?wh=2256x1232" title="Sidecar 模式" /></p>
 <p>左侧 Pod1 里有两个容器，App 通过 StatsD 埋点，然后通过 UDP 推给 Telegraf，Telegraf 接收到数据之后做二次计算，把结果推给监控服务端；右侧 Pod2 里也有两个容器，App 通过 Prometheus SDK 埋点，暴露 <code>/metrics</code> 接口，Categraf 通过这个接口拉取数据，然后推给监控服务端。</p>
 <p>这种方式的优点是比较灵活，Pod 内怎么做应用自己说了算。即使给 <code>/metrics</code> 接口增加一些认证鉴权、指标过滤、扩展标签的逻辑，都不影响其他的 Pod。数据是推给监控服务端的，监控服务端接收数据的组件可以做成无状态集群，前面架设负载均衡，整个架构非常简单、扩展性也很好。当然缺点也很明显，每个 Pod 里都伴生 Sidecar agent，浪费资源。</p>
 <p>StatsD 埋点的方式只能使用 Sidecar模式传输数据，而Prometheus SDK 埋点还有第二种数据抓取方式：中心端服务发现模式。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a4/d8/a4e052ddd462710c05d2c21db88388d8.png?wh=1818x1324" title="中心端服务发现模式" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a4/d8/a4e052ddd462710c05d2c21db88388d8.png?wh=1818x1324" title="中心端服务发现模式" /></p>
 <p>每个应用容器都统一暴露 <code>/metrics</code> 接口，监控抓取器通过 Kubernetes 服务发现机制，找到所有的 Pod，分别抓取即可。不过，并不是所有的 Pod 都暴露指标数据，即使暴露了，接口路径也未必一定是 <code>/metrics</code>，这就需要有一个机制和规范，通过这个机制告诉指标抓取器，选择哪个类型的 Pod 抓数据，抓数据的时候使用哪个端口、哪个接口路径来抓。</p>
 <p>一般我们使用 Pod 注解来承接这个规范，比如我们制定标准：所有想要被抓取监控数据的 Pod 都统一暴露如下注解。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nx">prometheus</span><span class="p">.</span><span class="nx">io</span><span class="o">/</span><span class="nx">scrape</span><span class="p">=</span><span class="kc">true</span>
@@ -6270,7 +6270,7 @@
 <h2 id="_3">小结</h2>
 <p>这一讲我们介绍了两种埋点监控应用的方式，一个是 StatsD，一个是 Prometheus，这两种方式都是跨语言的埋点方案，业界应用广泛。StatsD 是推模式，采用 UDP 协议，各类计算逻辑挪到了 StatsD Server 中，对应用本身不会造成影响。Prometheus 是拉模式，SDK 的逻辑跑在应用进程里，可能对应用造成一定影响，不过已经有很多公司做了生产验证，Prometheus 的 SDK 还是很稳定的，大可放心使用。</p>
 <p>对于 Prometheus SDK 的埋点方案，有两种数据抓取方式，一个是 Sidecar 模式，灵活但是占用资源多；一个是中心端服务发现模式，不那么灵活但是资源占用得少，技术上没有非黑即白，建议你根据具体场景灵活选择。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8f/6c/8f8c77346f64b8f850798a08238c0a6c.jpg?wh=2197x1573" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8f/6c/8f8c77346f64b8f850798a08238c0a6c.jpg?wh=2197x1573" /></p>
 <h2 id="_4">互动时刻</h2>
 <p>对于 Prometheus SDK 埋点机制，在使用中心端抓取方式的时候，如果目标 Pod 量很大，单个抓取器就抓不过来了，这个时候就需要有个分片机制，用多个抓取器来抓，每个抓取器抓一部分指标。我们应该按照哪些维度做分片呢？具体配置样例是什么样子的？欢迎你留言分享，也欢迎你把今天的内容分享给你身边的朋友，邀他一起学习。我们下一讲再见！</p>
 <div><strong>精选留言（5）</strong></div>
@@ -6418,8 +6418,6 @@ action: keep</p>2023-02-20</li><br/>
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

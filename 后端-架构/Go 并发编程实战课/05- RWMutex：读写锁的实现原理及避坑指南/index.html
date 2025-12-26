@@ -13842,7 +13842,7 @@
 <p>第二种死锁的场景有点隐蔽。我们知道，有活跃reader的时候，writer会等待，如果我们在reader的读操作时调用writer的写操作（它会调用Lock方法），那么，这个reader和writer就会形成互相依赖的死锁状态。Reader想等待writer完成后再释放锁，而writer需要这个reader释放锁之后，才能不阻塞地继续执行。这是一个读写锁常见的死锁场景。</p>
 <p>第三种死锁的场景更加隐蔽。</p>
 <p>当一个writer请求锁的时候，如果已经有一些活跃的reader，它会等待这些活跃的reader完成，才有可能获取到锁，但是，如果之后活跃的reader再依赖新的reader的话，这些新的reader就会等待writer释放锁之后才能继续执行，这就形成了一个环形依赖： <strong>writer依赖活跃的reader -&gt; 活跃的reader依赖新来的reader -&gt; 新来的reader依赖writer</strong>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c1/35/c18e897967d29e2d5273b88afe626035.jpg?wh=2089%2A1666" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c1/35/c18e897967d29e2d5273b88afe626035.jpg?wh=2089%2A1666" /></p>
 <p>这个死锁相当隐蔽，原因在于它和RWMutex的设计和实现有关。啥意思呢？我们来看一个计算阶乘(n!)的例子：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>func main() {
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>var mu sync.RWMutex
@@ -13890,19 +13890,19 @@
 <h2 id="docker">Docker</h2>
 <h3 id="issue-36840">issue 36840</h3>
 <p><a href="https://github.com/moby/moby/pull/36840/files">issue 36840</a>修复的是错误地把writer当成reader的Bug。 这个地方本来需要修改数据，需要调用的是写锁，结果用的却是读锁。或许是被它紧挨着的findNode方法调用迷惑了，认为这只是一个读操作。可实际上，代码后面还会有changeNodeState方法的调用，这是一个写操作。修复办法也很简单，只需要改成Lock/Unlock即可。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e4/4b/e4d153cb5f81873a726b09bc436b8a4b.png?wh=1642%2A554" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e4/4b/e4d153cb5f81873a726b09bc436b8a4b.png?wh=1642%2A554" /></p>
 <h2 id="kubernetes">Kubernetes</h2>
 <h3 id="issue-62464">issue 62464</h3>
 <p><a href="https://github.com/kubernetes/kubernetes/pull/62464">issue 62464</a>就是读写锁第二种死锁的场景，这是一个典型的reader导致的死锁的例子。知道墨菲定律吧？“凡是可能出错的事，必定会出错”。你可能觉得我前面讲的RWMutex的坑绝对不会被人踩的，因为道理大家都懂，但是你看，Kubernetes就踩了这个重入的坑。</p>
 <p>这个issue在移除pod的时候可能会发生，原因就在于，GetCPUSetOrDefault方法会请求读锁，同时，它还会调用GetCPUSet或GetDefaultCPUSet方法，这时又会请求读锁。如果期间有其它goroutine请求写锁的话，GetCPUSetOrDefault方法调用GetCPUSet或GetDefaultCPUSet方法时就不会返回了，请求写锁的goroutine也不会返回，这就会形成死锁。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/06/c2/062ae5d2a6190f86cb7bf57db643d8c2.png?wh=2126%2A986" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/06/c2/062ae5d2a6190f86cb7bf57db643d8c2.png?wh=2126%2A986" /></p>
 <h1 id="_1">总结</h1>
 <p>在开发过程中，一开始考虑共享资源并发访问问题的时候，我们就会想到互斥锁Mutex。因为刚开始的时候，我们还并不太了解并发的情况，所以，就会使用最简单的同步原语来解决问题。等到系统成熟，真正到了需要性能优化的时候，我们就能静下心来分析并发场景的可能性，这个时候，我们就要考虑将Mutex修改为RWMutex，来压榨系统的性能。</p>
 <p>当然，如果一开始你的场景就非常明确了，比如我就要实现一个线程安全的map，那么，一开始你就可以考虑使用读写锁。</p>
 <p>正如我在前面提到的，如果你能意识到你要解决的问题是一个readers-writers问题，那么你就可以毫不犹豫地选择RWMutex，不用考虑其它选择。那在使用RWMutex时，最需要注意的一点就是尽量避免重入，重入带来的死锁非常隐蔽，而且难以诊断。</p>
 <p>另外我们也可以扩展RWMutex，不过实现方法和互斥锁Mutex差不多，在技术上是一样的，都是通过unsafe来实现，我就不再具体讲了。课下你可以参照我们<a href="https://time.geekbang.org/column/article/296793">上节课</a>学习的方法，实现一个扩展的RWMutex。</p>
 <p>这一讲我们系统学习了读写锁的相关知识，这里提供给你一个知识地图，帮助你复习本节课的知识。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/69/42/695b9aa6027b5d3a61e92cbcbba10042.jpg?wh=2250%2A2019" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/69/42/695b9aa6027b5d3a61e92cbcbba10042.jpg?wh=2250%2A2019" /></p>
 <h1 id="_2">思考题</h1>
 <p>请你写一个扩展的读写锁，比如提供TryLock，查询当前是否有writer、reader的数量等方法。</p>
 <p>欢迎在留言区写下你的思考和答案，我们一起交流讨论。如果你觉得有所收获，也欢迎你把今天的内容分享给你的朋友或同事。</p>
@@ -14146,8 +14146,6 @@ return s.defaultCPUSet.Clone()
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

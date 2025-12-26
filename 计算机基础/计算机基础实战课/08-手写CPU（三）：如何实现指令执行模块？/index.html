@@ -6522,13 +6522,13 @@
 <p>经过流水线的这两个步骤之后，下一步就需要把这些指令信息发送给执行单元去执行相关操作。根据译码之后的指令信息，我们可以把指令分为三类，分别是算术逻辑指令、分支跳转指令、存储器访问指令。</p>
 <p><a href="https://time.geekbang.org/column/article/548002">上节课</a>我们已经详细解读了RISC-V指令集的指令格式，正是因为格式上比较简单而且规整，所以不同类别的指令执行过程也是类似的。这样，RISC执行单元的电路结构相比CISC就得到了简化。</p>
 <p>所以在指令执行阶段，上述的这三类指令都能通过ALU进行相关操作。比如，存储访问指令用ALU进行地址计算，条件分支跳转指令用ALU进行条件比较，算术逻辑指令用ALU进行逻辑运算。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e3/28/e3548857ab073bb598f1dff35a245f28.jpg?wh=1920x1242" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e3/28/e3548857ab073bb598f1dff35a245f28.jpg?wh=1920x1242" /></p>
 <p>上图就是ALU模块的设计框图。<strong>在ALU模块中，指令可以分成三类来处理：第一类是普通的ALU指令，包括逻辑运算、移位操作等指令；第二类指令负责完成存储器访问指令Load和Store的地址生成工作；第三类是负责分支跳转指令的结果解析和执行。</strong>这就是流水线执行阶段的核心模块ALU的设计思路。</p>
 <h2 id="_1">执行控制模块的设计</h2>
 <p>根据上节课设计的译码模块，我们已经得到了指令的功能码、立即数、寄存器索引等字段信息。</p>
 <p>你是否还记得？我们在译码模块里根据指令的7位操作码opcode字段，还产生了一个ALU执行的指令控制字段aluCrtlOp。这正是上文提到的ALU模块把指令分成三类执行的控制信号。</p>
 <p>具体的信号编码，你可以参考后面的表格：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/43/be/43a64833c9d698e35697c7cb7c4d67be.jpg?wh=1920x710" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/43/be/43a64833c9d698e35697c7cb7c4d67be.jpg?wh=1920x710" /></p>
 <p>根据2位执行类型字段aluCrtlOp，以及指令译码得到的操作码funct7和funct3，就可以设计我们的执行控制模块了。</p>
 <p>结合前面的表格，我们来看看执行控制模块如何根据aluCrtlOp信号做判断。</p>
 <p>如果aluCrtlOp等于（00），对应的指令类型就是Load和Store指令，也就是通过加法运算来计算访存地址；如果aluCrtlOp等于（01），相应的指令类型就是ALUI/ALUR，同样也是根据输入的funct7和funct3字段决定执行哪些算术运算，比如加减运算、移位操作等；如果类型字段等于（10），就对应着分支跳转指令，流水线就会相应去完成条件分支的解析工作。</p>
@@ -6570,12 +6570,12 @@
 <p>根据上述的三类指令，就会产生一个4位的ALU操作信号aluOp，为后面的ALU模块做相关逻辑运行提供操作码。</p>
 <h2 id="_2">通用寄存器</h2>
 <p>在ALU模块开始执行运算之前，我们还需要提前完成一个操作——读取通用寄存器。在参与ALU逻辑运算的两个操作数中，至少有一个来自于通用寄存器，另一个可以来自于通用寄存器或者指令自带的立即数，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/12/d3/12b4de8b3f29f191fbd679439008acd3.jpg?wh=1920x1498" /></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/2a/7d/2afc17e22ce4b29bb2c861ff33afb97d.jpg?wh=1920x330" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/12/d3/12b4de8b3f29f191fbd679439008acd3.jpg?wh=1920x1498" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2a/7d/2afc17e22ce4b29bb2c861ff33afb97d.jpg?wh=1920x330" /></p>
 <p>由于第七节课提到的6种指令中的R型指令有三个操作数，分别对应于两个源寄存器rs1和rs2，以及一个目标寄存器rd。一条R指令类似于有三个参数的函数，如add（rd，rs1，rs2），完成的功能就是先读取rs1、rs2两个参数，然后相加，最后把结果写入到rd参数中。</p>
 <p>对应到每条指令，则需要从通用寄存器模块中读取其中两个寄存器中的数据，之后还要把运算结果写入另一个通用寄存器。每读取一个寄存器，就需要输入一个寄存器索引，并输出一个通用寄存器中的值。两个操作数对应的寄存器需要同时读取，所以<strong>通用寄存器模块需要两个读地址接口和两个读数据输出接口</strong>。</p>
 <p>此外，处于流水线上的指令是并发执行的，在读取通用寄存器的同时，可能还需要写入数据到通用寄存器，所以需要<strong>一套写地址和写数据接口</strong>。因此，通用寄存器模块的设计框图如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a6/57/a67a8bf89580a4418287026580a2a557.jpg?wh=1805x1305" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a6/57/a67a8bf89580a4418287026580a2a557.jpg?wh=1805x1305" /></p>
 <p>根据上述的设计思路，我们就可以设计和实现通用寄存器代码了。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">module</span><span class="w"> </span><span class="n">gen_regs</span><span class="w"> </span><span class="p">(</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">input</span><span class="w">  </span><span class="n">clk</span><span class="p">,</span>
@@ -6612,7 +6612,7 @@
 <h2 id="alu">ALU模块设计</h2>
 <p>当操作码和操作数都准备好后，我们就可以开始ALU模块的实现了。</p>
 <p>上述执行控制模块根据三类指令产生的ALU操作信号aluOp，在ALU模块就能以此为依据，执行相应的运算了。操作码对应的ALU操作如下表所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/22/38/22033f3e45836cce1a6c35a6def6e038.jpg?wh=1920x1457" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/22/38/22033f3e45836cce1a6c35a6def6e038.jpg?wh=1920x1457" /></p>
 <p>根据表格中的操作编码和对应的运行操作，很容易就可以设计出ALU模块，具体的设计代码如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">module</span><span class="w"> </span><span class="n">alu</span><span class="w"> </span><span class="p">(</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">input</span><span class="w">  </span><span class="p">[</span><span class="mh">31</span><span class="o">:</span><span class="mh">0</span><span class="p">]</span><span class="w"> </span><span class="n">alu_data1_i</span><span class="p">,</span>
@@ -6700,7 +6700,7 @@
 <p>接着我们设计了执行控制模块。根据译码模块里产生的指令控制字段aluCrtlOp，执行控制模块可以根据上述的三类指令，相应产生一个4位的ALU操作信号aluOp，为后面的ALU模块提供运算执行码。</p>
 <p>根据指令在流水线中执行时对通用寄存器的读写特点，我们为32个通用寄存器组设计了<strong>由两个套读接口和一套写接口组成的通用寄存器模块，这三套接口可以支持其他模块对通用寄存器进行同时读写。</strong></p>
 <p>最后，根据执行控制模块产生的ALU运算控制信号aluOp，我们设计出了ALU模块。在ALU模块中，可以完成加减法计算，两个操作数的大小比较，操作数的左移右移等操作。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/65/f0/6538fa1bc1829f2f24cf1197fb579ef0.jpg?wh=1920x1466" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/65/f0/6538fa1bc1829f2f24cf1197fb579ef0.jpg?wh=1920x1466" /></p>
 <p>如果你有兴趣的话，可以参考前面RISC-V指令架构里列出的指令，自己试试实现更多的指令操作。下节课，我们继续探索访存相关模块如何设计和实现，敬请期待。</p>
 <h2 id="_4">思考题</h2>
 <p>在ALU模块代码中，为什么要把左移操作转换为右移进行处理？</p>
@@ -6828,8 +6828,6 @@ Q3：regs[ii] &lt;= 32&#39;b0;   是把32&#39;b0写到regs[ii]吗？
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

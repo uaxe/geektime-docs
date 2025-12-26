@@ -6960,24 +6960,24 @@
 </ol>
 <p>那针对这两个问题，LevelDB采用了延迟合并的设计来优化。具体来说就是，先将Immutable MemTable顺序快速写入磁盘，直接变成一个个<strong>SSTable</strong>（Sorted String Table）文件，之后再对这些SSTable文件进行合并。这样就避免了C0树和C1树昂贵的合并代价。至于SSTable文件是什么，以及多个SSTable文件怎么合并，我们一会儿再详细分析。</p>
 <p>好了，现在你已经知道了，内存数据高效存储到磁盘上的具体方案了。那在这种方案下，数据又是如何检索的呢？在检索一个数据的时候，我们会先在MemTable中查找，如果查找不到再去Immutable MemTable中查找。如果Immutable MemTable也查询不到，我们才会到磁盘中去查找。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/22/1a/22cbb79dd84126a66b12e1b50c58991a.jpeg?wh=1920%2A1080" title="增加Immutable MemTable设计的示意图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/22/1a/22cbb79dd84126a66b12e1b50c58991a.jpeg?wh=1920%2A1080" title="增加Immutable MemTable设计的示意图" /></p>
 <p>因为磁盘中原有的C1树被多个较小的SSTable文件代替了。那现在我们要解决的问题就变成了，如何快速提高磁盘中多个SSTable文件的检索效率。</p>
 <h2 id="sstable">SSTable的分层管理设计</h2>
 <p>我们知道，SSTable文件是由Immutable MemTable将数据顺序导入生成的。尽管SSTable中的数据是有序的，但是每个SSTable覆盖的数据范围都是没有规律的，所以SSTable之间的数据很可能有重叠。</p>
 <p>比如说，第一个SSTable中的数据从1到1000，第二个SSTable中的数据从500到1500。那么当我们要查询600这个数据时，我们并不清楚应该在第一个SSTable中查找，还是在第二个SSTable中查找。最差的情况是，我们需要查询每一个SSTable，这会带来非常巨大的磁盘访问开销。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5f/02/5f197f2664d0358e03989ef7ae2e7e02.jpeg?wh=1920%2A1080" title="范围重叠时，查询多个SSTable的示意图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5f/02/5f197f2664d0358e03989ef7ae2e7e02.jpeg?wh=1920%2A1080" title="范围重叠时，查询多个SSTable的示意图" /></p>
 <p>因此，对于SSTable文件，我们需要将它整理一下，将SSTable文件中存的数据进行重新划分，让每个SSTable的覆盖范围不重叠。这样我们就能将SSTable按照覆盖范围来排序了。并且，由于每个SSTable覆盖范围不重叠，当我们需要查找数据的时候，我们只需要通过二分查找的方式，找到对应的一个SSTable文件，就可以在这个SSTable中完成查询了。
-<img alt="" src="https://static001.geekbang.org/resource/image/4d/a7/4de515f8b4f7f90cc99112fe5b2b2da7.jpeg?wh=1920%2A1080" title="范围不重叠时，只需查询一个SSTable的示意图" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4d/a7/4de515f8b4f7f90cc99112fe5b2b2da7.jpeg?wh=1920%2A1080" title="范围不重叠时，只需查询一个SSTable的示意图" /></p>
 <p>但是要让所有SSTable文件的覆盖范围不重叠，不是一个很简单的事情。为什么这么说呢？我们看一下这个处理过程。系统在最开始时，只会生成一个SSTable文件，这时候我们不需要进行任何处理，当系统生成第二个SSTable的时候，为了保证覆盖范围不重合，我们需要将这两个SSTable用多路归并的方式处理，生成新的SSTable文件。</p>
 <p>那为了方便查询，我们要保证每个SSTable文件不要太大。因此，LevelDB还控制了每个SSTable文件的容量上限（不超过2M）。这样一来，两个SSTable合并就会生成1个到2个新的SSTable。</p>
 <p>这时，新的SSTable文件之间的覆盖范围就不重合了。当系统再新增一个SSTable时，我们还用之前的处理方式，来计算这个新的SSTable的覆盖范围，然后和已经排好序的SSTable比较，找出覆盖范围有重合的所有SSTable进行多路归并。这种多个SSTable进行多路归并，生成新的多个SSTable的过程，也叫作Compaction。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/32/0a/32e551a4f13d5630b7a0e43bef556b0a.jpeg?wh=1920%2A1080" title="SSTable保持有序的多路归并过程" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/32/0a/32e551a4f13d5630b7a0e43bef556b0a.jpeg?wh=1920%2A1080" title="SSTable保持有序的多路归并过程" /></p>
 <p>随着SSTable文件的增多，多路归并的对象也会增多。那么，最差的情况会是什么呢？最差的情况是所有的SSTable都要进行多路归并。这几乎是一个不可能被接受的时间消耗，系统的读写性能都会受到很严重的影响。</p>
 <p>那我们该怎么降低多路归并涉及的SSTable个数呢？在<a href="https://time.geekbang.org/column/article/222807">第9讲</a>中，我们提到过，对于少量索引数据和大规模索引数据的合并，我们可以采用滚动合并法来避免大量数据的无效复制。因此，LevelDB也采用了这个方法，将SSTable进行分层管理，然后逐层滚动合并。这就是LevelDB的分层思想，也是LevelDB的命名原因。接下来，我们就一起来看看LevelDB具体是怎么设计的。</p>
 <p>首先，<strong>从Immutable MemTable转成的SSTable会被放在Level 0 层。</strong>Level 0 层最多可以放4个SSTable文件。当Level 0层满了以后，我们就要将它们进行多路归并，生成新的有序的多个SSTable文件，这一层有序的SSTable文件就是Level 1 层。</p>
 <p>接下来，如果Level 0 层又存入了新的4个SSTable文件，那么就需要和Level 1层中相关的SSTable进行多路归并了。但前面我们也分析过，如果Level 1中的SSTable数量很多，那么在大规模的文件合并时，磁盘IO代价会非常大。因此，LevelDB的解决方案就是，<strong>给Level 1中的SSTable文件的总容量设定一个上限</strong>（默认设置为10M），这样多路归并时就有了一个代价上限。</p>
 <p>当Level 1层的SSTable文件总容量达到了上限之后，我们就需要选择一个SSTable的文件，将它并入下一层（为保证一层中每个SSTable文件都有机会并入下一层，我们选择SSTable文件的逻辑是轮流选择。也就是说第一次我们选择了文件A，下一次就选择文件A后的一个文件）。<strong>下一层会将容量上限翻10倍</strong>，这样就能容纳更多的SSTable了。依此类推，如果下一层也存满了，我们就在该层中选择一个SSTable，继续并入下一层。这就是LevelDB的分层设计了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ca/5a/ca6dad0aaa0eb1303b5c1bb17241915a.jpeg?wh=1920%2A1080" title="LevelDB的层次结构示意图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ca/5a/ca6dad0aaa0eb1303b5c1bb17241915a.jpeg?wh=1920%2A1080" title="LevelDB的层次结构示意图" /></p>
 <p>尽管LevelDB通过限制每层的文件总容量大小，能保证做多路归并时，会有一个开销上限。但是层数越大，容量上限就越大，那发生在下层的多路归并依然会造成大量的磁盘IO开销。这该怎么办呢？</p>
 <p>对于这个问题，LevelDB是通过加入一个限制条件解决的。在多路归并生成第n层的SSTable文件时，LevelDB会判断生成的SSTable和第n+1层的重合覆盖度，如果重合覆盖度超过了10个文件，就结束这个SSTable的生成，继续生成下一个SSTable文件。</p>
 <p>通过这个限制，<strong>LevelDB就保证了第n层的任何一个SSTable要和第n+1层做多路归并时，最多不会有超过10个SSTable参与</strong>，从而保证了归并性能。</p>
@@ -6985,12 +6985,12 @@
 <p>在理解了这样的架构之后，我们再来看看当我们想在磁盘中查找一个元素时，具体是怎么操作的。</p>
 <p>首先，我们会在Level 0 层中进行查找。由于Level 0层的SSTable没有做过多路归并处理，它们的覆盖范围是有重合的。因此，我们需要检查Level 0层中所有符合条件的SSTable，在其中查找对应的元素。如果Level 0没有查到，那么就下沉一层继续查找。</p>
 <p>而从Level 1开始，每一层的SSTable都做过了处理，这能保证覆盖范围不重合的。因此，对于同一层中的SSTable，我们可以使用二分查找算法快速定位唯一的一个SSTable文件。如果查到了，就返回对应的SSTable文件；如果没有查到，就继续沉入下一层，直到查到了或查询结束。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/57/8b/57cd22fa67cba386d83686a31434e08b.jpeg?wh=1920%2A1080" title="LevelDB分层检索过程示意图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/57/8b/57cd22fa67cba386d83686a31434e08b.jpeg?wh=1920%2A1080" title="LevelDB分层检索过程示意图" /></p>
 <p>可以看到，通过这样的一种架构设计，我们就将SSTable进行了有序的管理，使得查询操作可以快速被限定在有限的SSTable中，从而达到了加速检索的目的。</p>
 <h2 id="sstable_2">SSTable文件中的检索加速</h2>
 <p>那在定位到了对应的SSTable文件后，接下来我们该怎么查询指定的元素呢？这个时候，前面我们学过的一些检索技术，现在就可以派上用场了。</p>
 <p>首先，LevelDB使用索引与数据分离的设计思想，将SSTable分为数据存储区和数据索引区两大部分。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/53/40/53d347e57ffee9a7ea14dde2b5f4a340.jpeg?wh=1920%2A1080" title="SSTable文件格式" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/53/40/53d347e57ffee9a7ea14dde2b5f4a340.jpeg?wh=1920%2A1080" title="SSTable文件格式" /></p>
 <p>我们在读取SSTable文件时，不需要将整个SSTable文件全部读入内存，只需要先将数据索引区中的相关数据读入内存就可以了。这样就能大幅减少磁盘IO次数。</p>
 <p>然后，我们需要快速确定这个SSTable是否包含查询的元素。对于这种是否存在的状态查询，我们可以使用前面讲过的BloomFilter技术进行高效检索。也就是说，我们可以从数据索引区中读出BloomFilter的数据。这样，我们就可以使用O(1)的时间代价在BloomFilter中查询。如果查询结果是不存在，我们就跳过这个SSTable文件。而如果BloomFilter中查询的结果是存在，我们就继续进行精确查找。</p>
 <p>在进行精确查找时，我们将数据索引区中的Index Block读出，Index Block中的每条记录都记录了每个Data Block的最小分隔key、起始位置，还有block的大小。由于所有的记录都是根据Key排好序的，因此，我们可以使用二分查找算法，在Index Block中找到我们想查询的Key。</p>
@@ -7161,8 +7161,6 @@ MySQL在写数据的时候，是先写到change buffer内存中的，不会立�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

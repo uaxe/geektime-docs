@@ -5394,10 +5394,10 @@
 <p>通过前面几节课的学习，我们理解了JavaScript是一门基于对象的语言，它能实现非常多的特性，诸如函数是一等公民、闭包、函数式编程、原型继承等，搞懂了这些特性，我们就可以来打开V8这个黑盒，深入了解它的编译流水线了。</p>
 <p>我们知道，当你想执行一段JavaScript代码时，只需要将代码丢给V8虚拟机，V8便会执行并返回给你结果。</p>
 <p>其实在执行JavaScript代码之前，V8就已经准备好了代码的运行时环境，这个环境包括了堆空间和栈空间、全局执行上下文、全局作用域、内置的内建函数、宿主环境提供的扩展函数和对象，还有消息循环系统。准备好运行时环境之后，V8才可以执行JavaScript代码，这包括解析源码、生成字节码、解释执行或者编译执行这一系列操作。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a8/54/a89d747fb614a17e08b1a6b7dce62b54.jpg?wh=2284%2A588" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a8/54/a89d747fb614a17e08b1a6b7dce62b54.jpg?wh=2284%2A588" /></p>
 <p>对运行时环境有足够的了解，能够帮助我们更好地理解V8的执行流程。比如事件循环系统可以让你清楚各种回调函数是怎么被执行的，栈空间可以让你了解函数是怎么被调用的，堆空间和栈空间让你了解为什么要有传值和传引用，等等。</p>
 <p>运行时环境涉及到的知识都是非常基础，但又非常容易被忽视的。今天这节课，我们就来分析下这些基础的运行时环境。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9a/49/9ad5d32bce98aad219c9f73513ac6349.jpg?wh=2284%2A1285" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9a/49/9ad5d32bce98aad219c9f73513ac6349.jpg?wh=2284%2A1285" /></p>
 <h2 id="_1">什么是宿主环境？</h2>
 <p>要聊运行V8的运行时环境，我们不得不聊V8的宿主环境，什么是V8的宿主环境呢？</p>
 <p>在生物学上，宿主是指为病毒等寄生物提供生存环境的生物，宿主有自己的完整的代谢系统，而病毒则没有自己的代谢系统，也没有自己的酶系统，它只是由核酸长链和蛋白质外壳构成。</p>
@@ -5405,7 +5405,7 @@
 <p>同样，你可以把V8和浏览器的渲染进程的关系看成病毒和细胞的关系，浏览器为V8提供基础的消息循环系统、全局变量、Web API，而V8的核心是实现了ECMAScript标准，这相当于病毒自己的DNA或者RNA，V8只提供了ECMAScript定义的一些对象和一些核心的函数，这包括了Object、Function、String。除此之外，V8还提供了垃圾回收器、协程等基础内容，不过这些功能依然需要宿主环境的配合才能完整执行。</p>
 <p>如果V8使用不当，比如不规范的代码触发了频繁的垃圾回收，或者某个函数执行时间过久，这些都会占用宿主环境的主线程，从而影响到程序的执行效率，甚至导致宿主环境的卡死。</p>
 <p>其实，除了浏览器可以作为V8的宿主环境，Node.js也是V8的另外一种宿主环境，它提供了不同的宿主对象和宿主的API，但是整个流程依然是相同的，比如Node.js也会提供一套消息循环系统，也会提供一个运行时的主线程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e5/2f/e541d8611b725001509bfcd6797f492f.jpg?wh=2284%2A1285" title="宿主环境和V8的关系" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e5/2f/e541d8611b725001509bfcd6797f492f.jpg?wh=2284%2A1285" title="宿主环境和V8的关系" /></p>
 <p>好了，现在我们知道，要执行V8，则需要有一个宿主环境，宿主环境可以是浏览器中的渲染进程，可以是Node.js进程,也可以是其他的定制开发的环境，而这些宿主则提供了很多V8执行JavaScript时所需的基础功能部件，接下来我们就来一一分析下这些部件。</p>
 <h2 id="_2">构造数据存储空间：堆空间和栈空间</h2>
 <p>由于V8是寄生在浏览器或者Node.js这些宿主中的，因此，V8也是被这些宿主启动的。比如，在Chrome中，只要打开一个渲染进程，渲染进程便会初始化V8，同时初始化堆空间和栈空间。</p>
@@ -5430,7 +5430,7 @@
 <p>执行上下文中主要包含三部分，变量环境、词法环境和this关键字。比如在浏览器的环境中，全局执行上下文中就包括了window对象，还有默认指向window的this关键字，另外还有一些Web API函数，诸如setTimeout、XMLHttpRequest等内容。</p>
 <p>而词法环境中，则包含了使用let、const等变量的内容。</p>
 <p>执行上下文所包含的具体内容，你可以参考下图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0b/f5/0b4929e11b49856037ffdcf00508d4f5.jpg?wh=2284%2A1285" title="什么是执行上下文" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0b/f5/0b4929e11b49856037ffdcf00508d4f5.jpg?wh=2284%2A1285" title="什么是执行上下文" /></p>
 <p>全局执行上下文在V8的生存周期内是不会被销毁的，它会一直保存在堆中，这样当下次在需要使用函数或者全局变量时，就不需要重新创建了。另外，当你执行了一段全局代码时，如果全局代码中有声明的函数或者定义的变量，那么函数对象和声明的变量都会被添加到全局执行上下文中。比如下面这段代码：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>var x = 1
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>function show_x(){
@@ -5446,7 +5446,7 @@
 <a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>}
 </code></pre></div>
 <p>这段代码在执行时，就会有两个对应的作用域，一个是全局作用域，另外一个是括号内部的作用域，但是这些内容都会保存到全局执行上下文中。具体你可以参考下图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/24/4d/2400b1d780a7abfabdf48b39607f244d.jpg?wh=2284%2A1285" title="全局作用域和子作用域关系" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/24/4d/2400b1d780a7abfabdf48b39607f244d.jpg?wh=2284%2A1285" title="全局作用域和子作用域关系" /></p>
 <p>当V8调用了一个函数时，就会进入函数的执行上下文，这时候全局执行上下文和当前的函数执行上下文就形成了一个栈结构。比如执行下面这段代码：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>var x = 1
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>function show_x(){
@@ -5458,7 +5458,7 @@
 <a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>bar()
 </code></pre></div>
 <p>当执行到show_x的时候，其栈状态如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/86/e1/86ee3d0f4b2a8e8cc6c2b3fc320dcce1.jpg?wh=2284%2A1285" title="函数调用栈" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/86/e1/86ee3d0f4b2a8e8cc6c2b3fc320dcce1.jpg?wh=2284%2A1285" title="函数调用栈" /></p>
 <h2 id="_4">构造事件循环系统</h2>
 <p>有了堆空间和栈空间，生成了全局执行上下文和全局作用域，接下来就可以执行JavaScript代码了吗？</p>
 <p>答案是不行，因为V8还需要有一个主线程，用来执行JavaScript和执行垃圾回收等工作。V8是寄生在宿主环境中的，它并没有自己的主线程，而是使用宿主所提供的主线程，V8所执行的代码都是在宿主的主线程上执行的。</p>
@@ -5629,8 +5629,6 @@ ES5和ES6的执行环境的区别是啥？
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

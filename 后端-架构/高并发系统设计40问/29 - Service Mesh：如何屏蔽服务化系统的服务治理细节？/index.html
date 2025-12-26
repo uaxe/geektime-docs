@@ -14619,11 +14619,11 @@
 <h2 id="service-mesh">Service Mesh是如何工作的</h2>
 <h3 id="1-service-mesh">1. 什么是Service Mesh</h3>
 <p>Service Mesh主要处理服务之间的通信，它的主要实现形式就是在应用程序同主机上部署一个代理程序。一般来讲，我们将这个代理程序称为“Sidecar（边车）”，服务之间的通信也从之前的客户端和服务端直连，变成了下面这种形式：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/83/1b/833f4c8daea04104dfa5566715642c1b.jpg?wh=1142%2A305" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/83/1b/833f4c8daea04104dfa5566715642c1b.jpg?wh=1142%2A305" /></p>
 <p>在这种形式下，RPC客户端将数据包先发送给与自身同主机部署的Sidecar，在Sidecar中经过服务发现、负载均衡、服务路由、流量控制之后，再将数据发往指定服务节点的Sidecar，在服务节点的Sidecar中，经过记录访问日志、记录分布式追踪日志、限流之后，再将数据发送给RPC服务端。</p>
 <p>这种方式可以把业务代码和服务治理的策略隔离开，将服务治理策略下沉，让它成为独立的基础模块。这样一来，不仅可以实现跨语言服务治理策略的复用，还能对这些Sidecar做统一的管理。</p>
 <p><strong>目前，业界提及最多的Service Mesh方案当属<a href="https://istio.io">Istio</a>，</strong> 它的玩法是这样的：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/60/64/604415b5d99ca176baf1c628d0677c64.jpg?wh=1142%2A482" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/60/64/604415b5d99ca176baf1c628d0677c64.jpg?wh=1142%2A482" /></p>
 <p>它将组件分为数据平面和控制平面，数据平面就是我提到的Sidecar（Istio使用<a href="https://www.envoyproxy.io/">Envoy</a>作为Sidecar的实现）。控制平面主要负责服务治理策略的执行，在Istio中，主要分为Mixer、Pilot和Istio-auth三部分。</p>
 <p>你可以先不了解每一部分的作用，只知道它们共同构成了服务治理体系就可以了。</p>
 <p>然而，在Istio中，每次请求都需要经过控制平面，也就是说，每次请求都需要跨网络地调用Mixer，这会极大地影响性能。</p>
@@ -14632,7 +14632,7 @@
 <p>在Service Mesh的实现中，一个主要的问题是如何尽量无感知地引入Sidecar作为网络代理。也就是说，无论是数据流入还是数据流出时，都要将数据包重定向到Sidecar的端口上。实现思路一般有两种：</p>
 <p>第一种，使用iptables的方式来实现流量透明的转发，而Istio就默认了使用iptables来实现数据包的转发。为了能更清晰地说明流量转发的原理，我们先简单地回顾一下什么是iptables。</p>
 <p>Iptables是 Linux 内核中，防火墙软件 Netfilter 的管理工具，它位于用户空间，可以控制Netfilter实现地址转换的功能。在iptables中默认有五条链，你可以把这五条链当作数据包流转过程中的五个步骤，依次为PREROUTING，INPUT，FORWARD，OUTPUT和POSTROUTING。数据包传输的大体流程如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0e/8e/0e432f5623f7c1528341d2459b949a8e.jpg?wh=1142%2A272" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0e/8e/0e432f5623f7c1528341d2459b949a8e.jpg?wh=1142%2A272" /></p>
 <p>从图中可以看到，数据包以PREROUTING链作为入口，当数据包目的地为本机时，它们也都会流经到OUTPUT链。所以，我们可以在这两个链上增加一些规则，将数据包重定向。我以Istio为例，带你看看如何使用iptables实现流量转发。</p>
 <p>在Istio中，有一个叫做“istio-iptables.sh”的脚本，这个脚本在Sidecar被初始化的时候执行，主要是设置一些iptables规则。</p>
 <p>我摘录了一些关键点来说明一下：</p>
@@ -14657,13 +14657,13 @@
 <a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>iptables -t nat -A ISTIO_INBOUND -p tcp --dport &quot;${port}&quot; -j ISTIO_IN_REDIRECT //将ISTIO_INBOUND链上指定目的端口的流量重定向到ISTIO_IN_REDIRECT链
 </code></pre></div>
 <p>假设服务的节点部署在9080端口上，Sidecar开发的端口是15001，那么流入流量的流向如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/01/24/014a530acbcac3f8b57635627a22e924.jpg?wh=1142%2A168" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/01/24/014a530acbcac3f8b57635627a22e924.jpg?wh=1142%2A168" /></p>
 <p>流出流量的流量图如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/43/55/43ee298a3f01c0de5d3ee0c5c96ea455.jpg?wh=1142%2A152" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/43/55/43ee298a3f01c0de5d3ee0c5c96ea455.jpg?wh=1142%2A152" /></p>
 <p><strong>Iptables方式的优势在于对业务完全透明，</strong>业务甚至不知道有Sidecar存在，这样会减少业务接入的时间。不过它也有缺陷，那就是它是在高并发下，性能上会有损耗，因此国内大厂采用了另外一种方式：轻量级客户端。</p>
 <p>在这种方式下，RPC客户端会通过配置的方式，知道Sidecar的部署端口，然后通过一个轻量级客户端，将调用服务的请求发送给Sidecar。Sidecar在转发请求之前，先执行一些服务治理的策略，比如，从注册中心中查询到服务节点信息并且缓存起来，然后从服务节点中，使用某种负载均衡的策略选出一个节点等等。</p>
 <p>请求被发送到服务端的Sidecar上后，然后在服务端记录访问日志和分布式追踪日志，再把请求转发到真正的服务节点上。当然，服务节点在启动时，会委托服务端Sidecar向注册中心注册节点，Sidecar也就知道了真正服务节点部署的端口是多少。整个请求过程如图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ea/1d/ea37c1e8374d2c67b3348b566fb8921d.jpg?wh=1142%2A426" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ea/1d/ea37c1e8374d2c67b3348b566fb8921d.jpg?wh=1142%2A426" /></p>
 <p>当然，除了iptables和轻量级客户端两种方式外，目前在探索的方案还有<a href="https://github.com/cilium/cilium">Cilium</a>。这个方案可以从Socket层面实现请求的转发，也就可以避免iptables方式在性能上的损耗。<strong>在这几种方案中，我建议你使用轻量级客户端的方式，</strong>这样虽然会有一些改造成本，但是却在实现上最简单，可以快速让Service Mesh在你的项目中落地。</p>
 <p>当然，无论采用哪种方式，你都可以实现将Sidecar部署到客户端和服务端的调用链路上，让它代理进出流量。这样，你就可以使用运行在Sidecar中的服务治理的策略了。至于这些策略我在前面的课程中都带你了解过（你可以回顾23至26讲的课程），这里就不再赘述了。</p>
 <p>与此同时，我也建议你了解目前业界一些开源的Service Mesh框架，这样在选择方案时可以多一些选择。目前在开源领域比较成熟的Service Mesh框架有下面几个，你可以通过阅读它们的文档来深入了解，作为本节课的引申阅读。</p>
@@ -14805,8 +14805,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

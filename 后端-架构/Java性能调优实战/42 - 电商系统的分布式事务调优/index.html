@@ -14626,8 +14626,8 @@
 <p>如今，大部分公司的服务基本都实现了微服务化，首先是业务需求，为了解耦业务；其次是为了减少业务与业务之间的相互影响。</p>
 <p>电商系统亦是如此，大部分公司的电商系统都是分为了不同服务模块，例如商品模块、订单模块、库存模块等等。事实上，分解服务是一把双刃剑，可以带来一些开发、性能以及运维上的优势，但同时也会增加业务开发的逻辑复杂度。其中最为突出的就是分布式事务了。</p>
 <p>通常，存在分布式事务的服务架构部署有以下两种：同服务不同数据库，不同服务不同数据库。我们以商城为例，用图示说明下这两种部署：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/11/5a/111f44892deb9919a1310d636a538f5a.jpg?wh=992%2A752" /></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/48/6c/48d448543aeac5eba4b9edd24e1bcf6c.jpg?wh=1038%2A1029" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/11/5a/111f44892deb9919a1310d636a538f5a.jpg?wh=992%2A752" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/48/6c/48d448543aeac5eba4b9edd24e1bcf6c.jpg?wh=1038%2A1029" /></p>
 <p>通常，我们都是基于第二种架构部署实现的，那我们应该如何实现在这种服务架构下，有关订单提交业务的分布式事务呢？</p>
 <h2 id="_1">分布式事务解决方案</h2>
 <p>我们讲过，在单个数据库的情况下，数据事务操作具有ACID四个特性，但如果在一个事务中操作多个数据库，则无法使用数据库事务来保证一致性。</p>
@@ -14637,17 +14637,17 @@
 <h3 id="1-xa">1. XA规范</h3>
 <p>在XA规范之前，存在着一个DTP模型，该模型规范了分布式事务的模型设计。</p>
 <p>DTP规范中主要包含了AP、RM、TM三个部分，其中AP是应用程序，是事务发起和结束的地方；RM是资源管理器，主要负责管理每个数据库的连接数据源；TM是事务管理器，负责事务的全局管理，包括事务的生命周期管理和资源的分配协调等。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/dc/67/dcbb483b62b1e0a51d03c7edfcf89767.jpg?wh=1086%2A676" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dc/67/dcbb483b62b1e0a51d03c7edfcf89767.jpg?wh=1086%2A676" /></p>
 <p>XA则规范了TM与RM之间的通信接口，在TM与多个RM之间形成一个双向通信桥梁，从而在多个数据库资源下保证ACID四个特性。</p>
 <p>这里强调一下，JTA是基于XA规范实现的一套Java事务编程接口，是一种两阶段提交事务。我们可以通过<a href="https://github.com/nickliuchao/jta">源码</a>简单了解下JTA实现的多数据源事务提交。</p>
 <h3 id="2">2. 二阶提交和三阶提交</h3>
 <p>XA规范实现的分布式事务属于二阶提交事务，顾名思义就是通过两个阶段来实现事务的提交。</p>
 <p>在第一阶段，应用程序向事务管理器（TM）发起事务请求，而事务管理器则会分别向参与的各个资源管理器（RM）发送事务预处理请求（Prepare），此时这些资源管理器会打开本地数据库事务，然后开始执行数据库事务，但执行完成后并不会立刻提交事务，而是向事务管理器返回已就绪（Ready）或未就绪（Not Ready）状态。如果各个参与节点都返回状态了，就会进入第二阶段。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2a/95/2a1cf8f45675acac6fe07c172a36ec95.jpg?wh=2224%2A746" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2a/95/2a1cf8f45675acac6fe07c172a36ec95.jpg?wh=2224%2A746" /></p>
 <p>到了第二阶段，如果资源管理器返回的都是就绪状态，事务管理器则会向各个资源管理器发送提交（Commit）通知，资源管理器则会完成本地数据库的事务提交，最终返回提交结果给事务管理器。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/59/d5/59734e1a229ceee9df4295d0901ce2d5.jpg?wh=2212%2A688" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/59/d5/59734e1a229ceee9df4295d0901ce2d5.jpg?wh=2212%2A688" /></p>
 <p>在第二阶段中，如果任意资源管理器返回了未就绪状态，此时事务管理器会向所有资源管理器发送事务回滚（Rollback）通知，此时各个资源管理器就会回滚本地数据库事务，释放资源，并返回结果通知。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/87/2f/8791dfe19fce916f77b6c5740bc32e2f.jpg?wh=2202%2A760" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/87/2f/8791dfe19fce916f77b6c5740bc32e2f.jpg?wh=2202%2A760" /></p>
 <p>但事实上，二阶事务提交也存在一些缺陷。</p>
 <p>第一，在整个流程中，我们会发现各个资源管理器节点存在阻塞，只有当所有的节点都准备完成之后，事务管理器才会发出进行全局事务提交的通知，这个过程如果很长，则会有很多节点长时间占用资源，从而影响整个节点的性能。</p>
 <p>一旦资源管理器挂了，就会出现一直阻塞等待的情况。类似问题，我们可以通过设置事务超时时间来解决。</p>
@@ -14660,7 +14660,7 @@
 <p>除了性能问题，JTA只能解决同一服务下操作多数据源的分布式事务问题，换到微服务架构下，可能存在同一个事务操作，分别在不同服务上连接数据源，提交数据库操作。</p>
 <p>而TCC正是为了解决以上问题而出现的一种分布式事务解决方案。TCC采用最终一致性的方式实现了一种柔性分布式事务，与XA规范实现的二阶事务不同的是，TCC的实现是基于服务层实现的一种二阶事务提交。</p>
 <p>TCC分为三个阶段，即Try、Confirm、Cancel三个阶段。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/23/a9/23f68980870465ba6c00c0f2619fcfa9.jpg?wh=1892%2A1300" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/23/a9/23f68980870465ba6c00c0f2619fcfa9.jpg?wh=1892%2A1300" /></p>
 <ul>
 <li>Try阶段：主要尝试执行业务，执行各个服务中的Try方法，主要包括预留操作；</li>
 <li>Confirm阶段：确认Try中的各个方法执行成功，然后通过TM调用各个服务的Confirm方法，这个阶段是提交阶段；</li>
@@ -14672,7 +14672,7 @@
 <h3 id="4-seatafescar">4. 业务无侵入方案——Seata(Fescar)</h3>
 <p>Seata是阿里去年开源的一套分布式事务解决方案，开源一年多已经有一万多star了，可见受欢迎程度非常之高。</p>
 <p>Seata的基础建模和DTP模型类似，只不过前者是将事务管理器分得更细了，抽出一个事务协调器（Transaction Coordinator 简称TC），主要维护全局事务的运行状态，负责协调并驱动全局事务的提交或回滚。而TM则负责开启一个全局事务，并最终发起全局提交或全局回滚的决议。如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6a/83/6ac3de014819c54fe6904c938240b183.jpg?wh=1086%2A896" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6a/83/6ac3de014819c54fe6904c938240b183.jpg?wh=1086%2A896" /></p>
 <p>按照<a href="https://github.com/seata/seata">Github</a>中的说明介绍，整个事务流程为：</p>
 <ul>
 <li>TM 向 TC 申请开启一个全局事务，全局事务创建成功并生成一个全局唯一的 XID；</li>
@@ -14825,8 +14825,6 @@ Seata将RM也提升到了服务层实现。
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

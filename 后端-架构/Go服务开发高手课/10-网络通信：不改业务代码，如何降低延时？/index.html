@@ -14035,23 +14035,23 @@
 <p>不过呢，当服务调用的IO延时比较长时，除了框架本身网络IO模型的优化之外，我们还可以使用其它方式，来降低服务调用的网络IO延时。今天我就来聊聊如何在不改业务代码的情况下，降低服务调用的IO延时。</p>
 <h2 id="_1">跨机通信优化</h2>
 <p>就像下面的图展示的一样，两个服务之间的请求调用会经过网络上的很多节点。服务之间的物理距离越远，经过的网络节点越多，两个服务之间的网络通信延时就会越高。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ba/e3/bae050cb46e8b90ed4bddd76d1593ae3.jpg?wh=4217x762" title="图1 服务调用网络链路" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ba/e3/bae050cb46e8b90ed4bddd76d1593ae3.jpg?wh=4217x762" title="图1 服务调用网络链路" /></p>
 <p>因此，为了降低网络IO的延时，咱们的第一个优化思路是——让通信的Client和Server物理距离尽可能近一点。怎么才能达到这一目标呢？</p>
 <p>为了让进行通信的Client和Server尽可能近，在流量调度上，我们可以采取下面两个优化策略。</p>
 <p>第一个策略是，当两个服务在多地域有部署时，Client和Server<strong>不进行跨地域调用</strong>。比如，以下面的图为例，服务A在华北区域的服务器，只调用服务B在华北区域部署的服务器，尽量不要跨地域去调用服务B在华东区域部署的服务器。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/67/c5/67c7905091e2089b4c37cc66d69245c5.jpg?wh=1289x886" title="图2 同地域调用" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/67/c5/67c7905091e2089b4c37cc66d69245c5.jpg?wh=1289x886" title="图2 同地域调用" /></p>
 <p>当然，如果同地域内的下游服务出现故障或不可用时，在延时满足要求的情况下，出于容灾上的考虑，我们可以允许短期的跨地域调用。
-<img alt="" src="https://static001.geekbang.org/resource/image/5f/c2/5f9f60dafe887a86cf60c95092d732c2.jpg?wh=2413x1805" title="图3 跨地域容灾调用" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5f/c2/5f9f60dafe887a86cf60c95092d732c2.jpg?wh=2413x1805" title="图3 跨地域容灾调用" /></p>
 <p>第二个优化策略是，当两个服务在同地域多机房有部署时，Client和Server<strong>不进行跨机房调用。</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/11/89/11b8deb3e4fb93f66bd9e355e581de89.jpg?wh=2898x1846" title="图4 同机房调用" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/11/89/11b8deb3e4fb93f66bd9e355e581de89.jpg?wh=2898x1846" title="图4 同机房调用" /></p>
 <p>和跨区域容灾调用类似，如果同机房内的服务出现故障或不可用时，在延时满足要求的情况下，我们也可以允许短期的跨机房调用。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4a/48/4a286146bd5035303e158a53b2c02a48.jpg?wh=2900x2062" title="图5 容灾跨机房调用" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4a/48/4a286146bd5035303e158a53b2c02a48.jpg?wh=2900x2062" title="图5 容灾跨机房调用" /></p>
 <h2 id="_2">亲和性部署</h2>
 <p>除了同地域、同机房调用外，我们还有没有办法让Client和Server的物理距离更近呢？</p>
 <p>就像下面的图展示的一样，你还可以将两个服务，尽可能地部署到一台物理机上，这样当Client发起请求调用时，可以优先调用同一个物理机上的Server，从而达到完全消除网络传输开销的目的，这就是<strong>亲和性部署策略</strong>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5c/87/5c95a5a729e55dc828b4aeec5a6ae887.jpg?wh=3000x1631" title="图6 同节点调用" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5c/87/5c95a5a729e55dc828b4aeec5a6ae887.jpg?wh=3000x1631" title="图6 同节点调用" /></p>
 <p>亲和性部署策略除了将服务之间的远程通信变成同机通信之外，为了减少复杂TCP协议通信所产生的开销，它还会将通信方式换成IPC通信（也就是进程间通信），比如共享内存通信，从而使两个服务之间的数据传输更为高效，数据传输的资源消耗也更低。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/33/dd/33791a93d659a4fac58e9b5b125737dd.jpg?wh=2731x1761" title="图7 TCP 通信转 IPC 通信" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/33/dd/33791a93d659a4fac58e9b5b125737dd.jpg?wh=2731x1761" title="图7 TCP 通信转 IPC 通信" /></p>
 <p>当然，如果我们要使用亲和性部署策略，达到降低网络IO延时的目的，公司的多个组件都需要进行一定的改造才能支持。</p>
 <p>改造主要包括以下三个层次。</p>
 <ol>
@@ -14059,11 +14059,11 @@
 <li>接着，流量调度层需要识别上游服务实例有哪些同机下游，并根据下游服务的全局负载，计算单个上游实例访问下游实例的动态权重。值得注意的是，在权重计算的具体流程中，流量调度层对下游同机实例所赋予的权重，相较其它实例而言会适当增大，从而尽可能让更多的流量可以进行本地通信。</li>
 <li>最后，服务框架需要扩展定制支持亲和性部署的IPC通信方式，这样基于流量调度层的计算结果将请求发给同机实例时，通信效率会更高。当然，由于物理机容量的限制，对于单个物理机上的服务调用，同机的下游实例未必能承受住所有流量，所以还是会有部分跨机调用流量，因此框架层面仍需要保留采用TCP协议的远程通信方式。</li>
 </ol>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5f/9d/5fb581b04d9bf0707b087964fa9a3b9d.jpg?wh=3000x2096" title="图8 亲和性部署" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5f/9d/5fb581b04d9bf0707b087964fa9a3b9d.jpg?wh=3000x2096" title="图8 亲和性部署" /></p>
 <h2 id="_3">合并编译</h2>
 <p>通过亲和性部署，我们将两个服务之间的调用，变成了同机调用。那同机调用的两个服务，还有没有办法继续降低通信延时呢？</p>
 <p>我们先来梳理一下同机服务进行RPC调用的过程，看看里面还有什么可以优化的地方。就像下面的图展示的一样，同机RPC调用的过程分为下面几个核心环节。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f9/26/f9f642012b53b769b2e9519a7a062826.jpg?wh=2900x2220" title="图9 client-server 同机通信过程" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f9/26/f9f642012b53b769b2e9519a7a062826.jpg?wh=2900x2220" title="图9 client-server 同机通信过程" /></p>
 <ol>
 <li>首先，Client需要用Protobuf等协议将数据编码。</li>
 <li>接着，Client要做系统调用，将数据写入内核缓冲区。</li>
@@ -14074,7 +14074,7 @@
 <p>实际上，编解码操作和操作系统调用，属于性能开销比较大的操作，特别是请求或响应的包比较大时。如果我们有办法去除这两类操作，服务调用性能会进一步提升。</p>
 <p>那在实践中，有没有办法去除这两类操作呢？</p>
 <p>业界的前沿实践中有一种叫做合并编译的方案。就像下面的图展示的一样，<strong>合并编译</strong>将下游服务编译成SDK，并将上游服务对下游服务的RPC调用，替换成本地SDK的函数调用，从而完全消除RPC调用的编解码操作和系统调用开销**。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ba/29/bacc087edda1472cd2daba9ab59ed329.jpg?wh=2900x1210" title="图10 合并编译" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ba/29/bacc087edda1472cd2daba9ab59ed329.jpg?wh=2900x1210" title="图10 合并编译" /></p>
 <p>当然，合并编译对服务调用极致的性能优化，核心目标是解决微服务过微导致的整体CPU资源成本过高的问题。为了能拿到较大的资源成本收益，只有当两个服务之间的调用QPS比较高，编解码操作消耗的CPU比较多时，才适合用合并编译方案。</p>
 <p>除了资源成本收益之外，当我们采用合并编译方案时，还需要考虑合并之后的服务稳定性问题。由于合并编译是把两个服务打包编译，部署到一个Pod里面，所以两个服务会共用一个Pod的资源。因此，如果服务本身的CPU或内存负载比较高，由于容器规格是有上限的，对于这样的服务就不太适合采用合并编译方案。</p>
 <p>合并编译既能满足服务各自迭代的优点，又能消除服务拆分所增加的性能损耗，那它到底是怎么实现把两个服务的代码编译成一个二进制文件的呢？</p>
@@ -14090,7 +14090,7 @@
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>└──<span class="w"> </span>kitex
 </code></pre></div>
 <p>接着，就像下面的图展示的一样，我们需要给两个服务代码里的import path，加个不同的前缀方便区分。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1d/b4/1dc0bbfe769026yy8e27f091313cbeb4.jpg?wh=2800x1008" title="图11 import 加前缀" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1d/b4/1dc0bbfe769026yy8e27f091313cbeb4.jpg?wh=2800x1008" title="图11 import 加前缀" /></p>
 <p>最后，我们需要在go.mod文件里，将远程tmp目录替换成本地目录，从而将代码里各个文件import的远程依赖，改成本地文件依赖。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>replace<span class="w"> </span><span class="nv">tmp</span><span class="w"> </span><span class="o">=</span>&gt;<span class="w"> </span>./tmp
 </code></pre></div>
@@ -14269,8 +14269,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

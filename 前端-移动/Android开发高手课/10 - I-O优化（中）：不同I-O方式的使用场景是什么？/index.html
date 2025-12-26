@@ -6411,7 +6411,7 @@
 <h2 id="io">I/O的三种方式</h2>
 <p>请你先在脑海里回想一下上一期提到的Linux通用I/O架构模型，里面会包括应用程序、文件系统、Page Cache和磁盘几个部分。细心的同学可能还会发现，在图中的最左侧跟右上方还有Direct I/O和mmap的这两种I/O方式。</p>
 <p>那张图似乎有那么一点复杂，下面我为你重新画了一张简图。从图中可以看到标准I/O、mmap、直接I/O这三种I/O方式在流程上的差异，接下来我详细讲一下不同I/O方式的关键点以及在实际应用中需要注意的地方。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3e/38/3e295519291c337bb394fb5fdbd7d538.png?wh=1202%2A692" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3e/38/3e295519291c337bb394fb5fdbd7d538.png?wh=1202%2A692" /></p>
 <p><strong>1. 标准I/O</strong></p>
 <p>我们应用程序平时用到read/write操作都属于标准I/O，也就是缓存I/O（Buffered I/O）。它的关键特性有：</p>
 <ul>
@@ -6430,11 +6430,11 @@
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>vm.dirty_ratio = 20
 </code></pre></div>
 <p><strong>在实际应用中，如果某些数据我们觉得非常重要，是完全不允许有丢失风险的，这个时候我们应该采用同步写机制</strong>。在应用程序中使用sync、fsync、msync等系统调用时，内核都会立刻将相应的数据写回到磁盘。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/43/bd/431742f4ad3aefcc90334c905a729abd.png?wh=1230%2A718" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/43/bd/431742f4ad3aefcc90334c905a729abd.png?wh=1230%2A718" /></p>
 <p>上图中我以read()操作为例，它会导致数据先从磁盘拷贝到Page Cache中，然后再从Page Cache拷贝到应用程序的用户空间，这样就会多一次内存拷贝。系统这样设计主要是因为内存相对磁盘是高速设备，即使多拷贝100次，内存也比真正读一次硬盘要快。</p>
 <p><strong>2. 直接I/O</strong></p>
 <p>很多数据库自己已经做了数据和索引的缓存管理，对页缓存的依赖反而没那么强烈。它们希望可以绕开页缓存机制，这样可以减少一次数据拷贝，这些数据也不会污染页缓存。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d7/e0/d7a24f0fe50d56df0b4f315b12d065e0.png?wh=1210%2A702" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d7/e0/d7a24f0fe50d56df0b4f315b12d065e0.png?wh=1210%2A702" /></p>
 <p>从图中你可以看到，直接I/O访问文件方式减少了一次数据拷贝和一些系统调用的耗时，很大程度降低了CPU的使用率以及内存的占用。</p>
 <p>不过，直接I/O有时候也会对性能产生负面影响。</p>
 <ul>
@@ -6450,25 +6450,25 @@
 <li>减少数据拷贝。普通的read()调用，数据需要经过两次拷贝；<strong>而mmap只需要从磁盘拷贝一次就可以了</strong>，并且由于做过内存映射，也不需要再拷贝回用户空间。</li>
 <li>可靠性高。mmap把数据写入页缓存后，跟缓存I/O的延迟写机制一样，可以依靠内核线程定期写回磁盘。<strong>但是需要提的是，mmap在内核崩溃、突然断电的情况下也一样有可能引起内容丢失，当然我们也可以使用msync来强制同步写。</strong></li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/11/3e/116ada829f5017f3d40bf2f78d4f4c3e.png?wh=1288%2A670" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/11/3e/116ada829f5017f3d40bf2f78d4f4c3e.png?wh=1288%2A670" /></p>
 <p>从上面的图看来，我们使用mmap仅仅只需要一次数据拷贝。看起来mmap的确可以秒杀普通的文件读写，那我们为什么不全都使用mmap呢？事实上，它也存在一些缺点：</p>
 <ul>
 <li>虚拟内存增大。mmap会导致虚拟内存增大，我们的APK、Dex、so都是通过mmap读取。而目前大部分的应用还没支持64位，除去内核使用的地址空间，一般我们可以使用的虚拟内存空间只有3GB左右。如果mmap一个1GB的文件，应用很容易会出现虚拟内存不足所导致的OOM。</li>
 <li>磁盘延迟。mmap通过缺页中断向磁盘发起真正的磁盘I/O，所以如果我们当前的问题是在于磁盘I/O的高延迟，那么用mmap()消除小小的系统调用开销是杯水车薪的。<strong>启动优化中讲到的类重排技术，就是将Dex中的类按照启动顺序重新排列，主要为了减少缺页中断造成的磁盘I/O延迟。</strong></li>
 </ul>
 <p>在Android中可以将文件通过<a href="https://developer.android.com/reference/android/os/MemoryFile">MemoryFile</a>或者<a href="https://developer.android.com/reference/java/nio/MappedByteBuffer">MappedByteBuffer</a>映射到内存，然后进行读写，使用这种方式对于小文件和频繁读写操作的文件还是有一定优势的。我通过简单代码测试，测试结果如下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f0/3a/f03df7c8d500c9e129bc853cff87bd3a.png?wh=1292%2A288" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f0/3a/f03df7c8d500c9e129bc853cff87bd3a.png?wh=1292%2A288" /></p>
 <p>从上面的数据看起来mmap好像的确跟写内存的性能差不多，但是这并不正确，因为我们并没有计算文件系统异步落盘的耗时。在低端机或者系统资源严重不足的时候，mmap也一样会出现频繁写入磁盘，这个时候性能就会出现快速下降。</p>
 <p>mmap比较适合于对同一块区域频繁读写的情况，推荐也使用线程来操作。用户日志、数据上报都满足这种场景，另外需要跨进程同步的时候，mmap也是一个不错的选择。Android跨进程通信有自己独有的Binder机制，它内部也是使用mmap实现。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/12/f2/12c2c64bd77fc58d414dfcdb8cfd91f2.png?wh=680%2A276" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/12/f2/12c2c64bd77fc58d414dfcdb8cfd91f2.png?wh=680%2A276" /></p>
 <p>利用mmap，Binder在跨进程通信只需要一次数据拷贝，比传统的Socket、管道等跨进程通信方式会少一次数据拷贝过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/26/9f/265862d451441b94e6205e07ab58879f.png?wh=1280%2A296" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/26/9f/265862d451441b94e6205e07ab58879f.png?wh=1280%2A296" /></p>
 <h2 id="ionio">多线程阻塞I/O和NIO</h2>
 <p>我在上一期说过，由于写入放大的现象，特别是在低端机中，有时候I/O操作可能会非常慢。</p>
 <p>所以I/O操作应该尽量放到线程中，不过很多同学可能都有这样一个疑问：如果同时读10个文件，我们应该用单线程还是10个线程并发读？</p>
 <p><strong>1. 多线程阻塞I/O</strong></p>
 <p>我们来做一个实验，使用Nexus 6P读取30个大小为40MB的文件，分别使用不同的线程数量做测试。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1d/b5/1dbf02b2f0b17f81a24f03b6adf1ccb5.png?wh=1274%2A368" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1d/b5/1dbf02b2f0b17f81a24f03b6adf1ccb5.png?wh=1274%2A368" /></p>
 <p>你可以发现多线程在I/O操作上收益并没有那么大，总时间从3.6秒减少到1.1秒。因为CPU的性能相比磁盘来说就是火箭，I/O操作主要瓶颈在于磁盘带宽，30条线程并不会有30倍的收益。而线程数太多甚至会导致耗时更长，表格中我们就发现30个线程所需要的时间比10个线程更长。但是在CPU繁忙的时候，更多的线程会让我们更有机会抢到时间片，这个时候多线程会比单线程有更大的收益。</p>
 <p><strong>总的来说文件读写受到I/O性能瓶颈的影响，在到达一定速度后整体性能就会受到明显的影响，过多的线程反而会导致应用整体性能的明显下降。</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>案例一:
@@ -6480,14 +6480,14 @@
 <p><strong>案例一</strong>：当系统空闲（36% idle）时，如果没有其他线程需要调度，这个时候才会出现I/O等待（60.2% iowait）。</p>
 <p><strong>案例二</strong>：如果我们的系统繁忙起来，这个时候CPU不会“无所事事”，它会去看有没有其他线程需要调度，这个时候I/O等待会降低（14.2% iowait）。但是太多的线程阻塞会导致线程切换频繁，增大系统上下文切换的开销。</p>
 <p><strong>简单来说，iowait高，I/O一定有问题。但iowait低，I/O不一定没有问题。这个时候我们还要看CPU的idle比例</strong>。从下图我们可以看到同步I/O的工作模式：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3f/43/3f322506a458d60145cee27f55673743.png?wh=1250%2A552" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3f/43/3f322506a458d60145cee27f55673743.png?wh=1250%2A552" /></p>
 <p>对应用程序来说，磁盘I/O阻塞线程的总时间会更加合理，它并不关心CPU是否真的在等待，还是去执行其他工作了。<strong>在实际开发工作中，大部分时候都是读一些比较小的文件，使用单独的I/O线程还是专门新开一个线程，其实差别不大。</strong></p>
 <p><strong>2. NIO</strong></p>
 <p>多线程阻塞式I/O会增加系统开销，那我们是否可以使用异步I/O呢？当我们线程遇到I/O操作的时候，不再以阻塞的方式等待I/O操作的完成，而是将I/O请求发送给系统后，继续往下执行。这个过程你可以参考下面的图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/22/f9/22141f888cefc43219b0c3df3ab8d4f9.png?wh=1274%2A568" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/22/f9/22141f888cefc43219b0c3df3ab8d4f9.png?wh=1274%2A568" /></p>
 <p>非阻塞的NIO将I/O以事件的方式通知，的确可以减少线程切换的开销。Chrome网络库是一个使用NIO提升性能很好的例子，特别是在系统非常繁忙的时候。但是NIO的缺点也非常明显，应用程序的实现会变得更复杂，有的时候异步改造并不容易。</p>
 <p>下面我们来看利用NIO的FileChannel来读写文件。FileChannel需要使用ByteBuffer来读写文件，可以使用ByteBuffer.allocate(int size)分配空间，或者通过ByteBuffer.wrap(byte[])包装byte数组直接生成。上面的示例使用NIO方式在CPU闲和CPU忙时耗时如下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/25/1d/25740c1def909b3860b1dd5f12ef391d.png?wh=1316%2A198" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/25/1d/25740c1def909b3860b1dd5f12ef391d.png?wh=1316%2A198" /></p>
 <p>通过上面的数据你可以看到，我们发现使用NIO整体性能跟非NIO差别并不大。这其实也是可以理解的，在CPU闲的时候，无论我们的线程是否继续做其他的工作，当前瓶颈依然在磁盘，整体耗时不会太大。在CPU忙的时候，无论是否使用NIO，单线程可以抢到的CPU时间片依然有限。</p>
 <p>那NIO是不是完全没有作用呢？<strong>其实使用NIO的最大作用不是减少读取文件的耗时，而是最大化提升应用整体的CPU利用率。</strong>在CPU繁忙的时候，我们可以将线程等待磁盘I/O的时间来做部分CPU操作。非常推荐Square的<a href="https://github.com/square/okio">Okio</a>，它支持同步和异步I/O，也做了比较多优化，你可以尝试使用。</p>
 <h2 id="_1">小文件系统</h2>
@@ -6642,8 +6642,6 @@ Binder的方案确实需要一次数据拷贝，那是Binder的机制决定的�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

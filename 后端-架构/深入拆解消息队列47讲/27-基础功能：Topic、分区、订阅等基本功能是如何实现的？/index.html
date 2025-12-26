@@ -14946,19 +14946,19 @@
 <li><strong>消费分组（订阅）的管理</strong>：详细讲一下消费进度的存储格式和保存机制的实现。</li>
 </ol>
 <p>为了便于理解，我们假设现在的集群是基于第三方存储引擎 ZooKeeper 来实现的。具体如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/09/e2/093daba2b27cd1a0c397920d288b48e2.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/09/e2/093daba2b27cd1a0c397920d288b48e2.jpg?wh=10666x6000" /></p>
 <h2 id="_1">如何实现静态和动态配置</h2>
 <h3 id="_2">静态配置</h3>
 <p>静态配置是我们在业务开发中经常用到的，配置信息一般以YAML、JSON、Properties等格式存储。在服务启动时加载配置文件到内存当中，进行业务逻辑处理。</p>
 <p>静态配置的好处是简单易用，能满足大部分的需求。缺点是每次变更都需要修改文件内容，并重启服务。在一些业务中，重启应用是比较重的操作，可能会对业务产生一定的影响。所以，就需要引入动态配置。</p>
 <h3 id="_3">动态配置</h3>
 <p>动态配置是指服务可以从某个地方动态加载配置信息。如下图所示，即 Broker 启动时会通过某个第三方服务，比如ZooKeeper、etcd、某个名字服务等来加载配置。当需要变更配置时，直接往第三方服务写入新的配置即可，Broker会自动监听到配置的变更。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/16/2b/16f0027f9f76ed5458f86788674a112b.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/16/2b/16f0027f9f76ed5458f86788674a112b.jpg?wh=10666x6000" /></p>
 <p>由于动态配置在技术上的实现方式比较多，这里我们就介绍两种常用的。一种是<strong>基于第三方组件</strong>，另一种是<strong>基于本地文件</strong>。</p>
 <p>第三方组件，我们以ZooKeeper的实现为例。</p>
 <p>基于ZooKeeper是指我们可以在ZooKeeper创建持久节点存储配置信息，然后Broker通过ZooKeeper 提供的 Watch 机制来监听节点。当节点内容变更时可以及时感知，并进行后续的处理。</p>
 <p>从实现上来看，我们可以在ZooKeeper上创建 /config 节点，在 /config 下创建Cluster、Broker、Topic 3 个节点，分别来保存集群、节点、Topic 的 3 个维度的配置信息。然后Broker监听这 3 个节点的变更来执行后续的配置变更操作。ZooKeeper的目录结构可以如下设计：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3c/d3/3ce624689a970535d9a8829a46b003d3.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3c/d3/3ce624689a970535d9a8829a46b003d3.jpg?wh=10666x6000" /></p>
 <p>从运行机制上来看，Broker 监听ZooKeeper有以下两种思路：</p>
 <ol>
 <li>Broker 会通过 ZooKeeper 的Watch机制监听 /config 下的每个节点，感知到节点内容的变化，再进行后续的操作，比如更新配置。</li>
@@ -14978,7 +14978,7 @@
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>}
 </code></pre></div>
 <p>集群维度的元数据需要持久化存储，所以我们可以在 ZooKeeper 上创建持久化节点 /Cluster 来存储集群的的元数据。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ce/c1/ce2bb9fc92279d680a1507cce1749fc1.jpg?wh=10666x4628" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ce/c1/ce2bb9fc92279d680a1507cce1749fc1.jpg?wh=10666x4628" /></p>
 <p>因此集群初始化的流程是：Broker 启动时检查 ZooKeeper的 /Cluster 节点是否创建，以确保集群已经经过了初始化。一般是集群中的第一台Broker节点启动时，会触发集群初始化的逻辑。初始化的逻辑会自动生成一个集群ID，然后根据配置好的集群名称，一起写入到 /Cluster 节点里面。</p>
 <h3 id="_6">节点元数据</h3>
 <p>节点元数据是用来保存 Broker 维度的一些基本信息。Broker 元数据一般至少要包含节点的唯一标识BrokerID、节点的IP、节点监听的端口 3 个字段。</p>
@@ -15023,7 +15023,7 @@
 </code></pre></div>
 <p>因为Broker数量不会很多，一个集群大概是百或千的量级，所以如果从Broker数量来看，这两个方案的区别不大。目前业界主要使用的是第二个思路，主要的原因是：<strong>Broker元数据分开存储方便管理，避免节点间相互影响，也可以避免单个ZooKeeper Node的数据量过大存不下。</strong></p>
 <p>所以在持久化存储方面，我们可以在ZooKeeper上创建持久化的 /brokers 节点，然后在这个节点下为每台Broker创建名称为BrokerID的临时节点，用来存储Broker的元数据。所以 Broker 在集群中的元数据的存储结构就如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/55/cf/55a37358eyy77d53755d36584d8b27cf.jpg?wh=10666x5306" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/55/cf/55a37358eyy77d53755d36584d8b27cf.jpg?wh=10666x5306" /></p>
 <p>Broker 初始化的流程是：Broker启动时会在 /Brokers 下面创建名称为自身BrokerID的临时节点，然后写入自己的元数据。Broker 异常时，会自动删除注册的节点。</p>
 <p>接下来，我们来看一下如何在一个空的集群中支持Topic和分区。</p>
 <h2 id="topic">在集群中支持Topic和分区</h2>
@@ -15032,7 +15032,7 @@
 <p>从业界主流消息队列来看，RocketMQ、Pulsar、Kafka都有Topic的概念。而RabbitMQ 只有Queue，没有Topic概念，但是RabbitMQ中的Exchange + Route起到的就是Topic的作用。消息发送到Exchange 中后，会根据配置的路由关系，将数据发送到不同的Queue中。</p>
 <p>从性能角度来看，如果只有一个分区，就会有性能瓶颈，无法提供水平扩容的能力。此时就需要在前面包一层概念，让它来组织多个分区，这就是Topic。</p>
 <p>所以如下图所示，在消息队列中 <strong>Topic和分区是必须的概念，Topic是用来组织分区的逻辑概念</strong>，<strong>分区用来存储实体的消息数据</strong>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/60/6d/60c323373e3a98f3f0848ec6bcb4856d.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/60/6d/60c323373e3a98f3f0848ec6bcb4856d.jpg?wh=10666x6000" /></p>
 <p>接下来看一下，Topic和分区的元数据都包含哪些信息呢？</p>
 <h3 id="topic_2">Topic和分区的元数据</h3>
 <p>从功能上来看，Topic 至少需要TopicID、Topic名称、分区和副本在集群中的分布3个元素。我们用一个简单的JSON格式字符串来表示Topic的元数据信息。</p>
@@ -15056,7 +15056,7 @@
 <h3 id="_7">元数据的持久化存储</h3>
 <p>在基于 ZooKeeper 的架构中，我们可以在ZooKeeper 集群中创建一个持久化的节点来存储Topic的相关信息。</p>
 <p>如下图所示，我们可以在ZooKeeper的根目录创建持久节点 /topics 存储Topic信息，然后为Topic1、Topic2、Topic3这 3 个Topic分别创建/topics/topic1、/topics/topic2、/topics/topic3 节点来存储对应Topic的元数据。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/73/7c/73828e5c70d0a002c55b9df32116ea7c.jpg?wh=10666x3933" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/73/7c/73828e5c70d0a002c55b9df32116ea7c.jpg?wh=10666x3933" /></p>
 <p>在集群启动时，就会为每一个分区选举出来一个Leader，然后更新对应的Leader字段信息。当节点出现变动时，也会触发Leader节点切换流程和更新Leader节点信息的逻辑。</p>
 <p>Leader切换、创建Topic和分区，以及如何生成分区和副本分布关系的流程，你可以参考<a href="https://time.geekbang.org/column/article/677936">第15讲</a>，这节课不再重复。</p>
 <p>接下来我们来看一下消费分组的进度是如何管理和保存的。</p>
@@ -15106,7 +15106,7 @@
 <p>这里你可以想一下，要在不同节点同步文件数据，并且保持文件数据的一致性，是不是和分区副本的模型很像？从技术上来看，是一样的。所以，就有了将消费进度数据存储在某一个内部的Topic的思路。</p>
 <p><strong>存内部的Topic是指在集群中创建一个特殊名字的Topic</strong>，比如consumer_group_offset。此时这个Topic不允许普通用户读写，只允许用来保存消费进度。</p>
 <p>如下图所示，我们知道分区的数据是顺序存储的，并且消息队列的分区是没有搜索和更新的能力的。此时就有一个问题，消费进度如何读取和更新呢？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e9/60/e9a41c34d1bd2fb7e08e31f5ee026f60.jpg?wh=10666x3246" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e9/60/e9a41c34d1bd2fb7e08e31f5ee026f60.jpg?wh=10666x3246" /></p>
 <p>从功能特性上来看，一个消费分组在一个分区维度的消费进度的值只有一个，即最新的那个值。</p>
 <p>所以有一种思路是：<strong>提供有压缩功能的Topic</strong>，即Topic支持根据消息的Key对消息进行压缩。比如消费分组 group 消费Topic1的0分区的进度的消息Key为group1-topic1-0，Value为消费位点，比如100。根据消息的Key进行压缩，只保留最后一条数据。此时提交Offset的时候就不需要更新，只需要将最新的消费进度的数据 “group1-topic1-0：101” 写入到Topic中。</p>
 <p>依托Topic的压缩特性，只保留最后一条数据，就可以让数据量大幅度减少。再配合一些编码技巧，如缓存、索引、二分查找等，就能大大提升获取当前消费分组的位点信息的速度。</p>
@@ -15242,8 +15242,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

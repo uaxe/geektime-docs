@@ -14246,7 +14246,7 @@
 <p>Kubernetes社区在client-go项目中提供了一个通用的Informer组件来负责client与kube-apiserver进行资源和事件同步，显著降低了开发者使用Kubernetes API、开发高性能Kubernetes扩展组件的复杂度。</p>
 <p>Informer机制的Reflector封装了Watch、List操作，结合本地Cache、Indexer，实现了控制器加载完初始状态数据后，接下来的其他操作都只需要从本地缓存读取，极大降低了kube-apiserver和etcd的压力。</p>
 <p>下面是Kubernetes社区给出的一个控制器使用Informer机制的架构图。黄色部分是控制器相关基础组件，蓝色部分是client-go的Informer机制的组件，它由Reflector、Queue、Informer、Indexer、Thread safe store(Local Cache)组成。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fb/99/fb7caaa37a6a860422825d2199217899.png?wh=1058%2A794" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fb/99/fb7caaa37a6a860422825d2199217899.png?wh=1058%2A794" /></p>
 <p>Informer机制的基本工作流程如下：</p>
 <ul>
 <li>client启动或与kube-apiserver出现连接中断再次Watch时，报"too old resource version"等错误后，通过Reflector组件的List操作，从kube-apiserver获取初始状态数据，随后通过Watch机制实时监听数据变化。</li>
@@ -14304,7 +14304,7 @@
 <p>下面我以Pod资源的历史事件滑动窗口为例，和你聊聊它在什么场景可能会触发client全量List同步操作。</p>
 <p>如下图所示，kube-apiserver启动后，通过List机制，加载初始Pod状态数据，随后通过Watch机制监听最新Pod数据变化。当你不断对Pod资源进行增加、删除、修改后，携带新Resource Version（简称RV）的Pod事件就会不断被加入到cyclic buffer。假设cyclic buffer容量为100，RV1是最小的一个Watch事件的Resource Version，RV 100是最大的一个Watch事件的Resource Version。</p>
 <p>当版本号为RV101的Pod事件到达时，RV1就会被淘汰，kube-apiserver维护的Pod最小版本号就变成了RV2。然而在Kubernetes集群中，不少组件都只关心cyclic buffer中与自己相关的事件。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/29/29/29deb02b3724edef274ce71d6a758b29.png?wh=1920%2A986" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/29/29/29deb02b3724edef274ce71d6a758b29.png?wh=1920%2A986" /></p>
 <p>比如图中的kubelet只关注运行在自己节点上的Pod，假设只有RV1是它关心的Pod事件版本号，在未实现Watch bookmark特性之前，其他RV2到RV101的事件是不会推送给它的，因此它内存中维护的Resource Version依然是RV1。</p>
 <p>若此kubelet随后与kube-apiserver连接出现异常，它将使用版本号RV1发起Watch重连操作。但是kube-apsierver cyclic buffer中的Pod最小版本号已是RV2，因此会返回"too old resource version"错误给client，client只能发起List操作，在获取到最新版本号后，才能重新进入监听逻辑。</p>
 <p>那么我们能否定时将最新的版本号推送给各个client来解决以上问题呢?</p>
@@ -14313,7 +14313,7 @@
 <h3 id="watch">更高效的Watch恢复机制</h3>
 <p>虽然Kubernetes社区通过Watch bookmark机制缓解了client与kube-apiserver重连等场景下可能导致的relist expensive request操作，然而在kube-apiserver重启、滚动更新时，它依然还是有可能导致大量的relist操作，这是为什么呢？ 如何进一步减少kube-apiserver重启场景下的List操作呢？</p>
 <p>如下图所示，在kube-apiserver重启后，kubelet等client会立刻带上Resource Version发起重建Watch的请求。问题就在kube-apiserver重启后，watchCache中的cyclic buffer是空的，此时watchCache中的最小Resource Version(listResourceVersion)是etcd的最新全局版本号，也就是图中的RV200。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e1/d2/e1694c3dce75b310b9950f3e3yydd2d2.png?wh=1920%2A1046" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e1/d2/e1694c3dce75b310b9950f3e3yydd2d2.png?wh=1920%2A1046" /></p>
 <p>在不少场景下，client请求重建Watch的Resource Version是可能小于listResourceVersion的。</p>
 <p>比如在上面的这个案例图中，集群内Pod稳定运行未发生变化，kubelet假设收到了最新的RV100事件。然而这个集群其他资源如ConfigMap，被管理员不断的修改，它就会导致导致etcd版本号新增，ConfigMap滑动窗口也会不断存储变更事件，从图中可以看到，它记录最大版本号为RV200。</p>
 <p>因此kube-apiserver重启后，client请求重建Pod Watch的Resource Version是RV100，而Pod watchCache中的滑动窗口最小Resource Version是RV200。很显然，RV100不在Pod watchCache所维护的滑动窗口中，kube-apiserver就会返回"too old resource version"错误给client，client只能发起relist expensive request操作同步最新数据。</p>
@@ -14505,8 +14505,6 @@ apiserver会把continueToken返回到client, client发现返回的结果中conti
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

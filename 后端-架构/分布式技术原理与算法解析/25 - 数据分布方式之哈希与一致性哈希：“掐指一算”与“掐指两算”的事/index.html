@@ -14554,7 +14554,7 @@
 <p>假设，有三个存储节点，分别为Node1、Node2和Node3；现有以下数据，ID的范围为[0,1000]：D0:{ id:100, name:‘a0’}、D1:{ id:200, name:‘a1’} 、D2:{ id:300, name:‘a2’}、D3:{ id:400, name:‘a3’}、D4:{ id:500, name:‘a4’}、D5:{ id:600, name:‘a5’}和D6:{ id:700, name:‘a6’}。</p>
 <p>假设，哈希函数为“id%节点个数”，通过计算可以得到每个数据应该存入的节点。在这个例子中，哈希函数是“id%3”，结果为0的数据存入Node1、结果为1的数据存入Node2、结果为2的数据存入Node3。</p>
 <p>如图所示，Node1将存储数据D2（300%3=0）和D5（600%3=0），Node2将存储数据D0（100%3=1）、D3（400%3=1）和D6（700%3=1），Node3将存储数据D1（200%3=2）和D4（500%3=2）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ff/00/ff2578a3e75e85ffb8a3f63f87bc8600.png?wh=1172%2A354" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ff/00/ff2578a3e75e85ffb8a3f63f87bc8600.png?wh=1172%2A354" /></p>
 <p>可以看出，哈希算法的一个优点是，只要哈希函数设置得当，可以很好地保证数据均匀性，但有一个较为严重的缺点，就是稳定性较差。</p>
 <p>比如，随着数据量的增加，三个节点的容量无法再满足存储需求了，需要再添加一个节点。这时，哈希函数变成了 id%4，原先存储在那三个节点的数据需要重新计算，然后存入相应节点，即需要大规模的数据迁移，显然会降低稳定性。</p>
 <p>所以，<strong>哈希方法适用于同类型节点且节点数量比较固定的场景。</strong>目前，Redis就使用了哈希方法，你可以再回顾下第10篇文章“分布式体系结构之非集中式结构：众生平等”中的相关内容。</p>
@@ -14564,7 +14564,7 @@
 <p>我们看看如何用一致性哈希方法，来实现上述案例的数据存储吧。</p>
 <p>如图所示，假设数据D0～D7按照ID进行等值映射，即映射值与ID值相等，比如数据D0映射到哈希环上的值为100，数据D1映射到哈希环上的值为200······；同时，假设存储节点Node1、Node2和Node3映射到哈希环上的值分别为400、600、900。</p>
 <p>按照规则，D0，D1，D2和D3顺时针方向的下一个存储节点为Node1，因此Node1将存储数据D0（id = 100）、D1（id = 200）、D2（id = 300）和D3（id = 400）；同理，Node2将存取数据D4（id = 500）和D5（id = 600），Node3将存取数据D6（id = 700）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c8/6c/c8098ceb11f706b93786f4cf9097d06c.png?wh=666%2A576" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c8/6c/c8098ceb11f706b93786f4cf9097d06c.png?wh=666%2A576" /></p>
 <p>可以看出，<strong>一致性哈希是对哈希方法的改进</strong>，在数据存储时采用哈希方式确定存储位置的基础上，又增加了一层哈希，也就是在数据存储前，对存储节点预先进行了哈希。</p>
 <p>这种改进可以很好地解决哈希方法存在的稳定性问题。当节点加入或退出时，仅影响该节点在哈希环上顺时针相邻的后继节点。比如，当Node2发生故障需要移除时，由于Node3是Node2顺时针方向的后继节点，本应存储到Node2的数据就会存储到Node3中，其他节点不会受到影响，因此不会发生大规模的数据迁移。</p>
 <p>所以，<strong>一致性哈希方法比较适合同类型节点、节点规模会发生变化的场景</strong>。目前，Cassandra就使用了一致性哈希方法，你可以再回顾下第10篇文章“分布式体系结构之非集中式结构：众生平等”中的相关内容。</p>
@@ -14575,7 +14575,7 @@
 <p>带有限负载的一致性哈希方法的核心原理是，给每个存储节点设置了一个存储上限值来控制存储节点添加或移除造成的数据不均匀。当数据按照一致性哈希算法找到相应的存储节点时，要先判断该存储节点是否达到了存储上限；如果已经达到了上限，则需要继续寻找该存储节点顺时针方向之后的节点进行存储。</p>
 <p>我们看看如何用带有限负载的一致性哈希方法，来实现上述案例的数据存储吧。</p>
 <p>如图所示，假设每个存储节点设置的上限值为3，按照一致性哈希算法，当存储数据D3（id = 400）时，会发现应该存储到Node1中，但Node1已经存储了三个数据D0（id = 100）、D1（id = 200）和D2（id = 300），达到了存储上限，因此会存储到该节点顺时针方向的下一个节点Node2中。当然，在存储前，也会先检查Node2是否达到了存储上限，如果达到了，会继续寻找其他节点。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ab/09/ab32844e83f73799d7d1123bda6e8309.png?wh=698%2A534" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ab/09/ab32844e83f73799d7d1123bda6e8309.png?wh=698%2A534" /></p>
 <p>如果你想要了解该算法的详细内容，可以阅读“<a href="https://epubs.siam.org/doi/pdf/10.1137/1.9781611975031.39">Consistent Hashing with Bounded Loads</a>”这篇论文。</p>
 <p><strong>带有限负载的一致性哈希方法比较适合同类型节点、节点规模会发生变化的场景</strong>。目前，在Google Cloud Pub/Sub、HAProxy中已经实现该方法，应用于Google、Vimeo等公司的负载均衡项目中。</p>
 <p>其实，<strong>哈希、一致性哈希、带有限负载的一致性哈希，都没有考虑节点异构性的问题。</strong>如果存储节点的性能好坏不一，数据分布方案还按照这些方法的话，其实还是没做到数据的均匀分布。</p>
@@ -14586,14 +14586,14 @@
 <p>因此，Node1对应一个虚拟节点Node1_1，Node2对应2个虚拟节点Node2_1和Node2_2，Node3对应3个虚拟节点Node3_1、Node3_2和Node3_3。</p>
 <p>假设，虚拟节点Node1_1、Node2_1、Node2_2、Node3_1、Node3_2、Node3_3的哈希值，分别为100、200、300、400、500、600。</p>
 <p>那么，按照带虚拟节点的哈希一致性方法， 数据D0和D6按顺时针方向的下一个虚拟存储节点为Node 1-1，因此节点Node1将会存储数据D0（id = 100）和D6（id = 700）；同理，Node2将会存储数据D1（id = 200）和D2（id = 300），Node3将会存储数据D3（id = 400）、D4（id = 500）和D5（id = 600）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/40/27/408bf17f91a77d89fbb2d41b6b3ec727.png?wh=886%2A738" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/40/27/408bf17f91a77d89fbb2d41b6b3ec727.png?wh=886%2A738" /></p>
 <p>可以看出，<strong>带虚拟节点的一致性哈希方法比较适合异构节点、节点规模会发生变化的场景</strong>。目前Memcached缓存系统实现了该方法，我会在第27篇文章中与你详细分析。</p>
 <p>这种方法不仅解决了节点异构性问题，还提高了系统的稳定性。当节点变化时，会有多个节点共同分担系统的变化，因此稳定性更高。</p>
 <p>比如，当某个节点被移除时，对应该节点的多个虚拟节点均会移除，而这些虚拟节点按顺时针方向的下一个虚拟节点，可能会对应不同的物理节点，即这些不同的物理节点共同分担了节点变化导致的压力。</p>
 <p>当然，这种方法引入了虚拟节点，增加了节点规模，从而增加了节点的维护和管理的复杂度，比如新增一个节点或一个节点故障时，对应到虚拟节点构建的哈希环上需要新增和删除多个节点，数据的迁移等操作相应地也会很复杂。</p>
 <h3 id="_7">四种数据分布方法对比</h3>
 <p>为方便理解与记忆，我再通过一个表格和你对比分析下这四种方法吧。请注意，以下方法之间的对比都是相对的比较，实际性能优劣与哈希函数的设定以及具体的数据场景密切相关。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ab/33/ab7df1d5a9b2c63b8929b18a0879d133.jpg?wh=3678%2A1673" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ab/33/ab7df1d5a9b2c63b8929b18a0879d133.jpg?wh=3678%2A1673" /></p>
 <h2 id="_8">知识扩展：数据分片和数据分区，有何区别？</h2>
 <p>首先，我们一起回忆一下第20篇文章中提到的数据分区。</p>
 <p>数据分区是从<strong>数据存储块</strong>的维度进行划分，不同的分区物理上归属于不同的节点。比如，现在有2个节点Node1和Node2，2个数据分区Partition1和Partition2，Partition1属于Node1、Partition2属于Node2。</p>
@@ -14610,7 +14610,7 @@
 <p>首先，我带你了解了分布式数据存储系统中，设计数据分布方法需要考虑的原则，主要包括数据均匀性、稳定性和节点异构性。</p>
 <p>其次，基于数据分布设计原则，我为你介绍了哈希、一致性哈希、带有限负载的一致性哈希和带虚拟节点的一致性哈希方法，并以例子进行辅助讲解，以便于你理解和学习。</p>
 <p>最后，我再通过一张思维导图来归纳一下今天的核心知识点吧。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a1/f8/a1fec7d2265432423bb9dfc0d7e4abf8.png?wh=1903%2A864" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a1/f8/a1fec7d2265432423bb9dfc0d7e4abf8.png?wh=1903%2A864" /></p>
 <p>加油，相信你通过对本讲的学习，对分布式数据存储系统中“导购”的角色有了更深入的理解，对分布式数据分布方法的原理，以及如何针对不同场景进行选型有了一定的认知。加油，赶紧行动起来，为你的应用场景选择一种合适的数据分布方法，并实践起来吧！</p>
 <h2 id="_10">思考题</h2>
 <p>今天，我主要与你分享的是哈希方法相关的数据分布方法，你还知道哪些常用的数据分布方法吗？</p>
@@ -14813,8 +14813,6 @@ Redis Cluster 中将 key space 分成 16384 个 slot，之后每个节点分配�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -14300,7 +14300,7 @@
 <p>程序员在开发代码的过程中，也是直接跟这些符号打交道的。如果想获取某个变量的值，就直接从变量符号里读取内容；如果想调用某个函数，也是直接写一个函数符号的调用语句。</p>
 <p>但是，我们知道，CPU在执行程序代码的时候，并不理解符号的概念，它所能理解的只有内存地址的概念。不管是读数据，调用函数还是读指令，对于CPU而言都是一个个的内存地址。因此，<strong>这里就需要一个连接CPU与程序员之间的桥梁，把程序中的符号转换成CPU执行时的内存地址</strong>。<strong>这个桥梁就是链接器，它负责将符号转换为地址。</strong></p>
 <p><strong>链接器的第一个作用就是把多个中间文件合并成一个可执行文件</strong>。我们在第3节课分析过，每个中间文件都有自己的代码段和数据段等多个section，在合并成一个可执行程序时，多个中间文件的代码段会被合并到可执行文件的代码段，它们数据段也会被合并为可执行文件的数据段。具体的过程可以参考下面这个图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e2/82/e22cc1820a1e9b5e3fc44b844dba7182.jpg?wh=2284x1301" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e2/82/e22cc1820a1e9b5e3fc44b844dba7182.jpg?wh=2284x1301" /></p>
 <p>但是链接器在合并多个目标文件的时候并不是简单地将各个section合并就可以了，它还需要考虑每个目标中的符号的地址。这就引出了<strong>链接器的第二个任务：重定位</strong>。所谓重定位，就是当被调用者的地址变化了，要让调用者知道新的地址是什么。</p>
 <h4 id="_3">两步链接</h4>
 <p>根据上边的分析，链接器的工作流程也主要分为两步：</p>
@@ -14363,7 +14363,7 @@
 <p><strong>首先，我来看看局部变量的处理过程</strong>。从反汇编的结果里，我们可以看到，局部变量在程序中的地址，都是基于%rbp的偏移这种形式，rbp寄存器存放的是当前函数栈帧的基地址。这些局部变量的内存分配与释放，都是在运行时通过%rbp的改变来进行的，因此，局部变量的内存地址不需要链接器来操心。</p>
 <p><strong>然后，再来看看比较简单的static_func，它是唯一不需要重定位的类型</strong>。对static_func的调用，所生成的指令的二进制是 e8 ae ff ff ff。其中，e8是callq指令的编码，后边4个字节就对应被调函数的地址。注意，这里生成的ae ff ff ff，如果采用小端的字节序数值来表示，应该是0xffffffae，也就是对应十进制的-82。</p>
 <p>此时，当CPU执行到callq这条指令时，rip寄存器的值指向的是下一条指令的内存地址，也就是5d这条指令的内存地址，通过计算0x5d – 82可以得到0xb。从反汇编中可以得到，0xb刚好是static_func的地址。static_func的链接原理，你可以参考下面这幅图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ae/3f/ae5b19734d342453826b41538d2d603f.jpg?wh=2284x1304" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ae/3f/ae5b19734d342453826b41538d2d603f.jpg?wh=2284x1304" /></p>
 <p>从上图中可以看出，同一个编译单元内部，static_func与main函数的相对位置是固定不变的，即便链接的过程中会对不同.o文件中的代码段进行合并，但是同一个.o文件内部不同函数之间的位置也会保持不变，因此，我们在编译的时候，就能确定对静态函数调用的偏移。也就是说，静态函数的调用地址在编译阶段就可以确定下来。</p>
 <p>我们可以在最终生成的可执行文件的main函数中，查看对应位置代码的反汇编。可以验证的是，这里确实没有进行重定位的修正：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>0000000004004ad &lt;main&gt;:
@@ -14461,7 +14461,7 @@
 <h4 id="_7">静态变量</h4>
 <p>除了上述所讲的四个符号之外，还有一个比较特殊的是static_var变量。我们可以从Sym. Name里找到其余变量的符号，但static_var的符号没有出现，只有一个.data的符号。</p>
 <p>这是因为static_var变量本身是一个静态变量，只在本编译单元内可见，不会对外进行暴露，所以它是根据本编译单元的.data段的地址来进行重定位。也就是说，<strong>static_var的最终地址就是本编译单元的.data段的最终地址</strong>。所以，它的重定义方法与extern_var等符号的重定位方法是一样的，区别仅仅在于它的符号被隐藏了。如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2e/be/2e29c9c26a715015ce08d3946dee6fbe.jpg?wh=2284x1032" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2e/be/2e29c9c26a715015ce08d3946dee6fbe.jpg?wh=2284x1032" /></p>
 <p>你可能会有疑问，既然静态函数可以在编译的时候确定相对偏移，那为什么静态变量做不到这一点呢？</p>
 <p>这是因为静态变量的位置是在data段，而对静态函数的访问是在text段。对应text段内部的偏移可以保证在链接的过程中不发生改变，但由于text段和data段分属不同的段，在链接的时候大概率会进行重新排布，所以它和引用它的地方之间的相对位置就发生变化了。所以静态变量的地址就需要链接器来进行重定位了。</p>
 <p>好，到这里我们就对整个重定位的过程有了清晰的了解。</p>
@@ -14473,7 +14473,7 @@
 <p>到这里，我们已经对例子中的几种不同类型符号的静态链接有了一个清晰的认识。下面的课程我会继续讲解loader和动态链接的过程。</p>
 <h3 id="_9">思考题</h3>
 <p>经过了这节课的学习，我们深刻地理解了全局变量，静态变量的用法。请你思考一下，全局变量和静态变量的初值是在哪个阶段决定的？更具体地说，是编译、链接、加载和运行这四个阶段中的哪一个阶段决定的？或者你也可以进行这样的思考，我们在目标文件、可执行文件和运行时内存里，能不能观察到全局变量和静态变量的初始值？欢迎你在留言区和我交流你的想法，我在留言区等你。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/78/3a/78039e07de9e869b6e966da9a61e963a.jpg?wh=2284x1523" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/78/3a/78039e07de9e869b6e966da9a61e963a.jpg?wh=2284x1523" />
 好啦，这节课到这就结束啦。欢迎你把这节课分享给更多对计算机内存感兴趣的朋友。我是海纳，我们下节课再见！</p>
 <div><strong>精选留言（15）</strong></div>
 <ul>
@@ -14614,8 +14614,6 @@ od -Ax -t x1 -j  192 -N 8 example.o
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

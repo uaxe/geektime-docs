@@ -5183,7 +5183,7 @@
 <p>那么这节课我们就偏居一隅，聊一聊各大视频会议厂商在基于纯浏览器视频会议上的一些尝试和遇到的问题，以及各主流浏览器在底层接口上提供的一些支持，并对其中涉及到的一些技术栈展开一定介绍。</p>
 <h2 id="webrtc"><strong>WebRTC</strong></h2>
 <p>提到 Web App 和浏览器对媒体传输的支持，首先不得说 WebRTC，典型的基于 WebRTC 的会议系统架构如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b2/8c/b2a338cfbddc5b45992769a3cd29558c.png?wh=1920x947" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b2/8c/b2a338cfbddc5b45992769a3cd29558c.png?wh=1920x947" /></p>
 <p>结合上面的架构图和流程图来看，WebRTC 的 Web App 似乎并不复杂，几乎所有的前后端模块都能找到成熟的开源实现。<strong>然而对于传统的视频会议提供商来说，支持 WebRTC 却并非这么简单。</strong></p>
 <p>首先要考虑到的问题就是 <strong>QoS</strong>。对于成熟的视频会议企业来说，无论是 ARQ、FEC 还是 CC，都会有一套自己私有的网络适应性算法（QoS）框架， 但这些经过长时间验证且成熟的网络适应性算法却无法直接用在 Web App 后端的 SFU，因为浏览器端并不支持。</p>
 <p>更进一步来说，不同的浏览器，其自身的<strong>网络适应性兼容方案</strong>也并不一致，再考虑到各种浏览器版本升级带来的进一步差异，在服务端做兼容各浏览器的网络适应性算法（QoS）其成本显然是相当高的。仅拿拥塞控制（Congest Control）举例来说，至少要分别实现 GCC/NADA/SCReAM 算法和 REMB/Transport-CC 报文来兼容不同的浏览器。</p>
@@ -5191,7 +5191,7 @@
 <p>除此之外，另一个更麻烦的问题是 <strong>WebRTC 中的 TURN/STUN 对于 TCP 443 端口的兼容性问题</strong>。很多企业内部的网络防火墙仅对外开放 TCP 443 端口，且该端口仅允许 TLS 数据包通过，但所有浏览器 WebRTC 的 TURN/STUN 实现都不支持 TLS，这意味我们需要为这种情况做失败转移。而遗憾的是，这里并没有简单的失败转移方案。</p>
 <h2 id="_1">失败转移方案</h2>
 <p>上面我们提到，Web App 为了支持仅开放了 443 端口的企业，不得不实现一套新的失败转移方案。而这套方案需要彻头彻尾的重新实现，其大致架构如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/aa/96/aae4704d15750b1e2c55523607d02296.png?wh=1920x1040" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/aa/96/aae4704d15750b1e2c55523607d02296.png?wh=1920x1040" /></p>
 <p>从上图我们可以看出，这里我们不再将媒体的处理和传输部分托管给 WebRTC，取而代之的是一个基于 WebWorker 的媒体流水线处理机（WebWorker based Media Processing Pipeline），用来对从本地设备采集到的设备进行编码，并打包成 RTP 包，再通过 WebSocket 信令通道发送给服务端。</p>
 <p><strong>完整的视频流发送过程是这样的。</strong></p>
 <p>首先通过 getUserMedia（getDisplayMedia）接口从设备获取视频流，再每间隔 33 毫秒（帧率为 30）执行以下流程：</p>
@@ -5221,7 +5221,7 @@
 <h2 id="_2">优化方案</h2>
 <p>上面我们提到，当我们不再依赖 WebRTC 的一揽子解决方案，而是通过 WebAssembly Based OpenH264 Codec 构建自己的媒体处理流水线，并通过 WebSocket 进行传输时，我们一开始提到的无论是 QoS 的兼容性问题，还是客户端的媒体流定制需求，都可以得到满足，客户端还是服务端的架构都变得统一起来。</p>
 <p>基于这种思路，我们可以继续在上面的失败转移方案的基础上，增加额外的基于 SCTP 传输协议的传输通道 DataChannel，以供媒体传输使用。此外，进一步丰富媒体处理流水线，使其能够实现滤镜、虚拟背景等媒体处理需求。最后，再加上统一的可跨浏览器的 QoS 算法，最终的架构图如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/bf/eb/bf1a3d95f1e6f051123c6e591888aaeb.png?wh=1920x1084" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bf/eb/bf1a3d95f1e6f051123c6e591888aaeb.png?wh=1920x1084" /></p>
 <p>增加了如上图中所示的橘色模块以后，我们的系统开始变得丰满起来。<strong>媒体定制处理</strong>加入到了流水线，让我们能跨平台地满足更多的用户功能；完全自己实现的<strong>跨浏览器 QoS 方案</strong>，让前后端的算法变得统一起来，无需再考虑 QoS 的兼容性问题。</p>
 <p>前端 DataChannel 和后端的 SCTP 的介入，让媒体流在绝大多数情况下，通过 DataChannel（SCTP）进行传输,  从而更好地利用 UDP 协议的优势，因为它的可靠性可以得到选择，从而弥补 TCP 按序重发机制在流媒体传输应用中的缺陷。而这里的WebSocket，作为媒体数据传输通道，仅会发生在失败转移的特殊情况下。</p>
 <p>看到这里，聪明的你一定发现了前端架构演进至此，也已经完全统一了，即正常流程和失败转移的流程除了传输层不同，其他模块完全共享，从而避免了多套解决方案需要同时维护的尴尬。</p>
@@ -5232,7 +5232,7 @@
 <p>其次就是 SCTP 的传输机制问题，虽然 SCTP 支持多流传输，能缓解队头阻塞的问题，但协议本身无法完全避免队头阻塞。除此之外，SCTP 协议建立连接时需要 4-RTT，其握手策略也可以继续优化，从而进一步减少视频首帧的加载时间。</p>
 <p>Chrome 浏览器率先实现了基于 W3C 的 WebTransport 和 WebCodecs 规范。WebTransport 进一步优化了媒体传输通道，而 WebCodecs 规范则定义了浏览器所提供的更底层的媒体编解码接口。因而<strong>我们可以直接调用浏览器提供的本地视频编解码器</strong>，而不再需要调用 WebAssembly Based OpenH264 Codec 进行视频编解码，从而极大地提高了视频编解码效率。</p>
 <p>因此，我们对前端架构进一步优化的架构图如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/cf/52/cff0f4ed7f97b94b2f3c9ab10d9d5c52.png?wh=1920x1088" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cf/52/cff0f4ed7f97b94b2f3c9ab10d9d5c52.png?wh=1920x1088" /></p>
 <p>但需要注意的是，由于 WebTransport 和 WebCodecs 规范的提出时间较短，<strong>目前只有 Chrome 浏览器支持</strong>，因此这步优化也只能应用于 Chrome 浏览器，当然 Chromebook 用户也能享受到这两个规范所带来的福利。</p>
 <p>以上就是这节课的全部内容，其中涉及到的很多技术栈这里只能点到即止，展开的话细节还有很多，感兴趣的同学可以通过文末的链接，获取相关技术的草案或者RFC做进一步了解。</p>
 <ol>
@@ -5361,8 +5361,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

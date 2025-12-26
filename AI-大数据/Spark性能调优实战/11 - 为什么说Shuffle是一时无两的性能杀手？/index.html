@@ -7205,18 +7205,18 @@
 <p>很久以前，燕山脚下有个小村庄，村子里有所“七色光”小学，方圆百里的孩子都来这里上学。这一天，一年级2班的黄老师和班里的五个孩子正在做一个游戏，叫做“仙女散花”。</p>
 <p>黄老师的背包里装满了五种不同颜色的花朵，五种颜色分别是红、橙、黄、紫、青。她把背包里的花朵随机地分发给五个小同学：小红、橙橙、黄小乙、阿紫和小青。花朵发完之后，每个同学分到的花朵数量差不多，颜色各有不同。</p>
 <p>接着，黄老师开始宣布游戏规则：“你们要一起协作，在最短的时间内，把花朵按照颜色收集在一起。游戏完成的标志是，课桌上有5堆花朵，每堆花朵的颜色都是一样的。”</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7c/yc/7cb3906ecd19fa0521c4a161f079dyyc.jpg?wh=8046%2A4245" title="仙女散花的游戏" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7c/yc/7cb3906ecd19fa0521c4a161f079dyyc.jpg?wh=8046%2A4245" title="仙女散花的游戏" /></p>
 <p>大家跃跃欲试，黄小乙说：“先别急，我们来制定个策略。先在前面摆上5张课桌，然后每个人需要做两件事情，先把自己手里的花朵按照颜色归类分为5堆，再把分好颜色的花朵，分别放到相应的课桌上！”于是，几个小同学按照黄小乙说的策略，不一会儿就完成了游戏。</p>
 <p>事实上，仙女散花的游戏过程和Shuffle的工作流程大同小异。当然，Shuffle过程中涉及的步骤和环节，要比“仙女散花”复杂一些。</p>
 <p>Shuffle的本意是“洗牌”，在分布式计算环境中，它有两个阶段。一般来说，前一个阶段叫做“Map阶段”，后一个阶段叫做“Reduce阶段”。当然，也有人把它们叫做Shuffle Write阶段和Shuffle Read阶段。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c4/d7/c4062c2a0d6fd31b425034a8f53159d7.jpg?wh=8112%2A4893" title="仙女散花中的Map和Reduce阶段" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c4/d7/c4062c2a0d6fd31b425034a8f53159d7.jpg?wh=8112%2A4893" title="仙女散花中的Map和Reduce阶段" /></p>
 <p><strong>在仙女散花的游戏中，从老师分发花朵，到5个小同学把花朵按照颜色归类，对应的是Shuffle的Map阶段，而大家把归类的花朵分发到相应的课桌，这个过程类似于Shuffle的Reduce阶段。</strong></p>
 <p>接下来，我们就借助这个故事来深入探讨Shuffle的两个阶段：Map阶段和Reduce阶段。</p>
 <p>自2.0版本之后，Spark将Shuffle操作统一交由Sort shuffle manager来管理。因此，今天这一讲，我们专注于Sort shuffle manager实现的Shuffle分发过程。</p>
 <h2 id="map">Map阶段是如何输出中间文件的？</h2>
 <p>以终为始、以结果为导向的学习往往效率更高，在深入探讨Map阶段如何生产数据之前，我们不妨先来明确：<strong>Map阶段的输出到底是什么？</strong></p>
 <p>之前我们也说过，Map阶段最终生产的数据会以中间文件的形式物化到磁盘中，这些中间文件就存储在spark.local.dir设置的文件目录里。中间文件包含两种类型：一类是后缀为data的数据文件，存储的内容是Map阶段生产的待分发数据；另一类是后缀为index的索引文件，它记录的是数据文件中不同分区的偏移地址。这里的分区是指Reduce阶段的分区，<strong>因此，分区数量与Reduce阶段的并行度保持一致。</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/85/c5/85f8e918e65792527889a71e2ca55dc5.jpg?wh=5055%2A2682" title="Map阶段输出的数据文件和索引文件" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/85/c5/85f8e918e65792527889a71e2ca55dc5.jpg?wh=5055%2A2682" title="Map阶段输出的数据文件和索引文件" /></p>
 <p>这样一来，我们就可以把问题进一步聚焦在，Spark在Map阶段是如何生产这些中间文件的。不过，我们首先需要明确的是，Map阶段每一个Task的执行流程都是一样的，每个Task最终都会生成一个数据文件和一个索引文件。<strong>因此，中间文件的数量与Map阶段的并行度保持一致。</strong>换句话说，有多少个Task，Map阶段就会生产相应数量的数据文件和索引文件。</p>
 <p>接下来，我带你用Spark来实现“仙女散花”的游戏，咱们一边做游戏，一边来分析Map阶段的中间文件是如何产生的。</p>
 <h3 id="groupbykey">用groupByKey实现“仙女散花”</h3>
@@ -7242,17 +7242,17 @@
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>flowersKV.groupByKey.collect
 </code></pre></div>
 <p>我们可以看到，代码步骤与游戏过程基本上一一对应。但是，读取完花朵文件之后，由于groupByKey是pairRDD算子，需要消费（Key，Value）形式的数据，因此我们需要对原始花朵数据做一次转换。以数据分区0为例，数据的转换过程如下图所示，你不妨把数据分区0理解为是黄老师分发给小红的花朵。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/19/e5/199ef31535ccabdcb2fa172cafb036e5.jpg?wh=3699%2A1269" title="将原始数据转换为pairRDD" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/19/e5/199ef31535ccabdcb2fa172cafb036e5.jpg?wh=3699%2A1269" title="将原始数据转换为pairRDD" /></p>
 <p>基于pairRDD的Key，也就是花朵的颜色，Map Task就可以计算每条数据记录在Reduce阶段的目标分区，目标分区也就是游戏中的课桌。在黄小乙制定的策略中，哪种花放到哪张桌子是大家事先商定好的，但在Spark中，每条数据记录应该分发到哪个目标分区，是由Key的哈希值决定的。</p>
 <p><strong>目标分区计算好之后，Map Task会把每条数据记录和它的目标分区，放到一个特殊的数据结构里，这个数据结构叫做“PartitionedPairBuffer”</strong>，它本质上就是一种数组形式的缓存结构。它是怎么存储数据记录的呢？</p>
 <p>每条数据记录都会占用数组中相邻的两个元素空间，第一个元素是（目标分区，Key），第二个元素是Value。假设PartitionedPairBuffer的大小是4，也就是最多只能存储4条数据记录。那么，如果我们还以数据分区0为例，小红的前4枚花朵在PartitionedPairBuffer中的存储状态就会如下所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/36/28/36fd9b5318e82bf1a3264fb558c0e128.jpg?wh=4926%2A1014" title="PartitionedPairBuffer存储小红的前4枚花朵" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/36/28/36fd9b5318e82bf1a3264fb558c0e128.jpg?wh=4926%2A1014" title="PartitionedPairBuffer存储小红的前4枚花朵" /></p>
 <p>对我们来说，最理想的情况当然是PartitionedPairBuffer足够大，大到足以容纳Map Task所需处理的所有数据。不过，现实总是很骨感，每个Task分到的内存空间是有限的，PartitionedPairBuffer自然也不能保证能容纳分区中的所有数据。因此，<strong>Spark需要一种计算机制，来保障在数据总量超出可用内存的情况下，依然能够完成计算。这种机制就是：排序、溢出、归并。</strong></p>
 <p>就拿大小为4的PartitionedPairBuffer来说，数据分区0里面有16朵花，对应着16条数据记录，它们至少要分4批才能依次完成处理。在处理下一批数据之前，Map Task得先把PartitionedPairBuffer中已有的数据腾挪出去，腾挪的方式简单粗暴，Map Task直接把数据溢出到磁盘中的临时文件。</p>
 <p>不过，在溢出之前，对于PartitionedPairBuffer中已有的数据，Map Task会先按照数据记录的第一个元素，也就是目标分区 + Key进行排序。也就是说，尽管数据暂时溢出到了磁盘，但是临时文件中的数据也是有序的。</p>
 <p>就这样，PartitionedPairBuffer腾挪了一次又一次，数据分区0里面的花朵处理了一批又一批，直到所有的花朵都被处理完。分区0有16朵花，PartitionedPairBuffer的大小是4，因此，PartitionedPairBuffer总共被腾挪了3次，生成了3个临时文件，每个临时文件中包含4条数据记录。16条数据，有12条分散在3个文件中，还有4条缓存在PartitionedPairBuffer里。</p>
 <p>到此为止，我们离Map阶段生产的、用于在网络中分发数据的中间文件仅有一步之遥了。还记得吗？Map阶段生产的中间文件有两类，一类是数据文件，另一类是索引文件。分散在3个临时文件和PartitionedPairBuffer里的数据记录，就是生成这两类文件的输入源。最终，Map Task用归并排序的算法，将4个输入源中的数据写入到数据文件和索引文件中去，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/47/9a/4778e6e7ba922b101936a4c983b3ed9a.jpg?wh=6669%2A5004" title="归并临时文件，生成最终的中间文件" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/47/9a/4778e6e7ba922b101936a4c983b3ed9a.jpg?wh=6669%2A5004" title="归并临时文件，生成最终的中间文件" /></p>
 <p>好了，到目前为止，我们用groupByKey实现了“仙女散花”的游戏，详细讲解了Map阶段生产中间文件的过程。虽然Map阶段的计算步骤很多，但其中最主要的环节可以归结为4步：</p>
 <p><strong>1. 对于分片中的数据记录，逐一计算其目标分区，并将其填充到PartitionedPairBuffer；</strong>
 <strong>2. PartitionedPairBuffer填满后，如果分片中还有未处理的数据记录，就对Buffer中的数据记录按（目标分区ID，Key）进行排序，将所有数据溢出到临时文件，同时清空缓存；</strong>
@@ -7262,9 +7262,9 @@
 <h3 id="_1">“仙女散花”游戏升级</h3>
 <p>5个小同学完成游戏之后，离下课时间还早。因此，黄老师调整了游戏规则：“你们五个人还是一起协作，这次要在最短的时间内，统计不同花色花朵的数量。”</p>
 <p>小红迫不及待地说：“很简单！还是按照刚才的策略，先把花朵分好堆，然后我们五个人分别去课桌上数数就好啦！”</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d2/11/d2f80245237d63a5b8977107320c2811.jpg?wh=10272%2A4245" title="小红的主意" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d2/11/d2f80245237d63a5b8977107320c2811.jpg?wh=10272%2A4245" title="小红的主意" /></p>
 <p>黄小乙皱了皱眉，说道：“别急，新的游戏规则也是有时间限制的，我想了一个和你差不多的办法，一共分三步：第一步，每个人把手里不同花色花朵的数量先算出来；第二步，我们只需要把花朵的数量写到相应的桌子上；第三步，我们分别对五张课桌上的数字求和。这样就能完成得更快了”</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/df/e3/df99bcca853e4948718617672ebddce3.jpg?wh=10272%2A4278" title="黄小乙的主意" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/df/e3/df99bcca853e4948718617672ebddce3.jpg?wh=10272%2A4278" title="黄小乙的主意" /></p>
 <h3 id="reducebykey">用reduceByKey实现升级后的仙女散花</h3>
 <p>如果我们想用Spark来实现升级后的游戏，该怎么办呢？其实很简单，只要把groupByKey换成reduceByKey就好了。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>val flowers = spark.sparkContext.textFile(&quot;flowers.txt&quot;)
@@ -7276,17 +7276,17 @@
 </code></pre></div>
 <p>接下来，我们来分析一下reduceByKey的Map阶段计算，相比groupByKey有何不同。就Map端的计算步骤来说，reduceByKey与刚刚讲的groupByKey一样，都是先填充内存数据结构，然后排序溢出，最后归并排序。</p>
 <p>区别在于，在计算的过程中，<strong>reduceByKey采用一种叫做PartitionedAppendOnlyMap的数据结构来填充数据记录</strong>。这个数据结构是一种Map，而<strong>Map的Value值是可累加、可更新的</strong>。因此，PartitionedAppendOnlyMap非常适合聚合类的计算场景，如计数、求和、均值计算、极值计算等等。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a3/a4/a3e397dd3ce348f10eae76f809f37ca4.jpg?wh=4929%2A1014" title="大小为4的PartitionedAppendOnlyMap" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a3/a4/a3e397dd3ce348f10eae76f809f37ca4.jpg?wh=4929%2A1014" title="大小为4的PartitionedAppendOnlyMap" /></p>
 <p>在上图中，4个KV对的Value值，是扫描到数据分区0当中青色花朵之前的状态。在PartitionedAppendOnlyMap中，由于Value是可累加、可更新的，因此这种数据结构可以容纳的花朵数量一定比4大。因此，相比PartitionedPairBuffer，PartitionedAppendOnlyMap的存储效率要高得多，溢出数据到磁盘文件的频率也要低得多。</p>
 <p>以此类推，最终合并的数据文件也会小很多。<strong>依靠高效的内存数据结构、更少的磁盘文件、更小的文件尺寸，我们就能大幅降低了Shuffle过程中的磁盘和网络开销。</strong></p>
 <p>事实上，相比groupByKey、collect_list这些收集类算子，聚合类算子（reduceByKey、aggregateByKey等）在执行性能上更占优势。<strong>因此，我们要避免在聚合类的计算需求中，引入收集类的算子。</strong>虽然这种做法不妨碍业务逻辑实现，但在性能调优上可以说是大忌。</p>
 <h2 id="reduce">Reduce阶段是如何进行数据分发的？</h2>
 <p>最后，我们再来说说Reduce阶段，在“仙女散花”的游戏里，每个人把自己的花朵归好类之后，主动地把不同颜色的花朵放到相应的课桌上，这个过程实际上就是Shuffle过程中的数据分发。不过，与课桌被动地接收花朵不同的是，Shuffle在Reduce阶段是主动地从Map端的中间文件中拉取数据。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/78/eb/78d2b2e4ee2aba1a0473367f96da7aeb.jpg?wh=5052%2A2679" title="Map阶段输出的数据文件和索引文件" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/78/eb/78d2b2e4ee2aba1a0473367f96da7aeb.jpg?wh=5052%2A2679" title="Map阶段输出的数据文件和索引文件" /></p>
 <p>刚刚讲过，每个Map Task都会生成如上图所示的中间文件，文件中的分区数与Reduce阶段的并行度一致。换句话说，每个Map Task生成的数据文件，都包含所有Reduce Task所需的部分数据。因此，任何一个Reduce Task要想完成计算，必须先从所有Map Task的中间文件里去拉取属于自己的那部分数据。索引文件正是用于帮助判定哪部分数据属于哪个Reduce Task。</p>
 <p><strong>Reduce Task通过网络拉取中间文件的过程，实际上就是不同Stages之间数据分发的过程</strong>。在“仙女散花”的游戏中，5个孩子与5张课桌之间，需要往返25人次。如果让100个孩子把100种颜色的花朵，分别收集到100张课桌上，那么这100个孩子与100张课桌之间，就需要10000人次的往返！显然，Shuffle中数据分发的网络开销，会随着Map Task与Reduce Task的线性增长，呈指数级爆炸。</p>
 <p>Reduce Task将拉取到的数据块填充到读缓冲区，然后按照任务的计算逻辑不停地消费、处理缓冲区中的数据记录，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2c/eb/2c4ec7fb70bfd103f70f24e56yya91eb.jpg?wh=10749%2A2208" title="Reduce阶段的计算过程" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2c/eb/2c4ec7fb70bfd103f70f24e56yya91eb.jpg?wh=10749%2A2208" title="Reduce阶段的计算过程" /></p>
 <p>我们可以看到，Reduce阶段用圆圈标记的1、2、3、4与Map阶段的四个步骤一模一样。没错，因即是果、果即是因，当我们说某个Stage是Map阶段或是Reduce阶段的时候，我们的出发点或者说锚点就是Shuffle。对于上图的Shuffle 0来说，Stage 0是Map阶段，Stage 1是Reduce阶段。但是，对于后面的Shuffle 1来说，Stage 1就变成了Map 阶段。因此你看，当我们把视角拉宽，Map和Reduce这两个看似对立的东西，其实有很多地方都是相通的。</p>
 <h2 id="_2">性能杀手</h2>
 <p>想必经过上面两个阶段的分析，你已经对Shuffle为何会成为性能瓶颈，有了比较直观的感受。这里，我再带你总结一下。</p>
@@ -7297,7 +7297,7 @@
 <li>呈指数级增长的跨节点数据分发，带来的网络开销更是不容小觑。</li>
 </ul>
 <p><strong>其次，Shuffle消耗的不同硬件资源之间很难达到平衡。</strong>磁盘和网络的消耗是Shuffle中必需的环节。但是，磁盘与网络的处理延迟相比CPU和内存要相差好几个数量级。以下表为例，如果以CPU L1缓存的处理延迟为基准，把单位从纳秒校准到秒，我们就会惊讶地发现，当CPU、内存以秒为单位处理数据时，磁盘和网络的处理延迟是以天、月为单位的！</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/64/50/64c9d3fc8524ba81ca048ab29dd55350.jpeg?wh=1677%2A747" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/64/50/64c9d3fc8524ba81ca048ab29dd55350.jpeg?wh=1677%2A747" /></p>
 <p>正是基于Shuffle的这些特点，我们才会“谈虎色变”，一提到Shuffle就避之唯恐不及，强调能省则省、能拖则拖。</p>
 <h2 id="_3">小结</h2>
 <p>这一讲，我借助实现仙女散花这个游戏的需求，带你直观地认识Shuffle的计算过程。Shuffle有两个计算阶段，Map阶段和Reduce阶段。我们要重点掌握Map阶段的计算流程，我把它总结为4步：</p>
@@ -7510,8 +7510,6 @@ reduce阶段：（1）reduce task数量：spark.sql.shuffle.partitions
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

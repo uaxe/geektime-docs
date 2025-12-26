@@ -5945,7 +5945,7 @@
 <p>你看，这类报错信息都把答案都告诉我们了，我们只要认真读一下就行，我们的“一推理”刚刚开始，就把这个 BUG 解决了，都用不着后面的“二分法”和“三问人”。</p>
 <p>在你把代码跑起来后，还需要准备一下调试工具 Flipper 和 React Native Tool。</p>
 <p>Flipper 调试工具，你只需要下载一下就行，它的功能很强大：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e4/d1/e4e1f3a26e124dd4c582342ayy70b7d1.png?wh=1726x3472" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e4/d1/e4e1f3a26e124dd4c582342ayy70b7d1.png?wh=1726x3472" /></p>
 <p>这张长截图显示了 Flipper 的功能，从上到下依次是打印日志 Logs、组件树 Components、性能火焰图 Profiler、宿主组件树和布局 Layout、网络请求 Network。它还有一个功能是支持 Hermes 引擎 Debugger，它和浏览器的 Debugger 类似，这里我没有进行截图了。</p>
 <p>现在 RecyclerListView 源码已经跑起来了，调试环境也已经准备完成，接着下一步就是找到控制布局的关键源码。</p>
 <h2 id="_2">找到关键源码</h2>
@@ -6102,13 +6102,13 @@
 <a id="__codelineno-11-34" name="__codelineno-11-34" href="#__codelineno-11-34"></a>}
 </code></pre></div>
 <p>虽然我已经把代码精简并写了备注，但理解起来可能还是有点难度，所以我还给你配了单列布局的原理示意图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c0/a8/c03b10ea793948d7f280072a857964a8.png?wh=1920x556" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c0/a8/c03b10ea793948d7f280072a857964a8.png?wh=1920x556" /></p>
 <p>单列布局的原理是什么呢？</p>
 <p>从代码层面看，它对你传入的列表项进行<code>for</code>循环遍历，并通过 <code>_checkBounds</code>方法来判断。如果当前遍历的列表项宽度和当前一列已有列表项的宽度之和，不超过屏幕宽度，也就是<code>itemX + itemDim.width &lt;= this._window.width</code>，那么就跳过 <code>while</code> 循环，直接使用同一行前几个列表项的宽度之和<code>startX += itemDim.width</code> ，作为当前列表项的 x(startX) 坐标。也就是情况一：<strong>宽度足够，放到同一行。</strong></p>
 <p>如果<code>_checkBounds</code>判断，同一行剩余宽度不够了，那么就进入 <code>while</code> 循环，将当前列表项的 x(startX) 坐标设置为 0，y 坐标设置增加上一行最高 item 的高度<code>maxBound</code>。也就是情况二：<strong>宽度不够，放到下一行。</strong></p>
 <p>我还在图中给你画了一个单列布局的例子。第一行 A、B 列表项宽度正好占满整个屏幕宽度，所以列表项 C 得再起一行，其 x 坐标为 0，其 y 坐标为 A 的 y 坐标和 B 的高度 height 之和。列表项 C 横向独占了一行，所以 D、E 就只能放到下一行了。整体上看，RecyclerListView 实现的还是一种单列布局，只不过同一行中可以放置多个列表项。</p>
 <p>理解完 RecyclerListView 的单列布局源码后，接下来就要设计我们自己的双列瀑布流布局了。我给你画了一张瀑布流的示意图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/93/9c/938fbe382fc3438c4ee41ed01c8eab9c.png?wh=1920x548" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/93/9c/938fbe382fc3438c4ee41ed01c8eab9c.png?wh=1920x548" /></p>
 <p>双列瀑布流布局只有两种情况，第一种情况是如果左边已有列表项的高度之和 <code>startLeftY</code> 大于右边已有列表项的高度之和 <code>startRightY</code>，那么下一个列表项就要放右边。第二种情况则刚好相反，我们需要把下一个列表项放在左边。简单来说就是，<strong>左高放右、右高放左。</strong></p>
 <p>我同样给你举了一个例子，你可以对照双列瀑布流布局的图片看一下。起始时左右两边一样高，所以先是左 A，再是右 B。接下来，由于左边比右边高，所以再是右 C，最后是左 D。如果是单列布局，C 应该放在左边，D 应该放在右边，这就是双列瀑布流布局和单列布局不同之处。</p>
 <p>双列瀑布流实现的核心代码如下：</p>
@@ -6144,7 +6144,7 @@
 </code></pre></div>
 <p>首先，双列瀑布流有一个假设，假设每个列表项的宽度为屏幕的一半。其次，我们还需要记录左边的高度之和<code>startLeftY</code>和右边的高度之和<code>startRightY</code>。在<code>for</code>遍历列表项时，如果左边高 <code>startLeftY &gt; startRightY</code>，那么当前列表项放右边<code>startX = halfWindowWidth</code>，否则当前列表项放左边<code>startX = 0</code>，同时记录最新的左边/右边高度之和。最后把当前列表项 push 到 <code>this._layouts</code> 中。</p>
 <p>将单列布局改为双列瀑布流布局，改动的代码量很少，你可以现在就动手试一试。我也将我改动的代码前后对比图，放在了下面，你可以参考一下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3b/b1/3b0cbcb54e6e06fd52b7fe0d5d1f35b1.png?wh=1920x3413" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3b/b1/3b0cbcb54e6e06fd52b7fe0d5d1f35b1.png?wh=1920x3413" /></p>
 <h2 id="_4">保存修改</h2>
 <p>现在，我们来到了最后一步保存修改的源码。</p>
 <p>在修改完 node_modules 中的源码后，如果不进行保存，很有可能就会丢失。并且，有时候我们需要和同事进行合作，同事也需要我们修改后的代码，又或者是在使用上线平台进行打包时，也需要将修改后的 node_modules 源码同步给上线平台一份。本地修改 node_modules 源码后，不保存、不同步肯定会出线上问题。</p>
@@ -6327,8 +6327,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

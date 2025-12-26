@@ -14075,7 +14075,7 @@
 <p><strong>MVCC机制正是基于多版本技术实现的一种乐观锁机制</strong>，它乐观地认为数据不会发生冲突，但是当事务提交时，具备检测数据是否冲突的能力。</p>
 <p>在MVCC数据库中，你更新一个key-value数据的时候，它并不会直接覆盖原数据，而是新增一个版本来存储新的数据，每个数据都有一个版本号。版本号它是一个逻辑时间，为了方便你深入理解版本号意义，在下面我给你画了一个etcd MVCC版本号时间序列图。</p>
 <p>从图中你可以看到，随着时间增长，你每次修改操作，版本号都会递增。每修改一次，生成一条新的数据记录。<strong>当你指定版本号读取数据时，它实际上访问的是版本号生成那个时间点的快照数据</strong>。当你删除数据的时候，它实际也是新增一条带删除标识的数据记录。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1f/2c/1fbf4aa426c8b78570ed310a8c9e2c2c.png?wh=1920%2A806" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1f/2c/1fbf4aa426c8b78570ed310a8c9e2c2c.png?wh=1920%2A806" /></p>
 <h2 id="mvcc_1">MVCC特性初体验</h2>
 <p>了解完什么是MVCC后，我先通过几个简单命令，带你初体验下MVCC特性，看看它是如何帮助你查询历史修改记录，以及找回不小心删除的key的。</p>
 <p>启动一个空集群，更新两次key hello后，如何获取key hello的上一个版本值呢？ 删除key hello后，还能读到历史版本吗?</p>
@@ -14120,13 +14120,13 @@
 <h2 id="_1">整体架构</h2>
 <p>在详细和你介绍etcd如何实现MVCC特性前，我先和你从整体上介绍下MVCC模块。下图是MVCC模块的一个整体架构图，整个MVCC特性由treeIndex、Backend/boltdb组成。</p>
 <p>当你执行MVCC特性初体验中的put命令后，请求经过gRPC KV Server、Raft模块流转，对应的日志条目被提交后，Apply模块开始执行此日志内容。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f5/2c/f5799da8d51a381527068a95bb13592c.png?wh=1920%2A1064" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f5/2c/f5799da8d51a381527068a95bb13592c.png?wh=1920%2A1064" /></p>
 <p>Apply模块通过MVCC模块来执行put请求，持久化key-value数据。MVCC模块将请求请划分成两个类别，分别是读事务（ReadTxn）和写事务（WriteTxn）。读事务负责处理range请求，写事务负责put/delete操作。读写事务基于treeIndex、Backend/boltdb提供的能力，实现对key-value的增删改查功能。</p>
 <p>treeIndex模块基于内存版B-tree实现了key索引管理，它保存了用户key与版本号（revision）的映射关系等信息。</p>
 <p>Backend模块负责etcd的key-value持久化存储，主要由ReadTx、BatchTx、Buffer组成，ReadTx定义了抽象的读事务接口，BatchTx在ReadTx之上定义了抽象的写事务接口，Buffer是数据缓存区。</p>
 <p>etcd设计上支持多种Backend实现，目前实现的Backend是boltdb。boltdb是一个基于B+ tree实现的、支持事务的key-value嵌入式数据库。</p>
 <p>treeIndex与boltdb关系你可参考下图。当你发起一个get hello命令时，从treeIndex中获取key的版本号，然后再通过这个版本号，从boltdb获取value信息。boltdb的value是包含用户key-value、各种版本号、lease信息的结构体。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e7/8f/e713636c6cf9c46c7c19f677232d858f.png?wh=1920%2A903" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e7/8f/e713636c6cf9c46c7c19f677232d858f.png?wh=1920%2A903" /></p>
 <p>接下来我和你重点聊聊treeIndex模块的原理与核心数据结构。</p>
 <h2 id="treeindex">treeIndex原理</h2>
 <p>为什么需要treeIndex模块呢?</p>
@@ -14139,7 +14139,7 @@
 <p>Google的开源项目btree，使用Go语言实现了一个内存版的B-tree，对外提供了简单易用的接口。etcd正是基于btree库实现了一个名为treeIndex的索引模块，通过它来查询、保存用户key与版本号之间的关系。</p>
 <p>下图是个最大度（degree &gt; 1，简称d）为5的B-tree，度是B-tree中的一个核心参数，它决定了你每个节点上的数据量多少、节点的“胖”、“瘦”程度。</p>
 <p>从图中你可以看到，节点越胖，意味着一个节点可以存储更多数据，树的高度越低。在一个度为d的B-tree中，节点保存的最大key数为2d - 1，否则需要进行平衡、分裂操作。这里你要注意的是在etcd treeIndex模块中，创建的是最大度32的B-tree，也就是一个叶子节点最多可以保存63个key。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/44/74/448c8a2bb3b5d2d48dfb6ea585172c74.png?wh=1920%2A934" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/44/74/448c8a2bb3b5d2d48dfb6ea585172c74.png?wh=1920%2A934" /></p>
 <p>从图中你可以看到，你通过put/txn命令写入的一系列key，treeIndex模块基于B-tree将其组织起来，节点之间基于用户key比较大小。当你查找一个key k95时，通过B-tree的特性，你仅需通过图中流程1和2两次快速比较，就可快速找到k95所在的节点。</p>
 <p>在treeIndex中，每个节点的key是一个keyIndex结构，etcd就是通过它保存了用户的key与版本号的映射关系。</p>
 <p>那么keyIndex结构包含哪些信息呢？下面是字段说明，你可以参考一下。</p>
@@ -14180,7 +14180,7 @@
 <h2 id="mvcckey">MVCC更新key原理</h2>
 <p>当你通过etcdctl发起一个put hello操作时，如下面的put事务流程图流程一所示，在put写事务中，首先它需要从treeIndex模块中查询key的keyIndex索引信息，keyIndex中存储了key的创建版本号、修改的次数等信息，这些信息在事务中发挥着重要作用，因此会存储在boltdb的value中。</p>
 <p>在我们的案例中，因为是第一次创建hello key，此时keyIndex索引为空。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/84/e1/84377555cb4150ea7286c9ef3c5e17e1.png?wh=1920%2A1063" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/84/e1/84377555cb4150ea7286c9ef3c5e17e1.png?wh=1920%2A1063" /></p>
 <p>其次etcd会根据当前的全局版本号（空集群启动时默认为1）自增，生成put hello操作对应的版本号revision{2,0}，这就是boltdb的key。</p>
 <p>boltdb的value是mvccpb.KeyValue结构体，它是由用户key、value、create_revision、mod_revision、version、lease组成。它们的含义分别如下：</p>
 <ul>
@@ -14190,7 +14190,7 @@
 </ul>
 <p>填充好boltdb的KeyValue结构体后，这时就可以通过Backend的写事务batchTx接口将key{2,0},value为mvccpb.KeyValue保存到boltdb的缓存中，并同步更新buffer，如上图中的流程二所示。</p>
 <p>此时存储到boltdb中的key、value数据如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a2/ba/a245b18eabc86ea83a71349f49bdceba.jpg?wh=1807%2A397" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a2/ba/a245b18eabc86ea83a71349f49bdceba.jpg?wh=1807%2A397" /></p>
 <p>然后put事务需将本次修改的版本号与用户key的映射关系保存到treeIndex模块中，也就是上图中的流程三。</p>
 <p>因为key hello是首次创建，treeIndex模块它会生成key hello对应的keyIndex对象，并填充相关数据结构。</p>
 <p>keyIndex填充后的结果如下所示：</p>
@@ -14209,11 +14209,11 @@
 </ul>
 <p>通过以上流程，一个put操作终于完成。</p>
 <p>但是此时数据还并未持久化，为了提升etcd的写吞吐量、性能，一般情况下（默认堆积的写事务数大于1万才在写事务结束时同步持久化），数据持久化由Backend的异步goroutine完成，它通过事务批量提交，定时将boltdb页缓存中的脏数据提交到持久化存储磁盘中，也就是下图中的黑色虚线框住的流程四。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5d/a2/5de49651cedf4595648aeba3c131cea2.png?wh=1920%2A1059" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5d/a2/5de49651cedf4595648aeba3c131cea2.png?wh=1920%2A1059" /></p>
 <h2 id="mvcckey_1">MVCC查询key原理</h2>
 <p>完成put hello为world1操作后，这时你通过etcdctl发起一个get hello操作，MVCC模块首先会创建一个读事务对象（TxnRead），在etcd 3.4中Backend实现了ConcurrentReadTx， 也就是并发读特性。</p>
 <p>并发读特性的核心原理是创建读事务对象时，它会全量拷贝当前写事务未提交的buffer数据，并发的读写事务不再阻塞在一个buffer资源锁上，实现了全并发读。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/55/ee/55998d8a1f3091076a9119d85e7175ee.png?wh=1920%2A1070" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/55/ee/55998d8a1f3091076a9119d85e7175ee.png?wh=1920%2A1070" /></p>
 <p>如上图所示，在读事务中，它首先需要根据key从treeIndex模块获取版本号，因我们未带版本号读，默认是读取最新的数据。treeIndex模块从B-tree中，根据key查找到keyIndex对象后，匹配有效的generation，返回generation的revisions数组中最后一个版本号{2,0}给读事务对象。</p>
 <p>读事务对象根据此版本号为key，通过Backend的并发读事务（ConcurrentReadTx）接口，优先从buffer中查询，命中则直接返回，否则从boltdb中查询此key的value信息。</p>
 <p>那指定版本号读取历史记录又是怎么实现的呢？</p>
@@ -14225,7 +14225,7 @@
 <a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>[{ver:2,created:&lt;2,0&gt;,revisions: [&lt;2,0&gt;,&lt;3,0&gt;]}]
 </code></pre></div>
 <p>boltdb插入一个新的key revision{3,0}，此时存储到boltdb中的key-value数据如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8b/f7/8bec06d61622f2a99ea9dd2f78e693f7.jpg?wh=1432%2A477" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8b/f7/8bec06d61622f2a99ea9dd2f78e693f7.jpg?wh=1432%2A477" /></p>
 <p>这时你再发起一个指定历史版本号为2的读请求时，实际是读版本号为2的时间点的快照数据。treeIndex模块会遍历generation内的历史版本号，返回小于等于2的最大历史版本号，在我们这个案例中，也就是revision{2,0}，以它作为boltdb的key，从boltdb中查询出value即可。</p>
 <h2 id="mvcckey_2">MVCC删除key原理</h2>
 <p>介绍完MVCC更新、查询key的原理后，我们接着往下看。当你执行etcdctl del hello命令时，etcd会立刻从treeIndex和boltdb中删除此数据吗？还是增加一个标记实现延迟删除（lazy delete）呢？</p>
@@ -14243,7 +14243,7 @@
 <a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>]
 </code></pre></div>
 <p>boltdb此时会插入一个新的key revision{4,0,t}，此时存储到boltdb中的key-value数据如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/da/17/da4e5bc5033619dda296c022ac6yyc17.jpg?wh=1611%2A581" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/da/17/da4e5bc5033619dda296c022ac6yyc17.jpg?wh=1611%2A581" /></p>
 <p>那么key打上删除标记后有哪些用途呢？什么时候会真正删除它呢？</p>
 <p>一方面删除key时会生成events，Watch模块根据key的删除标识，会生成对应的Delete事件。</p>
 <p>另一方面，当你重启etcd，遍历boltdb中的key构建treeIndex内存树时，你需要知道哪些key是已经被删除的，并为对应的key索引生成tombstone标识。而真正删除treeIndex中的索引对象、boltdb中的key是通过压缩(compactor)组件异步完成。</p>
@@ -14392,8 +14392,6 @@ lazy方式性能更高，空闲空间可以再利用；
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

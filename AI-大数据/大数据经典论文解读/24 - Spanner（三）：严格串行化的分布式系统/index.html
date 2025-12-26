@@ -7962,7 +7962,7 @@
 <li>王二的账户里再多了300元；</li>
 <li>张三的账户里少了400元。</li>
 </ol>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/84/8e/849687940ae62b65a927034157094a8e.jpg?wh=1920x1080" title="要注意，可线性化是针对单个对象的，而且和数据库的事务性不一定相关[br]这里的操作流程不满足事务性，特别是事务性中的“一致性”[br]但是因为系统中没有分布式的情况，所以仍然是可线性化的" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/84/8e/849687940ae62b65a927034157094a8e.jpg?wh=1920x1080" title="要注意，可线性化是针对单个对象的，而且和数据库的事务性不一定相关[br]这里的操作流程不满足事务性，特别是事务性中的“一致性”[br]但是因为系统中没有分布式的情况，所以仍然是可线性化的" /></p>
 <p>从可线性化的角度来看，每个用户的<strong>单个账户</strong>的操作顺序都是满足了可线性化的。我们在第一步和第二步之间，只要读到李四的账户，是多了新转进去的400元就可以。但是因为没有事务支持，这样的操作顺序也满足不了我们实际的业务需求。</p>
 <p><strong>可线性化的本质，是需要我们在分布式系统上的操作符合常识。</strong>我们写入成功的数据，之后去读取，必须要能读取到刚刚写入的新数据，而不是有可能会读到一个旧版本的数据。即使写入和读取的动作，可能分别是从两个相聚几千公里的不同数据中心发起的。</p>
 <p>如果做不到这一点，对应用开发人员来说，本来简单的逻辑会变得非常复杂，所有的业务逻辑，都需要去考虑因为网络延时或者时钟误差带来的紊乱。而我们本身设计分布式系统的一大目标，就是让应用开发人员不需要关心分布式的存在，那么不是“可线性化”的系统，显然做不到这一点。</p>
@@ -7984,7 +7984,7 @@
 <h2 id="spanner">Spanner事务的具体实现</h2>
 <p>因为要支持严格串行化，解决时钟误差问题就对Spanner尤为重要。所以Spanner里的时间，并不是给出了一个简单的数字，来代表某一个时间点。而是通过一组叫做<strong>TrueTime API</strong>的接口，提供了一个有误差范围的“时间”概念。</p>
 <h3 id="truetime-api">TrueTime API</h3>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0a/0b/0a0b5a3fc24957d588ba934f8c71ce0b.jpg?wh=1920x665" title="论文中的表1，TrueTime API，其中的参数 t 是 TTstamp 类型" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0a/0b/0a0b5a3fc24957d588ba934f8c71ce0b.jpg?wh=1920x665" title="论文中的表1，TrueTime API，其中的参数 t 是 TTstamp 类型" /></p>
 <p>首先，Spanner假设有一个绝对准确的时钟，这个时钟的每一个时间点，就是一个<strong>绝对时间</strong>。Spanner的论文里，对于任何一个事件的发生，都会有一个绝对的时间点，这个时间点，在论文里用$t_{abs}(e)$来表示。其中的e代表event，就是某一个事件，而$t_{abs}$则是绝对（absolute）时间（time）的意思。</p>
 <p>我们任何一个服务器去获取当前的时间，是拿不到绝对时间的，而只能拿到一个 [earliest, latest] 这样的时间范围。同时，Spanner也简单封装了TT.after和TT.before这两个接口，可以拿来比较服务器获取到的时间和绝对时间$t_{abs}(e_{now})$的先后。</p>
 <p>对于TrueTime API来说，它保障的是：</p>
@@ -7992,12 +7992,12 @@
 <p><em>tt = TT.now()</em>
 <em>tt.ealierst</em> &lt; $t_{abs}(e_{now})$ &lt; <em>tt.latest</em></p>
 </blockquote>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/bc/3b/bc144798946b44fc4edc09d60da4a13b.jpg?wh=1920x1080" title="TrueTime API拿到的是一个包含误差的绝对时间范围" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bc/3b/bc144798946b44fc4edc09d60da4a13b.jpg?wh=1920x1080" title="TrueTime API拿到的是一个包含误差的绝对时间范围" /></p>
 <p>Spanner为了要保障可线性化，本质上就是要确保任何一个在<strong>绝对时间t</strong>发生的数据读取，一定只能看到在t这个时间节点之前已经提交成功的数据写入，之后的数据写入它是看不到的。并且，只要是在绝对时间t之前已经提交成功的事务写入，它也一定要能看到，而不能有些看不到。</p>
 <p>那么，Spanner是怎么通过自己的系统架构和这里的TrueAPI，做到这一点的呢？我们一起接着往下看。</p>
 <h3 id="spanner_1">Spanner支持的读写类型</h3>
 <p>我们先来看看Spanner支持的数据读写的事务类型：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1b/da/1b1b25ff5ae1c3739aa0569c64ed51da.jpg?wh=2000x1052" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1b/da/1b1b25ff5ae1c3739aa0569c64ed51da.jpg?wh=2000x1052" /></p>
 <p>Spanner一共支持3种操作，分别是<strong>读写事务</strong>、<strong>快照读事务</strong>、以及<strong>普通的快照读</strong>。</p>
 <p>其中，<strong>只有读写事务可以修改数据库里的数据</strong>，读写事务需要使用悲观锁，也就是对应的数据行一旦被锁，其他读写事务，是不能并发修改对应数据的。而所有的读数据都是无锁的，也就是无论是否有其他并发的读请求，或者有读写事务在进行，都不会影响数据的读取。</p>
 <p>快照读事务，和普通的快照读，<strong>唯一的差异就在于这个快照的“时间戳”由谁来提供</strong>。如果是快照读事务，那么这个“时间戳”是由Spanner系统来提供的。而普通的快照读，则是由应用指定时间，Spanner里支持两种指定时间的方式，一个是客户端选择一个时间戳，另一种则是指定一个时间戳的上届（upper bound），让Spanner在这个上届之下，为客户端选择一个时间戳。</p>
@@ -8021,9 +8021,9 @@
 <p>第四步，在有了这个时间戳之后，协调者会进行一个有条件的等待。它会等到TT.after(s)，也就是在考虑误差的情况下，绝对时间一定已经晚于这个选择的事务提交时间之后，再提交事务。</p>
 <p>提交事务的时候，作为一个参与者，它会在本地应用这个事务。作为协调者，它会向其他的参与者发起请求，让它们也提交事务。所有参与者写入的数据都有相同的时间戳，并且在事务应用完成之后，参与者会把对应的写锁释放掉。</p>
 <p>第五步，在整个事务提交完成之后，协调者会返回结果给到客户端。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/36/d5/360b94110b6de6ee1cdc138175c672d5.jpg?wh=1920x1280" title="Spanner为事务生成的时间戳，需要考虑所有参与者的时钟，并且任何一个Paxos组生成的时间戳都必须是递增的" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/36/d5/360b94110b6de6ee1cdc138175c672d5.jpg?wh=1920x1280" title="Spanner为事务生成的时间戳，需要考虑所有参与者的时钟，并且任何一个Paxos组生成的时间戳都必须是递增的" /></p>
 <p>在这个机制下，当有两个并发的事务，需要写同一条记录的时候，我们能够确保它们写入事务的时间戳，是有明确的先后关系的。我们还是以上节课的转账例子来举例：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0a/46/0a96ce31ce7f9d383e21eb15e1e94946.jpg?wh=1920x789" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0a/46/0a96ce31ce7f9d383e21eb15e1e94946.jpg?wh=1920x789" /></p>
 <p>我们之前遇到的时间戳问题，在于事务二后执行的时候，因为B和C的时钟比A要快。所以，事务二执行的时候，提交的时间戳可能早于事务一。</p>
 <p>但是在现在这个机制下，我们看到：</p>
 <ul>
@@ -8038,7 +8038,7 @@
 <li>最后是 $t_{abs}(e_{2}^{server})$ $\leq$ $s_{2}$。也就是事务二选取的时间戳，是晚于事务提交的绝对时间的。这个，是因为我们在选取时间戳的时候，是在决定提交之后，选取本地TrueTime的时间范围内最晚的，只要我们的误差可信，那么这个时间戳一定晚于决定提交那一刻的绝对时间。</li>
 </ol>
 <p>然后根据大小比较的传递关系，我们就自然有$s_{1} \lt s_{2}$，也就是事务二记录的提交时间，是晚于事务一的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c3/04/c37b1369a262f9cb94cf24a856c1f604.jpg?wh=1920x1080" title="通过提交等待，以及生成时间戳的规则，我们可以确保后提交的事务，必然时间戳是晚于先提交的事务的" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c3/04/c37b1369a262f9cb94cf24a856c1f604.jpg?wh=1920x1080" title="通过提交等待，以及生成时间戳的规则，我们可以确保后提交的事务，必然时间戳是晚于先提交的事务的" /></p>
 <p>可以看到，<strong>在这个读写事务的机制下，我们的事务有可能需要等待一段时间，而且这个时间是和我们的时钟误差相关的</strong>。时钟误差越小，我们需要等待的时间越短。这也是为什么Google需要在数据中心里，采用原子钟和GPS时钟，尽可能缩短不同服务器的时钟差异的核心原因。</p>
 <h4 id="_6">快照事务和快照读取</h4>
 <p>既然我们已经能够保障，Spanner的事务写入的时候的时间戳没有问题。那么，下一个挑战就来自于数据库读了。<strong>因为Spanner允许从任何一个副本读取数据，所以我们就会面临另一个挑战，就是Paxos下，我们并不能保障每一个副本都拥有最新的数据。</strong></p>
@@ -8188,8 +8188,6 @@ $$</p>
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

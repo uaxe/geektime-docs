@@ -7330,7 +7330,7 @@
 2.将Hive AST经过语义分析器转换成MapReduce执行计划。
 3.将生成的MapReduce执行计划和Hive执行函数代码提交到Hadoop上执行。</p>
 <p>Panthera的设计思路是保留Hive语义分析器不动，替换Hive语法解析器，使其将标准SQL语句转换成Hive语义分析器能够处理的Hive抽象语法树。用图形来表示的话，是用红框内的部分代替黑框内原来Hive的部分。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/72/b0/7236e0335857fd75d7d773634eaf51b0.png?wh=1114%2A324" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/72/b0/7236e0335857fd75d7d773634eaf51b0.png?wh=1114%2A324" /></p>
 <p>红框内的组件我们重新开发过，浅蓝色的是我们使用的一个开源的SQL语法解析器，将标准SQL解析成标准SQL抽象语法树（SQL AST），后面深蓝色的就是团队自己开发的SQL抽象语法树分析与转换器，将SQL AST转换成Hive AST。</p>
 <p>那么标准SQL和Hive QL的差别在哪里呢？</p>
 <p>标准SQL和Hive QL的差别主要有两个方面，一个是语法表达方式，Hive QL语法和标准SQL语法略有不同；另一个是Hive QL支持的语法元素比标准SQL要少很多，比如，数据仓库领域主要的测试集<a href="http://www.tpc.org/tpch/">TPC-H</a>所有的SQL语句Hive都不支持。尤其是Hive不支持复杂的嵌套子查询，而对于数据仓库分析而言，嵌套子查询几乎是无处不在的。比如下面这样的SQL，在where查询条件existes里面包含了另一条SQL语句。</p>
@@ -7352,9 +7352,9 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>select panthera_10.panthera_1 as s_grade from (select panthera_1, panthera_4, panthera_6, s_empname, s_city from (select s_grade as panthera_1, s_city as panthera_4, s_empname as panthera_6, s_empname as s_empname, s_city as s_city from staff) panthera_14 left outer join (select panthera_16.panthera_7 as panthera_7, panthera_16.panthera_8 as panthera_8, panthera_16.panthera_9 as panthera_9, panthera_16.panthera_12 as panthera_12, panthera_16.panthera_13 as panthera_13 from (select panthera_0.panthera_1 as panthera_7, panthera_0.panthera_4 as panthera_8, panthera_0.panthera_6 as panthera_9, panthera_0.s_empname as panthera_12, panthera_0.s_city as panthera_13 from (select s_grade as panthera_1, s_city as panthera_4, s_empname as panthera_6, s_empname, s_city from staff) panthera_0 left semi join (select p_city as panthera_3, p_pname as panthera_5 from proj) panthera_2 on (panthera_0.panthera_4 = panthera_2.panthera_3) and (panthera_0.panthera_6 = panthera_2.panthera_5) where true) panthera_16 group by panthera_16.panthera_7, panthera_16.panthera_8, panthera_16.panthera_9, panthera_16.panthera_12, panthera_16.panthera_13) panthera_15 on ((((panthera_14.panthera_1 &lt;=&gt; panthera_15.panthera_7) and (panthera_14.panthera_4 &lt;=&gt; panthera_15.panthera_8)) and (panthera_14.panthera_6 &lt;=&gt; panthera_15.panthera_9)) and (panthera_14.s_empname &lt;=&gt; panthera_15.panthera_12)) and (panthera_14.s_city &lt;=&gt; panthera_15.panthera_13) where ((((panthera_15.panthera_7 is null) and (panthera_15.panthera_8 is null)) and (panthera_15.panthera_9 is null)) and (panthera_15.panthera_12 is null)) and (panthera_15.panthera_13 is null)) panthera_10 ;
 </code></pre></div>
 <p>通过可视化工具将上面两条SQL的语法树展示出来，是这样的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2e/2b/2ebce9da37fff01e5701342699b69f2b.png?wh=590%2A346" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2e/2b/2ebce9da37fff01e5701342699b69f2b.png?wh=590%2A346" /></p>
 <p>这是原始的SQL抽象语法树。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3a/15/3aafd8cf731eb6fd5b0e125847084f15.png?wh=1440%2A232" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3a/15/3aafd8cf731eb6fd5b0e125847084f15.png?wh=1440%2A232" /></p>
 <p>这是等价转换后的抽象语法树，内容太多被压缩得无法看清，不过你可以感受一下（笑）。</p>
 <p>那么，在程序设计上如何实现这样复杂的语法转换呢？当时Panthera项目组合使用了几种经典的设计模式，每个语法点被封装到一个类里去处理，每个类通常不过几十行代码，这样整个程序非常简单、清爽。如果在测试过程中遇到不支持的语法点，只需为这个语法点新增加一个类即可，团队协作与代码维护非常容易。</p>
 <p>使用装饰模式的语法等价转换类的构造，Panthera每增加一种新的语法转换能力，只需要开发一个新的Transformer类，然后添加到下面的构造函数代码里即可。</p>
@@ -7422,7 +7422,7 @@
 <p>将等价转换后的抽象语法树AST再进一步转换成Hive格式的抽象语法树，就可以交给Hive的语义分析器去处理了，从而也就实现了对标准SQL的支持。</p>
 <p>当时Facebook为了证明Hive对数据仓库的支持，Facebook的工程师手工将TPC-H的测试SQL转换成Hive QL，我们将这些手工Hive QL和Panthera进行对比测试，两者性能各有所长，总体上不相上下，这说明Panthera自动进行语法分析和转换的效率还是不错的。</p>
 <p>Panthera（ASE）和Facebook手工Hive QL对比测试结果如下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c1/6f/c1866cede6eb563481d917b0f06b176f.png?wh=1014%2A598" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c1/6f/c1866cede6eb563481d917b0f06b176f.png?wh=1014%2A598" /></p>
 <p>事实上，标准SQL语法集的语法点非常多，我们经过近两年的努力，绞尽脑汁进行各种关系代数等价变形，依然没有全部适配所有的标准SQL语法。</p>
 <p>我在开发Panthera的时候，查阅了很多关于SQL和数据库的网站和文档，发现在我们耳熟能详的那些主流数据库之外还有很多名不见经传的数据库，此外，还有大量的关于SQL的语法解析器、测试数据和脚本集、各种周边工具。我们经常看到的MySQL、Oracle这些产品仅仅是整个数据库生态体系的冰山一角。还有很多优秀的数据库在竞争中落了下风、默默无闻，而更多的支撑起这些优秀数据库的论文、工具，非业内人士几乎闻所未闻。</p>
 <p>这个认识给了我很大触动，我一直期待我们中国人能开发出自己的操作系统、数据库、编程语言，也看到有很多人前仆后继投入其中。但是这么多年过去了，大部分努力惨淡收场，小部分结果沦落为笑柄，成为人们饭后的谈资。我曾经思考过，为什么会这样？</p>
@@ -7431,7 +7431,7 @@
 <p>今天我讲的是一个SQL引擎是如何设计出来的，也许在你的工作几乎不可能去开发SQL引擎，但是了解这些基础的知识，了解一些设计的技巧，对你用好数据库，开发更加灵活、有弹性的系统也会很有帮助。</p>
 <h2 id="_1">思考题</h2>
 <p>SQL注入是一种常见的Web攻击手段，如下图所示，攻击者在HTTP请求中注入恶意SQL命令（drop table users;），服务器用请求参数构造数据库SQL命令时，恶意SQL被一起构造，并在数据库中执行。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8c/4f/8c92076fc8b4005ce075734e9641cd4f.png?wh=1352%2A566" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8c/4f/8c92076fc8b4005ce075734e9641cd4f.png?wh=1352%2A566" /></p>
 <p>但是JDBC的PrepareStatement可以阻止SQL注入攻击，MyBatis之类的ORM框架也可以阻止SQL注入，请从数据库引擎的工作机制解释PrepareStatement和MyBatis的防注入攻击的原理。</p>
 <p>欢迎你点击“请朋友读”，把今天的文章分享给好友。也欢迎你写下自己的思考或疑问，与我和其他同学一起讨论。</p>
 <div><strong>精选留言（15）</strong></div>
@@ -7596,8 +7596,6 @@ mybatis这些orm框架也是基于preparedstatement mybatis尽量使用#占位�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

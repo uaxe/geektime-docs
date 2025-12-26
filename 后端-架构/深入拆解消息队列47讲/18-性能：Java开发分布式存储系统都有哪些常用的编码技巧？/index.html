@@ -14905,7 +14905,7 @@
 <p>我一直认为，架构设计选型和编码是两个事情，魔鬼在细节，不管多牛逼的架构，都需要细致的工程化实现，才能达到我们预期的效果。这节课我们将用很零散的方式讲一下用 Java 来开发存储系统时会用到的一些技巧及其背后的原理。其中的每个知识点都是独立的，你可以挑自己感兴趣的部分学习。</p>
 <h2 id="pagecache-direct-io">PageCache 调优和 Direct IO</h2>
 <p>我们一直会听到PageCache，简单理解它就是内存。写内存性能肯定是最高的。但是PageCache 并不是万能的，在某些情况下会存在命中率低，导致读写性能不高的情况。遇到这种情况，就需要在业务上进行处理。我们先来看下面这张图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/58/80/586ac52baff5c8c9e6644da62d962f80.jpg?wh=10666x4844" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/58/80/586ac52baff5c8c9e6644da62d962f80.jpg?wh=10666x4844" /></p>
 <p>如上图所示，应用程序读取文件，会经过应用缓存、PageCache、DISK（硬盘）三层。即应用程序读取文件时，Linux 内核会把从硬盘中读取的文件页面缓存在内存一段时间，这个文件缓存被称为 PageCache。</p>
 <p><strong>缓存的核心逻辑是：</strong>比如应用层要读1KB文件，那么内核的预读算法则会以它认为更合适的大小进行预读 I/O，比如 16-128KB。当应用程序下次读数据的时候，会先尝试读PageCache，如果数据在PageCache中，就会直接返回；如果数据不在PageCache中，就会触发从硬盘读取数据，效率就会变低。</p>
 <p>这种预读机制，在顺序读的时候，性能会很高，因为已经预先加载了。但是有以下三种情况，PageCache无法起作用。</p>
@@ -14917,7 +14917,7 @@
 <p>为了解决上面这类PageCache无法起作用的场景，有一种解决思路是：<strong>通过使用</strong> <strong>Direct IO 来模拟实现</strong> <strong>PageCahce</strong> <strong>的效果。</strong>原先内核提供的 PageCache 的底层实现（比如数据加载、缓存命中、换页、刷盘等）是由操作系统来控制的，我们无法灵活控制，因此导致在一些场景中无法满足要求。</p>
 <p>那么新的思路是：可以绕过操作系统，直接使用通过自定义Cache + Direct IO来实现更细致、自定义的管理内存、命中和换页等操作，从而针对我们的业务场景来优化缓存策略，从而实现比PageCache更好的效果。从技术实现上看，它和我们使用C++ 管理内存编程是一样的效果。</p>
 <p>解决思路来看下图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d8/19/d86190bb6cfe6f3c0ba882335b71b219.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d8/19/d86190bb6cfe6f3c0ba882335b71b219.jpg?wh=10666x6000" /></p>
 <p>通过前面所学我们知道，NIO 中的 FileChannel 主要和ByteBuffer打交道，mmap直接和缓存打交道，而 Direct IO直接和硬盘打交道。即Direct IO是直接操作硬盘中的数据的，不经过应用缓存和页缓存。</p>
 <p>那么这个思路的核心实现就是：<strong>通过自定义 Cache 管理、缓存加载、换页等行为，让这些策略可以满足当前业务和场景的需求。</strong>比如在随机读或者内存不够的场景下，提高页缓存的命中率。</p>
 <p>在Java 中，Direct IO 可以通过 JNA/JNI 调用 Native 方法实来实现。GitHub上有封装好了Java JNA 库，实现了 Java 的 Direct IO，直接就可以使用。有兴趣的话，你可以去研究一下这个GitHub项目：<a href="https://github.com/smacke/jaydio">https://github.com/smacke/jaydio</a>。</p>
@@ -14941,7 +14941,7 @@
 </code></pre></div>
 <p>从技术上看，<strong>FileChannel 大多数时候是和 ByteBuffer 打交道的</strong>，你可以将ByteBuffer理解为一个 byte[] 的封装类。ByteBuffer 是在应用内存中的，它和硬盘之间还隔着一层 PageCache。</p>
 <p>如下图所示，即FileChannel 写的时候经历了应用内存 -&gt; PageCache -&gt; 磁盘三个步骤。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2e/b6/2e4c7986069cb2f423bd02ce2ef640b6.jpg?wh=10666x6000" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2e/b6/2e4c7986069cb2f423bd02ce2ef640b6.jpg?wh=10666x6000" />
 从使用上看，我们通过 filechannel.write 写入数据时，会将数据从应用内存写入到PageCache，此时便认为完成了落盘操作。但实际上，操作系统最终帮我们将 PageCache 的数据自动刷到了硬盘。这也是 FileChannel 提供了一个 force() 方法来通知操作系统进行及时刷盘的原因。</p>
 <p>接着我们来看一下 mmap，先看一下它的基本使用方式：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>MappedByteBuffer mappedByteBuffer = fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, filechannel.size();
@@ -14959,7 +14959,7 @@
 </code></pre></div>
 <p>mmap 是一个把文件映射到内存的操作，因此可以像读写内存一样读写文件。它省去了用户空间到内核空间的数据复制过程，从而提高了读写性能。</p>
 <p>如下图所示，mmap的写入也是先把数据写入到PageCache，不是直接把数据写到硬盘中。它的底层借助了内存来加速，即 MappedByteBuffer 的 put 实际是对内存进行操作。具体刷盘依赖操作系统定时刷盘或者手动调用 mappedByteBuffer.force() 刷盘。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f4/c0/f4e05ebbfc34a7d38b0a9c4b332f39c0.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f4/c0/f4e05ebbfc34a7d38b0a9c4b332f39c0.jpg?wh=10666x6000" /></p>
 <p>从经验来看，mmap 在内存充足、数据文件较小且相对固定的场景下，性能比 FileChannel 高。<strong>但它有这样几个缺点：</strong></p>
 <ol>
 <li>使用时必须先指定好内存映射的大小，并且一次 Map 的大小限制在 1.5G 左右。</li>
@@ -14992,7 +14992,7 @@
 <p>还一点就是对象池化，对象池化是指只要是需要反复 new 出来的东西都可以池化，以避免内存分配后再回收，造成额外的开销。Netty 中的 Recycler、RingBuffer 中预先分配的对象都是按照这个池化的思路来实现的。</p>
 <h2 id="_2">直接内存（堆外）和堆内内存</h2>
 <p>想必这个概念你已经很熟悉了。如下图所示，堆内和堆外的堆是指 JVM 堆，堆内内存就是指JVM堆内部的内存空间，堆外就是指除了JVM堆以外的内存空间。堆内内存加上堆外内存等于总内存。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4a/8f/4a3c99e3f26992da898eac1788b9a88f.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4a/8f/4a3c99e3f26992da898eac1788b9a88f.jpg?wh=10666x6000" /></p>
 <p>虽然概念熟悉，但你知道什么时候使用堆内内存，什么时候使用堆外内存吗?</p>
 <p><strong>关于堆内内存和堆外内存的选择，我有下面五点建议：</strong></p>
 <ol>
@@ -15009,12 +15009,12 @@
 <p>那有办法提高同步刷盘的性能吗？你的直觉是不是只能通过更高性能的硬盘，比如SSD、NVMe，或者AEP这种性能更高的存储介质了。除了存储介质外，有没有其他的解法呢？</p>
 <p>从应用程序的角度来看，可以通过批量同步刷盘的操作来提高性能。批量同步刷盘的核心思路是：<strong>每次刷盘尽量刷更多的数据到硬盘上</strong>。技术上是指通过收集多线程写过来的数据，汇总起来批量同步刷到硬盘中，从而提高数据同步刷盘的性能。</p>
 <p>我们来看一下具体的实现思路，来看下图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f2/b7/f22cf752b7a1876f42813dc5b58902b7.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f2/b7/f22cf752b7a1876f42813dc5b58902b7.jpg?wh=10666x6000" /></p>
 <p>业务线程 T1 到 T6 的数据通过内存将数据发送给IO 线程。然后业务线程进入await 状态，当 IO Thread 收集到一定的数据后，再一起将数据同步刷到硬盘中。最后唤醒T1到T6线程，返回写入成功。</p>
 <p><strong>这个方案和</strong> <strong>PageCache</strong> <strong>写入的最大区别在于：</strong>fileChannel.write() 只要写 PageCache 成功就会直接返回，后续的刷盘动作交给操作系统去执行，在客户端看来数据已经写入成功了，但是底层却没有写入成功。而新方案中写入线程是可以感知到刷盘的结果的，当同步刷盘失败，则 IO 线程会通知业务线程写入失败，业务线程就会进行重试或给客户端返回失败。</p>
 <p>我们在基础篇的网络模块中讲过，在消息队列系统中，客户端都是由多个生产者写入的，服务端会通过React模型配合后端 Process 线程池来处理请求。此时 Broker 接收到数据后，会分发给多个Process线程处理，当Process线程处理完数据后，如果需要同步刷盘，就可以使用上面这种优化方案来提高性能。</p>
 <p>另外，在主流的消息队列中，为了避免同步刷盘，常用的方案是<strong>通过多副本机制来实现数据的高可靠</strong>。如下图所示，数据会写入到多个副本中，每个副本只写入到本节点的PageCache，然后就返回成功。因为多台节点同时挂掉的概率很低，所以消息丢失的概率也就很低了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/27/ba/270e2464868e6cb0a10cacdf2d1820ba.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/27/ba/270e2464868e6cb0a10cacdf2d1820ba.jpg?wh=10666x6000" /></p>
 <h2 id="aep">新的存储 AEP</h2>
 <p>我们来看看什么是AEP，这部分相当于一个科普吧。我们在选用硬盘的时候，经常会听到SSD、SATA、NVMe 等存储介质。因为在传统存储系统中，我们通常采用机械盘或SSD作为后端存储系统的缓存。</p>
 <p>随着存储技术的发展，Intel 推出了基于 3D Xpoint 技术的新型存储介质傲腾内存（AEP）。相比普通内存，AEP 拥有有大容量、非易失的特点，相当于大容量的持久化的内存。</p>
@@ -15033,7 +15033,7 @@
 <h2 id="ssd-4kb">SSD 的 4KB 对齐</h2>
 <p>SSD 4KB 对齐指的将 SSD 盘的物理扇区和逻辑扇区对齐，从而提高 SSD 盘读写性能的一种技巧，是 SSD 盘经典的优化技巧。</p>
 <p><strong>底层大致的原理是：</strong>如果读取一次数据，要跨多个物理扇区，那么性能就会下降；如果每次读取刚刚好是读一个物理扇区的数据，那么性能就会很高。我在网上找了两张图来说明一下效果。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9b/f4/9b7c49bb5527974b4733c93c9e65e4f4.png?wh=667x90" /><img alt="" src="https://static001.geekbang.org/resource/image/30/5f/30cf525c0acae5c8fcb14f496635705f.png?wh=668x98" title="图片来源：https://www.disktool.cn/content-center/ssd-alignment-tool-666.html" /></p>
+<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9b/f4/9b7c49bb5527974b4733c93c9e65e4f4.png?wh=667x90" /><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/30/5f/30cf525c0acae5c8fcb14f496635705f.png?wh=668x98" title="图片来源：https://www.disktool.cn/content-center/ssd-alignment-tool-666.html" />}{:referrerpolicy="no-referrer"</p>
 <p>可以看到，如果读取的刚好是一个物理扇区，那么就不需要跨物理扇区读，读取性能就会更高。当然，这块的细节很多，你如果有兴趣的话可以深入去研究下，这里只是点一下，让你知道有这么个东西。</p>
 <p>基于这个理论，我们在使用SSD的时候，如果追求性能，并且场景合适，可以使用这个技巧来提高性能。但是在实际系统中，特别是在消息系统，因为用户的消息的大小是动态变化的，消息基本不可能是4KB的整数倍。所以如果强制要求4KB对齐，就需要进行空数据填充，当消息量多的时候，填充行为可能会导致额外的硬盘空间浪费。</p>
 <h2 id="_5">其他一些优化手段</h2>
@@ -15189,8 +15189,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

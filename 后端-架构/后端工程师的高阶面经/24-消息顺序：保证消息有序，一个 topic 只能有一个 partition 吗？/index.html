@@ -14914,14 +14914,14 @@
 <h2 id="_1">消息在分区上的组织方式</h2>
 <p>在 Kafka 中，消息是以分区为单位进行存储的。分区是逻辑上的概念，用于对消息进行水平划分和并行处理。每个 topic 都可以被划分为一个或多个分区，每个分区都是一个<strong>有序、不可变</strong>的消息日志。</p>
 <p>Kafka 使用 WAL （write-ahead-log）日志来存储消息。每个分区都有一个对应的日志文件，新的消息会被追加到文件的末尾，而已经加入日志里的消息，就不会再被修改了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/73/70/73ef185e2011f444026cff4d140caf70.png?wh=1920x806" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/73/70/73ef185e2011f444026cff4d140caf70.png?wh=1920x806" /></p>
 <p>每个消息在分区日志里都有一个唯一的偏移量（offset），用来标识消息在分区里的位置。<strong>Kafka 保证同一分区内的消息顺序，但不保证不同分区之间的顺序</strong>。</p>
 <p>而 Kafka 本身暴露了对应的接口，也就是说你可以显式地指定消息要发送到哪个分区，也可以显式地指定消费哪个分区的数据。</p>
 <h2 id="_2">什么是有序消息？</h2>
 <p>在消息队列里面，有序消息是指消费者消费某个 topic 消息的顺序，和生产者生产消息的顺序一模一样，它也叫做顺序消息。</p>
 <p>前面你应该注意到了，Kafka 并不能保证不同分区之间的顺序。也就是说，如果业务上有先后顺序的消息被发送到不同的分区上，那么你难以确定哪一个消息会先被消费。</p>
 <p>你需要注意一点语义上的差别，这里说生产者生产消息的顺序，不是指你创建出来消息那个实例的先后顺序，而是指broker收到的顺序。比如说你有两个生产者，一个生产者先生产了 msg1，另外一个生产者生产了 msg2，但是 msg2 先发到了broker上。那么实际上我们认为 msg2 是先于 msg1 的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/26/f7/2682e2f251a64e06e24ae7012337e8f7.png?wh=1920x941" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/26/f7/2682e2f251a64e06e24ae7012337e8f7.png?wh=1920x941" /></p>
 <p>如果你要求的是两个生产者，一个生产者一定要先于另外一个生产者发送一条消息，那么这实际上已经超出了消息队列要解决的问题的范畴了，它属于在分布式环境下如何协调不同节点按照先后顺序执行一定的步骤这个问题范畴。有序消息强调的是某个 topic 内，而不是跨 topic 的有序消息。</p>
 <h2 id="topic">跨 topic 的有序消息</h2>
 <p>不过有些时候可能因为业务特征或者历史问题，业务会要求你在不同的 topic 之间也保证消息是有序的。比如说 msg1 先发送到了 topic_a 上， msg2 被发送到了 topic_b 上。但是在业务层面上，要求 msg1 一定要先于 msg2 消费。</p>
@@ -14947,7 +14947,7 @@
 </ol>
 <h2 id="_4">基本思路</h2>
 <p>我在前置知识里面已经说了 Kafka 分区是如何存储数据的。所以你很容易就猜到第一个解决方案，就是每一个 topic 只使用一个分区，也就是所谓的单分区解决方案。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d5/23/d5b8898e6905940312cedee64fa7e523.png?wh=1920x941" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d5/23/d5b8898e6905940312cedee64fa7e523.png?wh=1920x941" /></p>
 <p>所以你可以简单介绍这个方案。</p>
 <blockquote>
 <p>要保证消息有序，最简单的做法就是让特定的 topic 只有一个分区。这样所有的消息都发到同一个分区上，那么自然就是有序的。</p>
@@ -14957,7 +14957,7 @@
 <blockquote>
 <p>这种只有一个分区的方案性能差，没办法支撑高并发。对于生产端来说，所有的消息都在一个分区上，也同时意味着所有的消息都发送到了同一个broker上，这个服务器很可能撑不住压力；对于消费端来说，只有一个分区，那么就只能有一个消费者消费，很容易出现消息积压的问题。</p>
 </blockquote>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/37/b3/377e7d99d997ea28f29e7ce17fd232b3.png?wh=1920x941" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/37/b3/377e7d99d997ea28f29e7ce17fd232b3.png?wh=1920x941" /></p>
 <p>既然你说了这个点，自然就是为了引出改进方案。不过改进方案都有一个基本的前提，消息需要保持有序，但不是全局有序，而是同一个业务内有序。</p>
 <p>如果业务要求的是全局有序，那就没什么优化手段，只能是换用更加强大的机器。但是你设想一下真实的业务场景，大部分业务强调的有序是全局有序吗？并不是，而是<strong>业务内有序</strong>。比如说在下单的场景下，会产生创建订单消息和完成支付消息。业务上只会要求同一个订单的创建订单消息应该优先于完成支付消息，但是不会要求订单 A 的创建消息需要先于订单 B 的支付消息。</p>
 <p>所以你可以先暂时澄清一下同一个业务内有序的概念，然后引出优化方案。</p>
@@ -14967,7 +14967,7 @@
 <h3 id="_5">异步消费</h3>
 <p>在单分区方案里，最容易遇到的问题就是消息积压，因为你只有一个消费者。在遇到消息积压的情况下，你可以考虑异步消费。但是这里的异步消费和上节课讲的比起来，有点不一样，这里你要关注一个问题：如何维持顺序？</p>
 <p>这里说的顺序，就是同一个业务内的顺序。所以我们可以考虑在异步消费时，当消费者从队列取出来消息之后，把同一个业务的消息丢到同一个队列里。你可以看一下整体的架构图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0c/f2/0c23f9fa9600707333d3f4c9efafc3f2.png?wh=1920x916" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0c/f2/0c23f9fa9600707333d3f4c9efafc3f2.png?wh=1920x916" /></p>
 <p>图中有一个消费者负责从 Kafka 里拉取消息，然后发送到基于内存的队列里面。在发送的时候，它会根据 id 做一个简单的取余操作来筛选队列。然后工作线程从队列里面拿取消息，真正执行业务逻辑。</p>
 <p>这个例子用的是 id，但是你可以根据自己的业务来选择其他字段，你选择的这些字段就被叫做业务特征。</p>
 <p>你抓住关键字<strong>异步消费</strong>介绍这个方案。</p>
@@ -14984,7 +14984,7 @@
 <p>第二个方案就是直接扩展为使用多个分区，只需要确保同一个业务的消息发送到同一个分区就可以保证同一个业务的消息是有序的。</p>
 </blockquote>
 <p>面试官自然就会追问，怎么保证同一个业务的消息必然发送到同一个分区呢？做法也很简单，只需要生产者在发送消息的时候，根据业务特征，比如说业务 ID 计算出目标分区，在发送的时候显式地指定分区就可以了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ed/80/ed75cffc180df3eccf3dbfe1f0977880.png?wh=1920x989" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ed/80/ed75cffc180df3eccf3dbfe1f0977880.png?wh=1920x989" /></p>
 <p>这里你抓住关键词<strong>计算分区</strong>回答。</p>
 <blockquote>
 <p>要想确保同一个业务的消息都发送到同一个分区，那么只需要发送者自己根据业务特征，直接计算出来一个目标分区。比如说最简单的策略就是根据业务 ID 对分区数量取余，余数就是目标分区。</p>
@@ -14993,7 +14993,7 @@
 <p>我们先来看第一个缺点。</p>
 <h3 id="_7">数据不均匀</h3>
 <p>这个缺点很容易理解，因为发送方要按照业务特征来选择分区，自然就容易导致一些分区有很多数据，而另外一些分区数据很少。而如果某个分区有很多数据的话，消费者来不及消费也是正常的事情。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/16/79/1621e78eafde1138214b080ba3974579.png?wh=1920x917" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/16/79/1621e78eafde1138214b080ba3974579.png?wh=1920x917" /></p>
 <blockquote>
 <p>数据不均匀一般是业务造成的。在我们的方案里面，分区是根据业务特征来选择的，那么自然有一些分区有很多数据，有一些分区数据很少。比如说万一我们不小心把热点用户的消息都发到了同一个分区里面，那么这个分区的 QPS 就会很高，消费者也不一定来得及消费，就可能引起消息积压。</p>
 </blockquote>
@@ -15006,7 +15006,7 @@
 <p>这种解决方案的基本思路就是借鉴 Redis 的数据分布方案。你可以根据业务特征计算一个哈希值，然后映射到槽上。这里，你可以参考 Redis，使用 16384 个槽，不过如果业务体量不是那种几百万 QPS 的，你用 1024 个槽就可以。</p>
 <p>你再通过指定不同的槽把数据分配到不同的分区上，这个时候你就可以根据你的业务特征合理分配槽，从而保证分区之间数据分布是均匀的。</p>
 <p>整个架构如图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9c/93/9c0e58fe55c8b65d4c2b28f836971393.png?wh=1920x820" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9c/93/9c0e58fe55c8b65d4c2b28f836971393.png?wh=1920x820" /></p>
 <p>你抓住关键词<strong>槽</strong>回答。</p>
 <blockquote>
 <p>第一种思路是借鉴 Redis 的槽与槽分配方案。不过 Redis 使用了 16384 个槽，一般的业务用不上那么多槽，所以可以考虑用 1024 个槽。根据业务的特征来计算一个哈希值，再除以 1024 取余就可以得到所在的槽。再根据不同槽的数据多少，合理地把槽分配到不同的分区。最好把槽和分区的绑定关系做成动态的，也就是说我可以随时调整槽到分区的映射关系，保证所有的分区负载都是均匀的。</p>
@@ -15017,7 +15017,7 @@
 <h4 id="_9">一致性哈希</h4>
 <p>你已经接触过一致性哈希这个算法很多次了。那么在这里使用哈希一致性算法，就是把分区分散在哈希环上。你根据业务特征计算出一个哈希值之后，根据哈希值在这个环上找到合适的分区，然后把消息发送过去。</p>
 <p>你只要通过调整不同分区之间的间隔，就能控制分区上的数据分布。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8c/71/8c9fd7c86f8830ec3aaf542192909271.png?wh=1920x1144" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8c/71/8c9fd7c86f8830ec3aaf542192909271.png?wh=1920x1144" /></p>
 <blockquote>
 <p>另外一种思路是使用一致性哈希算法来筛选分区。首先要根据数据分布的整体情况，把分区分布在哈希环上，确保每一个分区上的数据分布大体上是均匀的。如果一部分哈希值上数据较多，就多插入几个分区节点。然后根据业务特征计算一个哈希值，从哈希环上找到对应的分区。</p>
 </blockquote>
@@ -15028,7 +15028,7 @@
 <p>到这里，我们已经彻底解决了数据不均匀的问题，接下来就要讨论增加分区引起消息失序的问题了。</p>
 <h3 id="_10">增加分区引起消息失序</h3>
 <p>你可以结合下面这张图来理解。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/12/69/125a0070a6d42117e6bbb5e728d58569.png?wh=1920x1023" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/12/69/125a0070a6d42117e6bbb5e728d58569.png?wh=1920x1023" /></p>
 <p>在面试的时候，你可以先介绍这个缺点，关键词是<strong>增加分区会引起消息失序</strong>，同时补充一个例子。</p>
 <blockquote>
 <p>它还有另外一个缺点，就是如果中间有增加新的分区，那么就可能引起消息失序。比如说最开始 id 为 3 的订单消息 msg1 发到分区 0 上，但是这时候很不幸分区 0 上积攒了很多消息，所以 msg1 迟迟得不到消费。</p>
@@ -15062,7 +15062,7 @@
 <li>增加分区引起的消息失序。要解决这个问题也很简单，就是新增加的分区暂时不要消费，确保在别的分区上的消息已经被消费完了再消费。</li>
 </ol>
 <p>RabbitMQ 和 RocketMQ 里面消息有序性的解法也是差不多的。不同的是，在 RabbitMQ 里面使用的是 queue，因为 RabbitMQ 没有分区的概念。而 RocketMQ 里面内置了有序消息的功能，底层原理也基本相似。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8y/5c/8yy49b0e01ae1e565c7a4d97c5175c5c.jpg?wh=2933x1896" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8y/5c/8yy49b0e01ae1e565c7a4d97c5175c5c.jpg?wh=2933x1896" /></p>
 <h2 id="_13">思考题</h2>
 <p>最后请你来思考两个问题。</p>
 <ul>
@@ -15203,8 +15203,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

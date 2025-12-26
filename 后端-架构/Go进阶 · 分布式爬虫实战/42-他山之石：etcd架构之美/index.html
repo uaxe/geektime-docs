@@ -14798,14 +14798,14 @@
 <p>使用etcd的重要项目包括了CoreOS与Kubernetes。etcd使用 Go 书写，底层使用了 Raft 协议，它的架构本身非常优美。这节课就让我们来看一看etcd的架构、核心特性和实现机制，这样我们才能利用etcd更好地完成分布式协调工作，领会这个优秀的开源组件的设计哲学。同时，掌握etcd也有助于我们更深入地了解Kubernetes的运行机制。</p>
 <h2 id="etcd">etcd全局架构</h2>
 <p>etcd的第一个版本 v0.1 于2013年发布，现在已经更新到了v3，在这个过程中，etcd 的稳定性、扩展性、性能都在不断提升。我们这节课主要讨论的是当前最新的v3版本。话不多说，我们先来从整体上看一看etcd的架构。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b3/11/b37975657d35abfca244f2884d840c11.jpg?wh=1920x736" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b3/11/b37975657d35abfca244f2884d840c11.jpg?wh=1920x736" /></p>
 <p>etcd从大的方面可以分为几个部分，让我们结合图片从右往左说起。</p>
 <p><strong>首先etcd抽象出了raft-http模块，由于etcd通常为分布式集群部署方式，该层用于处理和其他etcd节点的网络通信。</strong>etcd内部使用了HTTP协议来进行通信，由于etcd中的消息类型很多，心跳探活的数据量较小，快照信息较大（可达GB级别），所以etcd有两种处理消息的通道，分别是Pipeline消息通道与Stream消息通道。</p>
 <p>Stream消息通道是etcd中节点与节点之间维护的长连接，它可以处理频繁的小消息，还能复用HTTP底层的连接，不必每次都建立新的连接。而Pipeline消息通道用于处理快照这样数据量大的信息，处理完毕后连接会关闭。</p>
 <p><strong>再往左是etcd-raft模块，它是etcd的核心。</strong>该层实现了Raft协议，可以完成节点状态的转移、节点的选举、数据处理等重要功能，确保分布式系统的一致性与故障容错性。之前我们也介绍过，Raft中的节点有3种状态，分别是Leader（领导者），Candidates（候选人）和 Follower（跟随者）。在此基础上，etcd 为 Raft 节点新增了一个PreCandidate（预候选人）。</p>
 <p>我们在讲解Raft协议时介绍过，如果节点收不到来自Leader的心跳检测，就会变为Candidates开始新的选举。如果当前节点位于不足半数的网络分区中，短期内不会影响集群的使用，但是当前节点在不断发起选举的过程中，当前选举周期的Term号会不断增长，当网络分区消失后，由于该节点的Term号高于当前集群中Leader节点的Term号，Raft协议就会迫使当前的Leader切换状态并开始新一轮的选举。</p>
 <p>但是，这种选举是没有意义的。为了解决这样的问题，etcd在选举之前会有一个新的阶段叫做PreVote，当前节点会先尝试连接集群中的其他节点，如果能够成功连接到半数以上的节点，才开始新一轮的选举。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c0/5f/c02597ae424e9d8af6d654aea7119e5f.jpg?wh=1920x1351" title="Raft节点状态转移" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c0/5f/c02597ae424e9d8af6d654aea7119e5f.jpg?wh=1920x1351" title="Raft节点状态转移" /></p>
 <p><strong>在etcd-raft模块基础之上还封装出了raft-node模块。</strong>这个模块主要是上层模块和下层Raft模块沟通的桥梁，它同时还有一个重要任务，就是调用storage模块，将记录（Record）存储到WAL日志文件中落盘。WAL日志文件可以存储多种类型的记录，包括下面几种。</p>
 <ul>
 <li>WAL文件的元数据，记录节点 ID、集群 ID 信息。</li>
@@ -14846,7 +14846,7 @@
 <a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>}
 </code></pre></div>
 <p>简单地搜索一下，可以发现etcd内部使用了大量接口。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e2/df/e2a93f76a8dcc64844bb6d63f99fcedf.png?wh=1920x1312" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e2/df/e2a93f76a8dcc64844bb6d63f99fcedf.png?wh=1920x1312" /></p>
 <p>这样做的好处是，etcd抽象出了etcd-raft这个模块，实现了Raft协议，开发者可以在这个模块之上构建实现了Raft协议的分布式系统，这就减轻了开发者的心理和技术负担。因为分布式协议是非常难实现的，它潜在的问题也很难被发现，发现问题之后又很难定位原因，有了etcd-raft模块，这一系列问题都迎刃而解了。</p>
 <p>在etcd代码库中有一个<a href="https://github.com/etcd-io/etcd/tree/main/contrib/raftexample">示例代码</a>，该示例代码基于etcd-raft模块实现了一个最简单的分布式内存KV数据库。在示例代码中实现了上游的KVServer服务器与raft-node节点，并与etcd-raft模块进行交互，去掉了etcd实现的日志落盘等逻辑，将键值对存储到了内存中。如果你有志于深入地学习etcd，从这个实例入手是非常不错的选择。</p>
 <ul>
@@ -15017,8 +15017,6 @@ OK
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

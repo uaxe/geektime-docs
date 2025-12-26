@@ -7136,7 +7136,7 @@
 <p>所以今天这一讲，我们就来说说磁盘在Spark任务执行的过程中都扮演哪些重要角色，它功能方面的作用，以及性能方面的价值。掌握它们可以帮助我们更合理地利用磁盘，以成本优势平衡不同硬件资源的计算负载。</p>
 <h2 id="_1">磁盘在功能上的作用</h2>
 <p>在Spark当中，磁盘都用在哪些地方呢？在Shuffle那一讲我们说过，在Map阶段，Spark根据计算是否需要聚合，分别采用PartitionedPairBuffer和PartitionedAppendOnlyMap两种不同的内存数据结构来缓存分片中的数据记录。分布式计算往往涉及海量数据，因此这些数据结构通常都没办法装满分区中的所有数据。在内存受限的情况下，溢出机制可以保证任务的顺利执行，不会因为内存空间不足就立即报OOM异常。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/68/4e/688d5453a9431c53d0a75c7a4yy3e44e.jpg?wh=7212%2A2328" title="溢出数据到磁盘，避免频繁的OOM" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/68/4e/688d5453a9431c53d0a75c7a4yy3e44e.jpg?wh=7212%2A2328" title="溢出数据到磁盘，避免频繁的OOM" /></p>
 <p>以“仙女散花”的游戏为例，我们用groupByKey去收集不同花色的花朵。在PartitionedPairBuffer大小为4的情况下，当小红拿到的花朵数量超过4朵的时候，其余花朵要想进入内存，Spark就必须把PartitionedPairBuffer中的内容暂时溢出到临时文件，把内存空间让出来才行。<strong>这就是磁盘在功能上的第一个作用：溢出临时文件。</strong></p>
 <p>当分区中的最后一批数据加载到PartitionedPairBuffer之后，它会和之前溢出到磁盘的临时文件一起做归并计算，最终得到Shuffle的数据文件和索引文件也会存储到磁盘上，也就是我们常说的Shuffle中间文件。<strong>这就是磁盘的在功能上的第二个作用：存储Shuffle中间文件。</strong></p>
 <p>除此之外，<strong>磁盘的第三个作用就是缓存分布式数据集。也就是说，凡是带<em>DISK</em>字样的存储模式，都会把内存中放不下的数据缓存到磁盘</strong>。这些缓存数据还有刚刚讲的临时文件、中间文件，都会存储到spark.local.dir参数对应的文件系统目录中。</p>
@@ -7144,7 +7144,7 @@
 <p>在配置项那一讲我们说过，把spark.local.dir这个参数配置到SDD或者其他访问效率更高的存储系统中可以提供更好的 I/O 性能。除此之外，磁盘复用还能给执行性能带来更好的提升。所谓<strong>磁盘复用，它指的是Shuffle Write阶段产生的中间文件被多次计算重复利用的过程</strong>。下面，我就通过两个例子给你详细讲讲，磁盘复用的常见应用和它的收益。</p>
 <h3 id="_3">失败重试中的磁盘复用</h3>
 <p>我们经常说，在没有RDD Cache的情况下，一旦某个计算环节出错，就会触发整条DAG从头至尾重新计算，这个过程又叫失败重试。严格来说，这种说法是不准确的。因为，失败重试的计算源头并不是整条DAG的“头”，而是与触发点距离最新的Shuffle的中间文件。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/35/86/35c13d9f2eba5d23dabe05249ccb9486.jpg?wh=2626%2A1190" title="磁盘复用与蓄水池" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/35/86/35c13d9f2eba5d23dabe05249ccb9486.jpg?wh=2626%2A1190" title="磁盘复用与蓄水池" /></p>
 <p>我们以文稿示意图中的DAG为例子，HDFS源数据经过两次转换之后，分别得到RDD1和RDD2。RDD2在Shuffle之后再进行两次计算，分成得到RDD3和RDD4。</p>
 <p>不幸的是，在计算RDD4的过程中有些任务失败了。在失败重试的时候，Spark确实会从RDD4向前回溯，但是有了磁盘复用机制的存在，它并不会一直回溯到HDFS源数据，而是直接回溯到已经物化到节点的RDD3的“数据源”，也就是RDD2在Shuffle Write阶段输出到磁盘的中间文件。因此，<strong>磁盘复用的收益之一就是缩短失败重试的路径，在保障作业稳定性的同时提升执行性能</strong>。</p>
 <p>为了方便你理解，我们不妨把DAG中的流水线计算想象成是干渠灌溉，黄土高坡上的麦田一年到头也喝不到几滴雨水，完全依靠人工干渠进行灌溉。当水电站开闸放水的时候，水会沿着干渠一路向东流进支渠去滋养如饥似渴的麦苗。</p>
@@ -7152,7 +7152,7 @@
 <h3 id="reuseexchange">ReuseExchange机制下的磁盘复用</h3>
 <p>你可能会说：“磁盘复用也没什么嘛，无非是在失败重试的时候，抄个近道、少走些弯路。在任务不出错的情况下是利用不到这项优势的。”没错，所以我们再来说说磁盘复用的另一种形式：ReuseExchange机制。ReuseExchange是Spark SQL众多优化策略中的一种，它指的是<strong>相同或是相似的物理计划可以共享Shuffle计算的中间结果</strong>，也就是我们常说的Shuffle中间文件。ReuseExchange机制可以帮我们削减I/O开销，甚至节省Shuffle，来大幅提升执行性能。</p>
 <p>那我们该怎么有效利用ReuseExchange机制呢？在数据仓库场景下，为了得到数据报表或是可视化图表，用户往往需要执行多个相似的查询，甚至会把同样的查询语句执行多次。在这种情况下，ReuseExchange策略在执行效率方面会带来非常大的收益。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5f/98/5f390cdb366edc25329956c11e773f98.jpg?wh=3023%2A1384" title="同样或相似的查询利用ReuseExchange缩短执行路径" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5f/98/5f390cdb366edc25329956c11e773f98.jpg?wh=3023%2A1384" title="同样或相似的查询利用ReuseExchange缩短执行路径" /></p>
 <p>即便是在没有DataFrame Cache的情况下，相同或是相似的查询也可以利用ReuseExchange策略，在缩短执行路径的同时，消除额外的Shuffle计算。从数据复用的角度来说，ReuseExchange和DISK_ONLY模式的DataFrame Cache能起到的作用完全等价。</p>
 <p>咱们来举个例子。现在有这样一个业务需求：给定用户访问日志，分别统计不同用户的PV（Page Views，页面浏览量）、UV（Unique Views，网站独立访客），然后再把两项统计结果合并起来，以备后用。其中，用户日志包含用户ID、访问时间、页面地址等主要字段。业务需求不仅明确也很简单，我们很快就能把代码写出来。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>//版本1：分别计算PV、UV，然后合并
@@ -7173,7 +7173,7 @@
 </code></pre></div>
 <p>代码逻辑是先读取用户日志，然后在同一个DataFrame之上分别调用count和countDistinct计算PV、UV，最后把PU、UV对应的两个DataFrame合并在一起。</p>
 <p>虽然代码实现起来简单直接，但是，如果我们在resultDF之上调用explain或是通过Spark UI去查看物理计划就会发现，尽管count和countDistinct是基于同一份数据源计算的，但这两个操作的执行路径是完全独立的。它们各自扫描Parquet源文件，并且通过Shuffle完成计算，在Shuffle之前会先在Map端做本地聚合，Shuffle之后会在Reduce端再进行全局聚合。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/dd/28/dd150e0863812522a6f2ee9102678928.jpg?wh=2663%2A1333" title="Parquet文件扫描两次、Shuffle两次" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dd/28/dd150e0863812522a6f2ee9102678928.jpg?wh=2663%2A1333" title="Parquet文件扫描两次、Shuffle两次" /></p>
 <p>对于绝大多数的合并场景来说，计算流程大抵如此。显然，这样的做法是极其低效的，尤其是在需要合并多个数据集的时候，重复的数据扫描和分发就会引入更多的性能开销。那么，有没有什么办法，让同一份数据源的多个算子只读取一次Parquet文件，且只做一次Shuffle呢？</p>
 <p>做了这么半天铺垫，答案自然是“有”。针对版本1中的代码，我们稍作调整就可以充分利用ReuseExchange策略来做优化。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>//版本2：分别计算PV、UV，然后合并
@@ -7194,7 +7194,7 @@
 </code></pre></div>
 <p>需要调整的部分仅仅是数据源读取，其他部分的代码保持不变。在用Parquet API读取用户日志之后，我们追加一步重分区操作，也就是以userId为分区键调用repartition算子。</p>
 <p>经过这个微小的改动之后，我们重新在resultDF之上调用explain或是查看Spark UI会发现，在新的物理计划中，count或是countDistinct分支出现了ReuseExchange字样，也就是其中一方复用了另一方的Exchange结果。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/00/b2/008e691de73eefc6daa4886017fa33b2.jpg?wh=2868%2A1210" title="ReuseExchange" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/00/b2/008e691de73eefc6daa4886017fa33b2.jpg?wh=2868%2A1210" title="ReuseExchange" /></p>
 <p>通过观察执行计划不难发现，ReuseExchange带来的收益相当可观，不仅是<strong>数据源只需要扫描一遍，而且作为“性能瓶颈担当”的Shuffle也只发生了一次</strong>。</p>
 <p>另外，你可能也会发现，复用Shuffle中间结果的是两个不完全相同的查询，一个是用count做统计计数，另一个是用countDistinct做去重计数。你看，两个相似的查询，通过ReuseExchange数据复用，达到了使用DISK_ONLY缓存的等价效果。换句话说，你不需要手动调用persist(DISK_ONLY)，也不需要忍受磁盘缓存的计算过程，就可以享受它带来的收益。这惊不惊喜、意不意外？</p>
 <p>你可能会问：“既然ReuseExchange机制这么好用，满足什么条件才能触发Spark SQL去选择这个执行策略呢？”事实上，触发条件至少有2个：</p>
@@ -7339,8 +7339,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

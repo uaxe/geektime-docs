@@ -14366,7 +14366,7 @@
 <p>以Customer微服务为例，在我们访问findCoupon接口查询优惠券的时候，用户微服务通过OpenFeign组件向Template微服务发起了一次查询请求。</p>
 <p>Sleuth为了将Trace ID和Customer服务的Span ID传递给Template微服务，它在OpenFeign的环节动了一个手脚。Sleuth通过<strong>TracingFeignClient类</strong>，将一系列Tag标记塞进了OpenFeign构造的服务请求的Header结构中。</p>
 <p>我在TracingFeignClient的类中打了一个Debug断点，将Request的Header信息打印了出来：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b4/40/b4f541ed4c9ed4ff35f39eb273e0ea40.png?wh=1104x626" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b4/40/b4f541ed4c9ed4ff35f39eb273e0ea40.png?wh=1104x626" /></p>
 <p>在这个Header结构中，我们可以看到有几个以X-B3开头的特殊标记，这个X-B3就是Sleuth的特殊接头暗号。其中X-B3-TraceId就是全局唯一的链路追踪ID，而X-B3-SpanId和X-B3-ParentSpandID分别是当前请求的单元ID和父级单元ID，最后的X-B3-Sampled则表示当前链路是否是一个已被采样的链路。通过Header里的这些信息，下游服务就完整地得到了上游服务的情报。</p>
 <p>以上是Sleuth对OpenFeign动的手脚。为了应对调用链中可能出现的各种不同组件，Sleuth内部构造了各式各样的适配器，用来在不同组件中使用同样的接头暗号“X-B3-*”，这样就可以传递链路追踪的信息。如果你对这部分的源码感兴趣，你可以深入研究spring-cloud-sleuth-instrumentation和spring-cloud-sleuth-brave两个依赖包的源代码，了解更加详细的实现过程。</p>
 <p>搞定了链路打标之后，我们怎样才能通过Trace ID来查询链路信息呢？这时就要找Zipkin来帮忙了。</p>
@@ -14374,7 +14374,7 @@
 <p>Zipkin是一个分布式的Tracing系统，它可以用来收集时序化的链路打标数据。通过Zipkin内置的UI界面，我们可以根据Trace ID搜索出一次调用链所经过的所有访问单元，并获取每个单元在当前服务调用中所花费的时间。</p>
 <p>为了搭建一条高可用的链路信息传递通道，我将使用RabbitMQ作为中转站，让各个应用服务器将服务调用链信息传递给RabbitMQ，而Zipkin服务器则通过监听RabbitMQ的队列来获取调用链数据。相比于让微服务通过Web接口直连Zipkin，<strong>使用消息队列可以大幅提高信息的送达率和传递效率</strong>。</p>
 <p>我画了一张图来帮你理解Zipkin和微服务之间是如何通信的，你可以参考一下。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0c/de/0c634a28570dee1e48166dcfd0413cde.jpg?wh=1920x706" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0c/de/0c634a28570dee1e48166dcfd0413cde.jpg?wh=1920x706" /></p>
 <p>下面我来带你手动搭建Zikpin服务器。</p>
 <h3 id="zipkin_1">搭建Zipkin服务器</h3>
 <p>首先，我们要下载一个Zipkin的可执行jar包，这里我推荐你使用2.23.9版本的Zipkin组件。你可以通过访问<a href="https://search.maven.org/remote_content?g=io.zipkin&amp;a=zipkin-server&amp;c=exec&amp;v=2.23.9">maven的中央仓库</a>下载zipkin-server-2.23.9-exec.jar文件，我已经将版本参数添加到了地址中，不过你可以将地址超链接复制出来，通过修改URL中的版本参数来下载指定版本。</p>
@@ -14383,11 +14383,11 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>java -jar zipkin-server-2.23.9-exec.jar --zipkin.collector.rabbitmq.addresses=localhost:5672
 </code></pre></div>
 <p>要注意的是，我在命令行中设置了zipkin.collector.rabbitmq.addresses参数，所以Zipkin在启动阶段将尝试连接RabbitMQ，你需要<strong>确保RabbitMQ始终处于启动状态</strong>。Zipkin已经为我们内置了RabbitMQ的默认连接属性，如果没有特殊指定，那么Zipkin会使用guest默认用户登录RabbitMQ。如果你想要切换用户、指定默认监听队列或者设置连接参数，那么可以在命令行中添加以下参数进行配置。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/89/65/898f9d17f9a5f31d586173d7ae1b4a65.jpg?wh=1920x769" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/89/65/898f9d17f9a5f31d586173d7ae1b4a65.jpg?wh=1920x769" /></p>
 <p>启动成功后，你可以在命令行看到Zipkin的特色Logo，以及一行Serving HTTP的运行日志。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/85/a0/859711f37127fdyybc9abfa7ab5b8ca0.jpg?wh=1142x640" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/85/a0/859711f37127fdyybc9abfa7ab5b8ca0.jpg?wh=1142x640" /></p>
 <p>最后，我们只需要验证消息监听队列是否已就位就可以了。我们使用guest账号登录RabbitMQ，并切换到“Queues”面板，如果Zipkin和RabbitMQ的对接一切正常，那么你会在Queues面板下看到一个名为zipkin的队列，如下图所示。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f2/40/f2d11231539c530b8438c9bb52423740.png?wh=798x377" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f2/40/f2d11231539c530b8438c9bb52423740.png?wh=798x377" /></p>
 <p>到这里，我们就完成了Zipkin服务器的创建。接下来，你还需要将应用程序生成的链路数据发送给Zipkin服务器。</p>
 <h3 id="zipkin_2">传送链路数据到Zipkin</h3>
 <p>我在方案中使用RabbitMQ作为中转站来传递链路调用数据，因此应用程序并不需要直连Zipkin，而是需要接入到RabbitMQ，并将链路数据发布到RabbitMQ中的“zipkin”队列中就可以了。</p>
@@ -14420,7 +14420,7 @@
 <p>在这段video中，我可以选择想要搜索的时间范围，还可以搜索包含特定服务的调用链。而在搜索结果中，当前调用链都访问了哪些微服务，你可以一目了然。</p>
 <p>如果你知道了某个调用链的全局唯一Trace ID，那么你也可以通过这个Trace ID把一整条调用链路查出来。我又录了一段video来演示这个过程。在链路详情页面中，<strong>所有Span都以时间序列的先后顺序进行排布</strong>，你可以从链路中清晰地看到每个Span的开始、结束时间，以及处理用时。</p>
 <p>如果某个调用链出现了运行期异常，那么你可以从调用链中轻松看出异常发生在哪个阶段。比如下图中的调用链在OpenFeign调用Template服务的时候抛出了RuntimeException，相关Span在页面上已被标红，如果你点击Span详情，就可以看到具体的Error异常提示信息。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/42/91/42ab09e0fec875117cfc361311793791.png?wh=1396x918" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/42/91/42ab09e0fec875117cfc361311793791.png?wh=1396x918" /></p>
 <p>除此之外，Zipkin还有一个很花哨的依赖报表功能，它会以图形化的方式展示某段时间内微服务之间的相互调用情况，如果两个微服务之间有调用关系，Zipkin就会用一条实线将两者关联起来，而实线上流动的小圆点则表示调用量的多少，圆点越多则表示这条链路的流量越多。而且，小圆点还会有红蓝两种颜色，其中红色表示调用失败，蓝色表示调用成功。</p>
 <p>我录了一小段video，你可以感受一下依赖报表功能是怎么用的。</p>
 <p>到这里，相信你已经对调用链追踪系统的搭建和使用十分了解了，现在让我们来回顾一下这节课的重点内容吧。</p>
@@ -14564,8 +14564,6 @@ B Sleuth对OpenFeign的处理，是通过拦截器实现的吗？</p>2022-02-02<
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

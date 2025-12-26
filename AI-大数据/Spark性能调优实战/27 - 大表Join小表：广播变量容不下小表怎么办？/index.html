@@ -7106,10 +7106,10 @@
 <p>在系统和用户的维度组合之下，流量被细分为数以百万计的不同“种类”。比如，来自XX平台XX站点的在校大学生的访问量，或是来自XX媒体XX频道25-45岁女性的访问量等等。</p>
 <p>我们知道，流量预测本身是个时序问题，它和股价预测类似，都是基于历史、去预测未来。在我们的案例中，为了预测上百万种不同的流量，咱们得先为每种流量生成时序序列，然后再把这些时序序列喂给机器学习算法进行模型训练。</p>
 <p>统计流量的数据源是线上的访问日志，它记录了哪类用户在什么时间访问了哪些站点。要知道，我们要构建的，是以小时为单位的时序序列，但由于流量的切割粒度非常细致，因此有些种类的流量不是每个小时都有访问量的，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7e/9f/7e8fc62ca38cb1a0a557b6b7eb1af99f.jpg?wh=2934%2A924" title="某种流量在过去24小时的记录情况" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7e/9f/7e8fc62ca38cb1a0a557b6b7eb1af99f.jpg?wh=2934%2A924" title="某种流量在过去24小时的记录情况" /></p>
 <p>我们可以看到，在过去的24小时中，某种流量仅在20-24点这5个时段有数据记录，其他时段无记录，也就是流量为零。在这种情况下，我们就需要用“零”去补齐缺失时段的序列值。那么我们该怎么补呢？</p>
 <p><strong>因为业务需求是填补缺失值，所以在实现层面，我们不妨先构建出完整的全零序列，然后以系统、用户和时间这些维度组合为粒度，用统计流量去替换全零序列中相应位置的“零流量”。</strong>这个思路描述起来比较复杂，用图来理解会更直观、更轻松一些。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/90/fe/90d03196d4c71c133344f913e4f69dfe.jpg?wh=3999%2A1554" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/90/fe/90d03196d4c71c133344f913e4f69dfe.jpg?wh=3999%2A1554" /></p>
 <p>首先，我们生成一张全零流量表，如图中左侧的“负样本表”所示。这张表的主键是划分流量种类的各种维度，如性别、年龄、平台、站点、小时时段等等。表的Payload只有一列，也即访问量，在生成“负样本表”的时候，这一列全部置零。</p>
 <p>然后，我们以同样的维度组合统计日志中的访问量，就可以得到图中右侧的“正样本表”。不难发现，两张表的Schema完全一致，要想获得完整的时序序列，我们只需要把外表以“左连接（Left Outer Join）”的形式和内表做关联就好了。具体的查询语句如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>//左连接查询语句
@@ -7126,7 +7126,7 @@
 <p>我们知道，SMJ机制会引入Shuffle，将上百GB的数据在全网分发可不是一个明智的选择。那么，根据“能省则省”的开发原则，我们有没有可能“省去”这里的Shuffle呢？要想省去Shuffle，我们只有一个办法，就是把SMJ转化成BHJ。你可能会说：“都说了好几遍了，小表的尺寸10GB远超广播阈值，我们还能怎么转化呢？”</p>
 <p>办法总比困难多，我们先来反思，关联这两张表的目的是什么？目的是以维度组合（Join Keys）为基准，用内表的访问量替换掉外表的零值。那么，这两张表有哪些特点呢？<strong>首先，两张表的Schema完全一致。其次，无论是在数量、还是尺寸上，两张表的Join Keys都远大于Payload。</strong>那么问题来了，要达到我们的目的，一定要用那么多、那么长的Join Keys做关联吗？</p>
 <p>答案是否定的。在上一讲，我们介绍过Hash Join的实现原理，在Build阶段，Hash Join使用哈希算法生成哈希表。在Probe阶段，哈希表一方面可以提供O(1)的查找效率，另一方面，在查找过程中，Hash Keys之间的对比远比Join Keys之间的对比要高效得多。受此启发，我们为什么不能计算Join Keys的哈希值，然后把生成的哈希值当作是新的Join Key呢？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1c/69/1c93475b8d2d5d18d6b49fb7a258db69.jpg?wh=4719%2A1869" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1c/69/1c93475b8d2d5d18d6b49fb7a258db69.jpg?wh=4719%2A1869" /></p>
 <p>我们完全可以基于现有的Join Keys去生成一个全新的数据列，它可以叫“Hash Key”。生成的方法分两步：</p>
 <ul>
 <li>把所有Join Keys拼接在一起，把性别、年龄、一直到小时拼接成一个字符串，如图中步骤1、3所示</li>
@@ -7143,7 +7143,7 @@
 <p>案例1说到这里，其实已经基本解决了，不过这里还有一个小细节需要我们特别注意。<strong>案例1优化的关键在于，先用Hash Key取代Join Keys，再清除内表冗余数据。Hash Key实际上是Join Keys拼接之后的哈希值。既然存在哈希运算，我们就必须要考虑哈希冲突的问题。</strong></p>
 <p>哈希冲突我们都很熟悉，它指的就是不同的数据源经过哈希运算之后，得到的哈希值相同。在案例1当中，如果我们为了优化引入的哈希计算出现了哈希冲突，就会破坏原有的关联关系。比如，本来两个不相等的Join Keys，因为哈希值恰巧相同而被关联到了一起。显然，这不是我们想要的结果。</p>
 <p>消除哈希冲突隐患的方法其实很多，比如“二次哈希”，也就是我们用两种哈希算法来生成Hash Key数据列。两条不同的数据记录在两种不同哈希算法运算下的结果完全相同，这种概率几乎为零。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bb/bf/bb79544467e98f9d2b6f13a437bb2dbf.jpg?wh=1500%2A1584" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bb/bf/bb79544467e98f9d2b6f13a437bb2dbf.jpg?wh=1500%2A1584" /></p>
 <h2 id="2selectivity">案例2：过滤条件的Selectivity较高</h2>
 <p>除了Join Keys远大于Payload的情况会导致我们无法选择BHJ，还有一种情况是过滤条件的Selectivity较高。这个案例来源于电子商务场景，在星型（Start Schema）数仓中，我们有两张表，一张是订单表orders，另一张是用户表users。订单表是事实表（Fact），而用户表是维度表（Dimension）。</p>
 <p>这个案例的业务需求很简单，是统计所有头部用户贡献的营业额，并按照营业额倒序排序。订单表和用户表的Schema如下表所示。</p>
@@ -7356,8 +7356,6 @@ AQE的自动倾斜处理，在 Reduce 阶段，当 Reduce Task 所需处理的�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

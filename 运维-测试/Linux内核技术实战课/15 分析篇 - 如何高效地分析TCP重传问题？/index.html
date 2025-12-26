@@ -5900,17 +5900,17 @@
 <p>但是，TCP重传率分析并不是一件很容易的事，比如说现在某台服务器的TCP重传率很高，那究竟是什么业务在进行TCP重传呢？对此，很多人并不懂得如何来分析。所以，在这节课中，我会带你来认识TCP重传是怎么回事，以及如何来高效地分析它。</p>
 <h2 id="tcp">什么是TCP重传 ？</h2>
 <p>我在“<a href="https://time.geekbang.org/column/article/273544">开篇词</a>”中举过一个TCP重传率的例子，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ab/f6/ab358c52ede21f0983fe7dfb032dc3f6.jpg?wh=896%2A488" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ab/f6/ab358c52ede21f0983fe7dfb032dc3f6.jpg?wh=896%2A488" /></p>
 <p>这是互联网企业普遍都有的TCP重传率监控，它是服务器稳定性的一个指标，如果它太高，就像上图中的那些毛刺一样，往往就意味着服务器不稳定了。那TCP重传率究竟表示什么呢？</p>
 <p>其实TCP重传率是通过解析/proc/net/snmp这个文件里的指标计算出来的，这个文件里面和TCP有关的关键指标如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d5/e7/d5be65df068c3a2c4d181f492791efe7.jpg?wh=2460%2A1592" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d5/e7/d5be65df068c3a2c4d181f492791efe7.jpg?wh=2460%2A1592" /></p>
 <p>TCP重传率的计算公式如下：</p>
 <blockquote>
 <p>retrans = (RetransSegs－last RetransSegs) ／ (OutSegs－last OutSegs) * 100</p>
 </blockquote>
 <p>也就是说，单位时间内TCP重传包的数量除以TCP总的发包数量，就是TCP重传率。那我们继续看下这个公式中的RetransSegs和OutSegs是怎么回事，我画了两张示例图来演示这两个指标的变化：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ed/54/ed69e93e3c13f0e117021e399500e854.jpg?wh=3600%2A1889" title="不存在重传的情况" /></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0a/b6/0a28a0596bd56174feaec0d82245b5b6.jpg?wh=3478%2A2009" title="存在重传的情况" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ed/54/ed69e93e3c13f0e117021e399500e854.jpg?wh=3600%2A1889" title="不存在重传的情况" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0a/b6/0a28a0596bd56174feaec0d82245b5b6.jpg?wh=3478%2A2009" title="存在重传的情况" /></p>
 <p>通过这两个示例图，你可以发现，发送端在发送一个TCP数据包后，会把该数据包放在发送端的发送队列里，也叫重传队列。此时，OutSegs会相应地加1，队列长度也为1。如果可以收到接收端对这个数据包的ACK，该数据包就会在发送队列中被删掉，然后队列长度变为0；如果收不到这个数据包的ACK，就会触发重传机制，我们在这里演示的就是超时重传这种情况，也就是说发送端在发送数据包的时候，会启动一个超时重传定时器（RTO），如果超过了这个时间，发送端还没有收到ACK，就会重传该数据包，然后OutSegs加1，同时RetransSegs也会加1。</p>
 <p>这就是OutSegs和RetransSegs的含义：每发出去一个TCP包（包括重传包），OutSegs会相应地加1；每发出去一个重传包，RetransSegs会相应地加1。同时，我也在图中展示了重传队列的变化，你可以仔细看下。</p>
 <p>除了上图中展示的超时重传外，还有快速重传机制。关于快速重传，你可以参考“<a href="https://time.geekbang.org/column/article/286494">13讲</a>”，我就不在这里详细描述了。</p>
@@ -5943,7 +5943,7 @@ TCP数据包在网络传输过程中可能会在某个交换机/路由器上排�
 <h2 id="tcp_2">如何高效地分析TCP重传 ？</h2>
 <p>其实，就像应用程序实现一些功能需要调用对应的函数一样，TCP重传也需要调用特定的内核函数。这个内核函数就是tcp_retransmit_skb()。你可以把这个函数名字里的skb理解为是一个需要发送的网络包。那么，如果我们想要高效地追踪TCP重传情况，那么直接追踪该函数就可以了。</p>
 <p>追踪内核函数最通用的方法是使用Kprobe，Kprobe的大致原理如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9f/c8/9f3f412208d8e17dd859a97b017228c8.jpg?wh=3080%2A1771" title="Kprobe基本原理" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9f/c8/9f3f412208d8e17dd859a97b017228c8.jpg?wh=3080%2A1771" title="Kprobe基本原理" /></p>
 <p>你可以实现一个内核模块，该内核模块中使用Kprobe在tcp_retransmit_skb这个函数入口插入一个probe，然后注册一个break_handler，这样在执行到tcp_retransmit_skb时就会异常跳转到注册的break_handler中，然后在break_handler中解析TCP报文（skb）就可以了，从而来判断是什么在重传。</p>
 <p>如果你觉得实现内核模块比较麻烦，可以借助ftrace框架来使用Kprobe。Brendan Gregg实现的<a href="https://github.com/brendangregg/perf-tools/blob/master/net/tcpretrans">tcpretrans</a>采用的就是这种方式，你也可以直接使用它这个工具来追踪TCP重传。不过，该工具也有一些缺陷，因为它是通过读取/proc/net/tcp这个文件来解析是什么在重传，所以它能解析的信息比较有限，而且如果TCP连接持续时间较短（比如短连接），那么该工具就无法解析出来了。另外，你在使用它时需要确保你的内核已经打开了ftrace的tracing功能，也就是/sys/kernel/debug/tracing/tracing_on中的内容需要为1；在CentOS-6上，还需要/sys/kernel/debug/tracing/tracing_enabled也为1。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>$ cat /sys/kernel/debug/tracing/tracing_on
@@ -6107,8 +6107,6 @@ TCP数据包在网络传输过程中可能会在某个交换机/路由器上排�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

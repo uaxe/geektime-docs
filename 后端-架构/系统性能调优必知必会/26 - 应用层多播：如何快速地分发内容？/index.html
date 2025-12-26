@@ -14500,7 +14500,7 @@
 </ul>
 <p>这些因素都使得网络层的多播功能难以推广，因此，各类基于IP单播功能的应用层多播协议应运而生。可能有些同学对于单播、多播这些网络知识还不熟悉，下图我将传统单播、网络层多播、应用层多播放在一起对比着看，你可以很容易看到它们的区别。</p>
 <p>这里仍然以版本发布场景为例，主机1是发布节点，它需要将文件分发到其余3台主机上，其中传统单播协议的玩法，是在主机2、3、4上分别向主机1发起下载文件命令，因此主机1上有3条TCP下载链路，图中我用3种不同的颜色表示。很明显，此时主机1的下行流量一定会成为瓶颈，而且随着集群规模的扩大，网络链路中的路由器也会很快达到流量瓶颈。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/34/7a/3457fac0f6811d21357188c48fe5867a.png?wh=684%2A750" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/34/7a/3457fac0f6811d21357188c48fe5867a.png?wh=684%2A750" /></p>
 <p>再来看效率最高的网络层多播，主机1可以仅通过1次报文传输，将文件分发到所有主机上。在整个流程中，仅由路由器将网络报文扩散到相邻的主机、路由器上，没有任何多余的动作。如同上述所说，网络层多播的使用有很多困难，这里列出它是为了方便与应用层多播作对比。</p>
 <p>在上图的应用层多播中，文件传输分为两个阶段。首先，主机2、3直接从主机1中下载文件（参见绿色与红色线）。其次，当主机3完成下载后，主机4再从主机3上下载文件（参见蓝色线）。可见，相对于IP多播，<strong>应用层多播有以下3个缺点：</strong></p>
 <p>首先网络效率下降了不少，这由2个原因所致：</p>
@@ -14521,16 +14521,16 @@
 <h2 id="_2">应用层多播协议是如何工作的？</h2>
 <p>其实，应用层多播主要是指一种<a href="https://zh.wikipedia.org/wiki/%E5%B0%8D%E7%AD%89%E7%B6%B2%E8%B7%AF">P2P（Peer to Peer）</a>网络传输思想，任何基于IP单播的通讯协议都可以拿来使用。比如针对于在分布式集群中分发软件安装包的场景，完全可以使用HTTP协议实现应用层的分发，阿里巴巴开源的<a href="https://github.com/DarLiner/Dragonfly">Dragonfly蜻蜓</a>就是这么做的。</p>
 <p>蜻蜓拥有1个中心化的集群服务节点：SuperNode，其中既可以直接保存着源文件，也可以通过HTTP缓存加速第三方文件源（比如Docker仓库）。集群中的每个节点都要启动dfget进程（替代了传统的wget），它就像我们平时使用的迅雷，在下载文件的同时，也会将自己下载完成的文件传输给其他节点。其中，通过HTTP的Range文件分段下载规范，dfget就可以实现断点续传、多线程下载等功能，如下图所示：</p>
-<p><a href="https://github.com/DarLiner/Dragonfly/blob/master/docs/zh/architecture.md"><img alt="" src="https://static001.geekbang.org/resource/image/2f/00/2fbba7f194bd3bcabded582467056700.png?wh=668%2A393" title="图片及下图来源：https://github.com/DarLiner/Dragonfly/blob/master/docs/zh/architecture.md" /></a></p>
+<p><a href="https://github.com/DarLiner/Dragonfly/blob/master/docs/zh/architecture.md" referrerpolicy="no-referrer"><img alt="" src="https://static001.geekbang.org/resource/image/2f/00/2fbba7f194bd3bcabded582467056700.png?wh=668%2A393" title="图片及下图来源：https://github.com/DarLiner/Dragonfly/blob/master/docs/zh/architecture.md" /></a></p>
 <p>各个dfget程序间通过SuperNode协调传输关系，这样绝大部分dfget程序并不需要从SuperNode节点下载文件。比如上图中的节点C，通过HTTP Range协议从节点A中下载了文件的第1块，同时并发地从节点B中下载了文件的第2块，最后再把这些Block块拼接为完整的文件。</p>
 <p>这里你可能会想，这不就是一个P2P下载工具么？是的，但你站在集群运维的角度，这就是基于应用层多播协议的文件分发工具。当每个节点部署dfget服务后，新版本安装包发布时，就可以由SuperNode节点推送，经由各个dfget进程以多播的形式分发下去，此时性能会获得大幅度的提升。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/36/82/36de22b49038a6db2b8bc7ce953e5c82.png?wh=714%2A414" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/36/82/36de22b49038a6db2b8bc7ce953e5c82.png?wh=714%2A414" /></p>
 <p>上图是传统的wget单播与蜻蜓多播分发文件的性能对比图。我们可以看到，传统方式下，<strong>分发客户端越多（Y轴）总分发时长（X轴）就越大，特别是1200个以上的并发节点下载文件时，会直接将文件源打爆。</strong>而采用应用层多播方式后，下载时长要低得多，而且伴随着节点数的增加，下载时长也不会增长。</p>
 <p>蜻蜓虽然传输效率很高，但SuperNode却是保存着全局信息的中心节点，一旦宕机就会造成系统不可用。我们再来看去中心化的<a href="https://en.wikipedia.org/wiki/Gossip_protocol">Gossip流言协议</a>是如何实现应用层多播的。</p>
 <p>Gossip协议也叫epidemic传染病协议，工作原理如下图所示。在这个分布式网络中，并没有任何中心化节点，但只要第1个种子节点被感染为红色后，每个节点只需要感染其相邻的、有限的几个节点，最终就能快速感染网络中的所有节点（即仅保证最终一致性）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fa/b5/fa710dc6de9aa9238fee647ffdb69eb5.gif?wh=640%2A428" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fa/b5/fa710dc6de9aa9238fee647ffdb69eb5.gif?wh=640%2A428" /></p>
 <p>当然，所谓的“感染”就是数据的传输，这一算法由1987年发布的《<a href="http://bitsavers.trailing-edge.com/pdf/xerox/parc/techReports/CSL-89-1_Epidemic_Algorithms_for_Replicated_Database_Maintenance.pdf">Epidemic algorithms for replicated database maintenance</a>》论文提出，同时证明了算法的收敛概率。Cassandra数据库、Fabric区块链、Consul系统等许多去中心化的分布式系统，都使用Gossip协议管理集群中的节点状态。以Cassandra为例，每秒钟每个节点都会随机选择1到3个相邻节点，通过默认的7000端口传输包含节点状态的心跳信息，这样集群就可以快速发现宕机或者新增的节点。</p>
-<p><a href="https://www.linkedin.com/pulse/gossip-protocol-inside-apache-cassandra-soham-saha"><img alt="" src="https://static001.geekbang.org/resource/image/79/fe/7918df00c24e6e78122d5a70bd6bd2fe.png?wh=533%2A123" title="图片来源：https://www.linkedin.com/pulse/gossip-protocol-inside-apache-cassandra-soham-saha" /></a></p>
+<p><a href="https://www.linkedin.com/pulse/gossip-protocol-inside-apache-cassandra-soham-saha" referrerpolicy="no-referrer"><img alt="" src="https://static001.geekbang.org/resource/image/79/fe/7918df00c24e6e78122d5a70bd6bd2fe.png?wh=533%2A123" title="图片来源：https://www.linkedin.com/pulse/gossip-protocol-inside-apache-cassandra-soham-saha" /></a></p>
 <h2 id="_3">小结</h2>
 <p>这一讲我们介绍了应用层的多播协议。</p>
 <p>网络层的IP多播功能有限，对网络环境也有过多的要求，所以很难通过多播协议提升传输效率。基于IP单播协议（如TCP或者UDP），在应用代码层面实现分布式节点间的接力转发，就可以实现应用层的多播功能。</p>
@@ -14654,8 +14654,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

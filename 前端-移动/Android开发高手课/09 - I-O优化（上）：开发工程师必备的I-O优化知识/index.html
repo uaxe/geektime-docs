@@ -6411,14 +6411,14 @@
 <p>在专栏前面卡顿和启动优化里，我也经常提到I/O优化。可能很多同学觉得I/O优化不就是不在主线程读写大文件吗，真的只有这么简单吗？那你是否考虑过，从应用程序调用read()方法，内核和硬件会做什么样的处理，整个流程可能会出现什么问题？今天请你带着这些疑问，我们一起来看看I/O优化需要的知识。</p>
 <h2 id="io">I/O的基本知识</h2>
 <p>在工作中，我发现很多工程师对I/O的认识其实比较模糊，认为I/O就是应用程序执行read()、write()这样的一些操作，并不清楚这些操作背后的整个流程是怎样的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/60/d4/60928bc51c0d04b1c39b24282e8126d4.jpg?wh=2223%2A1053" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/60/d4/60928bc51c0d04b1c39b24282e8126d4.jpg?wh=2223%2A1053" /></p>
 <p>我画了一张简图，你可以看到整个文件I/O操作由应用程序、文件系统和磁盘共同完成。首先应用程序将I/O命令发送给文件系统，然后文件系统会在合适的时机把I/O操作发给磁盘。</p>
 <p>这就好比CPU、内存、磁盘三个小伙伴一起完成接力跑，最终跑完的时间很大程度上取决于最慢的小伙伴。我们知道，CPU和内存相比磁盘是高速设备，整个流程的瓶颈在于磁盘I/O的性能。所以很多时候，文件系统性能比磁盘性能更加重要，为了降低磁盘对应用程序的影响，文件系统需要通过各种各样的手段进行优化。那么接下来，我们首先来看文件系统。</p>
 <p><strong>1. 文件系统</strong></p>
 <p>文件系统，简单来说就是存储和组织数据的方式。比如在iOS 10.3系统以后，苹果使用APFS（Apple File System）替代之前旧的文件系统HFS+。对于Android来说，现在普遍使用的是Linux常用的ext4文件系统。</p>
 <p>关于文件系统还需要多说两句，华为在EMUI 5.0以后就使用F2FS取代ext4，Google也在最新的旗舰手机Pixel 3使用了F2FS文件系统。Flash-Friendly File System是三星是专门为NAND闪存芯片开发的文件系统，也做了大量针对闪存的优化。根据华为的测试数据，F2FS文件系统在小文件的随机读写方面比ext4更快，例如随机写可以优化60%，不足之处在于可靠性方面出现过一些问题。我想说的是，随着Google、华为的投入和规模化使用，F2FS系统应该是未来Android的主流文件系统。</p>
 <p>还是回到文件系统的I/O。应用程序调用read()方法，系统会通过中断从用户空间进入内核处理流程，然后经过VFS（Virtual File System，虚拟文件系统）、具体文件系统、页缓存Page Cache。下面是Linux一个通用的I/O架构模型。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fb/4b/fb11cbe604eb6c0fc2ba5825275f104b.png?wh=1218%2A626" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fb/4b/fb11cbe604eb6c0fc2ba5825275f104b.png?wh=1218%2A626" /></p>
 <ul>
 <li>虚拟文件系统（VFS）。它主要用于实现屏蔽具体的文件系统，为应用程序的操作提供一个统一的接口。这样保证就算厂商把文件系统从ext4切换到F2FS，应用程序也不用做任何修改。</li>
 <li>文件系统（File System）。ext4、F2FS都是具体文件系统实现，文件元数据如何组织、目录和索引结构如何设计、怎么分配和清理数据，这些都是设计一个文件系统必须要考虑的。<strong>每个文件系统都有适合自己的应用场景，我们不能说F2FS就一定比ext4要好。</strong>F2FS在连续读取大文件上并没有优势，而且会占用更大的空间。只是对一般应用程序来说，随机I/O会更加频繁，特别是在启动的场景。你可以在/proc/filesystems看到系统可以识别的所有文件系统的列表。</li>
@@ -6434,7 +6434,7 @@
 <p><strong>2. 磁盘</strong></p>
 <p>磁盘指的是系统的存储设备，就像小时候我们常听的CD或者电脑使用的机械硬盘，当然还有现在比较流行的SSD固态硬盘。</p>
 <p>正如我上面所说，如果发现应用程序要read()的数据没有在页缓存中，这时候就需要真正向磁盘发起I/O请求。这个过程要先经过内核的通用块层、I/O调度层、设备驱动层，最后才会交给具体的硬件设备处理。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/13/18/13c06810c88632db1050ab3e56139a18.png?wh=1256%2A660" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/13/18/13c06810c88632db1050ab3e56139a18.png?wh=1256%2A660" /></p>
 <ul>
 <li>通用块层。系统中能够随机访问固定大小数据块（block）的设备称为块设备，CD、硬盘和SSD这些都属于块设备。通用块层主要作用是接收上层发出的磁盘请求，并最终发出I/O请求。它跟VFS的作用类似，让上层不需要关心底层硬件设备的具体实现。</li>
 <li>I/O调度层。磁盘I/O那么慢，为了降低真正的磁盘I/O，我们不能接收到磁盘请求就立刻交给驱动层处理。所以我们增加了I/O调度层，它会根据设置的调度算法对请求合并和排序。这里比较关键的参数有两个，一个是队列长度，一个是具体的调度算法。我们可以通过下面的文件可以查看对应块设备的队列长度和使用的调度算法。</li>
@@ -6451,7 +6451,7 @@
 <p>我们先来简单讲讲手机使用的存储设备，手机使用闪存作为存储设备，也就是我们常说的ROM。</p>
 <p>考虑到体积和功耗，我们肯定不能直接把PC的SSD方案用在手机上面。Android手机前几年通常使用eMMC标准，近年来通常会采用性能更好的UFS 2.0/2.1标准，之前沸沸扬扬的某厂商“闪存门”事件就是因为使用eMMC闪存替换了宣传中的UFS闪存。而苹果依然坚持独立自主的道路，在2015年就在iPhone 6s上就引入了MacBook上备受好评的NVMe协议。</p>
 <p>最近几年移动硬件的发展非常妖孽，手机存储也朝着体积更小、功耗更低、速度更快、容量更大的方向狂奔。iPhone XS的容量已经达到512GB，连续读取速度可以超过1GB/s，已经比很多的SSD固态硬盘还要快，同时也大大缩小了和内存的速度差距。不过这些都是厂商提供的一些测试数据，特别是对于随机读写的性能相比内存还是差了很多。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f3/b1/f3bcc6974bf879f35a842ecd8ee086b1.png?wh=1290%2A216" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f3/b1/f3bcc6974bf879f35a842ecd8ee086b1.png?wh=1290%2A216" /></p>
 <p>上面的数字好像有点抽象，直白地说闪存的性能会影响我们打开微信、游戏加载以及连续自拍的速度。当然闪存性能不仅仅由硬件决定，它跟采用的标准、文件系统的实现也有很大的关系。</p>
 <p><strong>2. 两个疑问</strong></p>
 <p>看到这里可能有些同学会问，知道文件读写的流程、文件系统和磁盘这些基础知识，对我们实际开发有什么作用呢？下面我举两个简单的例子，可能你平时也思考过，不过如果不熟悉I/O的内部机制，你肯定是一知半解。</p>
@@ -6469,7 +6469,7 @@
 </ul>
 <p>闪存寿命也可能会导致数据错误，由于闪存的内部结构和特征，导致它写过的地址必须擦除才能再次写入，而每个块擦除又有次数限制，次数限制是根据采用的存储颗粒，从十万次到几千都有（SLC&gt;MLC&gt;TLC）。</p>
 <p>下图是闪存（Flash Memory）的结构图，其中比较重要的是FTL（Flash Translation Layer），它负责物理地址的分配和管理。它需要考虑到每个块的擦除寿命，将擦除次数均衡到所有块上去。当某个块空间不够的时候，它还要通过垃圾回收算法将数据迁移。FTL决定了闪存的使用寿命、性能和可靠性，是闪存技术中最为重要的核心技术之一。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/97/96/97c18602e462d5724d26660fc5115e96.png?wh=1248%2A652" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/97/96/97c18602e462d5724d26660fc5115e96.png?wh=1248%2A652" /></p>
 <p>对于手机来说，假设我们的存储大小是128GB，即使闪存的最大擦除次数只有1000次，那也可以写入128TB，但一般来说比较难达到。</p>
 <p><strong>疑问二：I/O有时候为什么会突然很慢？</strong></p>
 <p>手机厂商的数据通常都是出厂数据，我们在使用Android手机的时候也会发现，刚买的时候“如丝般顺滑”的手机，在使用一年之后就会变得卡顿无比。</p>
@@ -6482,7 +6482,7 @@
 <p>系统为了缓解磁盘碎片问题，可以引入fstrim/TRIM机制，在锁屏、充电等一些时机会触发磁盘碎片整理。</p>
 <h2 id="io_1">I/O的性能评估</h2>
 <p>正如下图你所看到的，整个I/O的流程涉及的链路非常长。我们在应用程序中通过打点，发现一个文件读取需要300ms。但是下面每一层可能都有自己的策略和调度算法，因此很难真正的得到每一层的耗时。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2d/60/2d2dffd5b2a95363c100875be6cae360.png?wh=954%2A690" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2d/60/2d2dffd5b2a95363c100875be6cae360.png?wh=954%2A690" /></p>
 <p>在前面的启动优化内容中，我讲过Facebook和支付宝采用编译单独ROM的方法来评估I/O性能。这是一个比较复杂但是有效的做法，我们可以通过定制源码，选择打开感兴趣的日志来追踪I/O的性能。</p>
 <p><strong>1. I/O性能指标</strong></p>
 <p>I/O性能评估中最为核心的指标是吞吐量和IOPS。今天文章开头所说的，“连续读取不超过550MB/s，连续写入不超过520MB/s”，就指的是I/O吞吐量。</p>
@@ -6522,7 +6522,7 @@
 <p>从上面的信息你可以看到，读占了97.56%的时间，一共调用了1987次，耗时0.04s，平均每次系统调用21us。同样的道理，<strong>我们也可以计算应用程序某个任务I/O耗时的百分比</strong>。假设一个任务执行了10s，I/O花了9s，那么I/O耗时百分比就是90%。这种情况下，I/O就是我们任务很大的瓶颈，需要去做进一步的优化。</p>
 <p><strong>第三种方法：使用vmstat。</strong></p>
 <p>vmstat的各个字段说明可以参考<a href="https://linuxtools-rst.readthedocs.io/zh_CN/latest/tool/vmstat.html">《vmstat监视内存使用情况》</a>，其中Memory中的buff和cache，I/O中的bi和bo，System中的cs，以及CPU中的sy和wa，这些字段的数值都与I/O行为有关。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5f/a2/5fcc14c666f9c5c6d0cfb803634b2ba2.png?wh=1134%2A122" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5f/a2/5fcc14c666f9c5c6d0cfb803634b2ba2.png?wh=1134%2A122" /></p>
 <p>我们可以配合<a href="https://www.cnblogs.com/kongzhongqijing/articles/9049336.html">dd命令</a>来配合测试，观察vmstat的输出数据变化。<strong>不过需要注意的是Android里面的dd命令似乎并不支持conv和flag参数。</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>//清除Buffer和Cache内存缓存
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>echo 3 &gt; /proc/sys/vm/drop_caches
@@ -6672,8 +6672,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -13931,7 +13931,7 @@
 <p><strong>2.底层实现使用了Mutex，对这个锁并发请求竞争激烈的时候，会导致性能的下降。</strong></p>
 <p>在Go 1.13中，sync.Pool做了大量的优化。前几讲中我提到过，提高并发程序性能的优化点是尽量不要使用锁，如果不得已使用了锁，就把锁Go的粒度降到最低。<strong>Go对Pool的优化就是避免使用锁，同时将加锁的queue改成lock-free的queue的实现，给即将移除的元素再多一次“复活”的机会。</strong></p>
 <p>当前，sync.Pool的数据结构如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f4/96/f4003704663ea081230760098f8af696.jpg?wh=3659%2A2186" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f4/96/f4003704663ea081230760098f8af696.jpg?wh=3659%2A2186" /></p>
 <p>Pool最重要的两个字段是 local和victim，因为它们两个主要用来存储空闲的元素。弄清楚这两个字段的处理逻辑，你就能完全掌握sync.Pool的实现了。下面我们来看看这两个字段的关系。</p>
 <p>每次垃圾回收的时候，Pool会把victim中的对象移除，然后把local的数据给victim，这样的话，local就会被清空，而victim就像一个垃圾分拣站，里面的东西可能会被当做垃圾丢弃了，但是里面有用的东西也可能被捡回来重新使用。</p>
 <p>victim中的元素如果被Get取走，那么这个元素就很幸运，因为它又“活”过来了。但是，如果这个时候Get的并发不是很大，元素没有被Get取走，那么就会被移除掉，因为没有别人引用它的话，就会被垃圾回收掉。</p>
@@ -14047,17 +14047,17 @@
 <p>这节课刚开始的时候，我讲到，可以使用sync.Pool做buffer池，但是，如果用刚刚的那种方式做buffer池的话，可能会有内存泄漏的风险。为啥这么说呢？我们来分析一下。</p>
 <p>取出来的bytes.Buffer在使用的时候，我们可以往这个元素中增加大量的byte数据，这会导致底层的byte slice的容量可能会变得很大。这个时候，即使Reset再放回到池子中，这些byte slice的容量不会改变，所占的空间依然很大。而且，因为Pool回收的机制，这些大的Buffer可能不被回收，而是会一直占用很大的空间，这属于内存泄漏的问题。</p>
 <p>即使是Go的标准库，在内存泄漏这个问题上也栽了几次坑，比如 <a href="https://github.com/golang/go/issues/23199">issue 23199</a>、<a href="https://github.com/dsnet">@dsnet</a>提供了一个简单的可重现的例子，演示了内存泄漏的问题。再比如encoding、json中类似的问题：将容量已经变得很大的Buffer再放回Pool中，导致内存泄漏。后来在元素放回时，增加了检查逻辑，改成放回的超过一定大小的buffer，就直接丢弃掉，不再放到池子中，如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e3/9f/e3e23d2f2ab55b64741e14856a58389f.png?wh=1098%2A319" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e3/9f/e3e23d2f2ab55b64741e14856a58389f.png?wh=1098%2A319" /></p>
 <p>package fmt中也有这个问题，修改方法是一样的，超过一定大小的buffer，就直接丢弃了：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/06/62/06c68476cac13a860c470b006718c462.png?wh=1012%2A392" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/06/62/06c68476cac13a860c470b006718c462.png?wh=1012%2A392" /></p>
 <p>在使用sync.Pool回收buffer的时候，<strong>一定要检查回收的对象的大小。</strong>如果buffer太大，就不要回收了，否则就太浪费了。</p>
 <h3 id="_3">内存浪费</h3>
 <p>除了内存泄漏以外，还有一种浪费的情况，就是池子中的buffer都比较大，但在实际使用的时候，很多时候只需要一个小的buffer，这也是一种浪费现象。接下来，我就讲解一下这种情况的处理方法。</p>
 <p>要做到物尽其用，尽可能不浪费的话，我们可以将buffer池分成几层。首先，小于512 byte的元素的buffer占一个池子；其次，小于1K byte大小的元素占一个池子；再次，小于4K byte大小的元素占一个池子。这样分成几个池子以后，就可以根据需要，到所需大小的池子中获取buffer了。</p>
 <p>在标准库 <a href="https://github.com/golang/go/blob/617f2c3e35cdc8483b950aa3ef18d92965d63197/src/net/http/server.go">net/http/server.go</a>中的代码中，就提供了2K和4K两个writer的池子。你可以看看下面这段代码：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/55/35/55086ccba91975a0f65bd35d1192e335.png?wh=628%2A611" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/55/35/55086ccba91975a0f65bd35d1192e335.png?wh=628%2A611" /></p>
 <p>YouTube开源的知名项目vitess中提供了<a href="https://github.com/vitessio/vitess/blob/master/go/bucketpool/bucketpool.go">bucketpool</a>的实现，它提供了更加通用的多层buffer池。你在使用的时候，只需要指定池子的最大和最小尺寸，vitess就会自动计算出合适的池子数。而且，当你调用Get方法的时候，只需要传入你要获取的buffer的大小，就可以了。下面这段代码就描述了这个过程，你可以看看：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c5/08/c5cd474aa53fe57e0722d840a6c7f308.png?wh=591%2A146" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c5/08/c5cd474aa53fe57e0722d840a6c7f308.png?wh=591%2A146" /></p>
 <h1 id="_4">第三方库</h1>
 <p>除了这种分层的为了节省空间的buffer设计外，还有其它的一些第三方的库也会提供buffer池的功能。接下来我带你熟悉几个常用的第三方的库。</p>
 <p>1.<a href="https://github.com/valyala/bytebufferpool">bytebufferpool</a></p>
@@ -14078,7 +14078,7 @@
 <h2 id="http-client">标准库中的http client池</h2>
 <p>标准库的http.Client是一个http client的库，可以用它来访问web服务器。为了提高性能，这个Client的实现也是通过池的方法来缓存一定数量的连接，以便后续重用这些连接。</p>
 <p>http.Client实现连接池的代码是在Transport类型中，它使用idleConn保存持久化的可重用的长连接：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/14/ec/141ced98a81466b793b0f90b9652afec.png?wh=1192%2A430" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/14/ec/141ced98a81466b793b0f90b9652afec.png?wh=1192%2A430" /></p>
 <h2 id="tcp">TCP连接池</h2>
 <p>最常用的一个TCP连接池是fatih开发的<a href="https://github.com/fatih/pool">fatih/pool</a>，虽然这个项目已经被fatih归档（Archived），不再维护了，但是因为它相当稳定了，我们可以开箱即用。即使你有一些特殊的需求，也可以fork它，然后自己再做修改。</p>
 <p>它的使用套路如下：</p>
@@ -14142,9 +14142,9 @@
 </code></pre></div>
 <h2 id="_6">数据库连接池</h2>
 <p>标准库sql.DB还提供了一个通用的数据库的连接池，通过MaxOpenConns和MaxIdleConns控制最大的连接数和最大的idle的连接数。默认的MaxIdleConns是2，这个数对于数据库相关的应用来说太小了，我们一般都会调整它。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/49/15/49c14b5bccb6d6ac7a159eece17a2215.png?wh=552%2A106" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/49/15/49c14b5bccb6d6ac7a159eece17a2215.png?wh=552%2A106" /></p>
 <p>DB的freeConn保存了idle的连接，这样，当我们获取数据库连接的时候，它就会优先尝试从freeConn获取已有的连接（<a href="https://github.com/golang/go/blob/4fc3896e7933e31822caa50e024d4e139befc75f/src/database/sql/sql.go#L1196">conn</a>）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d0/b5/d043yyd649a216fe37885yy4e03af3b5.png?wh=789%2A345" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d0/b5/d043yyd649a216fe37885yy4e03af3b5.png?wh=789%2A345" /></p>
 <h2 id="memcached-client">Memcached Client连接池</h2>
 <p>Brad Fitzpatrick是知名缓存库Memcached的原作者，前Go团队成员。<a href="https://github.com/bradfitz/gomemcache">gomemcache</a>是他使用Go开发的Memchaced的客户端，其中也用了连接池的方式池化Memcached的连接。接下来让我们看看它的连接池的实现。</p>
 <p>gomemcache Client有一个freeconn的字段，用来保存空闲的连接。当一个请求使用完之后，它会调用putFreeConn放回到池子中，请求的时候，调用getFreeConn优先查询freeConn中是否有可用的连接。它采用Mutex+Slice实现Pool：</p>
@@ -14205,7 +14205,7 @@
 <p>我们一般不会在程序一开始的时候就开始考虑优化，而是等项目开发到一个阶段，或者快结束的时候，才全面地考虑程序中的优化点，而Pool就是常用的一个优化手段。如果你发现程序中有一种GC耗时特别高，有大量的相同类型的临时对象，不断地被创建销毁，这时，你就可以考虑看看，是不是可以通过池化的手段重用这些对象。</p>
 <p>另外，在分布式系统或者微服务框架中，可能会有大量的并发Client请求，如果Client的耗时占比很大，你也可以考虑池化Client，以便重用。</p>
 <p>如果你发现系统中的goroutine数量非常多，程序的内存资源占用比较大，而且整体系统的耗时和GC也比较高，我建议你看看，是否能够通过Worker Pool解决大量goroutine的问题，从而降低这些指标。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/58/aa/58358f16bcee0281b55299f0386e17aa.jpg?wh=2250%2A2404" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/58/aa/58358f16bcee0281b55299f0386e17aa.jpg?wh=2250%2A2404" /></p>
 <h1 id="_8">思考题</h1>
 <p>在标准库net/rpc包中，Server端需要解析大量客户端的请求（<a href="https://github.com/golang/go/blob/master/src/net/rpc/server.go#L171">Request</a>），这些短暂使用的Request是可以重用的。请你检查相关的代码，看看Go开发者都使用了什么样的方式来重用这些对象。</p>
 <p>欢迎在留言区写下你的思考和答案，我们一起交流讨论。如果你觉得有所收获，也欢迎你把今天的内容分享给你的朋友或同事。</p>
@@ -14382,8 +14382,6 @@ return req
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

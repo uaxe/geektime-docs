@@ -14677,7 +14677,7 @@
 <p>你好，我是蒋德钧。</p>
 <p>上节课，我们学习了主从库集群模式。在这个模式下，如果从库发生故障了，客户端可以继续向主库或其他从库发送请求，进行相关的操作，但是如果主库发生故障了，那就直接会影响到从库的同步，因为从库没有相应的主库可以进行数据复制操作了。</p>
 <p>而且，如果客户端发送的都是读操作请求，那还可以由从库继续提供服务，这在纯读的业务场景下还能被接受。但是，一旦有写操作请求了，按照主从库模式下的读写分离要求，需要由主库来完成写操作。此时，也没有实例可以来服务客户端的写操作请求了，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d8/20/d828d7eee133cec690dc140e99e26f20.jpg?wh=3371%2A2250" title="主库故障后从库无法服务写操作" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d8/20/d828d7eee133cec690dc140e99e26f20.jpg?wh=3371%2A2250" title="主库故障后从库无法服务写操作" /></p>
 <p>无论是写服务中断，还是从库无法进行数据同步，都是不能接受的。所以，如果主库挂了，我们就需要运行一个新主库，比如说把一个从库切换为主库，把它当成主库。这就涉及到三个问题：</p>
 <ol>
 <li>主库真的挂了吗？</li>
@@ -14692,7 +14692,7 @@
 <p>这个流程首先是执行哨兵的第二个任务，选主。主库挂了以后，哨兵就需要从很多个从库里，按照一定的规则选择一个从库实例，把它作为新的主库。这一步完成后，现在的集群里就有了新主库。</p>
 <p>然后，哨兵会执行最后一个任务：通知。在执行通知任务时，哨兵会把新主库的连接信息发给其他从库，让它们执行replicaof命令，和新主库建立连接，并进行数据复制。同时，哨兵会把新主库的连接信息通知给客户端，让它们把请求操作发到新主库上。</p>
 <p>我画了一张图片，展示了这三个任务以及它们各自的目标。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ef/a1/efcfa517d0f09d057be7da32a84cf2a1.jpg?wh=2890%2A1018" title="哨兵机制的三项任务与目标" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ef/a1/efcfa517d0f09d057be7da32a84cf2a1.jpg?wh=2890%2A1018" title="哨兵机制的三项任务与目标" /></p>
 <p>在这三个任务中，通知任务相对来说比较简单，哨兵只需要把新主库信息发给从库和客户端，让它们和新主库建立连接就行，并不涉及决策的逻辑。但是，在监控和选主这两个任务中，哨兵需要做出两个决策：</p>
 <ul>
 <li>在监控任务中，哨兵需要判断主库是否处于下线状态；</li>
@@ -14714,12 +14714,12 @@
 <p>在判断主库是否下线时，不能由一个哨兵说了算，只有大多数的哨兵实例，都判断主库已经“主观下线”了，主库才会被标记为“客观下线”，这个叫法也是表明主库下线成为一个客观事实了。这个判断原则就是：少数服从多数。同时，这会进一步触发哨兵开始主从切换流程。</p>
 <p>为了方便你理解，我再画一张图展示一下这里的逻辑。</p>
 <p>如下图所示，Redis主从集群有一个主库、三个从库，还有三个哨兵实例。在图片的左边，哨兵2判断主库为“主观下线”，但哨兵1和3却判定主库是上线状态，此时，主库仍然被判断为处于上线状态。在图片的右边，哨兵1和2都判断主库为“主观下线”，此时，即使哨兵3仍然判断主库为上线状态，主库也被标记为“客观下线”了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/19/0d/1945703abf16ee14e2f7559873e4e60d.jpg?wh=3807%2A1416" title="客观下线的判断" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/19/0d/1945703abf16ee14e2f7559873e4e60d.jpg?wh=3807%2A1416" title="客观下线的判断" /></p>
 <p>简单来说，“客观下线”的标准就是，当有N个哨兵实例时，最好要有N/2 + 1个实例判断主库为“主观下线”，才能最终判定主库为“客观下线”。这样一来，就可以减少误判的概率，也能避免误判带来的无谓的主从库切换。（当然，有多少个实例做出“主观下线”的判断才可以，可以由Redis管理员自行设定）。</p>
 <p>好了，到这里，你可以看到，借助于多个哨兵实例的共同判断机制，我们就可以更准确地判断出主库是否处于下线状态。如果主库的确下线了，哨兵就要开始下一个决策过程了，即从许多从库中，选出一个从库来做新主库。</p>
 <h2 id="_3">如何选定新主库？</h2>
 <p>一般来说，我把哨兵选择新主库的过程称为“筛选+打分”。简单来说，我们在多个从库中，先按照<strong>一定的筛选条件</strong>，把不符合条件的从库去掉。然后，我们再按照<strong>一定的规则</strong>，给剩下的从库逐个打分，将得分最高的从库选为新主库，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f2/4c/f2e9b8830db46d959daa6a39fbf4a14c.jpg?wh=3671%2A1743" title="新主库的选择过程" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f2/4c/f2e9b8830db46d959daa6a39fbf4a14c.jpg?wh=3671%2A1743" title="新主库的选择过程" /></p>
 <p>在刚刚的这段话里，需要注意的是两个“一定”，现在，我们要考虑这里的“一定”具体是指什么。</p>
 <p>首先来看筛选的条件。</p>
 <p>一般情况下，我们肯定要先保证所选的从库仍然在线运行。不过，在选主时从库正常在线，这只能表示从库的现状良好，并不代表它就是最适合做主库的。</p>
@@ -14736,7 +14736,7 @@
 <p>上节课我向你介绍过，主从库同步时有个命令传播的过程。在这个过程中，主库会用master_repl_offset记录当前的最新写操作在repl_backlog_buffer中的位置，而从库会用slave_repl_offset这个值记录当前的复制进度。</p>
 <p>此时，我们想要找的从库，它的slave_repl_offset需要最接近master_repl_offset。如果在所有从库中，有从库的slave_repl_offset最接近master_repl_offset，那么它的得分就最高，可以作为新主库。</p>
 <p>就像下图所示，旧主库的master_repl_offset是1000，从库1、2和3的slave_repl_offset分别是950、990和900，那么，从库2就应该被选为新主库。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/62/df/626yy88853a2d15b5196b922367140df.jpg?wh=3746%2A1121" title="基于复制进度的新主库选主原则" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/62/df/626yy88853a2d15b5196b922367140df.jpg?wh=3746%2A1121" title="基于复制进度的新主库选主原则" /></p>
 <p>当然，如果有两个从库的slave_repl_offset值大小是一样的（例如，从库1和从库2的slave_repl_offset值都是990），我们就需要给它们进行第三轮打分了。</p>
 <p><strong>第三轮：ID号小的从库得分高。</strong></p>
 <p>每个实例都会有一个ID，这个ID就类似于这里的从库的编号。目前，Redis在选主库时，有一个默认的规定：<strong>在优先级和复制进度都相同的情况下，ID号最小的从库得分最高，会被选为新主库</strong>。</p>
@@ -15042,8 +15042,6 @@ Paxos&#47;Raft&#47;ZAB&#47;Quorum NWR&#47;FBFT&#47;POW 算法都是领导者模�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

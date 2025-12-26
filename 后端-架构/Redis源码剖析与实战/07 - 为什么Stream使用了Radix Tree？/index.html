@@ -14631,28 +14631,28 @@
 <h2 id="radix-tree">Radix Tree的基本结构</h2>
 <p>Radix Tree是属于前缀树的一种类型。前缀树也称为Trie Tree，它的特点是，保存在树上的每个key会被拆分成单字符，然后逐一保存在树上的节点中。前缀树的根节点不保存任何字符，而除了根节点以外的其他节点，每个节点只保存一个字符。当我们把从根节点到当前节点的路径上的字符拼接在一起时，就可以得到相应key的值了。</p>
 <p>下面这张图展示了一个简单的前缀树，你可以看下。图中的前缀树有两个叶子节点，将根节点到这两个叶子节点的路径上，对应的字符拼接起来后，就得到了两个key：read和real。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/04/56/04f86e94817aca643a8d2c05c580c856.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/04/56/04f86e94817aca643a8d2c05c580c856.jpg?wh=2000x1125" /></p>
 <p>另外从图中，我们还可以看到，前缀树是把保存的key的公共前缀（即r、e、a）独立出来共享使用的。这样一来，就可以避免在树中对相同的字符做重复存储。</p>
 <p>而如果不采用这种方法，只是把这两个key保存在哈希表中，那么key的相同前缀就会被单独存储，这样就会导致内存空间的浪费。所以，<strong>相比哈希表的保存方式，前缀树能够很好地节省内存空间，这对于Redis来说是非常重要的。</strong></p>
 <h3 id="radix-tree_1">前缀树的不足和Radix Tree的改进</h3>
 <p>当然，前缀树在每个节点中只保存一个字符，这样做的好处就是可以尽可能地共享不同key的公共前缀。但是，这也会导致key中的某些字符串，虽然不再被共享，可仍然会按照每个节点一个字符的形式来保存，这样反而会造成空间的浪费和查询性能的降低。</p>
 <p>我来给你举个例子，假设有5个key，分别是radix、race、read、real和redis，它们在前缀树上的布局如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f4/50/f44c4bc26d2d4b09a1701d09697c5550.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f4/50/f44c4bc26d2d4b09a1701d09697c5550.jpg?wh=2000x1125" /></p>
 <p>对于“redis”来说，因为它和“read”“real”共享“r”和“e”，和“radix”“race”共享“r”，也就是说“r”和“e”节点都分别指向多个子节点。类似的，“real”和“read”共享了“r”“e”和“a”前缀，“a”节点也指向了多个子节点。所以，在前缀树的节点中单独保存“r”“e”“a”是很有必要的。</p>
 <p>但是，我们还是看“redis”这个key，除了“r”“e”字符和其他key有共享外，“re”后面的“dis”没有再被其他key共享了。所以此时，其实并没有必要再对“dis”进行拆分，将其分成单个字符“d”“i”和“s”来保存，而是可以把它们合并在一起保存。</p>
 <p>那么到这里，你就可以发现，在前缀树上，确实有的字符需要单独保存，用来作为不同key的公共前缀进行共享，但其实有的单字符节点可以和其他单字符节点进行合并，这样能进一步节省空间。</p>
 <p>而从一个更加通用的角度来说，在前缀树的某个节点开始，如果从该节点到另外一个节点之间，每一个节点都只有一个子节点，那就表明这些节点对应的字符，并没有和其他节点共享了。那么如果我们还是按照前缀树的方式，为每一个字符创建一个节点进行保存的话，一是会<strong>浪费内存空间</strong>，二是在进行查询时，还需要逐一匹配每个节点表示的字符，<strong>对查询性能也会造成影响</strong>。</p>
 <p>所以，在前缀树中，如果一系列单字符节点之间的分支连接是唯一的，那么这些单字符节点就可以合并成一个节点，而这种结构的树，就正是<strong>Radix Tree，也被称为基数树</strong>。相比前缀树来说，Radix Tree既可以节约内存的使用，同时还可以提高查询访问的效率。</p>
 <p>我画了下面这张图，展示了刚才介绍的前缀树上的5个key（radix、race、read、real和redis），在Radix Tree上的布局，你可以对照着看下它们在前缀树布局上的不同之处。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/52/84/5235453fd27d1f97fcc42abd22d04084.jpg?wh=2000x950" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/52/84/5235453fd27d1f97fcc42abd22d04084.jpg?wh=2000x950" /></p>
 <h3 id="radix-tree_2">Radix Tree数据结构</h3>
 <p>好了，从刚才介绍的Radix Tree的结构中，我们其实可以发现，在Radix Tree中存在两类节点。</p>
 <p><strong>第一类节点是非压缩节点</strong>，这类节点会包含多个指向不同子节点的指针，以及多个子节点所对应的字符，比如前面Radix Tree例子中的节点“r”，这个节点就包含了指向子节点“a”和“e”的指针。同时，如果从根节点到一个非压缩节点的路径上的字符串，已经对应了Radix Tree中保存的一个key，那么这个非压缩节点中还包含了指向这个key对应的value的指针。</p>
 <p>比如，下面这张图就显示了刚才例子中的节点r，它是一个非压缩节点，指向了两个子节点，这两个子节点对应的字符分别是“a”和“e”，这个非压缩节点包含了指向子节点a和e的指针。此外，非压缩节点头部保存的HDR，是Radix Tree节点数据结构中的元数据，我一会儿会给你具体介绍它。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/61/62/61016426c97acb2b9465b2df5befb662.jpg?wh=2000x813" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/61/62/61016426c97acb2b9465b2df5befb662.jpg?wh=2000x813" /></p>
 <p><strong>第二类节点是压缩节点</strong>，这类节点会包含一个指向子节点的指针，以及子节点所代表的合并的字符串。比如前面Radix Tree例子中的节点e，这个节点指向的子节点包含的字符串就是合并的字符串“dis”。和非压缩节点类似，如果从根节点到一个压缩节点的路径上的字符串，已经对应了Radix Tree中保存的一个key，那么，这个压缩节点中还包含指向这个key对应的value的指针。</p>
 <p>下图展示的就是一个压缩节点，它包含一个指向子节点的指针，这个子节点表示的合并字符串是“is”，所以在当前这个压缩节点中，保存了合并字符“is”。而和非压缩节点类似，压缩节点的头部HDR，保存的也是Radix Tree节点结构中的元数据。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/82/d0/822ebedaf35cb59c8be7ecd2c90b3dd0.jpg?wh=2000x735" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/82/d0/822ebedaf35cb59c8be7ecd2c90b3dd0.jpg?wh=2000x735" /></p>
 <p>既然，这两类节点的头部HDR中都保存了元数据，下面我们就来看看，这些元数据都包括了什么内容。</p>
 <p>首先，我们需要了解下Radix Tree的节点数据结构。Radix Tree节点的数据结构是由<a href="https://github.com/redis/redis/tree/5.0/src/rax.h">rax.h</a>文件中的raxNode定义的，如下所示：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>typedef struct raxNode {
@@ -14685,10 +14685,10 @@
 <p>一方面，Radix Tree非叶子节点，要不然是压缩节点，只指向单个子节点，要不然是非压缩节点，指向多个子节点，但每个子节点只表示一个字符。所以，<strong>非叶子节点无法同时指向表示单个字符的子节点和表示合并字符串的子节点</strong>。</p>
 <p>我给你举个例子，在下图的左半部分，节点r的子节点a，它的两个子节点表示的都是合并字符串“dix”和“ce”。因此，节点a的raxNode结构，无法同时指向dix子节点和ce子节点。类似的，r节点的子节点e，它的两个子节点，一个表示的是单字符“a”，另一个表示的是合并字符串“dis”，节点e的raxNode结构也无法同时指向这两个子节点。</p>
 <p>所以，在实际使用raxNode结构保存数据时，节点dix会被拆为节点d和ix，节点ce会被拆为节点c和e，节点dis会被拆为节点d和is，如下图的右半部分所示。这样一来，节点r的子节点a和e，就可以用非压缩节点的结构来保存了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/09/dd/09bd522df6dbaa3216acd20b0248a2dd.jpg?wh=2000x1003" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/09/dd/09bd522df6dbaa3216acd20b0248a2dd.jpg?wh=2000x1003" /></p>
 <p>我们再来看另一方面，对于Radix Tree的叶子节点来说，因为它没有子节点了，所以，<strong>Redis会用一个不包含子节点指针的raxNode节点来表示叶子节点</strong>，也就是说，叶子节点的raxNode元数据size为0，没有子节点指针。如果叶子节点代表了一个key，那么它的raxNode中是会保存这个key的value指针的。</p>
 <p>为了便于你理解非压缩节点、压缩节点和叶子节点的raxNode结构内容，我画了下面这张图，你可以看下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7c/cd/7c6b7d2a809178c80405bb5e667b21cd.jpg?wh=2000x1104" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7c/cd/7c6b7d2a809178c80405bb5e667b21cd.jpg?wh=2000x1104" /></p>
 <p>这张图上显示了Radix Tree最右侧分支的4个节点r、e、d、is和它们各自的raxNode内容。其中，节点r、e和d都不代表key，所以它们的iskey值为0，isnull值为1，没有为value指针分配空间。</p>
 <p>节点r和e指向的子节点都是单字符节点，所以它们不是压缩节点，iscompr值为0。而节点d的子节点包含了合并字符串“is”，所以该节点是压缩节点，iscompr值为1。最后的叶子节点is，它的raxNode的size为0，没有子节点指针。不过，因为从根节点到节点is路径上的字符串代表了key“redis”，所以，节点is的value指针指向了“redis”对应的value数据。</p>
 <p>这里，你需要注意的是，<strong>为了满足内存对齐的需要，raxNode会根据保存的字符串长度，在字符串后面填充一些字节</strong>，也就是图中的padding部分。</p>
@@ -14738,7 +14738,7 @@
 <h2 id="streamradix-treelistpack">Stream如何组合使用Radix Tree和listpack？</h2>
 <p>我们知道，Stream保存的消息数据，按照key-value形式来看的话，消息ID就相当于key，而消息内容相当于是value。也就是说，Stream会使用Radix Tree来保存消息ID，然后将消息内容保存在listpack中，并作为消息ID的value，用raxNode的value指针指向对应的listpack。</p>
 <p>这里我放了一张图，展示了Stream结构、rax、raxNode以及listpack相互之间的关系。注意，在这张图中，我们假设就只有一个streamID作为key。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1e/0d/1e5aa7509b25bb94d53c183130d3460d.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1e/0d/1e5aa7509b25bb94d53c183130d3460d.jpg?wh=2000x1125" /></p>
 <p>我们可以看到，stream结构体中的rax指针，指向了Radix Tree的头节点，也就是rax结构体。rax结构体中的头指针进一步指向了第一个raxNode。因为我们假设就只有一个streamID，暂时没有其他streamID和该streamID共享前缀，所以，当前这个streamID就可以用压缩节点保存。</p>
 <p>然后，第一个raxNode指向了下一个raxNode，也是Radix Tree的叶子节点。这个节点的size为0，它的value指针指向了实际的消息内容。</p>
 <p>而在消息内容这里，是使用了listpack进行保存的。你可以看到，listpack中是使用了master entry来保存键值对类型消息中的键，而值会在master entry后面保存。这种保存方式其实也是为了<strong>节省内存空间</strong>，这是因为很多消息的键是相同的，保存一份就行。关于在Stream中，将消息的键和值分开保存到listpack中的这种设计方法，我会在后面的课程中继续给你详细介绍。</p>
@@ -14927,8 +14927,6 @@ https:&#47;&#47;github.com&#47;zpoint&#47;Redis-Internals&#47;blob&#47;5.0&#47;O
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

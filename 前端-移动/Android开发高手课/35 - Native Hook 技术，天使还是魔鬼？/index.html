@@ -6389,12 +6389,12 @@
 <p>对于Native Hook技术，我们比较熟悉的有GOT/PLT Hook、Trap Hook以及Inline Hook，下面我来逐个讲解这些Hook技术的实现原理和优劣比较。</p>
 <p><strong>1. GOT/PLT Hook</strong></p>
 <p>在<a href="https://github.com/AndroidAdvanceWithGeektime/Chapter06-plus">Chapter06-plus</a>中，我们使用了PLT Hook技术来获取线程创建的堆栈。先来回顾一下它的整个流程，我们将libart.so中的外部函数pthread_create替换成自己的方法pthread_create_hook。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/71/f5/715e03d40d7c5f185959e284c23e9df5.png?wh=1772%2A1042" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/71/f5/715e03d40d7c5f185959e284c23e9df5.png?wh=1772%2A1042" /></p>
 <p>你可以发现，GOT/PLT Hook主要是用于替换某个SO的外部调用，通过将外部函数调用跳转成我们的目标函数。GOT/PLT Hook可以说是一个非常经典的Hook方法，它非常稳定，可以达到部署到生产环境的标准。</p>
 <p>那GOT/PLT Hook的实现原理究竟是什么呢？你需要先对SO库文件的ELF文件格式和动态链接过程有所了解。</p>
 <p><strong>ELF格式</strong></p>
 <p>ELF（Executableand Linking Format）是可执行和链接格式，它是一个开放标准，各种UNIX系统的可执行文件大多采用ELF格式。虽然ELF文件本身就支持三种不同的类型（重定位、执行、共享），不同的视图下格式稍微不同，不过它有一个统一的结构，这个结构如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/18/96/181d3fed100b9ca11360a03625db5296.png?wh=1242%2A1324" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/18/96/181d3fed100b9ca11360a03625db5296.png?wh=1242%2A1324" /></p>
 <p>网上介绍ELF格式的文章非常多，你可以参考<a href="https://felixzhang00.github.io/2016/12/24/2016-12-24-ELF%E6%96%87%E4%BB%B6%E8%A3%85%E8%BD%BD%E9%93%BE%E6%8E%A5%E8%BF%87%E7%A8%8B%E5%8F%8Ahook%E5%8E%9F%E7%90%86/">《ELF文件格式解析》</a>。顾名思义，对于GOT/PLT Hook来说，我们主要关心“.plt”和“.got”这两个节区：</p>
 <ul>
 <li><strong>.plt</strong>。该节保存过程链接表（Procedure Linkage Table）。</li>
@@ -6420,7 +6420,7 @@
 <li><strong>The Procedure Linkage Table (PLT)</strong>。PLT不同于GOT，它位于代码段，动态库的每一个外部函数都会在PLT中有一条记录，每一条PLT记录都是一小段可执行代码。 一般来说，外部代码都是在调用PLT表里的记录，然后PLT的相应记录会负责调用实际的函数。我们一般把这种设定叫作“<a href="http://en.wikipedia.org/wiki/Trampoline_%28computing%29">蹦床</a>”（Trampoline）。</li>
 </ul>
 <p>PLT和GOT记录是一一对应的，并且GOT表第一次解析后会包含调用函数的实际地址。既然这样，那PLT的意义究竟是什么呢？PLT从某种意义上赋予我们一种懒加载的能力。当动态库首次被加载时，所有的函数地址并没有被解析。下面让我们结合图来具体分析一下首次函数调用，请注意图中黑色箭头为跳转，紫色为指针。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b8/33/b86ff32360acd5151050fd30e1762233.png?wh=438%2A288" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b8/33/b86ff32360acd5151050fd30e1762233.png?wh=438%2A288" /></p>
 <ul>
 <li>我们在代码中调用func，编译器会把这个转化为func@plt，并在PLT表插入一条记录。</li>
 <li>PLT表中第一条（或者说第0条）PLT[0]是一条特殊记录，它是用来帮助我们解析地址的。通常在类Linux系统，这个的实现会位于动态加载器，就是专栏前面文章提到的/system/bin/linker。</li>
@@ -6435,12 +6435,12 @@
 <li>在解析前GOT[n]会直接指向jmp *GOT[n]的下一条指令。在解析完成后，我们就得到了func的实际地址，动态加载器会将这个地址填入GOT[n]，然后调用func。</li>
 </ul>
 <p>如果对上面的这个调用流程还有疑问，你可以参考<a href="https://www.jianshu.com/p/0ac63c3744dd">《GOT表和PLT表》</a>这篇文章，它里面有一张图非常清晰。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8b/c6/8bacb98e41eaa8ed048294dbf42896c6.png?wh=1000%2A664" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8b/c6/8bacb98e41eaa8ed048294dbf42896c6.png?wh=1000%2A664" /></p>
 <p>当第一次调用发生后，之后再调用函数func就高效简单很多。首先调用PLT[n]，然后执行jmp *GOT[n]。GOT[n]直接指向func，这样就高效的完成了函数调用。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/08/1e/08d7d70593533b9908426945d16ad91e.png?wh=396%2A335" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/08/1e/08d7d70593533b9908426945d16ad91e.png?wh=396%2A335" /></p>
 <p>总结一下，因为很多函数可能在程序执行完时都不会被用到，比如错误处理函数或一些用户很少用到的功能模块等，那么一开始把所有函数都链接好实际就是一种浪费。为了提升动态链接的性能，我们可以使用PLT来实现延迟绑定的功能。</p>
 <p>对于函数运行的实际地址，我们依然需要通过GOT表得到，整个简化过程如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/69/27/698af1afdf2327233ef5bf2d09df4c27.png?wh=1406%2A970" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/69/27/698af1afdf2327233ef5bf2d09df4c27.png?wh=1406%2A970" /></p>
 <p>看到这里，相信你已经有了如何Hack这一过程的初步想法。这里业界通常会根据修改PLT记录或者GOT记录区分为GOT Hook和PLT Hook，但其本质原理十分接近。</p>
 <p><strong>GOT/PLT Hook实践</strong></p>
 <p>GOT/PLT Hook看似简单，但是实现起来也是有一些坑的，需要考虑兼容性的情况。一般来说，推荐使用业界的成熟方案。</p>
@@ -6468,7 +6468,7 @@
 <p><strong>如何Hook</strong></p>
 <p>但更进一步思考，如果我们不需要修改内存或者做类似调试器一样复杂的交互，我们完全可以不依赖ptrace，只需要接收相关signal即可。这时我们就想到了句柄（signal handler）。对！我们完全可以主动raise signal，然后使用signal handler来实现类似的Hook效果。</p>
 <p>业界也有不少人将Trap Hook叫作断点Hook，它的原理就是在需要Hook的地方想办法触发断点，并捕获异常。一般我们会利用SIGTRAP或者SIGKILL（非法指令异常）这两种信号。下面以SIGTRAP信号为例，具体的实现步骤如下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/07/cc/0746c1505e06c80345cbeb30b7c6c6cc.png?wh=1920%2A842" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/07/cc/0746c1505e06c80345cbeb30b7c6c6cc.png?wh=1920%2A842" /></p>
 <ul>
 <li>注册信号接收句柄（signal handler），不同的体系结构可能会选取不同的信号，我们这里用SIGTRAP。</li>
 <li>在我们需要Hook得部分插入Trap指令。</li>
@@ -6483,7 +6483,7 @@
 <p>跟Trap Hook一样，Inline Hook也是函数内部调用的Hook。它直接将函数开始（Prologue）处的指令更替为跳转指令，使得原函数直接跳转到Hook的目标函数函数，并保留原函数的调用接口以完成后续再调用回来的目的。</p>
 <p>与GOT/PLT Hook相比，Inline Hook可以不受GOT/PLT表的限制，几乎可以Hook任何函数。不过其实现十分复杂，我至今没有见过可以用在生产环境的实现。并且在ARM体系结构下，无法对叶子函数和很短的函数进行Hook。</p>
 <p>在深入“邪恶的”细节前，我们需要先对Inline Hook的大体流程有一个简单的了解。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b7/56/b78e7fd925a5299b13058ef54d094d56.jpg?wh=1254%2A656" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b7/56/b78e7fd925a5299b13058ef54d094d56.jpg?wh=1254%2A656" /></p>
 <p>如图所示，Inline Hook的基本思路就是在已有的代码段中插入跳转指令，把代码的执行流程转向我们实现的Hook函数中，然后再进行指令修复，并跳转回原函数继续执行。这段描述看起来是不是十分简单而且清晰？</p>
 <p>对于Trap Hook，我们只需要在目标地址前插入特殊指令，并且在执行结束后把原始指令写回去就可以了。但是对Inline Hook来说，它是直接进行指令级的复写与修复。怎么理解呢？就相当于我们在运行过程中要去做ASM的字节码修改。</p>
 <p>当然Inline Hook远远比ASM操作更加复杂，因为它还涉及不同CPU架构带来的指令集适配问题，我们需要根据不同指令集来分别进行指令复写与跳转。</p>
@@ -6496,14 +6496,14 @@
 <p>ARM64目前我还没有适配，不过Google Play要求所有应用在2019年8月1日之前需要支持64位，所以今年上半年也要折腾一下。但它们的原理基本类似，下面我以最主流的ARMv7架构为例，为你庖丁解牛Inline Hook。</p>
 <p><strong>ARM32指令集</strong></p>
 <p>ARMv7中有一种广为流传的<code>$PC=$PC+8</code>的说法。这是指ARMv7中的三级流水线（取指、解码、执行），换句话说<code>$PC</code>寄存器总是指向正在取指的指令，而不是指向正在执行的指令。取指总会比执行快2个指令，在ARM32指令集下2个指令的长度为8个字节，所以<code>$PC</code>寄存器的值总是比当前指令地址要大8。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bb/f9/bb8ea924c24a27638d575e25ca101cf9.png?wh=715%2A373" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bb/f9/bb8ea924c24a27638d575e25ca101cf9.png?wh=715%2A373" /></p>
 <p>是不是感觉有些复杂，其实这是为了引出ARM指令集的常用跳转方法：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>LDR PC, [PC, #-4] ;0xE51FF004
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>$TRAMPOLIN_ADDR
 </code></pre></div>
 <p>在了解了三级流水线以后，就不会对这个PC-4有什么疑惑了。</p>
 <p>按照我们前面描述的Inline Hook的基本步骤，首先插入跳转指令，跳入我们的蹦床（Trampoline），执行我们实现的Hook后函数。这里还有一个“邪恶的”细节，由于指令执行是依赖当前运行环境的，即所有寄存器的值，而我们插入新的指令是有可能更改寄存器的状态的，所以我们要保存当前全部的寄存器状态到栈中，使用BLX指令跳转执行Hook后函数，执行完成后，再从栈中恢复所有的寄存器，最后才能像未Hook一样继续执行原先函数。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/05/2d/0589d761c3079aad02287b13a7c0612d.jpg?wh=1292%2A638" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/05/2d/0589d761c3079aad02287b13a7c0612d.jpg?wh=1292%2A638" /></p>
 <p>在执行完Hook后的函数后，我们需要跳转回原先的函数继续执行。这里不要忘记我们在一开始覆盖的LDR指令，我们需要先执行被我们复写的指令，然后再使用如下指令，继续执行原先函数。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>LDR PC, [PC, #-4]
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>HOOKED_ADDR+8
@@ -6522,7 +6522,7 @@
 <p>1.GOT/PLT Hook是一个比较中庸的方案，有较好的性能，中等的实现难度，但其只能Hook动态库之间的调用的函数，并且无法Hook未导出的私有函数，而且只存在安装与卸载2种状态，一旦安装就会Hook所有函数调用。</p>
 <p>2.Trap Hook最为稳定，但由于需要切换运行模式（R0/R3），且依赖内核的信号机制，导致性能很差。</p>
 <p>3.Inline Hook是一个非常激进的方案，有很好的性能，并且也没有PLT作用域的限制，可以说是一个非常灵活、完美的方案。但其实现难度极高，我至今也没有看到可以部署在生产环境的Inline Hook方案，因为涉及指令修复，需要编译器的各种优化。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/db/b9/dbaf5281ac153571b5f2b93f75ae2db9.jpg?wh=1186%2A430" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/db/b9/dbaf5281ac153571b5f2b93f75ae2db9.jpg?wh=1186%2A430" /></p>
 <p>但是需要注意，无论是哪一种Hook都只能Hook到应用自身的进程，我们无法替换系统或其他应用进程的函数执行。</p>
 <h2 id="_2">总结</h2>
 <p>总的来说Native Hook是一门非常底层的技术，它会涉及库文件编译、加载、链接等方方面面的知识，而且很多底层知识是与Android甚至移动平台无关的。</p>
@@ -6666,8 +6666,6 @@ ptrace 可以实现修改 其他进程？但是 由于trap hook 舍弃了 ptrace
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

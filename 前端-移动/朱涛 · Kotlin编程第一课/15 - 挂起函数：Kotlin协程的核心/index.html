@@ -6214,7 +6214,7 @@
 <p>补充：如果你接触过<a href="https://github.com/JetBrains/compose-jb">Compose</a>，你会发现其中的@Composable跟suspend一样，也可以改变一个函数的类型，不过这个并不是我们要了解的重点，这里只是帮助你建立一个知识连接，如果你将来遇到了Compose，你就可以快速理解了。</p>
 </blockquote>
 <p><strong>那么，suspend修饰的函数，到底会变成什么类型？</strong>如果你将挂起函数与前面“回调地狱的代码”放在一起对比，再结合我们<a href="https://time.geekbang.org/column/article/473529">第3讲</a>学过的Kotlin原理，应该就会找到一些头绪了：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/08/68/08c49bd12047359fc8cea409fc6a2568.png?wh=1442x811" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/08/68/08c49bd12047359fc8cea409fc6a2568.png?wh=1442x811" /></p>
 <p>其实，<strong>挂起函数的本质，就是Callback</strong>。</p>
 <p>别忘了，我们还有Kotlin编译器这个“幕后的翻译官”啊！虽然我们写出来的挂起函数并没有任何Callback的逻辑，但是，当Kotlin编译器检测到suspend关键字修饰的函数以后，就会自动将挂起函数转换成带有CallBack的函数。</p>
 <p>如果我们将上面的挂起函数反编译成Java，结果会是这样：</p>
@@ -6245,25 +6245,25 @@
 <p>根据以上定义我们其实能发现，<strong>Continuation本质上也就是一个带有泛型参数的CallBack</strong>，只是它的名字看起来有点吓人而已。这个“从挂起函数转换成CallBack函数”的过程，被叫做是CPS转换（Continuation-Passing-Style Transformation）。</p>
 <p>看，Kotlin官方要将CallBack命名为Continuation的原因也出来了：Continuation道出了它的实现原理。当然，为了理解挂起函数，我们用CallBack会更加简明易懂。</p>
 <p>下面我用动画来演示一下挂起函数在CPS转换过程中，函数签名的变化：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/37/92/3732f7a3473e82c5a5d109a18d87f992.gif?wh=720x405" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/37/92/3732f7a3473e82c5a5d109a18d87f992.gif?wh=720x405" /></p>
 <blockquote>
 <p><strong>注意</strong>：挂起函数CPS转换后的内部逻辑，其实要远比演示的复杂，这个我们到源码篇再深究，我们暂时只关注它<strong>函数签名</strong>的变化。</p>
 </blockquote>
 <p>你能看到，在上面CPS转换的过程中，函数的类型发生了变化：“suspend ()-&gt;String” 变成了 “(Continuation)-&gt; Any?”。</p>
 <p>而这就意味着，如果你在Java中访问一个Kotlin挂起函数getUserInfo()，会看到Java里的getUserInfo()的类型是“(Continuation)-&gt; Object”（即接收Continuation为参数，返回值是Object）。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/5b/90/5b81e4a51acaafa1ce56f7a888037790.png?wh=792x286" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5b/90/5b81e4a51acaafa1ce56f7a888037790.png?wh=792x286" /></p>
 <p>到这里，我们就只剩下最后一个问题需要搞清楚了，那就是：<strong>Continuation到底是什么</strong>？如果你查<a href="https://dictionary.cambridge.org/zhs/%E8%AF%8D%E5%85%B8/%E8%8B%B1%E8%AF%AD/continuation">词典</a>和<a href="https://zh.wikipedia.org/wiki/%E8%AE%A1%E7%AE%97%E7%BB%AD%E4%BD%93">维基百科</a>，可能会一头雾水，因为这个词太抽象了。</p>
 <p>让我结合前面的代码案例，用更加通俗的语言解释给你听。</p>
 <p>首先，我们只需要把握住Continuation的词源Continue即可。Continue是“继续”的意思，Continuation则是“接下来要做的事情”。放到程序中，Continuation就代表了，“程序继续运行下去需要执行的代码”，“接下来要执行的代码”，或者是“剩下的代码”。</p>
 <p>就以上面的代码为例，当程序运行getUserInfo()这个挂起函数的时候，它的“Continuation”则是下图红框的代码：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/06/yb/060c08db5f586ed8e189cfa26eaa6yyb.png?wh=960x376" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/06/yb/060c08db5f586ed8e189cfa26eaa6yyb.png?wh=960x376" /></p>
 <p>这样理解了Continuation以后，CPS也就容易理解了，它其实就是<strong>将程序接下来要执行的代码进行传递的一种模式</strong>。</p>
 <p>而CPS转换，就是<strong>将原本的同步挂起函数转换成CallBack异步代码</strong>的过程。这个转换是编译器在背后做的，我们程序员对此并无感知。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/03/22/03d156ec6a31d650c6634f486dc06222.gif?wh=720x405" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/03/22/03d156ec6a31d650c6634f486dc06222.gif?wh=720x405" /></p>
 <p>根据这个动图，可以看到当程序执行到getUserInfo()的时候，剩下的未执行代码都被一起打包了起来，以Continuation的形式，传递给了getUserInfo()的Callback回调当中。当然，这种方式其实只是大致模拟了挂起函数的CPS转换过程，实际细节要远比这个复杂。但这对于现阶段的学习来说，已经完全够用了。</p>
 <p>以上就是Kotlin挂起函数的核心原理，它的挂起和恢复，其实也是通过CPS转换来实现的。在后面学习源码篇的时候，我们还会继续跟Continuation继续打交道。现在我们看着CPS的过程好像很简单，等到深入底层的时候，你会发现Continuation是多么的复杂和精妙。</p>
 <p>这里，我们再来看看之前的协程思维模型：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c6/1b/c6e735653c09f05ea94f5478d5e0d61b.gif?wh=1080x492" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c6/1b/c6e735653c09f05ea94f5478d5e0d61b.gif?wh=1080x492" /></p>
 <p>所以，现在我们可以理出一条线索了：<strong>协程之所以是非阻塞，是因为它支持“挂起和恢复”；而挂起和恢复的能力，主要是源自于“挂起函数”；而挂起函数是由CPS实现的，其中的Continuation，本质上就是Callback</strong>。</p>
 <p>读完上面的这段话，也许你会忍不住好奇：<strong>协程跟挂起函数之间是什么关系？</strong></p>
 <h2 id="_1">协程与挂起函数</h2>
@@ -6284,7 +6284,7 @@
 <a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>}
 </code></pre></div>
 <p>在上面的代码中，我们直接在main函数当中调用了getUserInfo()这个挂起函数，这时候，我们发现IDE会报错，报错的具体内容是这样的：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/68/aa/68010f8b8bd5de8d58dd8576828d92aa.png?wh=945x247" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/68/aa/68010f8b8bd5de8d58dd8576828d92aa.png?wh=945x247" /></p>
 <p>这个报错信息的意思是：<strong>挂起函数，只能在协程当中被调用，或者是被其他挂起函数调用</strong>。这个意思也很好理解，对于这样的要求，我们很容易就能写出下面的代码：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>// 代码段9
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
@@ -6321,7 +6321,7 @@
 </ul>
 <p>最后，我们还探索了协程与挂起函数之间的关系。我们发现：<strong>挂起函数，只能在协程当中被调用，或者是被其他挂起函数调用</strong>。但协程中的block，本质上仍然是挂起函数。</p>
 <p>所以，我们可以认为：挂起和恢复是协程的一种底层能力；而挂起函数则是一种上层的表现形式。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/19/bd/19591ff06ebc553ca6fa695a3914bdbd.jpg?wh=2000x1279" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/19/bd/19591ff06ebc553ca6fa695a3914bdbd.jpg?wh=2000x1279" /></p>
 <h2 id="_3">思考题</h2>
 <p>前面我们提到“挂起函数只能在协程当中被调用，或者是被其他挂起函数调用”，而本质上，还是因为“挂起函数可以调用挂起函数”。那么，你能找出更加底层的证据吗？</p>
 <p>换个方式理解就是：凭什么挂起函数可以调用挂起函数，而普通函数不能调用挂起函数？它的底层逻辑到底什么？</p>
@@ -6499,8 +6499,6 @@ return &quot;{FeedList..}&quot;
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

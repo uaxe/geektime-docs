@@ -14454,7 +14454,7 @@
 <p>WebAppContext -&gt; SessionHandler -&gt; SecurityHandler -&gt; ServletHandler</p>
 <p>这样链中的Handler从头到尾能被依次调用，除此之外，Jetty还实现了“回溯”的链式调用，那就是从头到尾依次链式调用Handler的<strong>方法A</strong>，完成后再回到头节点，再进行一次链式调用，只不过这一次调用另一个<strong>方法B</strong>。你可能会问，一次链式调用不就够了吗，为什么还要回过头再调一次呢？这是因为一次请求到达时，Jetty需要先调用各Handler的初始化方法，之后再调用各Handler的请求处理方法，并且初始化必须在请求处理之前完成。</p>
 <p>而Jetty是通过ScopedHandler来做到这一点的，那ScopedHandler跟HandlerWrapper有什么关系呢？ScopedHandler是HandlerWrapper的子类，我们还是通过一张图来回顾一下各种Handler的继承关系：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/68/50/68f3668cc7b179b5311d1bb5cb3cf350.jpg?wh=1145%2A684" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/68/50/68f3668cc7b179b5311d1bb5cb3cf350.jpg?wh=1145%2A684" /></p>
 <p>从图上我们看到，ScopedHandler是Jetty非常核心的一个Handler，跟Servlet规范相关的Handler，比如ContextHandler、SessionHandler、ServletHandler、WebappContext等都直接或间接地继承了ScopedHandler。</p>
 <p>今天我就分析一下ScopedHandler是如何实现“回溯”的链式调用的。</p>
 <h2 id="handlerwrapper">HandlerWrapper</h2>
@@ -14512,9 +14512,9 @@
 <a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>wrapperX.setHandler(scopedC)
 </code></pre></div>
 <p>经过上面的设置之后，形成的Handler链是这样的：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5f/2a/5f18bc5677f9216a9126413db4f4b22a.png?wh=776%2A146" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5f/2a/5f18bc5677f9216a9126413db4f4b22a.png?wh=776%2A146" /></p>
 <p>上面的过程只是设置了<code>_handler</code>变量，那<code>_outScope</code>和<code>_nextScope</code>需要设置成什么样呢？为了方便你理解，我们先来看最后的效果图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/21/4c/21a2e99691804f64d13d62ab9b3f924c.png?wh=849%2A217" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/21/4c/21a2e99691804f64d13d62ab9b3f924c.png?wh=849%2A217" /></p>
 <p>从上图我们看到：scopedA的<code>_nextScope=scopedB</code>，scopedB的<code>_nextScope=scopedC</code>，为什么scopedB的<code>_nextScope</code>不是WrapperX呢，因为WrapperX不是一个ScopedHandler。scopedC的<code>_nextScope</code>是null（因为它是链尾，没有下一个节点）。因此我们得出一个结论：<code>_nextScope</code><strong>指向下一个Scoped节点</strong>的引用，由于WrapperX不是Scoped节点，它没有<code>_outScope</code>和<code>_nextScope</code>变量。</p>
 <p>注意到scopedA的<code>_outerScope</code>是null，scopedB和scopedC的<code>_outScope</code>都是指向scopedA，即<code>_outScope</code><strong>指向的是当前Handler链的头节点</strong>，头节点本身<code>_outScope</code>为null。</p>
 <p>弄清楚了<code>_outScope</code>和<code>_nextScope</code>的含义，下一个问题就是对于一个ScopedHandler对象如何设置这两个值以及在何时设置这两个值。答案是在组件启动的时候，下面是ScopedHandler中的doStart方法源码：</p>
@@ -14862,8 +14862,6 @@ super.handle(target,baseRequest,request,response);
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

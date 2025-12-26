@@ -6324,9 +6324,9 @@
 </code></pre></div>
 <p>在这个示例程序中，foo函数有8个参数。根据<a href="https://gitee.com/richard-gong/craft-a-language/blob/master/13/System%20V%20Application%20Binary%20Interface%20AMD64%20Architecture%20Processor%20Supplement%20Draft%20Version%200.99.6.pdf">System V AMD64的ABI</a>和C语言的调用约定，其中前6个参数是通过寄存器传递的，其他两个参数是通过栈桢传递的。</p>
 <p>在汇编代码中，我们会发现这6个通过寄存器传递的参数，都先被保存到了栈桢中。这6个寄存器和参数的对应关系是这样的：
-<img alt="图片" src="https://static001.geekbang.org/resource/image/22/33/22ff0091312f4df5fb6313bdf3045333.jpg?wh=1920x570" />
+<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/22/33/22ff0091312f4df5fb6313bdf3045333.jpg?wh=1920x570" />
 我也把它们保存在栈桢里的位置画成了一张图，你可以看一下：
-<img alt="图片" src="https://static001.geekbang.org/resource/image/21/e1/213c71d3e770fdc7972b622c77b8d6e1.jpg?wh=1920x1080" />
+<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/21/e1/213c71d3e770fdc7972b622c77b8d6e1.jpg?wh=1920x1080" />
 你可以看到，这里面的前6个参数的位置，都是从rbp的位置依次向下4个字节，也就是一个整数的位置。参数1是-4(%rbp)，参数2是-8(%rbp)，依此类推。</p>
 <p>而大于6个的参数，是保存在调用者的栈桢里的。其中参数7的地址是16(%rbp)，也就是rbp指针往上16个字节。这里为什么要加上16个字节呢？这是因为，这16个字节中，有8个字节是返回地址，是由callq _foo指令压到栈里的，还有8个字节是rbp之前的值，是由pushq rbp压到栈里的。</p>
 <p>好，到目前为止，我们就知道如何在汇编代码里访问每个参数了。你可以查看代码库里的<a href="https://gitee.com/richard-gong/craft-a-language/blob/master/16-18/asm_x86-64.ts#L1178">lowerVars</a>代码，它把每个参数转变成了一个内存地址类型的Oprand。</p>
@@ -6351,7 +6351,7 @@
 </code></pre></div>
 <p>接下来，我们再看看本地变量。在示例程序<a href="https://gitee.com/richard-gong/craft-a-language/blob/master/16-18/param.c">param.c</a>中，有x1和x2两个本地变量，你可以阅读<a href="https://gitee.com/richard-gong/craft-a-language/blob/master/16-18/param.s">param.s</a>，看看它们都是存在哪的。</p>
 <p>我相信，经过这么多节课的训练，现在你阅读汇编代码应该越来越熟练了。在这个代码里，你可以看到x1实际上是存在-28(%rbp)的，而x2是存在-32(%rbp)的。也就是说，在栈桢里，它们是紧挨着参数的区域继续往下延伸的，你可以看看下面这张图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9b/45/9b4b437edbe28b3e69f77990e17dd345.jpg?wh=1920x1080" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9b/45/9b4b437edbe28b3e69f77990e17dd345.jpg?wh=1920x1080" /></p>
 <p>好了，<strong>现在对于参数和本地变量的保存，我们都搞清楚了，它们都是保存在内存的栈桢里的</strong>。那么临时变量呢？临时变量也保存在内存里吗？</p>
 <p>这是不行的。为什么呢？这是因为，X86指令集中加减乘除等指令和mov指令对内存地址的使用是有限制的。</p>
 <p>怎么理解呢？我们分析一下x1=p1*p2这条语句来看看。在上节课中，我们已经知道这条语句在生成汇编代码时，需要用到一个临时变量t1，所以整条语句在逻辑上相当于下面这三条汇编代码：</p>
@@ -6392,7 +6392,7 @@
 </code></pre></div>
 <p>根据我们目前掌握的参数传递的知识，这里的前6个参数赋给了6个寄存器，而第7和第8个参数，则是基于rsp，赋给(%rsp)和8(%rsp)这两个内存地址。而在被调用者中，访问这两个参数则是使用16(%rbp)和24(%rbp)。</p>
 <p>我也画了一张图，给你展示了如何在Caller和Callee的栈桢中访问参数7和参数8：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8e/fd/8e15e972dd84d7a9352dff7227c253fd.jpg?wh=1920x1080" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8e/fd/8e15e972dd84d7a9352dff7227c253fd.jpg?wh=1920x1080" /></p>
 <p>你要注意，这里每个参数都占用了8个字节，而不是像前面在Caller的栈桢里保存参数和本地变量那样，占用4个字节。你能不能想一想这是什么原因呢？</p>
 <p>我估计你已经猜到了。这是因为在制定ABI的时候，要兼容尽量多的场景。这个规定，使得我们能够用同样的方式传递整型和长整型的参数，而长整型就需要占据8个字节。</p>
 <p>你可以看看<a href="https://gitee.com/richard-gong/craft-a-language/blob/master/16-18/param_long.c">param_long.c</a>及其对应的<a href="https://gitee.com/richard-gong/craft-a-language/blob/master/16-18/param_long.s">param_long.s</a>汇编代码文件。你会发现，在这个示例文件中，我们把整型的参数改成了长整型，但是传递第7个和第8个参数的方法方式没有任何改变。在代码里访问这两个参数值的内存地址的表达方式，也是一样的。</p>
@@ -6438,14 +6438,14 @@
 <p>那我们现在就再进一步，梳理一下栈桢里的内容，也来分析一下我们要怎么做好栈桢的维护。</p>
 <h2 id="_3">栈桢的维护</h2>
 <p>你可以先看一下，采用我们目前的算法形成的栈桢结构是这样的：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f5/a3/f5ab10b57d420d11265434ec74ec52a3.jpg?wh=1920x1080" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f5/a3/f5ab10b57d420d11265434ec74ec52a3.jpg?wh=1920x1080" /></p>
 <p>一个栈桢从上到下，依次是返回值、rbp原值、Callee保护的寄存器（目前我们的示例程序中还没有用到这些寄存器）、参数、本地变量、溢出到内存的临时变量。</p>
 <p>然后你再从栈顶，也就是栈桢的最底下往上看，这里是我们在调用函数时，为超过6个的参数所保存的空间。</p>
 <p>然后你还会注意到，在栈桢中间可能还有一些多余的空间。为什么会这样呢？</p>
 <p>第一个原因，是这个函数可能会调用多个函数，而被调用的多个函数所需的参数数量是不同的，因此我们需要为参数最多的那个函数预留出足够的用于保存参数的空间。</p>
 <p>第二个原因，是内存对齐。原来，在ABI中规定，如果这个函数要调用另一个函数，那么参数区的尾部应该是16字节对齐的。所以说，参数区的尾部也是两个栈桢之间的分界线。换句话说，在控制转移到函数入口的那一刻，(%rsp+8)的值是能够被16整除的。这里的8，是因为callq指令把8位的一个返回地址压到了栈里。</p>
 <p>我建议你看看<a href="https://gitee.com/richard-gong/craft-a-language/blob/master/13/System%20V%20Application%20Binary%20Interface%20AMD64%20Architecture%20Processor%20Supplement%20Draft%20Version%200.99.6.pdf">ABI文档</a>中对栈桢的描述，我截取了一小段，你可以看看：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/97/0d/979a6b4f32d2d48f3ab02762dbd0970d.png?wh=1524x442" title="来源：System V Application Binary Interface AMD64 Architecture Processor Supplement Draft Version 0.99.6" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/97/0d/979a6b4f32d2d48f3ab02762dbd0970d.png?wh=1524x442" title="来源：System V Application Binary Interface AMD64 Architecture Processor Supplement Draft Version 0.99.6" /></p>
 <p>基于上面的原则，我们在为一个函数建立栈桢的时候，需要计算出rsp移动的量，以便确定正确的栈桢尺寸。在<a href="https://gitee.com/richard-gong/craft-a-language/blob/master/16-18/param.s">param.s</a>的_main函数中，序曲和尾声部分各有一行指令，就是用来移动rsp指针的。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>##序曲
 <a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>pushq  %rbp
@@ -6462,9 +6462,9 @@
 </code></pre></div>
 <p>不过，刚才我们看的是main函数的栈桢的情况。但对于foo函数来说，它的栈桢会有所不同。</p>
 <p>有什么区别呢？区别就在于，foo函数是叶子函数，也就是说它没有调用其他函数。在这个情况下，我们根本没有必要移动rsp指针来为栈桢申请内存。只要foo函数占用的内存不超过128个字节，我们直接使用红区（RedZone）就行了。它的栈桢结构如下图所示，这时rsp的值和rbp的值是相同的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/94/54/942530836aecb652579f505a13a7ee54.jpg?wh=1920x1080" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/94/54/942530836aecb652579f505a13a7ee54.jpg?wh=1920x1080" /></p>
 <p>关于红区的知识点，我仍然建议你阅读<a href="https://gitee.com/richard-gong/craft-a-language/blob/master/13/System%20V%20Application%20Binary%20Interface%20AMD64%20Architecture%20Processor%20Supplement%20Draft%20Version%200.99.6.pdf">ABI文档</a>，我在这里也贴了一小段，供你参考。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9e/c7/9ec76b76c6da5d3b04469bac92876cc7.png?wh=1488x326" title="来源：System V Application Binary Interface AMD64 Architecture Processor Supplement Draft Version 0.99.6" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9e/c7/9ec76b76c6da5d3b04469bac92876cc7.png?wh=1488x326" title="来源：System V Application Binary Interface AMD64 Architecture Processor Supplement Draft Version 0.99.6" /></p>
 <p>现在，栈桢维护的原理，我们已经讲清楚了，至于具体的计算栈桢大小、维护栈桢的代码，你可以在代码库中的<a href="https://gitee.com/richard-gong/craft-a-language/blob/master/16-18/asm_x86-64.ts#L1262">addPrologue</a>和<a href="https://gitee.com/richard-gong/craft-a-language/blob/master/16-18/asm_x86-64.ts#L1312">addEpilogue</a>两个函数中看到。在这里，你要特别关注一下其中计算栈桢大小的相关代码，以此为线索你就能搞清楚整个栈桢的内存布局了。我相信，在明白原理之后，你再阅读这些代码，可以保持一条比较清晰的思路。</p>
 <h2 id="_4">课程小结</h2>
 <p>好了，今天的内容就是这些，到今天这节课为止，我们的语言已经能够为表达式计算和函数调用等功能生成汇编代码和可执行文件了。那么今天这节课，我希望你记住下面几个关键的知识点：</p>
@@ -6594,8 +6594,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

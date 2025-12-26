@@ -6354,10 +6354,10 @@
 <p>所以，<strong>在Kubernetes里应用的版本变化就是 <code>template</code> 里Pod的变化</strong>，哪怕 <code>template</code> 里只变动了一个字段，那也会形成一个新的版本，也算是版本变化。</p>
 <p>但 <code>template</code> 里的内容太多了，拿这么长的字符串来当做“版本号”不太现实，所以Kubernetes就使用了“摘要”功能，用摘要算法计算 <code>template</code> 的Hash值作为“版本号”，虽然不太方便识别，但是很实用。</p>
 <p>我们就拿<a href="https://time.geekbang.org/column/article/535209">第18讲</a>里的Nginx Deployment作为例子吧，创建对象之后，使用 <code>kubectl get</code> 来查看Pod的状态：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/67/7b/67bc5178acde882a57265d6413158a7b.png?wh=1550x234" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/67/7b/67bc5178acde882a57265d6413158a7b.png?wh=1550x234" /></p>
 <p>Pod名字里的那串随机数“6796……”就是Pod模板的Hash值，也就是Pod的“版本号”。</p>
 <p>如果你变动了Pod YAML描述，比如把镜像改成 <code>nginx:stable-alpine</code>，或者把容器名字改成 <code>nginx-test</code>，都会生成一个新的应用版本，<code>kubectl apply</code> 后就会重新创建Pod：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/15/1e/15e17760079a03f046aa67f6e34b511e.png?wh=1560x236" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/15/1e/15e17760079a03f046aa67f6e34b511e.png?wh=1560x236" /></p>
 <p>你可以看到，Pod名字里的Hash值变成了“7c6c……”，这就表示Pod的版本更新了。</p>
 <h2 id="kubernetes_1">Kubernetes如何实现应用更新</h2>
 <p>为了更仔细地研究Kubernetes的应用更新过程，让我们来略微改造一下Nginx Deployment对象，看看Kubernetes到底是怎么实现版本更新的。</p>
@@ -6398,7 +6398,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>kubectl port-forward svc/ngx-svc 8080:80 &amp;
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>curl 127.1:8080
 </code></pre></div>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/20/52/20d23af1305e2d2b4f66b951c09dac52.png?wh=1532x928" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/20/52/20d23af1305e2d2b4f66b951c09dac52.png?wh=1532x928" /></p>
 <p>从curl命令的输出中可以看到，现在应用的版本是 <code>1.21.6</code>。</p>
 <p>现在，让我们编写一个新版本对象 <code>ngx-v2.yml</code>，把镜像升级到 <code>nginx:1.22-alpine</code>，其他的都不变。</p>
 <p><strong>因为Kubernetes的动作太快了，为了能够观察到应用更新的过程，我们还需要添加一个字段 <code>minReadySeconds</code></strong> ，让Kubernetes在更新过程中等待一点时间，确认Pod没问题才继续其余Pod的创建工作。</p>
@@ -6420,15 +6420,15 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>kubectl apply -f ngx-v2.yml
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>kubectl rollout status deployment ngx-dep
 </code></pre></div>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6d/7f/6d4023181fe180d50eb4cca7755a207f.png?wh=1920x486" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6d/7f/6d4023181fe180d50eb4cca7755a207f.png?wh=1920x486" /></p>
 <p>更新完成后，你再执行 <code>kubectl get pod</code>，就会看到Pod已经全部替换成了新版本“d575……”，用curl访问Nginx，输出信息也变成了“1.22.0”：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6a/64/6a1776c3yy1ec374510af9e560401064.png?wh=1594x646" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6a/64/6a1776c3yy1ec374510af9e560401064.png?wh=1594x646" /></p>
 <p>仔细查看 <code>kubectl rollout status</code> 的输出信息，你可以发现，Kubernetes不是把旧Pod全部销毁再一次性创建出新Pod，而是在逐个地创建新Pod，同时也在销毁旧Pod，保证系统里始终有足够数量的Pod在运行，不会有“空窗期”中断服务。</p>
 <p>新Pod数量增加的过程有点像是“滚雪球”，从零开始，越滚越大，所以这就是所谓的“<strong>滚动更新</strong>”（rolling update）。</p>
 <p>使用命令 <code>kubectl describe</code> 可以更清楚地看到Pod的变化情况：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>kubectl describe deploy ngx-dep
 </code></pre></div>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3b/fa/3b88d6b0d609e3b99f33b4f8e997c3fa.png?wh=1232x550" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3b/fa/3b88d6b0d609e3b99f33b4f8e997c3fa.png?wh=1232x550" /></p>
 <ul>
 <li>一开始的时候V1 Pod（即ngx-dep-54b865d75）的数量是4；</li>
 <li>当“滚动更新”开始的时候，Kubernetes创建1个 V2 Pod（即ngx-dep-d575d5776），并且把V1 Pod数量减少到3；</li>
@@ -6437,7 +6437,7 @@
 </ul>
 <p>看到这里你是不是有点明白了呢，其实“滚动更新”就是由Deployment控制的两个同步进行的“应用伸缩”操作，老版本缩容到0，同时新版本扩容到指定值，是一个“此消彼长”的过程。</p>
 <p>这个滚动更新的过程我画了一张图，你可以参考它来进一步体会：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b3/31/b3abe70db73a9da71a1793722e743731.jpg?wh=1920x729" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b3/31/b3abe70db73a9da71a1793722e743731.jpg?wh=1920x729" /></p>
 <h2 id="kubernetes_2">Kubernetes如何管理应用更新</h2>
 <p>Kubernetes的“滚动更新”功能确实非常方便，不需要任何人工干预就能简单地把应用升级到新版本，也不会中断服务，不过如果更新过程中发生了错误或者更新后发现有Bug该怎么办呢？</p>
 <p>要解决这两个问题，我们还是要用 <code>kubectl rollout</code> 命令。</p>
@@ -6447,23 +6447,23 @@
 <p>查看更新历史使用的命令是 <code>kubectl rollout history</code>：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>kubectl rollout history deploy ngx-dep
 </code></pre></div>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7c/09/7cc86862b28829c58c00eeb0fcdfbd09.png?wh=1398x306" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7c/09/7cc86862b28829c58c00eeb0fcdfbd09.png?wh=1398x306" /></p>
 <p>它会输出一个版本列表，因为我们创建Nginx Deployment是一个版本，更新又是一个版本，所以这里就会有两条历史记录。</p>
 <p>但 <code>kubectl rollout history</code> 的列表输出的有用信息太少，你可以<strong>在命令后加上参数 <code>--revision</code> 来查看每个版本的详细信息</strong>，包括标签、镜像名、环境变量、存储卷等等，通过这些就可以大致了解每次都变动了哪些关键字段：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>kubectl rollout history deploy --revision=2
 </code></pre></div>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0f/7c/0f8c4d0a230b97bb1a74d745c220677c.png?wh=1608x1054" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0f/7c/0f8c4d0a230b97bb1a74d745c220677c.png?wh=1608x1054" /></p>
 <p>假设我们认为刚刚更新的 <code>nginx:1.22-alpine</code> 不好，<strong>想要回退到上一个版本，就可以使用命令 <code>kubectl rollout undo</code>，也可以加上参数 <code>--to-revision</code> 回退到任意一个历史版本</strong>：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>kubectl rollout undo deploy ngx-dep
 </code></pre></div>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/14/c7/149345b7df104ac70c23a6c877a9b1c7.png?wh=1408x406" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/14/c7/149345b7df104ac70c23a6c877a9b1c7.png?wh=1408x406" /></p>
 <p><code>kubectl rollout undo</code> 的操作过程其实和 <code>kubectl apply</code> 是一样的，执行的仍然是“滚动更新”，只不过使用的是旧版本Pod模板，把新版本Pod数量收缩到0，同时把老版本Pod扩展到指定值。</p>
 <p>这个V2到V1的“版本降级”的过程我同样画了一张图，它和从V1到V2的“版本升级”过程是完全一样的，不同的只是版本号的变化方向：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0c/29/0cbb6eec008546c4f5106de5ece20329.jpg?wh=1920x695" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0c/29/0cbb6eec008546c4f5106de5ece20329.jpg?wh=1920x695" /></p>
 <h2 id="kubernetes_3">Kubernetes如何添加更新描述</h2>
 <p>讲到这里，Kubernetes里应用更新的功能就学得差不多了。</p>
 <p>不过，你有没有觉得 <code>kubectl rollout history</code> 的版本列表好像有点太简单了呢？只有一个版本更新序号，而另一列 <code>CHANGE-CAUSE</code> 为什么总是显示成 <code>&lt;none&gt;</code> 呢？能不能像Git一样，每次更新也加上说明信息呢？</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7c/09/7cc86862b28829c58c00eeb0fcdfbd09.png?wh=1398x306" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7c/09/7cc86862b28829c58c00eeb0fcdfbd09.png?wh=1398x306" /></p>
 <p>这当然是可以的，做法也很简单，我们<strong>只需要在Deployment的 <code>metadata</code> 里加上一个新的字段 <code>annotations</code></strong> 。</p>
 <p><code>annotations</code> 字段的含义是“注解”“注释”，形式上和 <code>labels</code> 一样，都是Key-Value，也都是给API对象附加一些额外的信息，但是用途上区别很大。</p>
 <ul>
@@ -6500,7 +6500,7 @@
 </code></pre></div>
 <p>你需要注意YAML里的 <code>metadata</code> 部分，使用 <code>annotations.kubernetes.io/change-cause</code> 描述了版本更新的情况，相比 <code>kubectl rollout history --revision</code> 的罗列大量信息更容易理解。</p>
 <p>依次使用 <code>kubectl apply</code> 创建并更新对象之后，我们再用 <code>kubectl rollout history</code> 来看一下更新历史：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/74/69/74bcc2020yy6b121634b3cbf972fe669.png?wh=1398x356" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/74/69/74bcc2020yy6b121634b3cbf972fe669.png?wh=1398x356" /></p>
 <p>这次显示的列表信息就好看多了，每个版本的主要变动情况列得非常清楚，和Git版本管理的感觉很像。</p>
 <h2 id="_1">小结</h2>
 <p>好，今天我们一起学习了Kubernetes里的高级应用管理功能：滚动更新，它会自动缩放新旧版本的Pod数量，能够在用户无感知的情况下实现服务升级或降级，让原本复杂棘手的运维工作变得简单又轻松。</p>
@@ -6519,7 +6519,7 @@
 <li>直接部署旧版本的YAML也可以实现版本回退，<code>kubectl rollout undo</code> 命令的好处是什么？</li>
 </ol>
 <p>欢迎在留言区积极参与讨论。如果觉得今天的内容对你有帮助，也欢迎转发给身边的朋友一起讨论，我们下节课再见。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/55/f8/55154596ba524615a36601c7fdeb9af8.jpg?wh=1920x2635" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/55/f8/55154596ba524615a36601c7fdeb9af8.jpg?wh=1920x2635" /></p>
 <div><strong>精选留言（14）</strong></div>
 <ul>
 <li><span>马以</span> 👍（37） 💬（1）<p>思考题：
@@ -6667,8 +6667,6 @@ Q3： 第27讲，创建ngx-v1部分，创建四个POD都成功了，在一个终
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

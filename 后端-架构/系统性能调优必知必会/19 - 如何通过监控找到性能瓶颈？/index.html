@@ -14498,7 +14498,7 @@
 <li><strong>搭建环境的成本足够低。</strong>我曾经使用过systemtap来监控函数的执行状况，搭建这样的监控环境需要很多步骤，比如要重新编译Linux内核，这些过于繁琐的成本会阻碍很多应用开发者的性能优化脚步。</li>
 </ol>
 <p>带着这3个约束条件，最合适的方案已经呼之欲出了：那就是<a href="https://en.wikipedia.org/wiki/Brendan_Gregg">Brendan Gregg</a> 发明的<a href="http://www.brendangregg.com/flamegraphs.html">火焰图</a>，以及为火焰图提供监控数据的工具。我们先来直观感受下火焰图到底是什么样子：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9c/d8/9ca4ff41238f067341d70edbf87c4cd8.png?wh=1788%2A929" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9c/d8/9ca4ff41238f067341d70edbf87c4cd8.png?wh=1788%2A929" /></p>
 <p>火焰图可以将监控期间涉及到的所有函数调用栈都列出来，就像上图对Nginx worker进程的监控一样，函数非常密集，因此通常采用可缩放、可互动的<a href="https://en.wikipedia.org/wiki/Scalable_Vector_Graphics">SVG矢量格式</a>图片来展示。由于极客时间暂时还没法直接展示矢量图片，所以我把矢量图片放在了我的个人网站上，你可以点击<a href="http://www.taohui.pub/nginx_perf.svg">这个链接</a>跳转到矢量图片页面。在SVG图片上你可以用Ctrl+F，通过名称搜索函数，而且这是支持正则表达式匹配的。你还可以点击函数方块，只查看它相关的函数调用栈。</p>
 <p>火焰图中最重要的信息，就是表示函数执行时间的X轴，以及表示函数调用栈的Y轴。</p>
 <p>先来看X轴。X轴由多个方块组成，每个方块表示一个函数，<strong>其长度是定时采样得到的函数调用频率，因此你可以简单粗暴地把它近似为执行时间。</strong>需要注意的是，如果函数A中调用了函数B、C、D，监控采样时会形成A-&gt;B、A-&gt;C、A-&gt;D这3个函数调用栈，但火焰图会将3个调用栈中表示A函数的方块合并，并将B、C、D放在上一层中，并以字母表顺序排列它们。这样更有助于你找到耗时最长的函数。</p>
@@ -14506,9 +14506,9 @@
 <p>结合X轴和Y轴，我们再来看如何使用火焰图找到性能瓶颈。</p>
 <p>首先，火焰图很容易从全局视角，通过寻找长方块，找到调用频率最高的几个函数。</p>
 <p>其次，函数方块长，有些是因为函数自身执行了很消耗CPU的代码，而有些则是调用的子函数耗时长造成的。怎么区分这两种场景呢？很简单，<strong>如果函数方块的长度，远大于调用栈中子函数方块的长度之和，那么这个函数就执行了比较耗费CPU的计算。</strong>比如，下图中执行TLS握手的ngx_ssl_handshake_handler函数，自身并没有消耗CPU多少计算力。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/14/c2/14c155f5ef577fa2aa6a127145b2acc2.png?wh=1778%2A246" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/14/c2/14c155f5ef577fa2aa6a127145b2acc2.png?wh=1778%2A246" /></p>
 <p>而更新Nginx时间的ngx_time_update函数就不同，它在做时间格式转换时消耗了许多CPU，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b8/67/b8b40ab7b4d358b45e600d8721b1d867.png?wh=1775%2A252" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b8/67/b8b40ab7b4d358b45e600d8721b1d867.png?wh=1775%2A252" /></p>
 <p>这样，我们可以直观地找到最耗时的函数，再有针对性地优化它的性能。</p>
 <p>怎么生成火焰图呢？在Linux上这非常简单，因为Linux内核默认支持perf工具，你可以用perf生成函数的采样数据，再用FlameGraph脚本生成火焰图。当然，如果你在使用Java、GoLang、Python等高级语言，也可以使用各自语言生态中封装过的Profile类工具，生成采样数据。这里我以最基本的perf、FlameGraph为例，介绍下生成火焰图的5步流程。</p>
 <p>首先，你可以通过yum或者apt-get安装perf工具，再通过git来下载FlameGraph：</p>
@@ -14529,7 +14529,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>FlameGraph/flamegraph.pl out.folded &gt; out.svg
 </code></pre></div>
 <p>需要注意，<strong>上面的火焰图只能找到消耗CPU计算力最多的函数，因此它也叫做On CPU火焰图，由于CPU工作时会发热，所以色块都是暖色调。</strong>有些使用了阻塞API的代码，则会导致进程休眠，On CPU火焰图无法找到休眠时间最长的函数，此时可以使用Off CPU火焰图，它按照函数引发进程的休眠时间的长短，确定函数方块的长度。由于进程休眠时不使用CPU，所以色块会使用冷色调。如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/82/8f/823f2666f8f8b57714e751501f178a8f.png?wh=1616%2A875" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/82/8f/823f2666f8f8b57714e751501f178a8f.png?wh=1616%2A875" /></p>
 <p>图片来源：<a href="http://www.brendangregg.com/FlameGraphs/offcpuflamegraphs.html">http://www.brendangregg.com/FlameGraphs/offcpuflamegraphs.html</a>，你可以点击<a href="http://www.brendangregg.com/FlameGraphs/off-mysqld-busy.svg">这个链接</a>查看SVG图片。</p>
 <p>生成Off CPU火焰图的步骤稍微繁琐点，你可以参照<a href="http://www.brendangregg.com/FlameGraphs/offcpuflamegraphs.html">这个页面</a>。关于火焰图的设计思路和详细使用方式，推荐你参考<a href="https://en.wikipedia.org/wiki/Brendan_Gregg">Brendan Gregg</a> 的<a href="https://queue.acm.org/detail.cfm?id=2927301">这篇论文</a>。</p>
 <h2 id="_2">分布式系统：如何通过全链路监控找到性能瓶颈？</h2>
@@ -14673,8 +14673,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

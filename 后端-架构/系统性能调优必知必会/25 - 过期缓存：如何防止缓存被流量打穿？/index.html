@@ -14524,9 +14524,9 @@
 <p>可见，最快的CPU缓存与最慢的网络传输，有1亿倍的速度差距！一旦高速、低速硬件直接互相访问，前者就会被拖慢运行速度。因此，<strong>我们会使用高速的存储介质创建缓冲区，通过预处理、批处理以及缓冲数据的反复命中，提升系统的整体性能。</strong></p>
 <p>不只是硬件层面，软件设计对访问速度的影响更大。比如，对关系数据库的非索引列做条件查询，时间复杂度是O(N)，而对Memcached做Key/Value查询，时间复杂度则是O(1)，所以在海量数据下，两者的性能差距远高于硬件。因此，RabbitMQ、Kafka这样的消息服务也会充当高速、低速应用间的缓存。</p>
 <p>如果两个实体之间的访问时延差距过大，还可以通过多级缓存，逐级降低访问速度差，提升整体性能。比如<a href="https://time.geekbang.org/column/article/230194">[第1讲]</a> 我们介绍过CPU三级缓存，每级缓存越靠近CPU速度越快，容量也越小，以此缓解CPU频率与主存的速度差，提升CPU的运行效率。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/98/y9/986779b16684c3a250ded39066ea5yy9.png?wh=3749%2A2433" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/98/y9/986779b16684c3a250ded39066ea5yy9.png?wh=3749%2A2433" /></p>
 <p>再比如下图的Web场景中，浏览器的本地缓存、操作系统内核中的TCP缓冲区（参见<a href="https://time.geekbang.org/column/article/239176">[第11讲]</a>）、负载均衡中的TLS握手缓存、应用服务中的HTTP响应缓存、MySQL中的查询缓存等，每一级缓存都缓解了上下游间不均衡的访问速度，通过缩短访问路径降低了请求时延，通过异步访问、批量处理提升了系统效率。当然，缓存使用了简单的Key/Value结构，因此可以用哈希表、查找树等容器做索引，这也提升了访问速度。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/96/81/96f9fcdc192de9282830f8f7a1b75a81.png?wh=863%2A760" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/96/81/96f9fcdc192de9282830f8f7a1b75a81.png?wh=863%2A760" /></p>
 <p>从系统底层到业务高层，缓存都大有用武之地。比如在Django这个Python Web Server中，既可以使用视图缓存，将动态的HTTP响应缓存下来：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>from django.views.decorators.cache import cache_page
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
@@ -14564,20 +14564,20 @@
 <p>写请求也可以更新缓存，你可以参考<a href="https://time.geekbang.org/column/article/251062">[第20讲]</a> 我们介绍过write through和write back方式。其中，write back采用异步调用回写数据，能通过批量处理提升性能。比如Linux在合并IO的同时，也会像电梯运行一样，每次使磁头仅向一个方向旋转写入数据，提升机械磁盘的工作效率，因此得名为电梯调度算法。</p>
 <p>说完数据的添加，我们再来看2种最常见的缓存淘汰算法。</p>
 <p>首先来看<a href="https://en.wikipedia.org/wiki/FIFO_%28computing_and_electronics%29">FIFO</a>(First In, First Out)先入先出淘汰算法。<a href="https://time.geekbang.org/column/article/245966">[第16讲]</a> 介绍的HTTP/2动态表，会将HTTP/2连接上首次出现的HTTP头部，缓存在客户端、服务器的内存中。由于它们基于相同的规则生成，所以拥有相同的动态表序号。这样，传输1-2个字节的表序号，要比传输几十个字节的头部划算得多。当内存容量超过SETTINGS_HEADER_TABLE_SIZE阈值时，会基于FIFO算法将最早缓存的HTTP头部淘汰出动态表。</p>
-<p><a href="https://en.wikipedia.org/wiki/FIFO_%28computing_and_electronics%29"><img alt="" src="https://static001.geekbang.org/resource/image/7b/fa/7b4ed2f6e8e0e0379a89a921b587a7fa.jpg?wh=4897%2A3551" title="图片参见wiki：https://en.wikipedia.org/wiki/FIFO_(computing_and_electronics)" /></a></p>
+<p><a href="https://en.wikipedia.org/wiki/FIFO_%28computing_and_electronics%29" referrerpolicy="no-referrer"><img alt="" src="https://static001.geekbang.org/resource/image/7b/fa/7b4ed2f6e8e0e0379a89a921b587a7fa.jpg?wh=4897%2A3551" title="图片参见wiki：https://en.wikipedia.org/wiki/FIFO_(computing_and_electronics)" /></a></p>
 <p>再比如<a href="https://time.geekbang.org/column/article/241632">[第14讲]</a> 介绍的TLS握手很耗时，所以我们可以将密钥缓存在客户端、服务器中，等再次建立连接时，通过session ID迅速恢复TLS会话。由于内存有限，服务器必须及时淘汰过期的密钥，其中，Nginx也是采用FIFO队列淘汰TLS缓存的。</p>
 <p>其次，LRU(Less Recently Used)也是最常用的淘汰算法，比如Redis服务就通过它来淘汰数据，OpenResty在进程间共享数据的shared_dict在达到共享内存最大值后，也会通过LRU算法淘汰数据。LRU通常使用双向队列实现（时间复杂度为O(1)），队首是最近访问的元素，队尾就是最少访问、即将淘汰的元素。当访问了队列中某个元素时，可以将其移动到队首。当缓存溢出需要淘汰元素时，直接删除队尾元素，如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/21/80/21f4cfa8c5a92db8eaf358901a7f8780.png?wh=938%2A815" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/21/80/21f4cfa8c5a92db8eaf358901a7f8780.png?wh=938%2A815" /></p>
 <p>以上我只谈了缓存容量到达上限后的淘汰策略，为了避免缓存与源数据不一致，在传输成本高昂的分布式系统中，通常会基于过期时间来淘汰缓存。比如HTTP响应中的Cache-Control、Expires或者Last-Modified头部，都会用来设置定时器，响应过期后会被淘汰出缓存。然而，一旦热点数据被淘汰出缓存，那么来自用户的流量就会穿透缓存到达应用服务。由于缓存服务性能远大于应用服务，过大的流量很可能会将应用压垮。因此，过期缓存并不能简单地淘汰，下面我们以Nginx为例，看看如何利用过期缓存提升系统的可用性。</p>
 <h2 id="nginx">Nginx是如何防止流量打穿缓存的？</h2>
 <p>当热点缓存淘汰后，大量的并发请求会同时回源上游应用，其实这是不必要的。比如下图中Nginx的合并回源功能开启后，Nginx会将多个并发请求合并为1条回源请求，并锁住所有的客户端请求，直到回源请求返回后，才会更新缓存，同时向所有客户端返回响应。由于Nginx可以支持C10M级别的并发连接，因此可以很轻松地锁住这些并发请求，降低应用服务的负载。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3e/2d/3ec9f8f4251af844770d24c756a6432d.png?wh=709%2A769" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3e/2d/3ec9f8f4251af844770d24c756a6432d.png?wh=709%2A769" /></p>
 <p>启用合并回源功能很简单，只需要在nginx.conf中添加下面这条指令即可：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>proxy_cache_lock on;
 </code></pre></div>
 <p>当1个请求回源更新时，其余请求将会默认等待，如果5秒（可由proxy_cache_lock_timeout修改）后缓存依旧未完成更新，这些请求也会回源，但它们的响应不会用于更新缓存。同时，第1个回源请求也有时间限制，如果到达5秒（可由proxy_cache_lock_age修改）后未获得响应，就会放行其他并发请求回源更新缓存。</p>
 <p>如果Nginx上的缓存已经过期（未超过proxy_cache_path中inactive时间窗口的过期缓存，并不会被删除），且上游服务此时已不可用，那有没有办法可以通过Nginx提供降级服务呢？所谓“服务降级”，是指部分服务出现故障后，通过有策略地放弃一些可用性，来保障核心服务的运行，这也是<a href="https://time.geekbang.org/column/article/251062">[第20讲]</a> BASE理论中Basically Available的实践。如果Nginx上持有着过期的缓存，那就可以通过牺牲一致性，向用户返回过期缓存，以保障基本的可用性。比如下图中，Nginx会直接将过期缓存返回给客户端，同时也会一直试图更新缓存。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d0/e5/d086aa5b326c21ce7609a2b7b98f86e5.png?wh=691%2A769" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d0/e5/d086aa5b326c21ce7609a2b7b98f86e5.png?wh=691%2A769" /></p>
 <p>开启过期缓存功能也很简单，添加下面2行指令即可：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>proxy_cache_use_stale updating;
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>proxy_cache_background_update on;
@@ -14710,8 +14710,6 @@ Mysql的普通索引场景下，Update更新操作会记录在ChangeBuffer下，
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -6988,7 +6988,7 @@
 <p>路由表是一个什么样的结构呢？</p>
 <p>路由就是在Linux服务器上的路由表里面配置的一条一条规则。这些规则大概是这样的：想访问某个网段，从某个网卡出去，下一跳是某个IP。</p>
 <p>之前我们讲过一个简单的拓扑图，里面的三台Linux机器的路由表都可以通过ip route命令查看。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f6/0e/f6982eb85dc66bd04200474efb3a050e.png?wh=3650%2A2255" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f6/0e/f6982eb85dc66bd04200474efb3a050e.png?wh=3650%2A2255" /></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a># Linux服务器A
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>default via 192.168.1.1 dev eth0
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>192.168.1.0/24 dev eth0 proto kernel scope link src 192.168.1.100 metric 100
@@ -7004,7 +7004,7 @@
 <p>其实，对于两端的服务器来讲，我们没有太多路由可以选，但是对于中间的Linux服务器做路由器来讲，这里有两条路可以选，一个是往左面转发，一个是往右面转发，就需要路由表的查找。</p>
 <p>fib_table_lookup的代码逻辑比较复杂，好在注释比较清楚。因为路由表要按照前缀进行查询，希望找到最长匹配的那一个，例如192.168.2.0/24和192.168.0.0/16都能匹配192.168.2.100/24。但是，我们应该使用192.168.2.0/24的这一条。</p>
 <p>为了更方面的做这个事情，我们使用了Trie树这种结构。比如我们有一系列的字符串：{bcs#, badge#, baby#, back#, badger#, badness#}。之所以每个字符串都加上#，是希望不要一个字符串成为另外一个字符串的前缀。然后我们把它们放在Trie树中，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3f/11/3f0a99cf1c47afcd0bd740c4b7802511.png?wh=1543%2A2143" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3f/11/3f0a99cf1c47afcd0bd740c4b7802511.png?wh=1543%2A2143" /></p>
 <p>对于将IP地址转成二进制放入trie树，也是同样的道理，可以很快进行路由的查询。</p>
 <p>找到了路由，就知道了应该从哪个网卡发出去。</p>
 <p>然后，ip_route_output_key_hash_rcu会调用__mkroute_output，创建一个struct rtable，表示找到的路由表项。这个结构是由rt_dst_alloc函数分配的。</p>
@@ -7041,7 +7041,7 @@
 </code></pre></div>
 <p>最终返回struct rtable实例，第一部分也就完成了。</p>
 <p>第二部分，就是准备IP层的头，往里面填充内容。这就要对着IP层的头的格式进行理解。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6b/2b/6b2ea7148a8e04138a2228c5dbc7182b.png?wh=1066%2A1666" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6b/2b/6b2ea7148a8e04138a2228c5dbc7182b.png?wh=1066%2A1666" /></p>
 <p>在这里面，服务类型设置为tos，标识位里面设置是否允许分片frag_off。如果不允许，而遇到MTU太小过不去的情况，就发送ICMP报错。TTL是这个包的存活时间，为了防止一个IP包迷路以后一直存活下去，每经过一个路由器TTL都减一，减为零则“死去”。设置protocol，指的是更上层的协议，这里是TCP。源地址和目标地址由ip_copy_addrs设置。最后，设置options。</p>
 <p>第三部分，就是调用ip_local_out发送IP包。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>int ip_local_out(struct net *net, struct sock *sk, struct sk_buff *skb)
@@ -7068,7 +7068,7 @@
 </code></pre></div>
 <p>ip_local_out先是调用__ip_local_out，然后里面调用了nf_hook。这是什么呢？nf的意思是Netfilter，这是Linux内核的一个机制，用于在网络发送和转发的关键节点上加上hook函数，这些函数可以截获数据包，对数据包进行干预。</p>
 <p>一个著名的实现，就是内核模块ip_tables。在用户态，还有一个客户端程序iptables，用命令行来干预内核的规则。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/75/4d/75c8257049eed99499e802fcc2eacf4d.png?wh=2416%2A1423" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/75/4d/75c8257049eed99499e802fcc2eacf4d.png?wh=2416%2A1423" /></p>
 <p>iptables有表和链的概念，最终要的是两个表。</p>
 <p>filter表处理过滤功能，主要包含以下三个链。</p>
 <ul>
@@ -7082,7 +7082,7 @@
 <li>OUTPUT链：可以改变本地产生的数据包的目标地址</li>
 <li>POSTROUTING链：在数据包离开时改变数据包的源地址</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/76/da/765e5431fe4b17f62b1b5712cc82abda.png?wh=2143%2A943" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/76/da/765e5431fe4b17f62b1b5712cc82abda.png?wh=2143%2A943" /></p>
 <p>在这里，网络包马上就要发出去了，因而是NF_INET_LOCAL_OUT，也即ouput链，如果用户曾经在iptables里面写过某些规则，就会在nf_hook这个函数里面起作用。</p>
 <p>ip_local_out再调用dst_output，就是真正的发送数据。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>/* Output packet to network from transport.  */
@@ -7388,7 +7388,7 @@
 <p>三个波段的优先级也不相同。band 0的优先级最高，band 2的最低。如果band 0里面有数据包，系统就不会处理band 1里面的数据包，band 1和band 2之间也是一样。</p>
 <p>数据包是按照服务类型（Type of Service，TOS）被分配到三个波段里面的。TOS是IP头里面的一个字段，代表了当前的包是高优先级的，还是低优先级的。</p>
 <p>pfifo_fast分为三个先入先出的队列，我们能称为三个Band。根据网络包里面的TOS，看这个包到底应该进入哪个队列。TOS总共四位，每一位表示的意思不同，总共十六种类型。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ab/d9/ab6af2f9e1a64868636080a05cfde0d9.png?wh=1948%2A853" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ab/d9/ab6af2f9e1a64868636080a05cfde0d9.png?wh=1948%2A853" /></p>
 <p>通过命令行tc qdisc show dev eth0，我们可以输出结果priomap，也是十六个数字。在0到2之间，和TOS的十六种类型对应起来。不同的TOS对应不同的队列。其中Band 0优先级最高，发送完毕后才轮到Band 1发送，最后才是Band 2。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a># tc qdisc show dev eth0
 <a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>qdisc pfifo_fast 0: root refcnt 2 bands 3 priomap  1 2 2 2 1 2 0 0 1 1 1 1 1 1 1 1
@@ -7576,7 +7576,7 @@
 <p>至此，整个发送才算结束。</p>
 <h2 id="_1">总结时刻</h2>
 <p>这一节，我们继续解析了发送一个网络包的过程，我们整个过程的图画在了下面。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/79/6f/79cc42f3163d159a66e163c006d9f36f.png?wh=6064%2A7303" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/79/6f/79cc42f3163d159a66e163c006d9f36f.png?wh=6064%2A7303" /></p>
 <p>这个过程分成几个层次。</p>
 <ul>
 <li>VFS层：write系统调用找到struct file，根据里面的file_operations的定义，调用sock_write_iter函数。sock_write_iter函数调用sock_sendmsg函数。</li>
@@ -7596,7 +7596,7 @@
 <h2 id="_2">课堂练习</h2>
 <p>上一节你应该通过tcpdump看到了TCP包头的格式，这一节，请你查看一下IP包的格式以及ARP的过程。</p>
 <p>欢迎留言和我分享你的疑惑和见解 ，也欢迎可以收藏本节内容，反复研读。你也可以把今天的内容分享给你的朋友，和他一起学习和进步。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8c/37/8c0a95fa07a8b9a1abfd394479bdd637.jpg?wh=1110%2A659" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8c/37/8c0a95fa07a8b9a1abfd394479bdd637.jpg?wh=1110%2A659" /></p>
 <div><strong>精选留言（15）</strong></div>
 <ul>
 <li><span>安排</span> 👍（10） 💬（2）<p>老师。应用层调用socket  接口发送数据是到哪个阶段就返回了？是数据写到qdisc中应用就可以返回了吗？还是要等到写到硬件网卡中？</p>2019-07-14</li><br/><li><span>Mhy</span> 👍（4） 💬（2）<p>老师请问neigh_probe 发送 ARP后还需要阻塞等待其他主机返回mac吗，如果没有收到呢</p>2020-05-13</li><br/><li><span>安排</span> 👍（3） 💬（1）<p>发送数据包时，源Mac地址是由协议栈软件加上的吗，还是等数据包到网卡后由网卡硬件自动加上的？
@@ -7716,8 +7716,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

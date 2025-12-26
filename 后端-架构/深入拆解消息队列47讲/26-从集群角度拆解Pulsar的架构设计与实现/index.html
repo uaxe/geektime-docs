@@ -14851,7 +14851,7 @@
 <p>我们在基础篇讲过，从设计定位上来看，Pulsar 是作为 Kafka 的升级替代品出现的，它主要解决了 Kafka 在集群层面的弹性和规模限制问题。那么现在我们就从集群的角度来拆解一下 Pulsar 的架构设计和实现，先来看一下集群构建。</p>
 <h2 id="_1">集群构建</h2>
 <p>在当前版本，Pulsar 集群构建和元数据存储的核心依旧是 ZooKeeper，同时社区也支持了弱ZooKeeper化改造。如下图所示，Pulsar Broker 集群的构建思路和 Kafka 是一致的，都是通过 ZooKeeper 来完成节点发现和集群的元数据管理。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d4/62/d4090c7722effb453b5c965753736d62.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d4/62/d4090c7722effb453b5c965753736d62.jpg?wh=10666x6000" /></p>
 <p>从实现角度来看，Broker 启动时会在 ZooKeeper 上的对应目录创建名称为 BrokerIP + Port 的子节点，并在这个子节点上存储Broker相关信息，从而完成节点注册。Pulsar Broker 的节点信息是存储在 ZooKeeper 上的 /loadbalance/brokers 节点上，目录结构如下所示：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>[zk: 9.164.54.17:2181(CONNECTED) 67] ls /loadbalance/brokers
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>[30.13.4.1:8080, 30.13.8.2:8080, 30.13.4.3:8080]
@@ -14870,7 +14870,7 @@
 <p>此时单个节点可承载的容量上限，就是集群所能承载的容量上限。而 Pulsar 存算分离架构和计算层弹性需要存储很多元数据，所以ZooKeeper就成为了瓶颈。为了解决这个问题，Pulsar 走的技术路径是弱ZooKeeper，而不是去ZooKeeper。</p>
 <h3 id="zookeeper">弱 ZooKeeper 实现</h3>
 <p>弱 ZooKeeper 就是允许将 ZooKeeper 替换为其他的单机或分布式协调服务。目前支持ZooKeeper、etcd、RocksDB、内存四种方案。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1d/f6/1d3e7239b09cb9e7531a97a1722f05f6.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1d/f6/1d3e7239b09cb9e7531a97a1722f05f6.jpg?wh=10666x6000" /></p>
 <p>如上图所示，基于etcd的方案是当前集群化部署的推荐方案。etcd底层存储是B树的结构，在硬盘层面的读取性能较高，不一定要把数据加载到内存中，所以存储容量不受单机的限制。</p>
 <p>基于 RocksDB 的方案和 RabbitMQ 的 Mnesia 大致上是一个思路，都是基于节点层面的存储引擎来完成元数据的存储。RocksDB的方案主要用在单机模式上，主要原因是 RocksDB 是一个单机数据库。</p>
 <p>基于内存的方案主要用在集成测试的场景中。</p>
@@ -14896,7 +14896,7 @@
 <p>我们知道，Pulsar 是计算存储分离的架构，数据是通过 Ledger 和 Entry 的形式写入BookKeeper的。所以跟其他消息队列不一样的是，Pulsar 的 Topic 没有副本概念，消息数据的可靠性是通过 Ledger 多副本来实现的。</p>
 <p>我们在<a href="https://time.geekbang.org/column/article/681965">第17讲</a>讲过，Pulsar 通过在 Broker 中设置 Qw 和 Qa 来设置 Ledger 的总副本数和写入成功的副本数。所以从一致性来看，Pulsar 既可以是强一致，也可以是最终一致。</p>
 <p>接下来我们来看一张图，你应该在<a href="https://time.geekbang.org/column/article/676532">第13讲</a>中看到过。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/78/05/78a924ae3908e10cf78ef1afa4d22605.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/78/05/78a924ae3908e10cf78ef1afa4d22605.jpg?wh=10666x6000" /></p>
 <p>如上图所示，每条消息是一个 Entry ，一批 Entry 组成一个 Ledger ，一批 Ledger 组成一个分区。 所以当数据不断写入分区时，Broker 会根据条件来不停地创建分区维度的 Ledger。这个条件通常是 Ledger 的固定长度，另外当 Ledger 写入流断开时，也会创建新的 Ledger。</p>
 <p>所以，在 Ledger 创建时就会根据设置的 Qw 数量，在 多个 Bookie 中创建 Ledger。<strong>这个过程就需要控制Ledger 分布在哪些 BookKeeper 节点，怎么实现的呢？</strong></p>
 <p>BookKeeper 可以通过配置机架感知（RackawareEnsemblePlacementPolicy）、区域感知（RegionAwareEnsemblePlacementPolicy）、可用区感知（ZoneawareEnsemblePlacementPolicy）3 种集成放置策略，来控制 Ledger 在 BookKeeper 多节点中的分布，从而实现多副本数据的高可靠和跨机架、跨可用区、跨区域容灾。</p>
@@ -14908,12 +14908,12 @@
 <p>默认情况下，Pulsar 客户端是通过明文方式与 Broker 通信的，也不需要经过身份认证和授权。</p>
 <p>为了保证数据在传输过程中的安全，Pulsar 支持通过 TLS 对数据进行加密传输。从使用角度，需要先申请或者创建证书，然后在 Broker 中配置启用 TLS，再在客户端配置证书信息来完成访问。</p>
 <p>从代码实现的角度，Pulsar 是使用 <a href="https://github.com/netty/netty-tcnative">netty-tcnative</a> 库在 Broker 中实现支持 TLS 的。在部署层面，Pulsar 支持在 Pulsar Broker 和 Pulsar Proxy 组件开启TLS。即如果要支持 TLS 传输，既可以通过配置 Proxy 来支持，也可以通过 Broker 来支持。Pulsar Proxy 是 Pulsar 内核自带的一个代理模块，可以理解是一个负载均衡。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c0/9d/c0c1416023b7507521c6be3yya0c099d.jpg?wh=10666x3676" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c0/9d/c0c1416023b7507521c6be3yya0c099d.jpg?wh=10666x3676" /></p>
 <h3 id="_6">端到端加密</h3>
 <p>除了支持 TLS 传输加密，Pulsar 还支持数据端到端加密。即在生产者端加密消息，然后在消费者端解密消息，从而保证数据在 Broker 保存的是经过加密后的数据，这能有效避免存储在 Broker 中的数据被泄露。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/13/d8/13d504f85955949ayyd70a40a1a615d8.jpg?wh=10666x4071" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/13/d8/13d504f85955949ayyd70a40a1a615d8.jpg?wh=10666x4071" /></p>
 <p>从实现的角度，Pulsar 会使用<strong>动态生成的对称会话密钥</strong>来加密数据。来看下图，这是 Pulsar 在生产者端加密消息，然后在消费者端解密消息的流程图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6e/b8/6e7cb22e58f11644149d9d769b355eb8.png?wh=2198x532" title="图片来源：https://pulsar.apache.org/docs/3.0.x/security-encryption/" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6e/b8/6e7cb22e58f11644149d9d769b355eb8.png?wh=2198x532" title="图片来源：https://pulsar.apache.org/docs/3.0.x/security-encryption/" /></p>
 <p>如上图所示：</p>
 <ol>
 <li>生产者会定期（每 4 小时或在发布一定数量的消息后）生成一个会话密钥，然后使用对称算法（例如 AES）对消息进行加密，并每 4 小时获取一次非对称公钥。</li>
@@ -14943,7 +14943,7 @@
 </code></pre></div>
 <p>和其他消息队列直接通过用户名或者客户端信息来完成鉴权不一样的是，<strong>Pulsar 是通过 Role Token（角色令牌）来完成鉴权的</strong>。Role Token本质就是一个字符串，是一个逻辑的概念，用来在后续授权中标识客户端身份用的。</p>
 <p>从实现上看，认证组件完成认证后会将客户端和角色（Role）关联，即客户端不管使用的是 Auth2.0、JWT 或 Kerberos 认证方式，当通过认证后都会关联一个Role。然后再根据这个 Role 携带的权限信息来进行鉴权。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0a/de/0ae88481b3cbcbb96623a8519c0f01de.jpg?wh=10666x5163" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0a/de/0ae88481b3cbcbb96623a8519c0f01de.jpg?wh=10666x5163" /></p>
 <p>Pulsar 的 Role 分为超级用户和普通用户。超级用户有集群的所有权限，如创建、删除租户，并且对所有租户具有访问权限，超级用户需要在Broker的配置文件中进行配置。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>authorizationEnabled=true
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>superUserRoles=my-super-user-1,my-super-user-2
@@ -14962,7 +14962,7 @@
 <p>其实 Pulsar 的总结是最不好写的，因为Pulsar社区发展非常快，可能没几天内容就会过期、失效或总结错误。所以如果需要了解最新的信息，建议你去看源码或官方的最新文档。</p>
 <p>但是万变不离其宗，当我们掌握了原理，无论如何变化，对我们来讲都不过是变化而已。</p>
 <p>接下来我们用一张表格，针对进阶篇的所有知识点，从四个主流消息队列的角度来做一个原理概览性的总结。建议收藏！</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/51/03/5168b25e17b36bcd1eef9b0f10c13f03.jpg?wh=4760x4378" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/51/03/5168b25e17b36bcd1eef9b0f10c13f03.jpg?wh=4760x4378" /></p>
 <h2 id="_11">思考题</h2>
 <p>为什么在去ZooKeeper的路上选择了可插拔的元数据存储框架，而不是去掉第三方存储引擎？</p>
 <p>欢迎分享你的思考，如果觉得有收获，也欢迎你把这节课分享给身边的朋友。我们下节课再见！</p>
@@ -15088,8 +15088,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -14654,7 +14654,7 @@
 </code></pre></div>
 <p>这里，我在本讲开头处代码的基础上，进行了适当改进。在这段代码中，我们首先在 main 函数的开头处，使用标准库提供的 signal 函数，为当前程序设置了一段针对信号 SIGFPE 的自定义处理逻辑。</p>
 <p>其中，该函数的第一个参数为具体的某个信号。C 标准库一共提供了 6 种不同类型的信号，它们均以宏常量的形式被定义。我将它们的具体信息整理在了下面这个表格中，供你参考。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/4e/2c/4eefcdb690a849f7daa3e60f7727472c.jpg?wh=1920x966" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4e/2c/4eefcdb690a849f7daa3e60f7727472c.jpg?wh=1920x966" /></p>
 <p>需要注意的是，该参数也支持使用某些与具体操作系统实现相关的其他信号值，但需要确保程序运行所在的系统支持这些非 C 标准信号。</p>
 <p>第二个参数为具体的信号处理函数，它的原型需要满足 <code>void (*handler) (int)</code> 这样一种形式，即接收一个整型的信号值，但不返回任何内容（void）。</p>
 <p>随着程序的运行，当位于代码第 12 行的除法运算发生除零异常时，操作系统便会将信号 SIGFPE 发送给当前进程，并根据之前通过 signal 函数注册的信号处理信息，调用用户自定义或默认的信号处理函数。</p>
@@ -14667,7 +14667,7 @@
 <li>信号处理程序执行完毕后，若程序未退出，则将程序执行恢复到之前的中断点，即 CPU 会重新执行 <code>idiv</code> 指令。</li>
 </ol>
 <p>当然，除了上面这种自定义信号处理函数的方式外，C 标准库还为我们提供了两种基本的信号处理方式。同样地，它们也以宏的形式被定义，可以直接作为 signal 函数的第二个参数来使用。我将它们整理在了下面的表格中，供你参考：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c2/c1/c2d48c5925aa38e835569aae1be204c1.jpg?wh=1920x664" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c2/c1/c2d48c5925aa38e835569aae1be204c1.jpg?wh=1920x664" /></p>
 <p>其中，第一种 SIG_DFL 表示对信号进行默认处理，操作系统会按照信号既定的默认处理方式来处理程序；SIG_IGN 则会忽略程序收到的信号。</p>
 <p>但需要注意的是，并非所有类型的信号都可以被忽略，比如某些难以恢复的软硬件异常对应的信号，或是 Linux 上专有的 SIGKILL 和 SIGSTOP 信号等。关于它们的一个简单使用示例如下所示：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;signal.h&gt;</span>
@@ -14741,7 +14741,7 @@
 <p>到这里，按照我们的理解，程序正常运行后，应该会按顺序进行两次输出（对应两次系统调用），并完整打印字符串 “Hello, world!”。其中，前半段由首先调用完成的信号处理函数 sigHandler 中的 print_normal 函数输出；后半段由 main 函数内的 print_with_exp 函数输出。</p>
 <p><strong>但真实情况却并非如此。</strong>程序运行后，你会发现实际的输出内容是 “Hellold!Hellold!”。这是为什么呢？</p>
 <p>仔细查看代码可以看到，函数 print_with_exp 在调用时，存入全局静态数组 buf 中的字符串内容 “, world!”，会被信号处理代码中 print_normal 函数调用时存入的字符串 “Hello”，覆盖了一部分。而当执行流再次退回到 print_with_exp 函数中继续执行时，由于此时数组 buf 中的内容已经发生改变，因此便打印出了错误的结果。你可以参考下图，来理解上述程序的执行流程。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/77/70/778b7e241a25febcabaebc5978540a70.jpg?wh=1920x1281" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/77/70/778b7e241a25febcabaebc5978540a70.jpg?wh=1920x1281" /></p>
 <p>对于这种一旦在执行中途被临时打断，在此刻再次调用就可能影响前一次调用正常执行的函数，我们一般称之为“不可重入函数”。相反，<strong>不受中途打断和重新调用影响的函数，便被称为“可重入函数”</strong>。而在信号处理程序中，“尽量使用可重入函数”便是我们需要遵守的首要规则。虽然大多数情况下，在信号处理代码中对它们的调用都可以正常工作，但从程序健壮性的角度来看，却并不推荐这样做。</p>
 <p>实际上，包括 printf、exit，以及 malloc 在内的众多常用 C 标准库函数，它们都并非可重入函数。因此，我们能够在信号处理代码中进行的操作也并不多。而为了进一步简化信号处理模型，C 标准库为我们提供了一个名为 <code>sig_atomic_t</code> 的整数类型，该类型可以保证，<strong>即使存在可能由于中断导致的执行流程转移，对该类型变量的读写过程也都是原子的</strong>（注意，不要与并发编程中的原子类型混淆，标准中仅规定了 <code>sig_atomic_t</code> 类型在异步信号处理场景下的原子性）。</p>
 <p>在这种情况下，对信号的处理过程可以变为如下代码所示的模式：</p>
@@ -14911,8 +14911,6 @@ https:&#47;&#47;manpages.debian.org&#47;jessie&#47;linux-manual-3.16&#47;sys_kil
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

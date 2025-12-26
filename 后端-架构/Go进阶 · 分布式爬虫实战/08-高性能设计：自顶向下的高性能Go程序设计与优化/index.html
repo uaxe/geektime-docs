@@ -14858,19 +14858,19 @@
 <p><strong>首先，不加思考，一上来就优化肯定是不对的，这是这句话隐含的第一层意思。</strong>开发者应该更多地关注程序中的关键部分，忽略掉不关键的部分。有些开发者过于追求完美，希望考虑到所有的细节。但是，最快的代码是从未运行过的代码。你几乎总是能够使程序变得更快，优化通常是一种收益递减的游戏。</p>
 <p>性能优化是一种手段，最后需要为目标服务。资源可能是多方面的，例如时间、延迟、硬件、CPU、人力、内存等等……很多时候一种资源比另一种资源更稀缺，因此可能牺牲其他资源来优化某一种资源。不得不说，漫无目的的优化会无端消耗精力，开发者需要直面遇到的最严重的性能瓶颈问题，并尽可能想办法解决。</p>
 <p>二八定律在性能优化中仍然适用。20%的代码消耗了程序80%的时间。如果你将只占用 5% 运行时间的代码速度提高一倍，那么总程序的速度只会提高 2.5%。但是，将占用程序80%时间的代码，仅加速 10% 就将为程序带来8%的提速，成本与收益是显而易见的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8a/1d/8ab55c686d2ea3caa9ca08356daba91d.jpg?wh=1920x832" title="二八法则" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8a/1d/8ab55c686d2ea3caa9ca08356daba91d.jpg?wh=1920x832" title="二八法则" /></p>
 <p>但是，<strong>这句话还隐含了第二层意思，那就是你迟早要对关键代码做优化。</strong></p>
 <p>实际上，大部分的架构与代码，都是逐渐迭代的过程。很多代码现在看起来很糟糕，但当时也许是成本最低的一种实现方式。然而，随着负载、数据和程序版本的变化，系统可能出现各种超出预期的性能瓶颈，例如响应时间上升、内存泄露、CPU飙升甚至是程序卡死等等。同时，有时候企业会面临降低成本的压力。新的变化总会导致新的问题，所以有必要进行优化。<strong>这节课，我会重点讨论怎么在有限的CPU和内存资源下，通过对服务的设计和调优增加服务QPS，降低服务的响应延迟。其他资源都可以采取类似的范式进行分析。</strong></p>
 <p><strong>“过早的优化是万恶之源”隐含的第三层意思是，在设计阶段即进行优化仍然是有意义的。</strong></p>
 <p>实际上，一个完全不考虑设计的系统，最终带来的就是难以维护的“屎山”，它会逐渐变得又慢又臭。就像《人月神话》中描述的焦油坑，所有进入其中的动物都会慢慢下陷，直到被埋葬。相信你在过往经历中也有所体会。所以，我们要在设计阶段就全面考虑如何规避性能问题。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b5/e4/b5c9a1b72e209ee51710a6fb343d03e4.png?wh=1544x644" title="拉布雷亚沥青坑 (来自：维基百科)" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b5/e4/b5c9a1b72e209ee51710a6fb343d03e4.png?wh=1544x644" title="拉布雷亚沥青坑 (来自：维基百科)" /></p>
 <h2 id="_2">性能设计分层抽象</h2>
 <p>怎么做呢？性能问题复杂多样，只有拥有了具体的方法论支撑，才能将问题分离出来，在面对性能问题时有的放矢。我参考《Efficient Go》这本书将性能优化<strong>自上而下划分为了5个级别：</strong></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/58/17/5857a35e454d2c3076755229447cc617.jpg?wh=1920x893" title="性能优化分层抽象" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/58/17/5857a35e454d2c3076755229447cc617.jpg?wh=1920x893" title="性能优化分层抽象" /></p>
 <p>这个性能优化的分层抽象可以帮我们把复杂的性能问题拆解开来，然后逐个击破。我们先来看看第一层级的性能挑战：系统级别。</p>
 <h3 id="_3">系统级别</h3>
 <p>我们都知道，系统架构经历了从单体应用到分布式应用的发展进程。随着数据规模日渐庞大，单台机器难以承受所有流量。因此，现代大型系统普遍采用了分布式、微服务的系统架构。借助灵活的程序伸缩快速适应动态的外部变化。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0e/4d/0e836600096ecbeb3331f7f6e3e4544d.png?wh=1920x941" title="单体服务 VS 微服务 （图源《Kubernetes in Action》）" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0e/4d/0e836600096ecbeb3331f7f6e3e4544d.png?wh=1920x941" title="单体服务 VS 微服务 （图源《Kubernetes in Action》）" /></p>
 <p>随着功能越来越复杂，服务变得越来越多，如何将大规模服务有机统一起来变成了一个新的难题，这也催生了架构师这样的职业。在系统级别进行思考意味着我们要以架构师的视角构建“概念完整性”的系统，从全局角度思考程序的系统问题。如果能把大方向把控好，局部的服务也很难差到哪里去。大方向如果把控不好，那就是覆巢之下无完卵也。</p>
 <p>系统级别优化与架构设计的过程息息相关，其考虑的方面在于<strong>“如何对服务进行拆分”、“如何将服务链接在一起”、“服务调用的关系以及调用频率”</strong>等。</p>
 <p>更具体地来说，如何让服务随着负载的增加具有可扩展性？是否采用DDD的架构设计？如何进行分布式的协调？选择何种中间件、缓存数据库与存储数据库？使用何种通信方式？</p>
@@ -14888,7 +14888,7 @@
 <p>例如，任务执行完毕后需要将一些数据存入缓存中。这时可以直接返回结果，并异步地写入数据库。又如，调用一个执行周期很长的函数，可以先直接返回，然后在执行完毕后请求用户给的回调地址。不过要注意的是，无论怎样异步化，终究是需要执行任务的。</p>
 <p><strong>第二是在执行的关键阶段请求并行化，尽可能把串行改为并行。</strong>你可能听说过华罗庚烧水泡茶的故事，这个故事的要点，就是将整个大任务分割为小任务，让关键任务并行进行处理，这个方案可以大大减少整个任务的处理时间。</p>
 <p>例如，三个任务分别耗时 T1、T2、T3，如果串行调用，总耗时为 T=T1+T2+T3。但是如果三个任务并行执行，总耗时就是max(T1,T 2,T3)。在程序设计中也遵循类似的思路。只有做到真正的并行，利用Go语言运行时对协程的自动调度，才能充分发挥多核CPU的性能。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a7/15/a71c466409904fc632de812e5a407e15.jpg?wh=1920x835" title="并发与并行  (图源《Go底层原理剖析》)" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a7/15/a71c466409904fc632de812e5a407e15.jpg?wh=1920x835" title="并发与并行  (图源《Go底层原理剖析》)" /></p>
 <p><strong>第三是要合理选择与实际系统匹配的并发模型</strong>，根据自身服务的不同，需要了解Go语言在网络I/O、磁盘I/O，CPU密集型系统在程序处理过程中的不同处理模型。并根据不同的场景选择不同的高并发模型。 关于这一点的详细论述，你可以参考<a href="https://time.geekbang.org/column/article/596287">第7讲</a>。</p>
 <p><strong>最后一点是要考虑无锁化与缓存化，保证并发的威力。</strong>试想一个极端的不合理的锁设计，它可能会让所有的用户协程等待某一个协程执行完成，导致并行处理退化为串行执行。无锁化并不是完全不加锁，而是要合理设计并发控制。例如设计无锁的结构，在多读少写场景用读锁替代写锁，用局部缓存来减少对于全局结构的访问（关于如何设计无锁化结构，你可以参考sync.pool库、go内存分配、go调度器等模块在并行处理中的极致优化，我在《Go底层原理剖析》这本书里也有过详细的解读）。</p>
 <p><strong>充分考虑完上面四点之后，怎么用工具和指标来验证程序实际并行的效率呢?</strong></p>
@@ -14908,13 +14908,13 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>GODEBUG=schedtrace=1000,scheddetail=1 ./main
 </code></pre></div>
 <p>调度器打印的日志信息如下图所示。调度器可以打印出GMP之间的对应关系还有局部运行队列与全局运行队列的个数。如果当前M都绑定了G，那么curg对应的是G的协程id。如果当前所有的M都有对应的G运行，那么表明当前线程都已充分运行。关于调度器打印信息的详细说明，可参考<a href="https://www.ardanlabs.com/blog/2015/02/scheduler-tracing-in-go.html">这篇文章</a>。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c6/d3/c6c36e96bc9f36d17936aaecf8f2c5d3.png?wh=2000x798" title="调度器打印日志细节" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c6/d3/c6c36e96bc9f36d17936aaecf8f2c5d3.png?wh=2000x798" title="调度器打印日志细节" /></p>
 <p>分析调度器运行状态的第二个思路，就是使用pprof和trace工具。pprof和trace工具是分析和排查Go性能问题的强悍工具。它可以可视化分析某一时刻程序的快照，还可以分析一段时间内程序线程、协程、逻辑处理器的运行状况。在后面的课程中，我还会详细地介绍pprof和trace的案例、原理和最佳实践。</p>
 <h2 id="_5">总结</h2>
 <p>这节课就讲到这里。</p>
 <p>性能优化重要且非常复杂，它考验的是开发者的内功。 对于刚刚入门的开发者来说，性能优化是个知识大杂烩，摸不着头脑。 然而，<strong>通过对知识的分层抽象与梳理，可以让你有的放矢，将问题聚焦于特定的层面。</strong></p>
 <p><strong>程序面临的任何性能优化问题都可以对应到我们这节课讲的五层抽象模型中。对于性能优化，我们需要聚焦于核心的瓶颈问题，自上而下逐个击破，找到对应的设计思路、观察指标、排查手段和解决方法。这将帮助你更早地规避性能问题、更快地定位性能问题、更有效地解决性能问题。</strong></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/58/17/5857a35e454d2c3076755229447cc617.jpg?wh=1920x893" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/58/17/5857a35e454d2c3076755229447cc617.jpg?wh=1920x893" /></p>
 <p>下节课，我们会从上层设计衍生到下层分析高性能程序的底层基石：代码实施、操作系统与硬件。最后如果你想深入的了解性能问题的术语、背景知识和方法论，我推荐你阅读《Systems Performance, 2nd Edition》。</p>
 <h2 id="_6">课后题</h2>
 <p>学完这节课，我也给你留两道思考题吧。</p>
@@ -15049,8 +15049,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

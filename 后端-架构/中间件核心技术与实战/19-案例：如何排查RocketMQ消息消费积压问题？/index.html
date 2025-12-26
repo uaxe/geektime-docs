@@ -14099,13 +14099,13 @@
 <h2 id="rocketmq">RocketMQ的消息消费模型</h2>
 <p>在RocketMQ消费领域中，判断消费端遇到的瓶颈通常会用到两个重要的指标：Delay和LastConsumeTime。</p>
 <p>在开源版本的控制台rocketmq-console界面中，我们可以查阅消费端的这两个指标：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/yy/07/yy0cf8266e7c6c1cb8cfa7caf7562207.png?wh=1039x692" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/yy/07/yy0cf8266e7c6c1cb8cfa7caf7562207.png?wh=1039x692" /></p>
 <ul>
 <li>Delay指的是消息积压数量，它是由BrokerOffset（服务端当前最大的逻辑偏移量）减去ConsumerOffset（消费者消费的当前位点）计算出来的。<strong>如果Delay值很大，说明消费端遇到了瓶颈</strong>。</li>
 <li>LastConsumeTime表示上一次成功消费消息的存储时间。<strong>这个值如果很大，同样能说明消费端遇到了瓶颈。</strong>如果这个值线上为1970年，表示消费者当前消费位点对应的消息在服务端已经过期，被删除了。</li>
 </ul>
 <p>那为什么消费会积压呢？要理解这个问题，我们首先要了解RocketMQ消费者的消费处理模型。核心流程如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/69/72/694cf4yybd4f3ef68c14377d4e755672.jpg?wh=1920x889" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/69/72/694cf4yybd4f3ef68c14377d4e755672.jpg?wh=1920x889" /></p>
 <p>说明一下具体的工作流程。</p>
 <ol>
 <li>PullMessageService线程从拉取任务队列中获取一个待拉取任务PullRquest。</li>
@@ -14122,7 +14122,7 @@
 <li>第二，消费线程池中的线程因为某种原因阻塞，导致不消费消息，进而同样使得消费位点不提交。</li>
 </ul>
 <p>针对第一点，Pull线程的run方法采用的是while(true)+try catch的模式，只要不主动关闭消费者，这个线程是不会停止的。具体的代码实现如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c2/ac/c2dc20f9952417b2fdd742c09c26dcac.png?wh=1920x978" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c2/ac/c2dc20f9952417b2fdd742c09c26dcac.png?wh=1920x978" /></p>
 <p>这么看来，消费积压基本都是消费线程池由于某种原因阻塞导致的。</p>
 <p>在探究阻塞会发生在何处之前，你不妨思考一下，如果消费线程不干活，但拉取线程还一直在从服务端拉取消息，再将消息提交到消费线程池和ProcessQueue，这时会出现什么问题？</p>
 <p>没错，内存溢出。所以，为了保护消费者进程，这个时候我们必须引入限流机制限制拉取线程的行为。</p>
@@ -14141,7 +14141,7 @@
 </code></pre></div>
 <p>为了方便对比，我一般会连续打印五个文件，这样可以在五个文件中查看同一个消费者线程的状态，看它是否发生了变化。如果始终没有变化，说明该消费线程长时间阻塞，这就需要我们重点关注了。</p>
 <p>在RocketMQ中，消费端线程以ConsumeMessageThread_打头，通过对线程的判断，可以发现下面这段代码：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9c/d0/9c079bb6ff965945595be90c8c3378d0.png?wh=1073x472" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9c/d0/9c079bb6ff965945595be90c8c3378d0.png?wh=1073x472" /></p>
 <p>这些线程的状态为RUNNABLE，并且在jstack日志中状态一直没有发生变化，说明这些线程是有问题的。通过线程栈，我们可以清楚地定位到具体的代码行。</p>
 <p>在这个示例中，通过对线程栈的分析，我们发现是调用HTTP请求时没有设置超时时间，这就导致线程一直阻塞，对应的消息始终没有处理完成。消息一直在处理队列（ProcessQueue）中，而RocketMQ采取的又是最小位点提交机制，消费位点无法继续向前推进，这才出现了消费积压。</p>
 <p>至此，消费积压问题的根本原因就定位出来了。</p>
@@ -14274,8 +14274,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

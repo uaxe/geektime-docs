@@ -14394,11 +14394,11 @@
 <p>是不是发现消费方真的非常简单且普通。那怎么展开探索呢？我们以 Debug 的方式调试消费方，在 sayHello 方法打个断点，通过断点调试，钻进调用流程的各个环节，同时参考12字方针，深入研究调用流程的底层逻辑。</p>
 <h3 id="1-jdk">1. JDK代理</h3>
 <p>我们在调用 sayHello 方法的这行打上一个断点，先运行提供方，再 Debug 运行消费方，很快断点就到来了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/14/4f/14301447ee765c43ecc527061e60d44f.jpg?wh=4161x1791" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/14/4f/14301447ee765c43ecc527061e60d44f.jpg?wh=4161x1791" /></p>
 <p>还记得前面提出的一个疑问么，demoFacade 在内存运行时，值类型是什么？</p>
 <p>从图中，我们可以清楚地看到，demoFacade 的类型，是一个随机生成的代理类名，不再属于 DemoFacade 这个类型了，而且结合 $Proxy 类名、代理类中的 h 成员变量属于 JdkDynamicAopProxy 类型，综合判断，这是采用 JDK 代理动态，生成了一个继承 Proxy 的代理类。</p>
 <p>如果你再展开 h 属性看看它里面的成员变量。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/89/f4/8948b4228103f59fb5aa20ebfc9d4cf4.jpg?wh=4158x2607" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/89/f4/8948b4228103f59fb5aa20ebfc9d4cf4.jpg?wh=4158x2607" /></p>
 <p>有 2 个比较重要的字段，targetSource 和 interfaces，我们挨个看下。</p>
 <p>先来看看 targetSource 变量（ReferenceBean$DubboReferenceLazyInitTargetSource）。</p>
 <p>看到它的类名，有没有似曾相识的感觉，类名上包含了 DubboReference 关键字，想必跟订阅流程中的引用有关。而且类名的构成，由 $ 符号隔开了，可以说明 DubboReferenceLazyInitTargetSource 是 ReferenceBean 的一个内部类。</p>
@@ -14433,7 +14433,7 @@
 </code></pre></div>
 <p>进去之后才发现，原来内部类是一层壳，<strong>核心创建对象的逻辑还是 ReferenceConfig 的 get 方法。</strong></p>
 <p>我们再来看 interfacaces 变量。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7e/e6/7e6fcedfbb5be17e8776869d4b2466e6.jpg?wh=4671x2757" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7e/e6/7e6fcedfbb5be17e8776869d4b2466e6.jpg?wh=4671x2757" /></p>
 <p>这里除了有我们调用下游的接口 DemoFacade，还有一个回声测试接口（EchoService）和一个销毁引用的接口（Destroyable）。</p>
 <p>这俩接口我们没见过，却被 Dubbo 在创建代理的过程中追加进来了，可以说明一点，<strong>我们可以拿着 demoFacade 变量强转为 EchoService，或者强转为 Destroyable，强转后就可以调用对应接口的方法，实现了一个代理类拥有多态功能的效果。</strong></p>
 <p>这个多态功能的支持，得归功于 JDK 的 Proxy 类，它在创建代理对象的 newProxyInstance 方法中，支持入参传入一个接口数组，Dubbo 框架在创建代理时，不但传入了 DemoFacade 接口，还传入了 EchoService 和 Destroyable 接口，生成的代理对象就有了另外两种接口的行为能力。</p>
@@ -14452,7 +14452,7 @@
 <p>好，简单整理一下，刚开始断点探索，我们就接触到了“高深”的 JDK 代理对象，解开了开头的一个疑惑， demoFacade 在运行时并非我们所见的 DemoFacade 类型，而是由 JDK 动态代理生成的一个代理对象类型。</p>
 <p>碰巧发现，在生成的代理对象中，targetSource 成员变量创建的底层核心逻辑还是 ReferenceConfig 的 get 方法，不得不说 ReferenceConfig 是消费方引用下游接口逻辑中非常重要的一个类。</p>
 <p>同时还认识了 EchoService 和 Destroyable 两个接口，让我们使用 demoFacade 时不仅可以调用 sayHello 方法，还可以强转为这两个接口调用不同的方法，使得一个 demoFacade 变量拥有三能能力，这就是代理增强的魅力所在。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d8/d0/d87a5cc1fe85460b815dd250a84c4ed0.jpg?wh=4683x1170" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d8/d0/d87a5cc1fe85460b815dd250a84c4ed0.jpg?wh=4683x1170" /></p>
 <h3 id="2-invokerinvocationhandler">2. InvokerInvocationHandler</h3>
 <p>接下来，我们继续 Debug 进入 sayHello 方法中，发现了一个名字有点眼熟的 InvokerInvocationHandler 类，虽然不知道具体能做啥，但是发现它实现了 JDK 代理中的 InvocationHandler 接口，所以，我们可以认为，这个 InvokerInvocationHandler 类是 Dubbo 框架接收 JDK 代理触发调用的入口。</p>
 <p>来看看 InvokerInvocationHandler 的 invoke 方法，验证一下。</p>
@@ -14510,7 +14510,7 @@
 <li>再看方法实现体的一些细节，发现最终并没有使用 proxy 代理对象，而是使用了 invoker + rpcInvocation 传入 InvocationUtil 工具类，完成了逻辑收口。</li>
 </ul>
 <p>再进入 InvocationUtil，忽略与入参无关的逻辑，最终发现把 rpcInvocation 对象传入了 invoker 的 invoke 方法中，继续走后续调用逻辑。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ay/15/ayyd03a438fc2721b88e19cd721a9f15.jpg?wh=4683x1272" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ay/15/ayyd03a438fc2721b88e19cd721a9f15.jpg?wh=4683x1272" /></p>
 <h3 id="3-migrationinvoker">3. MigrationInvoker</h3>
 <p>Debug 一直往后走，来到了一个 MigrationInvoker 的调用类，从类的名字上看是“迁移”的意思，有点 Dubbo2 与 Dubbo3 新老兼容迁移的味道。</p>
 <p>那来看看 MigrationInvoker 的 invoke 方法代码逻辑。</p>
@@ -14557,7 +14557,7 @@
 <li>从方法的入参和返回值来看，入参 invocation 是一个富含所有请求信息的接口，返参也是一个抽象的 Result 接口，意思很直白，根据参数拿到结果，只是入参和返参是接口，体现了抽象的概念。</li>
 <li>再看看方法实现体的一些细节，通过针对 APPLICATION_FIRST、FORCE_APPLICATION、FORCE_INTERFACE 来进行分发处理，这不就是消费方设置 dubbo.application.service-discovery.migration 属性，进行新老订阅方案兼容的值么？根据不同的属性值，选择对应可用的 invoker 进行继续后续调用。</li>
 </ul>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7a/29/7a2fb581db370895cac43d3257d16f29.jpg?wh=4668x1416" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7a/29/7a2fb581db370895cac43d3257d16f29.jpg?wh=4668x1416" /></p>
 <h3 id="4-mockclusterinvoker">4. MockClusterInvoker</h3>
 <p>然后走进”step == APPLICATION_FIRST“的分支逻辑，进入 currentAvailableInvoker 的 invoke 方法，来到了 MockClusterInvoker 这个类，看名字是“模拟集群调用”的意思。</p>
 <p>本意是干啥的呢，我们继续看它的 invoke 方法逻辑。</p>
@@ -14621,11 +14621,11 @@
 <li>从方法的入参和返回值看，入参和返参和 MigrationInvoker 一样，都是重写了 invoke 方法，只是内部逻辑不一样，不同实现类做各自的事情。</li>
 <li>再看看方法实现体的一些细节，mock 属性值（除了空值），当以 force 开头时，会直接执行 Mock 业务逻辑，其他情况还是先尝试正常后续调用，如果出现了非业务异常时，就尝试执行 Mock 业务逻辑。</li>
 </ul>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/83/54/830368b86f33c6853349099a8fe48254.jpg?wh=4665x1671" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/83/54/830368b86f33c6853349099a8fe48254.jpg?wh=4665x1671" /></p>
 <h3 id="5">5. 过滤器链</h3>
 <p>这里，看到 Cluster 这个关键字，想必你也想到了它是一个 SPI 接口，那在“发布流程”中我们也学过，远程导出和远程引用的时候，会用过滤器链把 invoker 层层包装起来。</p>
 <p>那么我们就接着断点下去，发现确实进入 FutureFilter、MonitorFilter 等过滤器，这也证明了过滤器链包裹消费方 invoker 的存在。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ed/41/edc45b36f7b017011306eb2e13e47241.jpg?wh=4668x2001" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ed/41/edc45b36f7b017011306eb2e13e47241.jpg?wh=4668x2001" /></p>
 <h3 id="6-failoverclusterinvoker">6. FailoverClusterInvoker</h3>
 <p>断点一层层走完了所有的过滤器，接着又来到了 FailoverClusterInvoker 这个类，从名字上一看就是在“<a href="https://time.geekbang.org/column/article/611355">温故知新</a>”中接触的故障转移策略，是不是有点好奇故障到底是怎么转移的？</p>
 <p>我们不妨继续断点，进入它的 doInvoke 方法看看。</p>
@@ -14710,7 +14710,7 @@
 <li>从方法的入参和返回值看，入参是 invocation、invokers、loadbalance 三个参数，猜测应该就是利用 loadbalance 负载均衡器，从 invokers 集合中，选择一个 invoker来发送 invocation 数据，发送完成后得到了返参的 Result 结果。</li>
 <li>再看看方法实现体的一些细节，通过计算 retries 属性值得到重试次数并循环，每次循环都是利用负载均衡器选择一个进行调用，如果出现非业务异常，继续循环调用，直到所有次数循环完，还是没能拿到结果的话就会抛出 RpcException 异常了。</li>
 </ul>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ac/4b/acf6e7c2cd711b04fc391a1a678d264b.jpg?wh=4668x2265" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ac/4b/acf6e7c2cd711b04fc391a1a678d264b.jpg?wh=4668x2265" /></p>
 <h3 id="7-dubboinvoker">7. DubboInvoker</h3>
 <p>现在你应该知道“故障转移策略”的深层含义了吧，就是根据预先设置好的重试次数，当调用发生非业务异常时，按照负载均衡策略继续选择一个 invoker，再次发起调用。</p>
 <p>了解完故障转移策略，我们继续 Debug，结果来到了 DubboInvoker 这个类。</p>
@@ -14772,7 +14772,7 @@
 <li>再看看方法实现体的一些细节，计算了超时时间值，单程发送，不需要响应好说，直接调用交互数据客户端类的 send 方法就行，需要有响应的分支逻辑还定义了线程池，调用的是 request 方法进行发送。</li>
 </ul>
 <p>不过，两条分支最终都返回了一个异步结果对象，可以看出当前的 DubboInvoker 旨在屏蔽协议之间的差异，让上层调用方不感知协议间的不同。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/69/23/69f4a169eyy19bb3be65db9a029a3123.jpg?wh=4665x2520" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/69/23/69f4a169eyy19bb3be65db9a029a3123.jpg?wh=4665x2520" /></p>
 <h3 id="8-referencecountexchangeclient">8. ReferenceCountExchangeClient</h3>
 <p>因为我们没有单独设置调用不需要响应，就继续断点进入 currentClient 的 request 方法，看看到底是怎么发送的，来到了 ReferenceCountExchangeClient 类。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1">///////////////////////////////////////////////////</span>
@@ -14790,7 +14790,7 @@
 <li>从方法的入参和返回值看，入参是请求对象、超时时间、线程池对象，返参是 CompletableFuture 对象。从线程池和 Future 对象，充分说明了这个 request 方法进行了同步转异步的操作。</li>
 <li>再看看方法实现体的一些细节，从断点展示的变量值细节看，只是发现了 client 的类型属于 HeaderExchangeClient，也就意味着 HeaderExchangeClient 完成了同步转异步的逻辑操作。</li>
 </ul>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/09/2c/09f6334b9d3798fb1404d216e6e7072c.jpg?wh=4665x2751" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/09/2c/09f6334b9d3798fb1404d216e6e7072c.jpg?wh=4665x2751" /></p>
 <h3 id="9-nettyclient">9. NettyClient</h3>
 <p>仍然没有看到数据是怎么发送的，我们继续深入 HeaderExchangeClient 的 request 方法中，Debug 几步后发现，进入了抽象类 AbstractPeer 的 send 方法。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1">///////////////////////////////////////////////////</span>
@@ -14811,7 +14811,7 @@
 </ul>
 <p>那我们从 NettyClient 的 send 方法细看，结果发现了最终调用了 NioSocketChannel 的 writeAndFlush 方法，这个不就是 Netty 网络通信框架的 API 么？</p>
 <p>到这里，我们在代码层面解释了数据原来是通过 Netty 框架的 NioSocketChannel 发送出去的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/01/39/0187c8492bd188b1a2c29be081753339.jpg?wh=4665x2832" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/01/39/0187c8492bd188b1a2c29be081753339.jpg?wh=4665x2832" /></p>
 <h3 id="10-nettycodecadapter">10. NettyCodecAdapter</h3>
 <p>一旦进入到 Netty 框架，再通过断点一步步跟踪数据就有点难了，因为 Netty 框架内部处处都是“线程+队列”的异步操作方式，这里我们走个捷径，进入 NettyClient 类，找找初始化 NettyClient 的相关 Netty 层面的配置。</p>
 <p>你会找到一个 NettyCodecAdapter 类，对数据进行编解码，直接在类中的 encode 方法打个断点，等断点过来。</p>
@@ -14836,7 +14836,7 @@
 <li>从方法的入参和返回值看，msg 是请求数据对象，out 变量是 ByteBuf 缓冲区，应该是将 msg 编码之后的数据流。</li>
 <li>再看看方法实现体的一些细节，没什么特别之处，无非就是走后续编解码器的编码方法，编码完成后，再通过 Netty 框架把数据流发送出去。</li>
 </ul>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1f/1c/1ffc5804fb4eed68cbd594c35b296d1c.jpg?wh=4668x2895" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1f/1c/1ffc5804fb4eed68cbd594c35b296d1c.jpg?wh=4668x2895" /></p>
 <h2 id="_1">调用流程的其他案例</h2>
 <p>经过漫长的十步断点，我们把消费方的调用流程大致串了起来，虽说过程有点曲折，但最终的艰辛是值得的，对于你理解框架调用的来龙去脉很重要，而且未来你会体会到，当调用环节发生了异常，你只要认真回忆一下异常在哪个环节，然后结合代码简单分析一下，很快就能分析出原因来。</p>
 <p>消费方的调用流程就是这么一步步调试分析出来的，那还有哪些典型的流程，可以按这个思路一步步调试分析出调用流程呢？我就列举三个比较典型的，你课后可以练练手。</p>
@@ -14846,7 +14846,7 @@
 <h2 id="_2">总结</h2>
 <p>今天，从一个被 @DubboReference 标识的常规成员变量开始，我们抛出了两个问题，变量的值类型在运行时是否是见到的类型，在消费方发起调用时会经过怎样的调用流程体系。</p>
 <p>带着这两个问题，我们用最普通的 Debug 调试方式，借鉴 12 字方针深入跟踪调用流程的源码，边分析、边绘图，步步为营，最终梳理出了消费方调用流程的大体框架。<strong>你还可以和“源码框架”中学过的分层模块联系到一起复习。</strong></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/77/ba/77d06f89cf3731bf52488f109a26c6ba.jpg?wh=5412x2895" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/77/ba/77d06f89cf3731bf52488f109a26c6ba.jpg?wh=5412x2895" /></p>
 <p>总结一下跟踪源码的 12 字方针。</p>
 <ul>
 <li>“不钻细节：只看流程。”代码虽然多，但我们不必研究每个细节，要先捡方法中的重要分支流程，一些提前返回的边边角角的流程一概忽略不看。</li>
@@ -14992,7 +14992,7 @@
 <li>步骤五，启动提供方。</li>
 </ul>
 <p>就能看到断点的到来了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/38/3a/3805f9a2e330d32a74e313ac5d3af23a.jpg?wh=4857x1770" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/38/3a/3805f9a2e330d32a74e313ac5d3af23a.jpg?wh=4857x1770" /></p>
 <p>通过对断点调用栈的分析，真相也就清晰了，原来 dubbo 框架引用了 curator 插件来与 zookeeper 进行交互，curator 插件会实时感知 zookeeper 服务端发送的事件变更，然后 curator 再通过一定的回调处理，就调用到了 RegistryChildListenerImpl 类中的 childChanged 方法。</p>
 <div><strong>精选留言（4）</strong></div>
 <ul>
@@ -15110,8 +15110,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

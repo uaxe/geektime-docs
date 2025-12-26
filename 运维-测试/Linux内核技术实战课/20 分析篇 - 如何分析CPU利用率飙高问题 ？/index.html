@@ -5930,7 +5930,7 @@
 <p>不过，在使用strace跟踪进程之前，我希望你可以先明白strace的工作原理，这也是我们这节课的目的：你不只要知道怎样使用工具，更要明白工具的原理，这样在出现问题时，你就能明白该工具是否适用了。</p>
 <h2 id="_2">了解工具的原理，不要局限于如何使用它</h2>
 <p>strace工具的原理如下图所示（我们以上面的那个命令为例来说明）：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bc/6f/bc04236262f16e0b69842dafd503616f.jpg?wh=4871%2A3293" title="strace基本原理" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bc/6f/bc04236262f16e0b69842dafd503616f.jpg?wh=4871%2A3293" title="strace基本原理" /></p>
 <p>我们从图中可以看到，对于正在运行的进程而言，strace可以attach到目标进程上，这是通过ptrace这个系统调用实现的（gdb工具也是如此）。ptrace的PTRACE_SYSCALL会去追踪目标进程的系统调用；目标进程被追踪后，每次进入syscall，都会产生SIGTRAP信号并暂停执行；追踪者通过目标进程触发的SIGTRAP信号，就可以知道目标进程进入了系统调用，然后追踪者会去处理该系统调用，我们用strace命令观察到的信息输出就是该处理的结果；追踪者处理完该系统调用后，就会恢复目标进程的执行。被恢复的目标进程会一直执行下去，直到下一个系统调用。</p>
 <p>你可以发现，目标进程每执行一次系统调用都会被打断，等strace处理完后，目标进程才能继续执行，这就会给目标进程带来比较明显的延迟。因此，在生产环境中我不建议使用该命令，如果你要使用该命令来追踪生产环境的问题，那就一定要做好预案。</p>
 <p>假设我们使用strace跟踪到，线程延迟抖动是由某一个系统调用耗时长导致的，那么接下来我们该怎么继续追踪呢？这就到了应用开发者和运维人员需要拓展分析边界的时刻了，对内核开发者来说，这才算是分析问题的开始。</p>
@@ -5964,7 +5964,7 @@ ffffffffa02ef3d0 T ksys_pread64
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>$ echo function_graph &gt; /sys/kernel/debug/tracing/current_trace
 </code></pre></div>
 <p>然后我们就可以通过/sys/kernel/debug/tracing/trace_pipe来查看它的输出了，下面就是我追踪到的耗时情况：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/68/fc/689eacfa3ef10c236221f1b2051ab5fc.png?wh=1352%2A1238" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/68/fc/689eacfa3ef10c236221f1b2051ab5fc.png?wh=1352%2A1238" /></p>
 <p>我们可以发现pread(2)有102ms是阻塞在io_schedule()这个函数里的，io_schedule()的意思是，该线程因I/O阻塞而被调度走，线程需要等待I/O完成才能继续执行。在function_graph里，我们同样也能看到<strong>pread</strong>**(<strong>2</strong>)**是如何一步步执行到io_schedule的，由于整个流程比较长，我在这里只把关键的调用逻辑贴出来：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>21)               |            __lock_page_killable() {
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>21)   0.073 us    |              page_waitqueue();
@@ -5982,7 +5982,7 @@ ffffffffa02ef3d0 T ksys_pread64
 <p>$ iostat -dxm 1</p>
 </blockquote>
 <p>追踪信息如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ca/04/ca94121ff716f75c171e2a3380d14d04.png?wh=1920%2A837" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ca/04/ca94121ff716f75c171e2a3380d14d04.png?wh=1920%2A837" /></p>
 <p>其中，sdb是业务pread(2)读取的磁盘所在的文件，通常情况下它的读写量很小，但是我们从上图中可以看到，磁盘利用率（%util）会随机出现比较高的情况，接近100%。而且avgrq-sz很大，也就是说出现了很多I/O排队的情况。另外，w/s比平时也要高很多。我们还可以看到，由于此时存在大量的I/O写操作，磁盘I/O排队严重，磁盘I/O利用率也很高。根据这些信息我们可以判断，之所以pread(2)读磁盘文件耗时较长，很可能是因为被写操作饿死导致的。因此，我们接下来需要排查到底是谁在进行写I/O操作。</p>
 <p>通过iotop观察I/O行为，我们发现并没有用户线程在进行I/O写操作，写操作几乎都是内核线程kworker来执行的，也就是说用户线程把内容写在了Page Cache里，然后kwoker将这些Page Cache中的内容再同步到磁盘中。这就涉及到了我们这门课程第一个模块的内容了：如何观测Page Cache的行为。</p>
 <h2 id="_4">自己写分析工具</h2>
@@ -6230,8 +6230,6 @@ show_state_filter(&amp;filter);
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

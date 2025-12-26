@@ -14429,15 +14429,15 @@
   <h1>06   Tomcat系统架构（下）：聊聊多层容器的设计</h1>
 
 <p>专栏上一期我们学完了连接器的设计，今天我们一起来看一下Tomcat的容器设计。先复习一下，上期我讲到了Tomcat有两个核心组件：连接器和容器，其中连接器负责外部交流，容器负责内部处理。具体来说就是，连接器处理Socket通信和应用层协议的解析，得到Servlet请求；而容器则负责处理Servlet请求。我们通过下面这张图来回忆一下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ee/d6/ee880033c5ae38125fa91fb3c4f8cad6.jpg?wh=1580%2A836" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ee/d6/ee880033c5ae38125fa91fb3c4f8cad6.jpg?wh=1580%2A836" /></p>
 <p>容器，顾名思义就是用来装载东西的器具，在Tomcat里，容器就是用来装载Servlet的。那Tomcat的Servlet容器是如何设计的呢？</p>
 <h2 id="_1">容器的层次结构</h2>
 <p>Tomcat设计了4种容器，分别是Engine、Host、Context和Wrapper。这4种容器不是平行关系，而是父子关系。下面我画了一张图帮你理解它们的关系。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cc/ed/cc968a11925591df558da0e7393f06ed.jpg?wh=1172%2A718" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cc/ed/cc968a11925591df558da0e7393f06ed.jpg?wh=1172%2A718" /></p>
 <p>你可能会问，为什么要设计成这么多层次的容器，这不是增加了复杂度吗？其实这背后的考虑是，<strong>Tomcat通过一种分层的架构，使得Servlet容器具有很好的灵活性。</strong></p>
 <p>Context表示一个Web应用程序；Wrapper表示一个Servlet，一个Web应用程序中可能会有多个Servlet；Host代表的是一个虚拟主机，或者说一个站点，可以给Tomcat配置多个虚拟主机地址，而一个虚拟主机下可以部署多个Web应用程序；Engine表示引擎，用来管理多个虚拟站点，一个Service最多只能有一个Engine。</p>
 <p>你可以再通过Tomcat的<code>server.xml</code>配置文件来加深对Tomcat容器的理解。Tomcat采用了组件化的设计，它的构成组件都是可配置的，其中最外层的是Server，其他组件按照一定的格式要求配置在这个顶层容器中。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/82/66/82b3f97aab5152dd5fe74e947db2a266.jpg?wh=1230%2A578" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/82/66/82b3f97aab5152dd5fe74e947db2a266.jpg?wh=1230%2A578" /></p>
 <p>那么，Tomcat是怎么管理这些容器的呢？你会发现这些容器具有父子关系，形成一个树形结构，你可能马上就想到了设计模式中的组合模式。没错，Tomcat就是用组合模式来管理这些容器的。具体实现方法是，所有容器组件都实现了Container接口，因此组合模式可以使得用户对单容器对象和组合容器对象的使用具有一致性。这里单容器对象指的是最底层的Wrapper，组合容器对象指的是上面的Context、Host或者Engine。Container接口定义如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>public interface Container extends Lifecycle {
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>public void setName(String name);
@@ -14456,7 +14456,7 @@
 <p>读到这里你可能感到有些抽象，接下来我通过一个例子来解释这个定位的过程。</p>
 <p>假如有一个网购系统，有面向网站管理人员的后台管理系统，还有面向终端客户的在线购物系统。这两个系统跑在同一个Tomcat上，为了隔离它们的访问域名，配置了两个虚拟域名：<code>manage.shopping.com</code>和<code>user.shopping.com</code>，网站管理人员通过<code>manage.shopping.com</code>域名访问Tomcat去管理用户和商品，而用户管理和商品管理是两个单独的Web应用。终端客户通过<code>user.shopping.com</code>域名去搜索商品和下订单，搜索功能和订单管理也是两个独立的Web应用。</p>
 <p>针对这样的部署，Tomcat会创建一个Service组件和一个Engine容器组件，在Engine容器下创建两个Host子容器，在每个Host容器下创建两个Context子容器。由于一个Web应用通常有多个Servlet，Tomcat还会在每个Context容器里创建多个Wrapper子容器。每个容器都有对应的访问路径，你可以通过下面这张图来帮助你理解。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/be/96/be22494588ca4f79358347468cd62496.jpg?wh=1564%2A1140" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/be/96/be22494588ca4f79358347468cd62496.jpg?wh=1564%2A1140" /></p>
 <p>假如有用户访问一个URL，比如图中的<code>http://user.shopping.com:8080/order/buy</code>，Tomcat如何将这个URL定位到一个Servlet呢？</p>
 <p><strong>首先，根据协议和端口号选定Service和Engine。</strong></p>
 <p>我们知道Tomcat的每个连接器都监听不同的端口，比如Tomcat默认的HTTP连接器监听8080端口、默认的AJP连接器监听8009端口。上面例子中的URL访问的是8080端口，因此这个请求会被HTTP连接器接收，而一个连接器是属于一个Service组件的，这样Service组件就确定了。我们还知道一个Service组件里除了有多个连接器，还有一个容器组件，具体来说就是一个Engine容器，因此Service确定了也就意味着Engine也确定了。</p>
@@ -14486,7 +14486,7 @@
 <p>没错，Pipeline中有addValve方法。Pipeline中维护了Valve链表，Valve可以插入到Pipeline中，对请求做某些处理。我们还发现Pipeline中没有invoke方法，因为整个调用链的触发是Valve来完成的，Valve完成自己的处理后，调用<code>getNext.invoke</code>来触发下一个Valve调用。</p>
 <p>每一个容器都有一个Pipeline对象，只要触发这个Pipeline的第一个Valve，这个容器里Pipeline中的Valve就都会被调用到。但是，不同容器的Pipeline是怎么链式触发的呢，比如Engine中Pipeline需要调用下层容器Host中的Pipeline。</p>
 <p>这是因为Pipeline中还有个getBasic方法。这个BasicValve处于Valve链表的末端，它是Pipeline中必不可少的一个Valve，负责调用下层容器的Pipeline里的第一个Valve。我还是通过一张图来解释。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b0/ca/b014ecce1f64b771bd58da62c05162ca.jpg?wh=1550%2A1160" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b0/ca/b014ecce1f64b771bd58da62c05162ca.jpg?wh=1550%2A1160" /></p>
 <p>整个调用过程由连接器中的Adapter触发的，它会调用Engine的第一个Valve：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>// Calling the container
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>connector.getService().getContainer().getPipeline().getFirst().invoke(request, response);
@@ -14681,8 +14681,6 @@ contextList 尽管使用volatile修饰的，可以防止编译指令重拍序，
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

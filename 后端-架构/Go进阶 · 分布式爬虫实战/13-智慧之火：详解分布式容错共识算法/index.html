@@ -14898,7 +14898,7 @@
 <h2 id="raft">Raft算法</h2>
 <p>总的来说，Paxos理解起来还是比较困难，在工程上也比较难以实现，所以不太常用，Raft算法就是在这一背景下诞生的。Raft算法简单、容易理解、容易实现，已经成为现代多数分布式系统（例如etcd、TiDB）采用的算法。</p>
 <p>Raft算法实现了一种复制状态机。每个分布式的状态机中存储了一份包含命令序列的日志文件，这些文件通过复制的形式传播到其他节点中。每个日志包含相同的命令，并且顺序也相同。状态机会按顺序执行这些命令并产生相同的状态，最终所有的状态机都将达到一个确定的最终状态。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b5/8e/b5bc1de0e467146095c896873949408e.jpg?wh=1920x899" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b5/8e/b5bc1de0e467146095c896873949408e.jpg?wh=1920x899" /></p>
 <p>在Raft算法中，每一个节点会维护一份复制日志（Replicated Log），复制日志中存储了按顺序排列的条目（Entry），用户执行的每一个操作都会生成日志中的一个条目，稍后这个条目会通过节点之间的交流复制到所有节点上。</p>
 <p>如果一个条目是被大多数节点认可的，那么这种条目被称为Committed Entry，这也是节点唯一会执行的条目类型。各个节点只要按顺序执行复制日志中的Committed Entry，最终就会到达相同的状态。这样，即便节点崩溃后苏醒，也可以快速恢复到和其他节点相同的状态。</p>
 <p>总结一下Raft算法的核心思想就是，保证每个节点具有相同的复制日志，进而保证所有节点的最终状态是一致的。</p>
@@ -14924,7 +14924,7 @@
 <p>当Entry被复制到大多数节点之后，也就是被大部分的节点认可之后，这个Entry的状态就变为Committed。Raft算法会保证 Committed Entry 一定能够被所有节点的状态机执行。</p>
 <p>一旦Follower通过RPC协议知道某一个Entry被commit了，Follower就可以按顺序执行log中的Committed Entry了。</p>
 <p>如图所示，我们可以把log理解为Entry的集合。Entry中包含了Command命令（例如x←3），Entry所在的Term（方框里面的数字），以及每一个Entry的顺序编号（最上面标明的log index，顺序递增）。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/yy/9a/yy1600eec138e75b747d967d7bf7e49a.jpg?wh=1920x1057" title="异常处理" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/yy/9a/yy1600eec138e75b747d967d7bf7e49a.jpg?wh=1920x1057" title="异常处理" /></p>
 <p>但这里还有一个重要的问题，就是Raft节点在日志复制的过程中需要保证日志数据的一致性。要实现这一点，需要确认下面几个关键的属性：</p>
 <ul>
 <li>如果不同节点的log中的Entry有相同的index和Term, 那么它们存储的一定是相同的Command；</li>
@@ -14932,13 +14932,13 @@
 </ul>
 <p>接下来我们就来看看，Raft算法是怎么在不可靠的分布式环境中保证数据一致性的。</p>
 <p>在实际生产过程中，Raft算法可能会因为分布式系统中遇到的难题（例如节点崩溃），出现多种数据不一致的情况。如下所示，a → f分别代表Follower的复制日志中可能遇到的情况，方框中的方格表示当前节点复制日志中每一个Entry对应的Term序号。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e1/5e/e1df085a623977904b5c28aaf36e785e.jpg?wh=1920x1339" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e1/5e/e1df085a623977904b5c28aaf36e785e.jpg?wh=1920x1339" /></p>
 <p>a → e的情况你可以想一想什么时候会发生，我在这里重点解释一下f这种情况，因为f看起来是最奇怪的。</p>
 <p>f这种情况可能是这样的：f是Term 2的Leader, 它添加Entry到log中之后，Entry还没有复制到其他节点，也就是说，还没等到commit就崩溃了。但是它快速恢复之后又变为了Term 3 的Leader， 再次添加Entry到log之后，没有commit又崩溃了。当f再次苏醒时，世界已然发生了巨变。</p>
 <p>所以我们可以看到，在正常的情况下，Raft可以满足上面的两个属性，但是异常情况下，这种情况就可能被打破，出现数据不一致的情况。为了让数据保持最终一致，Raft算法会强制要求Follower的复制日志和Leader的复制日志一致，这样一来，Leader就必须要维护一个Entry index了。在这个Entry index之后的都是和Follower不相同的Entry，在这个Entry之前的都是和Follower一致的Entry。</p>
 <p>Leader会为每一个Follower维护一份next index数组，里面标志了将要发送给Follower的下一个Entry的序号。最后，Follower会删除掉所有不同的Entry，并保留和Leader一致的复制日志，这一过程都会通过AppendEntries RPC 执行完毕。</p>
 <p>不过，仅仅通过上面的措施还不足以保证数据的一致性。想想下图这个例子：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c7/c6/c72619cb8cacafcd79f28aa2b98c05c6.jpg?wh=1920x1120" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c7/c6/c72619cb8cacafcd79f28aa2b98c05c6.jpg?wh=1920x1120" /></p>
 <p>从这张图可以看出，一个已经被Committed的Entry是有可能被覆盖掉的。例如在a阶段，节点s1成为了Leader，Entry 2还没有成为Committed。在b阶段，s1崩溃，s5成为了Leader ，添加Entry到自己的log中，但是仍然没有commit。在c阶段，s5崩溃，s1成为了Leader，而且在这个过程中Entry 2成为了Committed Entry。接着在d阶段s1崩溃，s5成为了Leader，它会将本已commit的Entry 2给覆盖掉。但我们真正想期望的是e这种情况。</p>
 <p>怎么解决这个问题呢？Raft使用了一种简单的方法。Raft为Leader添加了下面几个限制：</p>
 <ul>
@@ -15074,8 +15074,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

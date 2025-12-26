@@ -14238,7 +14238,7 @@
 <p>TCP解决乱序问题的方案是在发送方在每个消息里包含了一个<strong>自增ID</strong>。接收方将所有收到的乱序消息先放到一个<strong>消息缓冲区</strong>。如果自己等待的ID出现在了缓冲区，再从缓冲区里将这个消息捞出来。</p>
 <p>在一般情况下，TCP自带的方案就能很好地解决乱序问题。但是在云计算的处理框架下，消息的发送方可能会通过多个TCP链接来给接收方发消息。这样的话虽然单个TCP内消息是不乱序的，但是多个TCP链接之间还是有可能乱序。</p>
 <p>举个例子。发送端和接收端中间有两个路由，分别是路由A和路由B。发送端一前一后分别给这两个路由发了一个消息。这两个路由将消息传递给接收端的速度不一样，最终导致消息的接收顺序错位。示意图如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c2/c6/c2faf539e9d0da7d2ccbf3977391d6c6.png?wh=1920%2A968" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c2/c6/c2faf539e9d0da7d2ccbf3977391d6c6.png?wh=1920%2A968" /></p>
 <p>解决乱序的方法很简单。<strong>发送方和接收方之间可以实现和TCP完全一样的乱序解决方案，也就是通过自增ID和消息缓冲区来解决乱序。</strong></p>
 <p>从理论上来讲，你需要的不乱序其实是要求系统具有线性一致性（linearizability）。这个内容，我们会在<a href="https://time.geekbang.org/column/article/335994">第13节课</a>“多机无容灾有哪几种不同的一致性实现”里给你详细讲解。</p>
 <h4 id="_5">消息投放至少一次</h4>
@@ -14256,7 +14256,7 @@
 <p>5.下游系统收到消息后返回回执消息。</p>
 <p>6.消息中间件收到回执消息后，改变数据库中的回执消息位。</p>
 <p>架构的简单示意图如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/52/59/5261c6443d989b96f95db138dff1bf59.jpg?wh=2106%2A2230" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/52/59/5261c6443d989b96f95db138dff1bf59.jpg?wh=2106%2A2230" /></p>
 <p>虽然你很可能一眼就看出来，上面这个架构能保证至少一次的要求。不过，我还是要给你说说里面蕴含的一些道理。</p>
 <p>至少一次指的是下游至少收到了一次消息，这是下游系统的客观状态。这个状态和上游系统无关，因此我们需要保证就算上游系统出了问题，系统也能正确记录下游状态。这种出了问题还能正确记录状态的能力，我们叫作<strong>数据库事务</strong>。这就是为什么我们需要用具有事务能力的数据库来存储回执状态。</p>
 <p>另外，回执消息还有一个数学特性叫作<strong>幂等性</strong>（idempotency）。幂等性指的是同一个操作执行多次的结果和执行一次一样。我们将回执位设置为成功多次和一次的结果是完全相同的，所以回执位的多次更新不会改变逻辑的正确性。正因为<strong>有了事务和幂等性这两个保证，上面的架构才能保证消息投放至少一次。</strong></p>
@@ -14271,15 +14271,15 @@
 <p>5.下游的业务系统处理完成后，通知消息中间件。</p>
 <p>6.消息中间件将消息变为已执行状态。</p>
 <p>架构的简单示意图如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8c/dc/8c4853c9f9e6061fe3b81db1d7yyacdc.jpg?wh=2106%2A2230" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8c/dc/8c4853c9f9e6061fe3b81db1d7yyacdc.jpg?wh=2106%2A2230" /></p>
 <p>和上游系统的逻辑一样，<strong>下游系统也是通过事务和幂等性来保证消息反馈的正确性。</strong></p>
 <p><strong>上下游结合</strong></p>
 <p>前面我们分别学习了上游系统和下游系统应该分别如何处理消息。如果我们将两者的架构图结合起来看的话，就是下面这个样子：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3e/3d/3eaba118bdd96e512a7bb51afb1b323d.jpg?wh=2106%2A2730" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3e/3d/3eaba118bdd96e512a7bb51afb1b323d.jpg?wh=2106%2A2730" /></p>
 <p>这个架构有一个隐含的假设：上下游分别由不同的人来设计。所以上下游系统需要在假设对方是正确的情况下，各自维护自己的逻辑。那我们可以再想想，如果有人同时设计上下游两个系统，有没有可能将架构设计得更加简洁呢？</p>
 <p>你可能已经想到了。只需要将上下游的消息中间件剥离出来，然后合并在一起，这样系统就分成了3个组件：上下游系统和消息系统。</p>
 <p>这时候上下游之间也需要6步来完成所有的交互，比之前两者分开的情况节省了4步。当中也有一些消息检查和重发的机制，你可以仔细想想都在哪些地方。合并之后的架构图如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0b/bb/0b738df1f564f7f8840c3fd858fa92bb.jpg?wh=2076%2A2236" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0b/bb/0b738df1f564f7f8840c3fd858fa92bb.jpg?wh=2076%2A2236" /></p>
 <p>上面这个架构图有很多名字，比如消息系统、企业总线等等。我们在开篇词提到过要透过现象看本质。你需要重点关注它究竟解决了什么问题，为什么可以解决这些问题，以及在不同环境下的不同使用方法。</p>
 <h4 id="_6">消息投放至多一次</h4>
 <p>刚才我们在保证消息投放至少一次的时侯，也制造了一个问题，那就是下游系统有可能收到多条同样的消息。</p>
@@ -14316,7 +14316,7 @@
 <p>事中的正确性要通过软件工程来解决，而不是通过架构设计。金融系统推荐使用函数式编程语言。在实现过程中还需要注意计算精度的问题。</p>
 <p>事后需要验证结果的正确性。验证的时候尽量不要和之前的计算有任何关系。一般验证1次就可以，多的可以验证3次。验证的时间可以选择实时验证，或者异步验证。如果采用异步验证，需要业务方对应的业务补偿能力。</p>
 <p><strong>总之，单个组件的正确性并不能保证整个系统的正确性。我们需要在架构设计上将组件之间不确定的交互行为变得确定，同时在软件工程实现上要选择一些不容易出错的解决方案。</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2f/29/2f60e47ea87fbce6b50ec01271344529.jpg?wh=1920%2A1519" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2f/29/2f60e47ea87fbce6b50ec01271344529.jpg?wh=1920%2A1519" /></p>
 <h2 id="_12">思考题</h2>
 <p>我们在讲如何保证消息至多投放一次的时候，说过可以用数据库来做去重工作。不过数据库的容量一般是有限的。</p>
 <p>假如你设计的系统预期会运行10年以上。数据库由于存储不了这么久的数据，一定会将过期不用的数据进行归档后删掉。这会造成你用来去重的数据有一部分会不见了。这样如果来了一个请求，这个请求恰好用了被删掉的ID，系统就会重复处理。那么你应该如何做呢？</p>
@@ -14440,8 +14440,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

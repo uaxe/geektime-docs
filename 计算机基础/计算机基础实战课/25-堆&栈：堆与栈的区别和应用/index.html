@@ -6534,11 +6534,11 @@
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>sudo cat /proc/59916/smaps &gt; main.map
 </code></pre></div>
 <p>上述命令是我机器上的情况，59916是我运行程序后给出的pid，上述命令就是把/proc/59916/maps 或者 smaps 读取输出到main.map文件中，我们打开main.map文件，看到的情况如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8c/01/8c9e14c740965f366082a3e1ea83ae01.jpg?wh=1071x548" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8c/01/8c9e14c740965f366082a3e1ea83ae01.jpg?wh=1071x548" /></p>
 <p>对照截图我们可以看到，每一行都表示一个应用进程虚拟内存中的一个区段。第一列表示该区间的起始、结束虚拟地址。第二列是该区段的属性，r代表读、w代表写、x代表执行、p代表私有。最后一列是该区段的内容属于哪个文件。</p>
 <p>我们发现，一个应用程序运行之后，它的虚拟内存中不仅仅有它自身的指令和数据，main.elf一共有5个区段，包含了text、data、bss，还有其它的文件内容，比如共享动态链接库。共享动态链接库也是一种程序，可以通过应用调用其功能接口。</p>
 <p>同时，我们也注意到了后面要详细探索的堆、栈，我为你画幅图总结一下，如下所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7d/7d/7db4a086408e8b50dbcc2a5833f5f17d.jpg?wh=1920x1881" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7d/7d/7db4a086408e8b50dbcc2a5833f5f17d.jpg?wh=1920x1881" /></p>
 <p>应用程序自身的段，取决于编译器和链接器的操作，堆段、内存映射段、栈段、环境变量和命令行参数段，这取决于操作系统的定义。需要注意的是，<strong>堆段和栈段的大小都是动态增加和减少的、且增长方向相反。</strong>堆是向高地址方向增长，栈是向低地址方向增长。这就是一个应用程序被操作系统加载运行后的虚拟内存布局。</p>
 <h3 id="_2">堆</h3>
 <p>下面我们将重点关注堆和栈。我们经常把堆栈作为一个名词，连在一起说，但这其实并不准确。因为堆是堆而栈是栈，这是两个不同的概念，不可以混为一谈。</p>
@@ -6546,10 +6546,10 @@
 <p>不过，我们今天要关注的重点，是操作系统为应用程序建立的堆。所以这节课要探讨的“堆”，不具有数据结构中对堆定义的完整特性，你可以只把它看作一个可以动态增加和减少大小的数组对象。</p>
 <p>简单点说，堆就是<strong>应用程序在运行时刻调用malloc函数时，动态分配的一块儿内存区域</strong>，有了它，就能满足应用程序在运行时动态分配内存空间，从而<strong>存放数据</strong>的需求了。</p>
 <p>你可以结合后面的示意图来理解。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/22/02/229fb6b67777465bbe8548ca5cdbde02.jpg?wh=1920x1054" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/22/02/229fb6b67777465bbe8548ca5cdbde02.jpg?wh=1920x1054" /></p>
 <p>由上图可以看出，堆其实是虚拟内存空间中一个段，由堆的开始地址和结束地址控制其大小，有一个堆指针指向未分配的第一个字节。所以，堆在本质上是指应用程序在运行过程中进行动态分配的内存区域，堆的管理通常在库函数中完成。</p>
 <p>之所以叫做堆，是因为通常会使用堆这种数据结构来管理分配出来的这块内存，但也可以使用更简单的方法来管理，下面让我们看看Linux是如何对堆区进行操作的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/29/fc/29b699733aa2756ee42a702838a5eafc.jpg?wh=1920x1039" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/29/fc/29b699733aa2756ee42a702838a5eafc.jpg?wh=1920x1039" /></p>
 <p>关于如何得到上图右边的map文件，可以参考前面应用程序虚拟内存布局的那部分内容。</p>
 <p>上图代码中的sbrk函数是库函数，它会调用Linux内核中的brk系统调用。这个brk系统调用，用于增加或者减少进程的mm_struct中的堆区指针brk。</p>
 <p>由于堆区指针始终指向未分配的堆区空间，brk系统调用会首先保存当前的brk到临时的tmpbrk，然后让当前brk加上传进来的大小，赋给brk，最后返回tmpbrk，这样就实现了堆区内存的分配。你可以看到图中三次调用sbrk函数返回的地址，确实落在应用程序的堆区内。</p>
@@ -6565,7 +6565,7 @@
 <p>我们先来看看栈的本质是什么，再分析它怎么用。</p>
 <p>栈作为一种数据结构，相当于<strong>只能在一端进行插入和删除操作的特殊线性表</strong>。它按照<strong>后进先出</strong>的原则存储数据，先进入的数据被压入栈底，最后进入的数据在栈顶，需要读数据的时候从栈顶开始弹出数据，最后进入的数据会被首先读出来。</p>
 <p>你可以把栈想象成一个桶，你往桶里压入东西就是压栈，你从桶里拿出东西就是出栈。但是要记住，你只能从桶的最上面开始拿，这就是栈。如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d4/a0/d480764f8133647eb02c689db135a5a0.jpg?wh=1920x1013" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d4/a0/d480764f8133647eb02c689db135a5a0.jpg?wh=1920x1013" /></p>
 <p>由于CPU的硬件特性，导致栈是从内存高地址向内存低地址增长的，所以实际应用程序中的栈更像是一个倒立的桶，栈其实也像一个反过来的堆。</p>
 <p>栈有两个基本的操作：压栈和出栈，有时也称为压入和弹出。压入操作就是栈指针减去一个栈中对象的大小，然后将对象写入栈指针对应的内存空间中；而弹出是将栈指针指向的对象读出，然后将栈指针加上一个栈中对象的大小，从而指向栈中的前一个对象。</p>
 <p>前面我们说过栈是和计算机硬件相关的，那是因为CPU很多指令都依赖于栈，例如x86 CPU的 call、ret、push、pop等指令，push和pop是栈的压入和弹出指令，call是函数调用指令，它把下一条指令的地址压入栈中，而ret指令则将call指令压入栈中的地址弹出，实现函数返回。</p>
@@ -6591,7 +6591,7 @@
 <a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>}
 </code></pre></div>
 <p>按照前面的描述，C函数的局部变量是放在栈中的，现在我们运行这个程序看一看，运行截图如下所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/5f/47/5f2a4f50721198c8b2df286d4a291947.jpg?wh=1920x1038" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5f/47/5f2a4f50721198c8b2df286d4a291947.jpg?wh=1920x1038" /></p>
 <p>由上图可以看出，两个函数的三个变量都落在了应用程序的栈区，我们可以用课程开头的命令得到图中的map文件，就可以看到应用程序栈区的地址区间的范围了。</p>
 <p>再结合前面说的栈区空间是从高地址向低地址方向增长继续分析。我们首先看到的是stacktest1函数的三个变量，其地址从高到低每次会下降8个字节，这就是因为long类型在64位系统上占用8字节的空间。然后是stacktest2函数的三个变量，它们的地址要远低于stacktest1函数的三个变量的地址，这是因为stacktest2函数是被stacktest1函数调用的。</p>
 <p>现在我们已经知道了，栈是现代计算机运行不可缺少的基础数据结构。本质上，栈就是动态增长的内存空间，它遵守先进后出的原则，在此基础上就定义了两个操作：压入和弹出。</p>
@@ -6601,7 +6601,7 @@
 <p>然后，我们重点研究了堆，发现应用程序虚拟内存空间的堆区，跟数据结构里的堆并不是一回事儿，它只是<strong>一个可以从低地址向高地址动态增长的内存空间，用于应用程序动态分配内存</strong>。</p>
 <p>最后，我们探讨了栈。硬件、应用程序、高级语言编译器，都需要栈。它是一种地址由高向低动态增长的内存空间，并且定义了压栈、出栈两个操作，遵守<strong>先进后出</strong>的原则。C语言的运行环境必须要有栈，栈是现代计算机运行的基础数据结构。</p>
 <p>这节课的导图如下，供你参考回顾。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/58/74/584080cb0699541b20a0b770ca7d2574.jpg?wh=1920x1805" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/58/74/584080cb0699541b20a0b770ca7d2574.jpg?wh=1920x1805" /></p>
 <h3 id="_5">思考题</h3>
 <p>你觉得堆、栈空间是虚拟内存空间吗？如果是，请问是在什么时候分配的物理内存呢？</p>
 <p>期待你在留言区记录自己的思考或疑问，积极参与是提升学习效果的秘诀。如果觉得这节课不错，别忘了分享给更多朋友。</p>
@@ -6732,8 +6732,6 @@ Q5：本课中所讲的5个段，对于C程序来说是这样。C++程序也是�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

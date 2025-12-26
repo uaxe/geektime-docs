@@ -6319,19 +6319,19 @@
 <p><strong>握手协议</strong>（Handshake Protocol）是TLS里最复杂的子协议，要比TCP的SYN/ACK复杂的多，浏览器和服务器会在握手过程中协商TLS版本号、随机数、密码套件等信息，然后交换证书和密钥参数，最终双方协商得到会话密钥，用于后续的混合加密系统。</p>
 <p>最后一个是<strong>变更密码规范协议</strong>（Change Cipher Spec Protocol），它非常简单，就是一个“通知”，告诉对方，后续的数据都将使用加密保护。那么反过来，在它之前，数据都是明文的。</p>
 <p>下面的这张图简要地描述了TLS的握手过程，其中每一个“框”都是一个记录，多个记录组合成一个TCP包发送。所以，最多经过两次消息往返（4个消息）就可以完成握手，然后就可以在安全的通信环境里发送HTTP报文，实现HTTPS协议。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/69/6c/69493b53f1b1d540acf886ebf021a26c.png?wh=2093%2A1865" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/69/6c/69493b53f1b1d540acf886ebf021a26c.png?wh=2093%2A1865" /></p>
 <h2 id="_1">抓包的准备工作</h2>
 <p>这次我们在实验环境里测试TLS握手的URI是“/26-1”，看了上面的图你就可以知道，TLS握手的前几个消息都是明文的，能够在Wireshark里直接看。但只要出现了“Change Cipher Spec”，后面的数据就都是密文了，看到的也就会是乱码，不知道究竟是什么东西。</p>
 <p>为了更好地分析TLS握手过程，你可以再对系统和Wireshark做一下设置，让浏览器导出握手过程中的秘密信息，这样Wireshark就可以把密文解密，还原出明文。</p>
 <p>首先，你需要在Windows的设置里新增一个系统变量“<strong>SSLKEYLOGFILE</strong>”，设置浏览器日志文件的路径，比如“D:\http_study\www\temp\sslkey.log”（具体的设置过程就不详细说了，可以在设置里搜索“系统变量”）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/70/42/70b36338611d5a249a7d2fc448f06d42.png?wh=1617%2A923" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/70/42/70b36338611d5a249a7d2fc448f06d42.png?wh=1617%2A923" /></p>
 <p>然后在Wireshark里设置“Protocols-TLS”（较早版本的Wireshark里是“SSL”），在“(Pre)-Master-Secret log filename”里填上刚才的日志文件。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/02/e7/0274e31e74e92b61892ec11cc3cd58e7.png?wh=813%2A589" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/02/e7/0274e31e74e92b61892ec11cc3cd58e7.png?wh=813%2A589" /></p>
 <p>设置好之后，过滤器选择“<strong>tcp port 443</strong>”，就可以抓到实验环境里的所有HTTPS数据了。</p>
 <p>如果你觉得麻烦也没关系，GitHub上有抓好的包和相应的日志，用Wireshark直接打开就行。</p>
 <h2 id="ecdhe">ECDHE握手过程</h2>
 <p>刚才你看到的是握手过程的简要图，我又画了一个详细图，对应Wireshark的抓包，下面我就用这个图来仔细剖析TLS的握手过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9c/1e/9caba6d4b527052bbe7168ed4013011e.png?wh=870%2A1979" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9c/1e/9caba6d4b527052bbe7168ed4013011e.png?wh=870%2A1979" /></p>
 <p>在TCP建立连接之后，浏览器会首先发一个“<strong>Client Hello</strong>”消息，也就是跟服务器“打招呼”。里面有客户端的版本号、支持的密码套件，还有一个<strong>随机数（Client Random）</strong>，用于后续生成会话密钥。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Handshake Protocol: Client Hello
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>Version: TLS 1.2 (0x0303)
@@ -6388,7 +6388,7 @@
 <p>第一个，使用ECDHE实现密钥交换，而不是RSA，所以会在服务器端发出“Server Key Exchange”消息。</p>
 <p>第二个，因为使用了ECDHE，客户端可以不用等到服务器发回“Finished”确认握手完毕，立即就发出HTTP报文，省去了一个消息往返的时间浪费。这个叫“<strong>TLS False Start</strong>”，意思就是“抢跑”，和“TCP Fast Open”有点像，都是不等连接完全建立就提前发应用数据，提高传输的效率。</p>
 <p>实验环境在440端口（<a href="https://www.chrono.com:440/26-1">https://www.chrono.com:440/26-1</a>）实现了传统的RSA密钥交换，没有“False Start”，你可以课后自己抓包看一下，这里我也画了个图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cb/d2/cb9a89055eadb452b7835ba8db7c3ad2.png?wh=1000%2A1651" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cb/d2/cb9a89055eadb452b7835ba8db7c3ad2.png?wh=1000%2A1651" /></p>
 <p>大体的流程没有变，只是“Pre-Master”不再需要用算法生成，而是客户端直接生成随机数，然后用服务器的公钥加密，通过“<strong>Client Key Exchange</strong>”消息发给服务器。服务器再用私钥解密，这样双方也实现了共享三个随机数，就可以生成主密钥。</p>
 <h2 id="_2">双向认证</h2>
 <p>到这里TLS握手就基本讲完了。</p>
@@ -6410,7 +6410,7 @@
 <li>你能画出双向认证的流程图吗？</li>
 </ol>
 <p>欢迎你把自己的学习体会写在留言区，与我和其他同学一起讨论。如果你觉得有所收获，也欢迎把文章分享给你的朋友。</p>
-<p><img alt="unpreview" src="https://static001.geekbang.org/resource/image/93/14/93d002084d9bf8283bab3e34e3f4bf14.png?wh=1769%2A3148" /></p>
+<p><img alt="unpreview" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/93/14/93d002084d9bf8283bab3e34e3f4bf14.png?wh=1769%2A3148" /></p>
 <div><strong>精选留言（15）</strong></div>
 <ul>
 <li><span>彩色的沙漠</span> 👍（92） 💬（25）<p>浏览留言区，留言区同学和我有一样的疑问“Client Params 和 Server Params 都可以被截获，为何中间人没法通过这两个信息计算 Pre-Master Secret 呢？”
@@ -6629,8 +6629,6 @@ rsa, 客户端产生随机数，rsa公钥加密传到对端，这种方式不具
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

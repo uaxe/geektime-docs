@@ -14150,15 +14150,15 @@
 <h2 id="_1">整体架构</h2>
 <p>在详细介绍etcd的认证、鉴权实现细节之前，我先给你从整体上介绍下etcd鉴权体系。</p>
 <p>etcd鉴权体系架构由控制面和数据面组成。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/30/4e/304257ac790aeda91616bfe42800364e.png?wh=1920%2A420" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/30/4e/304257ac790aeda91616bfe42800364e.png?wh=1920%2A420" /></p>
 <p>上图是是etcd鉴权体系控制面，你可以通过客户端工具etcdctl和鉴权API动态调整认证、鉴权规则，AuthServer收到请求后，为了确保各节点间鉴权元数据一致性，会通过Raft模块进行数据同步。</p>
 <p>当对应的Raft日志条目被集群半数以上节点确认后，Apply模块通过鉴权存储(AuthStore)模块，执行日志条目的内容，将规则存储到boltdb的一系列“鉴权表”里面。</p>
 <p>下图是数据面鉴权流程，由认证和授权流程组成。认证的目的是检查client的身份是否合法、防止匿名用户访问等。目前etcd实现了两种认证机制，分别是密码认证和证书认证。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2c/55/2c8f90fd1a30fab9b9a88ba18c24c555.png?wh=1920%2A1136" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2c/55/2c8f90fd1a30fab9b9a88ba18c24c555.png?wh=1920%2A1136" /></p>
 <p>认证通过后，为了提高密码认证性能，会分配一个Token（类似我们生活中的门票、通信证）给client，client后续其他请求携带此Token，server就可快速完成client的身份校验工作。</p>
 <p>实现分配Token的服务也有多种，这是TokenProvider所负责的，目前支持SimpleToken和JWT两种。</p>
 <p>通过认证后，在访问MVCC模块之前，还需要通过授权流程。授权的目的是检查client是否有权限操作你请求的数据路径，etcd实现了RBAC机制，支持为每个用户分配一个角色，为每个角色授予最小化的权限。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8d/8a/8d18f8877ea7c8fbyybebae236a8688a.png?wh=1920%2A1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8d/8a/8d18f8877ea7c8fbyybebae236a8688a.png?wh=1920%2A1125" /></p>
 <p>好了，etcd鉴权体系的整个流程讲完了，下面我们就以<a href="https://time.geekbang.org/column/article/336766">第三节课</a>中提到的put hello命令为例，给你深入分析以上鉴权体系是如何进行身份认证来防止匿名访问的，又是如何实现细粒度的权限控制以防止越权访问的。</p>
 <h2 id="_2">认证</h2>
 <p>首先我们来看第一个问题，如何防止匿名用户访问你的etcd数据呢？</p>
@@ -14254,7 +14254,7 @@
 <p>在etcd中，如果你使用了HTTPS协议并启用了client证书认证(--client-cert-auth)，它会取CN字段作为用户名，在我们的案例中，alice就是client发送请求的用户名。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>openssl x509 -noout -text -in client.pem
 </code></pre></div>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/55/94/55e03b4353c9a467493a3922cf68b294.png?wh=1144%2A854" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/55/94/55e03b4353c9a467493a3922cf68b294.png?wh=1144%2A854" /></p>
 <p>证书认证在稳定性、性能上都优于密码认证。</p>
 <p>稳定性上，它不存在Token过期、使用更加方便、会让你少踩坑，避免了不少Token失效而触发的Bug。性能上，证书认证无需像密码认证一样调用昂贵的密码认证操作(Authenticate请求)，此接口支持的性能极低，后面实践篇会和你深入讨论。</p>
 <h2 id="_7">授权</h2>
@@ -14266,7 +14266,7 @@
 <h3 id="rbac">RBAC</h3>
 <p>什么是基于角色权限的控制系统(RBAC)呢？</p>
 <p>它由下图中的三部分组成，User、Role、Permission。User表示用户，如alice。Role表示角色，它是权限的赋予对象。Permission表示具体权限明细，比如赋予Role对key范围在[key，KeyEnd]数据拥有什么权限。目前支持三种权限，分别是READ、WRITE、READWRITE。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ee/60/ee6e0a9a63aeaa2d3505ab1a37360760.png?wh=1786%2A1134" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ee/60/ee6e0a9a63aeaa2d3505ab1a37360760.png?wh=1786%2A1134" /></p>
 <p>下面我们通过etcd的RBAC机制，给alice用户赋予一个可读写[hello,helly]数据范围的读写权限， 如何操作呢?</p>
 <p>按照上面介绍的RBAC原理，首先你需要创建一个role，这里我们命名为admin，然后新增了一个可读写[hello,helly]数据范围的权限给admin角色，并将admin的角色的权限授予了用户alice。详细如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>$ #创建一个admin role
@@ -14428,8 +14428,6 @@ The range can be specified as an interval [start-key, end-key) where start-key s
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

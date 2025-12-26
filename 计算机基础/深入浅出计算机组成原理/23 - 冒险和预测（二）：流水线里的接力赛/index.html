@@ -6638,14 +6638,14 @@
 <h2 id="nop">NOP操作和指令对齐</h2>
 <p>要想理解操作数前推技术，我们先来回顾一下，<a href="https://time.geekbang.org/column/article/93359">第5讲</a>讲过的，MIPS体系结构下的R、I、J三类指令，以及<a href="https://time.geekbang.org/column/article/99523">第20讲</a>里的五级流水线“取指令（IF）-指令译码（ID）-指令执行（EX）-内存访问（MEM）-数据写回（WB） ”。</p>
 <p>我把对应的图片放进来了，你可以看一下。如果印象不深，建议你先回到这两节去复习一下，再来看今天的内容。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b1/bf/b1ade5f8de67b172bf7b4ec9f63589bf.jpeg?wh=2212%2A595" /><img alt="" src="https://static001.geekbang.org/resource/image/1e/ad/1e880fa8b1eab511583267e68f0541ad.jpeg?wh=2203%2A1180" /></p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/b1/bf/b1ade5f8de67b172bf7b4ec9f63589bf.jpeg?wh=2212%2A595" /><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1e/ad/1e880fa8b1eab511583267e68f0541ad.jpeg?wh=2203%2A1180" />}{:referrerpolicy="no-referrer"</p>
 <p>在MIPS的体系结构下，不同类型的指令，会在流水线的不同阶段进行不同的操作。</p>
 <p>我们以MIPS的LOAD，这样从内存里读取数据到寄存器的指令为例，来仔细看看，它需要经历的5个完整的流水线。STORE这样从寄存器往内存里写数据的指令，不需要有写回寄存器的操作，也就是没有数据写回的流水线阶段。至于像ADD和SUB这样的加减法指令，所有操作都在寄存器完成，所以没有实际的内存访问（MEM）操作。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b6/d4/b66ea9ca3300c7f71e91aaa6b6428fd4.jpg?wh=2181%2A592" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b6/d4/b66ea9ca3300c7f71e91aaa6b6428fd4.jpg?wh=2181%2A592" /></p>
 <p>有些指令没有对应的流水线阶段，但是我们并不能跳过对应的阶段直接执行下一阶段。不然，如果我们先后执行一条LOAD指令和一条ADD指令，就会发生LOAD指令的WB阶段和ADD指令的WB阶段，在同一个时钟周期发生。这样，相当于触发了一个结构冒险事件，产生了资源竞争。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9e/5f/9e62ab3b42e445d65accf0549badf45f.jpeg?wh=2015%2A1082" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9e/5f/9e62ab3b42e445d65accf0549badf45f.jpeg?wh=2015%2A1082" /></p>
 <p>所以，在实践当中，各个指令不需要的阶段，并不会直接跳过，而是会运行一次NOP操作。通过插入一个NOP操作，我们可以使后一条指令的每一个Stage，一定不和前一条指令的同Stage在一个时钟周期执行。这样，就不会发生先后两个指令，在同一时钟周期竞争相同的资源，产生结构冒险了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c1/42/c16643d83dd534d3d97d0d7ad8e30d42.jpg?wh=2181%2A573" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c1/42/c16643d83dd534d3d97d0d7ad8e30d42.jpg?wh=2181%2A573" /></p>
 <h2 id="_1">流水线里的接力赛：操作数前推</h2>
 <p>通过NOP操作进行对齐，我们在流水线里，就不会遇到资源竞争产生的结构冒险问题了。除了可以解决结构冒险之外，这个NOP操作，也是我们之前讲的流水线停顿插入的对应操作。</p>
 <p>但是，插入过多的NOP操作，意味着我们的CPU总是在空转，干吃饭不干活。那么，我们有没有什么办法，尽量少插入一些NOP操作呢？不要着急，下面我们就以两条先后发生的ADD指令作为例子，看看能不能找到一些好的解决方案。</p>
@@ -6659,15 +6659,15 @@
 </ol>
 <p>因为后一条的 add 指令，依赖寄存器 t0 里的值。而 t0 里面的值，又来自于前一条指令的计算结果。所以后一条指令，需要等待前一条指令的数据写回阶段完成之后，才能执行。就像上一讲里讲的那样，我们遇到了一个数据依赖类型的冒险。于是，我们就不得不通过流水线停顿来解决这个冒险问题。我们要在第二条指令的译码阶段之后，插入对应的NOP指令，直到前一天指令的数据写回完成之后，才能继续执行。</p>
 <p>这样的方案，虽然解决了数据冒险的问题，但是也浪费了两个时钟周期。我们的第2条指令，其实就是多花了2个时钟周期，运行了两次空转的NOP操作。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/94/69/94dda2330b07c08530540ae11838c569.jpeg?wh=2389%2A1069" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/94/69/94dda2330b07c08530540ae11838c569.jpeg?wh=2389%2A1069" /></p>
 <p>不过，其实我们第二条指令的执行，未必要等待第一条指令写回完成，才能进行。如果我们第一条指令的执行结果，能够直接传输给第二条指令的执行阶段，作为输入，那我们的第二条指令，就不用再从寄存器里面，把数据再单独读出来一次，才来执行代码。</p>
 <p>我们完全可以在第一条指令的执行阶段完成之后，直接将结果数据传输给到下一条指令的ALU。然后，下一条指令不需要再插入两个NOP阶段，就可以继续正常走到执行阶段。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/dc/27/dceadd35c334974d8270052b37d48c27.jpeg?wh=2249%2A638" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dc/27/dceadd35c334974d8270052b37d48c27.jpeg?wh=2249%2A638" /></p>
 <p>这样的解决方案，我们就叫作<strong>操作数前推</strong>（Operand Forwarding），或者操作数旁路（Operand Bypassing）。其实我觉得，更合适的名字应该叫<strong>操作数转发</strong>。这里的Forward，其实就是我们写Email时的“转发”（Forward）的意思。不过现有的经典教材的中文翻译一般都叫“前推”，我们也就不去纠正这个说法了，你明白这个意思就好。</p>
 <p>转发，其实是这个技术的<strong>逻辑含义</strong>，也就是在第1条指令的执行结果，直接“转发”给了第2条指令的ALU作为输入。另外一个名字，旁路（Bypassing），则是这个技术的<strong>硬件含义</strong>。为了能够实现这里的“转发”，我们在CPU的硬件里面，需要再单独拉一根信号传输的线路出来，使得ALU的计算结果，能够重新回到ALU的输入里来。这样的一条线路，就是我们的“旁路”。它越过（Bypass）了写入寄存器，再从寄存器读出的过程，也为我们节省了2个时钟周期。</p>
 <p>操作数前推的解决方案不但可以单独使用，还可以和流水线冒泡一起使用。有的时候，虽然我们可以把操作数转发到下一条指令，但是下一条指令仍然需要停顿一个时钟周期。</p>
 <p>比如说，我们先去执行一条LOAD指令，再去执行ADD指令。LOAD指令在访存阶段才能把数据读取出来，所以下一条指令的执行阶段，需要在访存阶段完成之后，才能进行。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/49/2d/49f3a9b1ae2972ac5c6cfca7731bf12d.jpeg?wh=2497%2A640" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/49/2d/49f3a9b1ae2972ac5c6cfca7731bf12d.jpeg?wh=2497%2A640" /></p>
 <p>总的来说，操作数前推的解决方案，比流水线停顿更进了一步。流水线停顿的方案，有点儿像游泳比赛的接力方式。下一名运动员，需要在前一个运动员游玩了全程之后，触碰到了游泳池壁才能出发。而操作数前推，就好像短跑接力赛。后一个运动员可以提前抢跑，而前一个运动员会多跑一段主动把交接棒传递给他。</p>
 <h2 id="_2">总结延伸</h2>
 <p>这一讲，我给你介绍了一个更加高级，也更加复杂的解决数据冒险问题方案，就是操作数前推，或者叫操作数旁路。</p>
@@ -6819,8 +6819,6 @@ CMP和JMP指令通常不需要内存访问阶段和写回阶段。</p>2024-08-23
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

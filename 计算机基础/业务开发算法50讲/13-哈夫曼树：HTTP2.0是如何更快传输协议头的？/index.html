@@ -6534,13 +6534,13 @@
 <h2 id="hpack_1">HPACK的压缩效果</h2>
 <p>既然HTTP中引入压缩技术很有意义，那我们就先来看看压缩之后的效果到底有多大吧。</p>
 <p>h2load 是网上开源的一个对 HTTP/2.0 做 benchmark 的工具，我们可以在系统上安装它，来访问某些网站，直观地感受一下HPACK技术带来的HTTP头的大小变化：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/93/cf/93dfe106f6yye5ab79a085f1d5a82bcf.png?wh=1334x912" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/93/cf/93dfe106f6yye5ab79a085f1d5a82bcf.png?wh=1334x912" /></p>
 <p>可以看到，采用了HTTP/2.0之后，直接压缩了HTTP头33%的空间，效果显著。</p>
 <p>那HPACK具体是如何做的呢？我们现在就来一探究竟。</p>
 <h3 id="1hpack">1.HPACK中的静态表</h3>
 <p>首先我们来看一下HPACK的第一个手段：静态表，它其实就是对HTTP头报文里最常见的文本进行了一种编码。静态表也是非常常用的压缩手段。</p>
 <p>HTTP/2.0 一共对61个常用的头，以及头和值的组合做了编码（<a href="https://docs.google.com/presentation/d/1r7QXGYOLCh4fcUq0jDdDwKJWNqWK1o4xMtYpKZCJYjM/edit#slide=id.gfd0e3427_048">图片来源</a>）。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d6/7f/d631868ef8210c57d3bec37e03f8717f.png?wh=1600x949" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d6/7f/d631868ef8210c57d3bec37e03f8717f.png?wh=1600x949" /></p>
 <p>比如HTTP的几种请求方法，GET、POST等，都编码到了一张范围为1-61的索引表里，这样原来的":method GET"等字符串需要的空间就小多了。</p>
 <h3 id="2hpack">2.HPACK中的动态表</h3>
 <p>但是只是如此的话，我们能压缩的报文就非常有限了，怎么办呢？</p>
@@ -6562,12 +6562,12 @@
 <p>所以ASCII作为一种典型的每个字符都等长编码的编码方法，有没有办法被压缩呢？是可以的。</p>
 <p>比如，在自然语言场景里，我们知道字母e可能是最常出现的字符，如果用更短的编码去表示e，而用其他更长的编码表示其他字符，就可以达到压缩文本编码长度的效果。</p>
 <p>不过这里还有个问题，用等长编码比如ASCII编码，我们解码的时候直接8位、8位的读，就很容易解出编码前的字符串，但<strong>如果用变长编码，我们就需要处理解码歧义的问题</strong>。
-<img alt="" src="https://static001.geekbang.org/resource/image/32/9a/32ae813f1a71f54c5e271e2974f8e19a.jpg?wh=2312x1379" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/32/9a/32ae813f1a71f54c5e271e2974f8e19a.jpg?wh=2312x1379" /></p>
 <p>比如在字符串“ABCD”里，我们假设把A用0编码、B用1编码、C用10编码、D用11编码。“ABCD”可以编码成二进制编码为“011011”，没问题，但如果中间不加任何分隔符，你并不能知道这个编码结果是由“ABCD”产生的还是由“ABBABB”产生的。</p>
 <p>如果加了分隔符，分隔符本身也会引入额外的编码成本，甚至可能导致一个负向的优化。</p>
 <p>为了解决这个问题，学生时代的哈夫曼（huffman）在 1952 年提出了最优前缀码的算法，也就是广泛应用在压缩领域的哈夫曼编码，它除了用更短的编码表示出现概率更高的字母，还引入了一个约束：<strong>不同的字符编码间不能彼此成为对方的前缀。</strong></p>
 <p>这条约束在解码的时候完美地避免了歧义的问题。比如刚刚如果把A编码成0、B编码成10、C编码成110、D编码成111，这就是一种符合约束的前缀码编码方式。ABCD就会编码成 010110111，一定只有一种解码方式。
-<img alt="" src="https://static001.geekbang.org/resource/image/4b/63/4bc77ae733c0e653d620eb429bd42163.jpg?wh=2312x1379" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4b/63/4bc77ae733c0e653d620eb429bd42163.jpg?wh=2312x1379" /></p>
 <p>那在不能成为对方前缀的约束下，具体如何根据出现频率选择合适的编码方式呢？</p>
 <p>哈夫曼采用了<strong>贪心的算法思想：用一棵二叉树来标记每个字符的编码方式，左分支代表0、右分支代表1，所有需要编码的字符都对应二叉树的叶子节点，根结点到该叶子结点的路径就代表着该字符的编码方式</strong>。由于各节点是独立的不可能重复，每个字符又都唯一对应着一个叶子节点，所以它们一定不会互相成为对方的前缀。</p>
 <p>下面我们要做的就是找到这样一个可以达到最大压缩效率的二叉树。</p>
@@ -6583,7 +6583,7 @@
 <p>那么如何编码可以让整个文本编码出来的二进制所占空间最少呢？</p>
 <p>最开始，我们先把每个字符都看成一个独立的二叉树节点，节点中同时包含了字符信息和频率信息。</p>
 <p>然后，从中选两个出现频率最少的节点，a和b，我们把这两个节点合并成一棵子树，也就是用一个父节点的左右节点指针分别链向a和b两个节点，把两者的频率之和作为父节点的频率。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/de/6a/dee506a76e6c1df873ac2bece984df6a.jpg?wh=2312x1379" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/de/6a/dee506a76e6c1df873ac2bece984df6a.jpg?wh=2312x1379" /></p>
 <p>之后，我们把这个频率为14的树放回所有的节点里（14 12 13 16 45），再从中继续选择最小的两个节点c和d合并成一棵新的树。</p>
 <p>更新之后的所有节点就是下面这些，其中a、b、c、d节点都被替换成了新的合成节点：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>(a, b)      14
@@ -6592,7 +6592,7 @@
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>f           45
 </code></pre></div>
 <p>不断进行这样的操作，最终就可以得到这样一棵树：
-<img alt="" src="https://static001.geekbang.org/resource/image/f1/ce/f14f482a590bbe76b6d35a89e5ef34ce.jpg?wh=2312x1379" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f1/ce/f14f482a590bbe76b6d35a89e5ef34ce.jpg?wh=2312x1379" /></p>
 <p>假设树的左链代表0，右链代表1，a b c d e f 对应的编码为：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">f</span><span class="w">          </span><span class="mi">0</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">c</span><span class="w">          </span><span class="mi">100</span>
@@ -6775,8 +6775,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

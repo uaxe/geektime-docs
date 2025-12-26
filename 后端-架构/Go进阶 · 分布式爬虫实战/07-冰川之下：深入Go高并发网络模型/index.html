@@ -14898,12 +14898,12 @@
 <p>当我们谈到网络编程的时候，免不了要谈Socket，但是Socket在不同的语境下有不同的含义。</p>
 <p><strong>Socket大多数时候指的是一个“插槽”。</strong>在网络连接时，我们需要建立一个Socket，服务器与客户端要想发送和接收网络数据都需要经过Socket。在Linux一切皆文件的设计下，Socket是一个特殊的文件，存储在描述进程的task_struct结构中。</p>
 <p>以TCP连接为例，Socket的相关结构如下图所示。进程可以通过文件描述符找到对应的Socket结构。Socket结构中存储了发送队列与接收队列，每一个队列中保存了结构 <a href="https://www.kernel.org/doc/html/latest/networking/skbuff.html">sk_buffer</a>。sk_buff 是代表数据包的主要网络结构，但是sk_buff 本身存储的是一个元数据，不保存任何数据包数据，所有数据都保存在相关的缓冲区中。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e7/7d/e71yy79168e3e8d7d30604b90e8a4e7d.jpg?wh=1920x1310" title="socket及其相关结构" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e7/7d/e71yy79168e3e8d7d30604b90e8a4e7d.jpg?wh=1920x1310" title="socket及其相关结构" /></p>
 <p><strong>在另一些时候，Socket指的是用户态和内核态之间进行交互的API。</strong>现代操作系统在处理网络协议栈时，链路层Ethernet协议、网络层IP协议、传输层TCP协议都是在操作系统内核实现的。而应用层是在用户态由应用程序实现的。应用程序和操作系统之间交流的接口就是通过操作系统提供的 Socket 系统调用 API 完成的。</p>
 <p>下面这张图列出了硬件、操作系统内核、用户态空间中分别对应的组件和交互。在这里，操作系统与硬件之间通过设备驱动进行通信，而应用程序与操作系统之间通过 Socket 系统调用API进行通信。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/de/be/def7353ed4d232fa0c1cf46be432e3be.jpg?wh=1920x1344" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/de/be/def7353ed4d232fa0c1cf46be432e3be.jpg?wh=1920x1344" /></p>
 <p><strong>还有些时候，Socket指的是Socket API中的socket函数。</strong>例如，在Unix 典型的TCP连接中，需要完成诸多系统调用，但是第一步往往都是调用socket函数。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/95/1a/95393134ce220e56881f58c7fa29e31a.jpg?wh=1920x1594" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/95/1a/95393134ce220e56881f58c7fa29e31a.jpg?wh=1920x1594" /></p>
 <p>在这些系统调用中，默认使用的是阻塞的模式。例如 accept 函数阻塞等待客户端的连接，read函数阻塞等待读取客户端发送的消息。但是Unix操作系统也为我们提供了一些其他手段来避免I/O的阻塞（相对应地也需要一些机制，例如轮询、回调函数来保证非阻塞的socket在未来准备就绪后能够正常处理），这就是我们将要谈到的I/O模型。</p>
 <h2 id="io">I/O模型</h2>
 <p>在经典的著作《UNIX Network Programming》（Volume 1, Third Edition）中，就有对于I/O模型的权威论述，它将I/O模型分为5种类型，分别是：</p>
@@ -14914,7 +14914,7 @@
 <li>信号驱动I/O；</li>
 <li>异步I/O。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/de/c1/de42349aa90a78a9849a01f823205ec1.jpg?wh=1920x1088" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/de/c1/de42349aa90a78a9849a01f823205ec1.jpg?wh=1920x1088" /></p>
 <p>其中，阻塞I/O是最简单直接的类型，例如，read系统调用函数会一直堵塞，直到操作完成为止。</p>
 <p>非阻塞I/O顾名思义不会陷入到阻塞，它一般通过将 Socket 指定为 <code>SOCK_NONBLOCK</code> 非堵塞模式来实现。这时就算当前Socket没有准备就绪，read等系统调用函数也不会阻塞，而会返回具体的错误。所以，这种方式一般需要开发者采用轮询的方式不时去检查。</p>
 <p>多路复用I/O是一种另类的方式，它仍然可能陷入阻塞，但是它可以一次监听多个Socket是否准备就绪，任何一个Socket准备就绪都可以返回。典型的函数有poll、select、epoll。多路复用仍然可以变为非阻塞的模式，这时仍然需要开发者采用轮询的方式不时去检查。</p>
@@ -14933,7 +14933,7 @@
 </ul>
 <p>我以多 Reactor 多线程为例说明一下，主Reactor使用selelct等多路复用机制监控连接建立事件，收到事件后通过 Acceptor 接收，并将新的连接分配给子Reactor。</p>
 <p>随后，子 Reactor 会将主 Reactor 分配的连接加入连接队列，监听Socket的变化，当Socket准备就绪后，在独立的线程中完成完整的业务流程。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/84/56/84d9b46b61e0e1e40440d046e7661256.jpg?wh=1920x810" title="多 Reactor 多线程（来自《从 0 开始学架构》）" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/84/56/84d9b46b61e0e1e40440d046e7661256.jpg?wh=1920x810" title="多 Reactor 多线程（来自《从 0 开始学架构》）" /></p>
 <h2 id="_2">基于协程的网络处理模型</h2>
 <p>如果说 Reactor 网络模型是I/O多路复用 + 线程池。那么 <strong>Go则采取了一种不太寻常的方式来构建自己的网络模型，我们可以将其理解为I/O多路复用 + 非阻塞I/O + 协程。</strong> 在多核时代，Go在线程之上创建了轻量级的协程。作为并发原语，协程解决了<a href="https://web.stanford.edu/~ouster/cgi-bin/papers/threads.pdf">传统多线程开发中开发者面临的心智负担</a>（内存屏障、死锁等），并降低了线程的时间成本与空间成本。</p>
 <p>线程的时间成本主要来自于切换线程上下文时，用户态与内核态的切换、线程的调度、寄存器变量以及状态信息的存储。</p>
@@ -14983,7 +14983,7 @@
 <h2 id="_3">同步编程模式</h2>
 <p>继续看上面这个例子，在这里，每一个新建的连接都有单独的协程处理handle函数，这个函数通过conn.Read读取数据，然后通过conn.Write写入数据。他们在开发者的眼中都是一种阻塞的模式。当conn.Read等待数据的读取时，当前的协程陷入到等待的状态，等到数据读取完毕，调度器才会唤醒协程去执行。这是一种直观、简单的编程模式。相对于回调、信号处理等异步机制，同步的编程模式明确并简化了处理流程，不易犯错并且方便调试。</p>
 <p>协程虽然会陷入阻塞，但是这种阻塞并不是对线程的阻塞，而是发生在用户态的阻塞。借助Go运行时强大的调度器，当前的协程阻塞了，其他可运行的协程借助逻辑处理器P仍然可以调度到线程上执行。在后面的课程中，还会详细介绍协程与调度器的原理。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e4/b4/e44db6277f6c40259610312914d5a5b4.jpg?wh=1920x1666" title="GMP模型" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e4/b4/e44db6277f6c40259610312914d5a5b4.jpg?wh=1920x1666" title="GMP模型" /></p>
 <h2 id="_4">多路复用</h2>
 <p>Go网络模型中另一个重要的机制是对I/O多路复用的封装。</p>
 <p>在上例中，协程可能会处于阻塞的状态，所以我们需要机制能够监听大量的Sokcet的变化。当Socket准备就绪之后，能够让被阻塞的协程恢复执行。</p>
@@ -15043,7 +15043,7 @@
 <h2 id="_5">总结</h2>
 <p>好了，这节课就讲到这里。今天我们重点讨论了Go语言的网络模型，并解释了Go语言为什么适合开发网络服务。</p>
 <p>其实，Go语言的致胜法宝可以总结为一个公式：<strong>同步编程+多路复用+非阻塞I/O+协程调度。</strong></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/72/80/72e76a1c52e124215c00e7cc5ce9d380.jpg?wh=1920x4296" title="Go网络模型" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/72/80/72e76a1c52e124215c00e7cc5ce9d380.jpg?wh=1920x4296" title="Go网络模型" /></p>
 <p>Go同步编程的模式简单直接，符合开发者的直觉。同时，协程的特点让开发者可以轻松地创建大量协程。</p>
 <p>在同步编程模式下，Go真正的阻塞并未发生在操作系统调用的阻塞上，而是发生在用户态协程的阻塞上。借助不同操作系统下多路复用的封装以及非阻塞的I/O模式，当可用的Socket准备就绪，Go就能保证之前陷入堵塞的协程可以运行，并最终被调度器调度。Go调度器牢牢地锁定了协程的控制权，即便协程发生阻塞，调度器也能够快速切换到其他协程运行，在高并发网络I/O密集的环境下保证了程序的高性能。</p>
 <h2 id="_6">课后题</h2>
@@ -15177,8 +15177,6 @@ I&#47;O 多路复用 和 非阻塞 I&#47;O 不是两个IO模型吗？这两个�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

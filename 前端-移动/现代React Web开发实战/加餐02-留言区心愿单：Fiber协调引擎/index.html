@@ -5591,7 +5591,7 @@
 <p>当第一次渲染，React元素树被创建出来后，Fiber协调引擎会从 <code>HostRoot</code> 这个特殊的元素开始，遍历元素树，创建对应的 <code>FiberNode</code> 。</p>
 <p><code>FiberNode</code> 与 <code>FiberNode</code> 之间，并没有按照传统的parent-children方式建立树形结构。而是在父节点和它的第一个子节点间，利用<code>child</code> 和 <code>return</code> 属性建立了双向链表。节点与它的平级节点间，利用 <code>sibling</code> 属性建立了单向链表，同时平级节点的 <code>return</code> 属性，也都被设置成和单向链表起点的节点 <code>return</code> 一样的值引用。</p>
 <p>如图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c6/60/c6d3d4806b9a80344a4431fc8245a460.jpg?wh=1142x670" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c6/60/c6d3d4806b9a80344a4431fc8245a460.jpg?wh=1142x670" /></p>
 <p>这样做的好处是，可以在协调引擎进行工作的过程中，<strong>避免递归遍历Fiber树，而仅仅用两层循环来完成深度优先遍历，</strong>这个用于遍历Fiber树的循环被称作workLoop。</p>
 <p>以下是workLoop的示意代码，为了便于理解，我对源码中的 <code>performUnitOfWork</code> 、 <code>beginWork</code>、<code>completeUnitOfWork</code>、<code>completeWork</code> 做了合并和简化，就是里面的 <code>workWork</code> （WARCRAFT梗）：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kd">let</span><span class="w"> </span><span class="nx">workInProgress</span><span class="p">;</span>
@@ -5617,7 +5617,7 @@
 </code></pre></div>
 <p>更狠的一点是，这个循环<strong>随时可以跑，随时可以停</strong>。这意味着 <code>workLoop</code> 既可以同步跑，也可以异步跑，当 <code>workLoop</code> 发现进行中的Fiber工作耗时过长时，可以根据一个 <code>shouldYield()</code> 标记决定是否暂停工作，释放计算资源给更紧急的任务，等完成后再恢复工作。</p>
 <p>当组件内更新state或有context更新时，React会进入渲染阶段（Render Phase）。这一阶段是异步的，Fiber协调引擎会启动<code>workLoop</code> ，从Fiber树的根部开始遍历，快速跳过已处理的节点；对有变化的节点，引擎会为 <code>Current</code><strong>（当前）节点</strong>克隆一个 <code>WorkInProgress</code><strong>（进行中）节点</strong>，将这两个FiberNode的 <code>alternate</code> 属性分别指向对方，并把更新都记录在<code>WorkInProgress</code> 节点上。如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/30/d0/303937fc145e64f0242bcd65c2d96bd0.jpg?wh=1142x550" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/30/d0/303937fc145e64f0242bcd65c2d96bd0.jpg?wh=1142x550" /></p>
 <p>你可以理解成同时存在两棵Fiber树，<strong>一棵 <code>Current</code> 树，对应着目前已经渲染到页面上的内容</strong>；<strong>另一棵是 <code>WorkInProgress</code> 树，记录着即将发生的修改</strong>。</p>
 <p>函数组件的Hooks也是在渲染阶段执行的。除了<code>useContext</code> ，Hooks在挂载后，都会形成一个由 <code>Hook.next</code> 属性连接的单向链表，而这个链表会挂在 <code>FiberNode.memoizedState</code> 属性上。</p>
 <p>在此基础上，<code>useEffect</code> 这样会产生副作用的Hooks，会额外创建与 <code>Hook</code> 对象一一对应的 <code>Effect</code> 对象，赋值给 <code>Hook.memoizedState</code> 属性。此外，也会在 <code>FiberNode.updateQueue</code> 属性上，维护一个由 <code>Effect.next</code> 属性连接的单向链表，并把这个 <code>Effect</code> 对象加入到链表末尾。</p>
@@ -5644,7 +5644,7 @@
 <p>这个<code>flushPassiveEffects()</code> 函数真正的执行时机，是在上述提交阶段的三个同步子阶段之后，下一次渲染阶段之前。引擎会保证在下一次渲染之前，执行完所有待执行的副作用。</p>
 <p>你也许会好奇，协调引擎的Diffing算法在哪里？其实从渲染到提交阶段，到处都在利用memoizedProps和memoizedState与新的props、state做比较，以减少不必要的工作，进而提高性能。</p>
 <p>以上学习了Fiber协调引擎的工作流程，再回来看看 <code>oh-my-kanban</code> 的Fiber树，是不是能更进一步理解 <code>oh-my-kanban</code> 的生命周期了？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/89/f6/892b4a21cb0a4d59a94a65e247b68af6.jpg?wh=1142x672" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/89/f6/892b4a21cb0a4d59a94a65e247b68af6.jpg?wh=1142x672" /></p>
 <p>好了，Fiber协调引擎我们暂时就讲到这里。</p>
 <p>如果你还有其他想听的话题，或者在课程学习中有什么疑问，欢迎在留言区告诉我。下节课再见！</p>
 <div><strong>精选留言（6）</strong></div>
@@ -5763,8 +5763,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -14112,7 +14112,7 @@
 <p>并且Diana设计应遵循开闭原则，能够支持灵活的限流规则功能扩展，即未来在不修改现有代码和兼容现有配置文件的情况下，支持新的配置规则。</p>
 <h2 id="_2">概要设计</h2>
 <p>Diana的设计目标是一个限流器组件，即Diana并不是一个独立的系统，不可以独立部署进行限流，而是部署在系统网关（或者其他HTTP服务器上），作为网关的一个组件进行限流，部署模型如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e7/4e/e77c0eaf41d816223d8b603f02a3854e.jpg?wh=1920x973" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e7/4e/e77c0eaf41d816223d8b603f02a3854e.jpg?wh=1920x973" /></p>
 <p>用户请求（通过负载均衡服务器）到达网关服务器。网关服务器本质也是一个HTTP服务器，限流器是部署在网关中的一个过滤器（filter）组件，和网关中的签名校验过滤器、用户权限过滤器等配置在同一个过滤器责任链（Chain of Responsibility）上。限流器应该配置在整个过滤器责任链的前端，也就是说，如果请求超过了限流，请求不需要再进入其他过滤器，直接被限流器拒绝。</p>
 <p>用户请求进入限流器后，根据限流策略，判断该请求是否已经超过限流，如果超过，限流器直接返回状态码为503（Too Many Requests）的响应；如果没有超过限流，请求继续向下处理（经过其他网关过滤器），并最终调用微服务完成处理。</p>
 <p>限流器的策略可以在本地配置，也可以通过远程的配置中心服务器加载，即远程配置。远程配置优先于本地配置。</p>
@@ -14153,29 +14153,29 @@
 <p>Diana支持配置4种限流算法，使用者可以根据自己的需求场景，为不同资源地址配置不同的限流算法，下面详细描述这四种算法实现。</p>
 <h4 id="window"><strong>固定窗口（Window）限流算法</strong></h4>
 <p>固定窗口限流算法就是将配置文件中的时间单位unit作为一个时间窗口，每个窗口仅允许限制流量内的请求通过，如图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/96/a3/9656050d518cca2825de965d180838a3.jpg?wh=1920x412" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/96/a3/9656050d518cca2825de965d180838a3.jpg?wh=1920x412" /></p>
 <p>我们将时间轴切分成一个一个的限流窗口，每个限流窗口有一个窗口开始时间和一个窗口结束时间，窗口开始时，计数器清零，每进入一个请求，计数器就记录+1。如果请求数目超过rpu配置的限流请求数，就拒绝服务，返回503响应。当前限流窗口结束后，就进入下个限流窗口，计数器再次清零，重新开始。处理流程活动图如下。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/cc/dd/cc5b503a196cd917d35464eb0e53bddd.jpg?wh=1920x1489" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cc/dd/cc5b503a196cd917d35464eb0e53bddd.jpg?wh=1920x1489" /></p>
 <p>上图包括“初始化”和“处理流程”两个泳道。初始化的时候，设置“窗口计数器”和“当前窗口结束时间”两个变量。处理请求的时候，判断当前时间是否大于“当前窗口结束时间”，如果大于，那么重置“窗口计数器”和“当前窗口结束时间”两个变量；如果没有，窗口计数器+1，并判断计数器是否大于配置的限流请求数rpu，根据结果决定是否进行限流。</p>
 <p>这里的“窗口计数器”可以本地记录，也可以远程记录，也就是配置中的local和global。固定窗口算法在配置文件中algo项可配置“window”或者缩写“W”。</p>
 <p>固定窗口实现比较容易，但是如果使用这种限流算法，在一个限流时间单位内，通过的请求数可能是rpu的两倍，无法达到限流的目的，如下图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c7/c6/c7b2dae2c9b96dd775557295ba3680c6.jpg?wh=1920x412" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c7/c6/c7b2dae2c9b96dd775557295ba3680c6.jpg?wh=1920x412" /></p>
 <p>假设单位时间请求限流数rpu为100，在第一个限流窗口快要到结束时间的时候，突然进来100个请求，因为这个请求量在限流范围内，所以没有触发限流，请求全部通过。然后进入第二个限流窗口，限流计数器清零。这时又忽然进入100个请求，因为已经进入第二个限流窗口，所以也没触发限流。在短时间内，通过了200个请求，这样可能会给系统造成巨大的负载压力。</p>
 <h4 id="sliding-window">滑动窗口（Sliding Window）限流算法</h4>
 <p>改进固定窗口缺陷的方法是采用滑动窗口限流算法，如下图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/12/cf/12d45534b212abf3cbfd764b85bd72cf.jpg?wh=1920x536" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/12/cf/12d45534b212abf3cbfd764b85bd72cf.jpg?wh=1920x536" /></p>
 <p>滑动窗口就是将限流窗口内部切分成一些更小的时间片，然后在时间轴上滑动，每次滑动，滑过一个小时间片，就形成一个新的限流窗口，即滑动窗口。然后在这个滑动窗口内执行固定窗口算法即可。</p>
 <p>滑动窗口可以避免固定窗口出现的放过两倍请求的问题，因为一个短时间内出现的所有请求必然在一个滑动窗口内，所以一定会被滑动窗口限流。</p>
 <p>滑动窗口的算法实现基本和固定窗口一致，只要改动重置“窗口计数器”和“当前窗口结束时间”的逻辑就可以。固定窗口算法重置为窗口结束时间+1 unit 时间，滑动窗口算法重置为窗口结束时间+1个时间片。但是固定窗口算法重置后，窗口计数器为0，而滑动窗口需要将窗口计数器设置为当前窗口已经经过的时间片的请求总数，比如上图里，一个滑动窗口被分为5个时间片，滑动窗口2的浅蓝色部分就是已经经过了4个时间片。</p>
 <p>滑动窗口算法在配置文件中algo项可配置“sliding window”或者缩写“SW”。</p>
 <h4 id="leaky-bucket">漏桶（Leaky Bucket）限流算法</h4>
 <p>漏桶限流算法是模拟水流过一个有漏洞的桶进而限流的思路，如图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d5/11/d5de3e408c2abc1ff15ee96a60439d11.jpg?wh=2000x654" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d5/11/d5de3e408c2abc1ff15ee96a60439d11.jpg?wh=2000x654" /></p>
 <p>水龙头的水先流入漏桶，再通过漏桶底部的孔流出。如果流入的水量太大，底部的孔来不及流出，就会导致水桶太满溢出去。</p>
 <p>限流器利用漏桶的这个原理设计漏桶限流算法，用户请求先流入到一个特定大小的漏桶中，系统以特定的速率从漏桶中获取请求并处理。如果用户请求超过限流，就会导致漏桶被请求数据填满，请求溢出，返回503响应。</p>
 <p>所以漏桶算法不仅可以限流，当流量超过限制的时候会拒绝处理，直接返回503响应，还能控制请求的处理速度。</p>
 <p>实践中，可以采用队列当做漏桶。如图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/bb/16/bb8ca5effb1458600a7a43a622764a16.jpg?wh=1920x354" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bb/16/bb8ca5effb1458600a7a43a622764a16.jpg?wh=1920x354" /></p>
 <p>构建一个特定长度的队列queue作为漏桶，开始的时候，队列为空，用户请求到达后从队列尾部写入队列，而应用程序从队列头部以特定速率读取请求。当读取速度低于写入速度的时候，一段时间后，队列会被写满，这时候写入队列操作失败。写入失败的请求直接构造503响应返回。</p>
 <p>但是使用队列这种方式，实际上是把请求处理异步化了（写入请求的线程和获取请求的线程不是同一个线程），并不适合我们目前同步网关的场景（如果使用前面设计过的Flower框架开发的异步网关就可以用这种队列方式）。</p>
 <p>因此Diana实现漏桶限流算法并不使用消息队列，而是阻塞等待。根据限流配置文件计算每个请求之间的间隔时间，例如：限流每秒10个请求，那么每两个请求的间隔时间就必须&gt;=100ms。用户请求到达限流器后，根据当前最近一个请求处理的时间和阻塞的请求线程数目，计算当前请求线程的sleep时间。每个请求线程的sleep时间不同，最后就可以实现每隔100ms唤醒一个请求线程去处理，从而达到漏桶限流的效果。</p>
@@ -14209,7 +14209,7 @@
 <p>漏桶算法的algo配置项名称为“leaky bucket”或者“LB”。</p>
 <h4 id="token-bucket">令牌桶（Token Bucket）限流算法</h4>
 <p>令牌桶是另一种桶限流算法，模拟一个特定大小的桶，然后向桶中以特定的速度放入令牌（token），请求到达后，必须从桶中取出一个令牌才能继续处理。如果桶中已经没有令牌了，那么当前请求就被限流，返回503响应。如果桶中的令牌放满了，令牌桶也会溢出。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ee/a8/eede538f223553d706aa77b7340407a8.png?wh=892x536" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ee/a8/eede538f223553d706aa77b7340407a8.png?wh=892x536" /></p>
 <p>上面的算法描述似乎需要有一个专门线程生成令牌，还需要一个数据结构模拟桶。实际上，令牌桶的实现，只需要在请求获取令牌的时候，通过时间计算，就可以算出令牌桶中的总令牌数。伪代码如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>初始化 :
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>最近生成令牌时间戳 = 0；
@@ -14371,8 +14371,6 @@ Q3：固定窗口方法中的时间结束是通过定时器实现的吗？</p>20
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

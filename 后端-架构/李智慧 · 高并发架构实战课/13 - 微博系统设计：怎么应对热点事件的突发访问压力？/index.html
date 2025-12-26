@@ -14037,7 +14037,7 @@
 <p>因此，Weitter的技术挑战，一方面是微博这样类似的信息流系统架构是如何设计的，另一方面就是如何解决大V们的热点消息产生的突发高并发访问压力，保障系统的可用性。今天我们就来看看这样的系统架构该怎么设计。</p>
 <h2 id="_1">需求分析</h2>
 <p>Weitter的核心功能只有三个：发微博，关注好友，刷微博。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/27/0a/27dbd5c5f28b1d834a8be005391e7e0a.jpg?wh=1920x1077" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/27/0a/27dbd5c5f28b1d834a8be005391e7e0a.jpg?wh=1920x1077" /></p>
 <ol>
 <li>发微博：用户可以发表微博，内容包含不超过140个字的文本，可以包含图片和视频。</li>
 <li>关注好友：用户可以关注其他用户。</li>
@@ -14071,15 +14071,15 @@
 <p>$\small （200万\div5\times500KB+200万\div10\times2MB）\times8bit=4.8Tb/s$</p>
 <h2 id="_3">概要设计</h2>
 <p>在需求分析中我们可以看到，Weitter的业务逻辑比较简单，但是<strong>并发量</strong>和<strong>数据量</strong>都比较大，所以，<strong>系统架构的核心就是解决高并发的问题</strong>，系统整体部署模型如下。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c3/4d/c3f3c3abe0708f5ebe31bf25eec67f4d.jpg?wh=1920x1054" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c3/4d/c3f3c3abe0708f5ebe31bf25eec67f4d.jpg?wh=1920x1054" /></p>
 <p>这里包含了“Get请求”和“Post请求”两条链路，Get请求主要处理刷微博的操作，Post请求主要处理发微博的请求，这两种请求处理也有重合的部分，我们拆分着来看。</p>
 <p>我们先来看看<strong>Get请求</strong>的部分。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c1/99/c19yy285078b6c40513c36503eee4799.jpg?wh=1920x1054" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c1/99/c19yy285078b6c40513c36503eee4799.jpg?wh=1920x1054" /></p>
 <p>用户通过CDN访问Weitter的数据中心、图片以及视频等极耗带宽的请求，绝大部分可以被CDN缓存命中，也就是说，4.8Tb/s的带宽压力，90%以上可以通过CDN消化掉。</p>
 <p>没有被CDN命中的请求，一部分是图片和视频请求，其余主要是用户刷新微博请求、查看用户信息请求等，这些请求到达数据中心的反向代理服务器。反向代理服务器检查本地缓存是否有请求需要的内容。如果有，就直接返回；如果没有，对于图片和视频文件，会通过分布式文件存储集群获取相关内容并返回。分布式文件存储集群中的图片和视频是用户发表微博的时候，上传上来的。</p>
 <p>对于用户微博内容等请求，如果反向代理服务器没有缓存，就会通过负载均衡服务器到达应用服务器处理。应用服务器首先会从Redis缓存服务器中，检索当前用户关注的好友发表的最新微博，并构建一个结果页面返回。如果Redis中缓存的微博数据量不足，构造不出一个结果页面需要的20条微博，应用服务器会继续从MySQL分片数据库中查找数据。</p>
 <p>以上处理流程主要是针对读（http get）请求，那如果是发表微博这样的写（http post）请求呢？我们再来看一下<strong>写请求</strong>部分的图。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/98/84/980db8e510ef320d44af9c53244d7e84.jpg?wh=1920x1054" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/98/84/980db8e510ef320d44af9c53244d7e84.jpg?wh=1920x1054" /></p>
 <p>你会看到，客户端不需要通过CDN和反向代理，而是直接通过负载均衡服务器到达应用服务器。应用服务器一方面会将发表的微博写入Redis缓存集群，一方面写入分片数据库中。</p>
 <p>在写入数据库的时候，如果直接写数据库，当有高并发的写请求突然到来，可能会导致数据库过载，进而引发系统崩溃。所以，数据库写操作，包括发表微博、关注好友、评论微博等，都写入到消息队列服务器，由消息队列的消费者程序从消息队列中按照一定的速度消费消息，并写入数据库中，保证数据库的负载压力不会突然增加。</p>
 <h2 id="_4">详细设计</h2>
@@ -14087,10 +14087,10 @@
 <h4 id="_5"><strong>微博的发表/订阅问题</strong></h4>
 <p>Weitter用户关注好友后，如何快速得到所有好友的最新发表的微博内容，即发表/订阅问题，是微博的核心业务问题。</p>
 <p>一种简单的办法就是“推模式”，即建一张用户订阅表，用户关注的好友发表微博后，立即在用户订阅中为该用户插入一条记录，记录用户id和好友发表的微博id。这样当用户刷新微博的时候，只需要从用户订阅表中按用户id查询所有订阅的微博，然后按时间顺序构建一个列表即可。也就是说，<strong>推模式是在用户发微博的时候推送给所有的关注者</strong>，如下图，用户发表了微博0，他的所有关注者的订阅表都插入微博0。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/91/84/91c929429edf6302fdea61e9e41dfa84.jpg?wh=1920x804" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/91/84/91c929429edf6302fdea61e9e41dfa84.jpg?wh=1920x804" /></p>
 <p>推模式实现起来比较简单，但是推模式意味着，如果一个用户有大量的关注者，那么该用户每发表一条微博，就需要在订阅表中为每个关注者插入一条记录。而对于明星用户而言，可能会有几千万的关注者，明星用户发表一条微博，就会导致上千万次的数据库插入操作，直接导致系统崩溃。</p>
 <p>所以，对于10亿级用户的微博系统而言，我们需要使用“拉模式”解决发表/订阅问题。也就是说，用户刷新微博的时候，根据其关注的好友列表，查询每个好友近期发表的微博，然后将所有微博按照时间顺序排序后构建一个列表。也就是说，<strong>拉模式是在用户刷微博的时候拉取他关注的所有好友的最新微博</strong>，如下图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/95/37/95a92ce90c758f9ba814c15724be7137.jpg?wh=1920x691" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/95/37/95a92ce90c758f9ba814c15724be7137.jpg?wh=1920x691" /></p>
 <p>拉模式极大降低了发表微博时写入数据的负载压力，但是却又急剧增加了刷微博时候读数据库的压力。因为对于用户关注的每个好友，都需要进行一次数据库查询。如果一个用户关注了大量好友，查询压力也是非常巨大的。</p>
 <p>所以，首先需要限制用户关注的好友数，在Weitter中，普通用户关注上限是2000人，VIP用户关注上限是5000人。其次，需要尽量减少刷新时查询数据库的次数，也就是说，微博要尽量通过缓存读取。</p>
 <p>但即使如此，你会发现每次刷新的查询压力还是太大，所以Weitter最终采用“推拉结合”的模式。也就是说，如果用户当前在线，那么就会使用推模式，系统会在缓存中为其创建一个好友最新发表微博列表，关注的好友如果有新发表微博，就立即将该微博插入列表的头部，当该用户刷新微博的时候，只需要将这个列表返回即可。</p>
@@ -14106,7 +14106,7 @@
 <p>此外，对于特别热门的微博内容，比如某个明星的离婚微博，这种针对单个微博内容的高并发访问，由于访问压力都集中一个缓存key上，会给单台Redis服务器造成极大的负载压力。因此，微博还会启用<strong>本地缓存模式</strong>，即应用服务器在内存中缓存特别热门的微博内容，应用构建微博刷新页的时候，会优先检查微博ID对应的微博内容是否在本地缓存中。</p>
 <p>Weitter最后确定的本地缓存策略是：针对拥有100万以上关注者的大V用户，缓存其48小时内发表的全部微博。</p>
 <p>现在，我们来看一下Weitter整体的缓存架构。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b0/8b/b039901b8cfaa6d1038007703ae1468b.jpg?wh=1920x691" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b0/8b/b039901b8cfaa6d1038007703ae1468b.jpg?wh=1920x691" /></p>
 <h4 id="_7">数据库分片策略</h4>
 <p>前面我们分析过，Weitter每天新增2亿条微博。也就是说，平均每秒钟需要写入2400条微博，高峰期每秒写入4600条微博。这样的写入压力，对于单机数据库而言是无法承受的。而且，每年新增700亿条微博记录，这也超出了单机数据库的存储能力。因此，Weitter的数据库需要采用分片部署的分布式数据库。分片的规则可以采用用户ID分片或者微博 ID分片。</p>
 <p>如果按用户ID（的hash值）分片，那么一个用户发表的全部微博都会保存到一台数据库服务器上。这样做的好处是，当系统需要按用户查找其发表的微博的时候，只需要访问一台服务器就可以完成。</p>
@@ -14261,8 +14261,6 @@ Q5：微博的信息会一直存吗？
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

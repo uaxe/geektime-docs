@@ -14517,10 +14517,10 @@
 <p>现代对称加密算法的特点是，即使把加密流程向全社会公开，攻击者也从公网上截获到密文，但只要他没有拿到密钥，就无法从密文中反推出原始明文。如何同步密钥我们稍后在谈，先来看如何优化对称加密算法。</p>
 <p>目前主流的对称加密算法叫做AES（Advanced Encryption Standard），它在性能和安全上表现都很优秀。而且，它不只在访问网站时最为常用，甚至你日常使用的WINRAR等压缩软件也在使用AES算法（见<a href="https://www.win-rar.com/encryption-faq.html?&amp;L=0">官方FAQ</a>）。<strong>因此，AES是我们的首选对称加密算法，</strong>下面来看看AES算法该如何优化。</p>
 <p><strong>AES只支持3种不同的密钥长度，分别是128位、192位和256位，它们的安全性依次升高，运算时间也更长。</strong>比如，当密钥为128比特位时，需要经过十轮操作，其中每轮要用移位法、替换法、异或操作等对明文做4次变换。而当密钥是192位时，则要经过12轮操作，密钥为256比特位时，则要经过14轮操作，如下图所示。</p>
-<p><a href="http://www.researchgate.net"><img alt="" src="https://static001.geekbang.org/resource/image/8a/28/8ae363f2b0b8cb722533b596b9201428.png?wh=734%2A999" title="AES128的10轮加密流程[br]此图由Ahmed Ghanim Wadday上传于www.researchgate.net" /></a></p>
+<p><a href="http://www.researchgate.net" referrerpolicy="no-referrer"><img alt="" src="https://static001.geekbang.org/resource/image/8a/28/8ae363f2b0b8cb722533b596b9201428.png?wh=734%2A999" title="AES128的10轮加密流程[br]此图由Ahmed Ghanim Wadday上传于www.researchgate.net" /></a></p>
 <p>密钥越长，虽然性能略有下降，但安全性提升很多。比如早先的DES算法只有56位密钥，在1999年便被破解。<strong>在TLS1.2及更早的版本中，仍然允许通讯双方使用DES算法，这是非常不安全的行为，你应该在服务器上限制DES算法套件的使用</strong>（Nginx上限制加密套件的方法，参见《Nginx 核心知识100讲》<a href="https://time.geekbang.org/course/detail/138-75878">第96课</a> 和<a href="https://time.geekbang.org/course/detail/138-79618">第131课</a>）。也正因为密钥长度对安全性的巨大影响，美国政府才不允许出口256位密钥的AES算法。</p>
 <p>只有数百比特的密钥，到底该如何对任意长度的明文加密呢？主流对称算法会将原始明文分成等长的多组明文，再分别用密钥生成密文，最后把它们拼接在一起形成最终密文。而AES算法是按照128比特（16字节）对明文进行分组的（最后一组不足128位时会填充0或者随机数）。为了防止分组后密文出现明显的规律，造成攻击者容易根据概率破解出原文，我们就需要对每组的密钥做一些变换，<strong>这种分组后变换密钥的算法就叫做分组密码工作模式（下文简称为分组模式），它是影响AES性能的另一个因素。</strong></p>
-<p><a href="https://zh.wikipedia.org/wiki/%E5%88%86%E7%BB%84%E5%AF%86%E7%A0%81%E5%B7%A5%E4%BD%9C%E6%A8%A1%E5%BC%8F"><img alt="" src="https://static001.geekbang.org/resource/image/46/d1/460d594465b9eb9a04426c6ee35da4d1.png?wh=1294%2A539" title="优秀的分组密码工作模式[br]更难以从密文中发现规律，图参见wiki" /></a></p>
+<p><a href="https://zh.wikipedia.org/wiki/%E5%88%86%E7%BB%84%E5%AF%86%E7%A0%81%E5%B7%A5%E4%BD%9C%E6%A8%A1%E5%BC%8F" referrerpolicy="no-referrer"><img alt="" src="https://static001.geekbang.org/resource/image/46/d1/460d594465b9eb9a04426c6ee35da4d1.png?wh=1294%2A539" title="优秀的分组密码工作模式[br]更难以从密文中发现规律，图参见wiki" /></a></p>
 <p>比如，CBC分组模式中，只有第1组明文加密完成后，才能对第2组加密，因为第2组加密时会用到第1组生成的密文。因此，CBC必然无法并行计算。在材料科学出现瓶颈、单核频率不再提升的当下，CPU都在向多核方向发展，而CBC分组模式无法使用多核的并行计算能力，性能受到很大影响。<strong>所以，通常我们应选择可以并行计算的GCM分组模式，这也是当下互联网中最常见的AES分组算法。</strong></p>
 <p>由于AES算法中的替换法、行移位等流程对CPU指令并不友好，所以Intel在2008年推出了支持<a href="https://zh.wikipedia.org/wiki/AES%E6%8C%87%E4%BB%A4%E9%9B%86">AES-NI指令集</a>的CPU，能够将AES算法的执行速度从每字节消耗28个时钟周期（参见<a href="https://www.cryptopp.com/benchmarks-p4.html">这里</a>），降低至3.5个时钟周期（参见<a href="https://groups.google.com/forum/#!msg/cryptopp-users/5x-vu0KwFRk/CO8UIzwgiKYJ">这里</a>）。在Linux上你可以用下面这行命令查看CPU是否支持AES-NI指令集：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a># sort -u /proc/crypto | grep module |grep aes
@@ -14533,7 +14533,7 @@
 <p>早期解决密钥传递的是<a href="https://en.wikipedia.org/wiki/RSA_%28cryptosystem%29">RSA</a> 密钥协商算法。当你部署TLS证书到服务器上时，证书文件中包含一对公私钥（参见<a href="https://zh.wikipedia.org/wiki/%E5%85%AC%E5%BC%80%E5%AF%86%E9%92%A5%E5%8A%A0%E5%AF%86">非对称加密</a>），其中，公钥会在握手阶段传递给客户端。在RSA密钥协商算法中，客户端会生成随机密钥（事实上是生成密钥的种子参数），并使用服务器的公钥加密后再传给服务器。根据非对称加密算法，公钥加密的消息仅能通过私钥解密，这样服务器解密后，双方就得到了相同的密钥，再用它加密应用消息。</p>
 <p><strong>RSA密钥协商算法的最大问题是不支持前向保密</strong>（<a href="https://zh.wikipedia.org/wiki/%E5%89%8D%E5%90%91%E4%BF%9D%E5%AF%86">Forward Secrecy</a>），一旦服务器的私钥泄露，过去被攻击者截获的所有TLS通讯密文都会被破解。解决前向保密的是<a href="https://zh.wikipedia.org/wiki/%E8%BF%AA%E8%8F%B2-%E8%B5%AB%E7%88%BE%E6%9B%BC%E5%AF%86%E9%91%B0%E4%BA%A4%E6%8F%9B">DH（Diffie–Hellman）密钥协商算法</a>。</p>
 <p>我们简单看下DH算法的工作流程。通讯双方各自独立生成随机的数字作为私钥，而后依据公开的算法计算出各自的公钥，并通过未加密的TLS握手发给对方。接着，根据对方的公钥和自己的私钥，双方各自独立运算后能够获得相同的数字，这就可以作为后续对称加密时使用的密钥。<strong>即使攻击者截获到明文传递的公钥，查询到公开的DH计算公式后，在不知道私钥的情况下，也是无法计算出密钥的。</strong>这样，DH算法就可以在握手阶段生成随机的新密钥，实现前向保密。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9f/1d/9f5ab0e7f64497c825a927782f58f31d.png?wh=1488%2A340" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9f/1d/9f5ab0e7f64497c825a927782f58f31d.png?wh=1488%2A340" /></p>
 <p>DH算法的计算速度很慢，如上图所示，计算公钥以及最终的密钥时，需要做大量的乘法运算，而且为了保障安全性，这些数字的位数都很长。为了提升DH密钥交换算法的性能，诞生了当下广为使用的<a href="https://zh.wikipedia.org/wiki/%E6%A9%A2%E5%9C%93%E6%9B%B2%E7%B7%9A%E8%BF%AA%E8%8F%B2-%E8%B5%AB%E7%88%BE%E6%9B%BC%E9%87%91%E9%91%B0%E4%BA%A4%E6%8F%9B">ECDH密钥交换算法</a>，<strong>ECDH在DH算法的基础上利用<a href="https://zh.wikipedia.org/wiki/%E6%A4%AD%E5%9C%86%E6%9B%B2%E7%BA%BF">ECC椭圆曲线</a>特性，可以用更少的计算量计算出公钥以及最终的密钥。</strong></p>
 <p>依据解析几何，椭圆曲线实际对应一个函数，而不同的曲线便有不同的函数表达式，目前不被任何已知专利覆盖的最快椭圆曲线是<a href="https://en.wikipedia.org/wiki/Curve25519">X25519曲线</a>，它的表达式是y2 = x3 + 486662x2 + x。因此，当通讯双方协商使用X25519曲线用于ECDH算法时，只需要传递X25519这个字符串即可。在Nginx上，你可以使用ssl_ecdh_curve指令配置想使用的曲线：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>ssl_ecdh_curve X25519:secp384r1;
@@ -14550,7 +14550,7 @@
 <h2 id="tls13">为什么应当尽快升级到TLS1.3？</h2>
 <p>TLS1.3（参见<a href="https://tools.ietf.org/html/rfc8446">RFC8446</a>）对性能的最大提升，在于它把TLS握手时间从2个RTT降为1个RTT。</p>
 <p>在TLS1.2的握手中，先要通过Client Hello和Server Hello消息协商出后续使用的加密算法，再互相交换公钥并计算出最终密钥。<strong>TLS1.3中把Hello消息和公钥交换合并为一步，这就减少了一半的握手时间</strong>，如下图所示：</p>
-<p><a href="https://www.ssl2buy.com/wiki/tls-1-3-protocol-released-move-ahead-to-advanced-security-and-privacy"><img alt="" src="https://static001.geekbang.org/resource/image/49/20/4924f22447eaf0cc443aac9b2d483020.png?wh=1832%2A1290" title="TLS1.3相对TLS1.2，减少了1个RTT的握手时间[br]图片来自www.ssl2buy.com" /></a></p>
+<p><a href="https://www.ssl2buy.com/wiki/tls-1-3-protocol-released-move-ahead-to-advanced-security-and-privacy" referrerpolicy="no-referrer"><img alt="" src="https://static001.geekbang.org/resource/image/49/20/4924f22447eaf0cc443aac9b2d483020.png?wh=1832%2A1290" title="TLS1.3相对TLS1.2，减少了1个RTT的握手时间[br]图片来自www.ssl2buy.com" /></a></p>
 <p>那TLS1.3握手为什么只需要1个RTT就可以完成呢？因为TLS1.3支持的密钥协商算法大幅度减少了，这样，客户端尽可以把常用DH算法的公钥计算出来，并与协商加密算法的HELLO消息一起发送给服务器，服务器也作同样处理，这样仅用1个RTT就可以协商出密钥。</p>
 <p>而且，TLS1.3仅支持目前最安全的几个算法，比如openssl中仅支持下面5种安全套件：</p>
 <ul>
@@ -14562,7 +14562,7 @@
 </ul>
 <p>相较起来，TLS1.2支持各种古老的算法，中间人可以利用<a href="https://en.wikipedia.org/wiki/Downgrade_attack">降级攻击</a>，在握手阶段把加密算法替换为不安全的算法，从而轻松地破解密文。如前文提到过的DES算法，由于密钥位数只有56位，很容易破解。</p>
 <p>因此，<strong>无论从性能还是安全角度上，你都应该尽快把TLS版本升级到1.3。</strong>你可以用<a href="https://www.ssllabs.com/ssltest/index.html">这个网址</a>测试当前站点是否支持TLS1.3。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a8/57/a816a361d7f47303cbfeb10035a96d57.png?wh=1051%2A794" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a8/57/a816a361d7f47303cbfeb10035a96d57.png?wh=1051%2A794" /></p>
 <p>如果不支持，还可以参见<a href="https://time.geekbang.org/dailylesson/detail/100028440">每日一课《TLS1.3原理及在Nginx上的应用》</a>，升级Nginx到TLS1.3版本。</p>
 <h2 id="_3">小结</h2>
 <p>这一讲，我们介绍了TLS协议的优化方法。</p>
@@ -14697,8 +14697,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

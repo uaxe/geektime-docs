@@ -14734,12 +14734,12 @@
 <p>那么，Pika是如何解决这两方面的问题呢？这就要提到Pika中的关键模块RocksDB、binlog机制和Nemo了，这些模块都是Pika架构中的重要组成部分。所以，接下来，我们就来先看下Pika的整体架构。</p>
 <h2 id="pika">Pika的整体架构</h2>
 <p>Pika键值数据库的整体架构中包括了五部分，分别是网络框架、Pika线程模块、Nemo存储模块、RocksDB和binlog机制，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a1/e7/a1421b8dbca6bb1ee9b6c1be7a929ae7.jpg?wh=1486%2A1469" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a1/e7/a1421b8dbca6bb1ee9b6c1be7a929ae7.jpg?wh=1486%2A1469" /></p>
 <p>这五个部分分别实现了不同的功能，下面我一个个来介绍下。</p>
 <p>首先，网络框架主要负责底层网络请求的接收和发送。Pika的网络框架是对操作系统底层的网络函数进行了封装。Pika在进行网络通信时，可以直接调用网络框架封装好的函数。</p>
 <p>其次，Pika线程模块采用了多线程模型来具体处理客户端请求，包括一个请求分发线程（DispatchThread）、一组工作线程（WorkerThread）以及一个线程池（ThreadPool）。</p>
 <p>请求分发线程专门监听网络端口，一旦接收到客户端的连接请求后，就和客户端建立连接，并把连接交由工作线程处理。工作线程负责接收客户端连接上发送的具体命令请求，并把命令请求封装成Task，再交给线程池中的线程，由这些线程进行实际的数据存取处理，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/46/06/4627f13848167cdaa3b30370d9b80a06.jpg?wh=3000%2A1676" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/46/06/4627f13848167cdaa3b30370d9b80a06.jpg?wh=3000%2A1676" /></p>
 <p>在实际应用Pika的时候，我们可以通过增加工作线程数和线程池中的线程数，来提升Pika的请求处理吞吐率，进而满足业务层对数据处理性能的需求。</p>
 <p>Nemo模块很容易理解，它实现了Pika和Redis的数据类型兼容。这样一来，当我们把Redis服务迁移到Pika时，不用修改业务应用中操作Redis的代码，而且还可以继续应用运维Redis的经验，这使得Pika的学习成本就较低。Nemo模块对数据类型的具体转换机制是我们要重点关心的，下面我会具体介绍。</p>
 <p>最后，我们再来看看RocksDB提供的基于SSD保存数据的功能。它使得Pika可以不用大容量的内存，就能保存更多数据，还避免了使用内存快照。而且，Pika使用binlog机制记录写命令，用于主从节点的命令同步，避免了刚刚所说的大内存实例在主从同步过程中的潜在问题。</p>
@@ -14747,11 +14747,11 @@
 <h2 id="pikassd">Pika如何基于SSD保存更多数据？</h2>
 <p>为了把数据保存到SSD，Pika使用了业界广泛应用的持久化键值数据库<a href="https://rocksdb.org/">RocksDB</a>。RocksDB本身的实现机制较为复杂，你不需要全部弄明白，你只要记住RocksDB的基本数据读写机制，对于学习了解Pika来说，就已经足够了。下面我来解释下这个基本读写机制。</p>
 <p>下面我结合一张图片，来给你具体介绍下RocksDB写入数据的基本流程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/95/1d/95d97d3cf0f1555b65b47fb256b7b81d.jpg?wh=3000%2A2139" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/95/1d/95d97d3cf0f1555b65b47fb256b7b81d.jpg?wh=3000%2A2139" /></p>
 <p>当Pika需要保存数据时，RocksDB会使用两小块内存空间（Memtable1和Memtable2）来交替缓存写入的数据。Memtable的大小可以设置，一个Memtable的大小一般为几MB或几十MB。当有数据要写入RocksDB时，RocksDB会先把数据写入到Memtable1。等到Memtable1写满后，RocksDB再把数据以文件的形式，快速写入底层的SSD。同时，RocksDB会使用Memtable2来代替Memtable1，缓存新写入的数据。等到Memtable1的数据都写入SSD了，RocksDB会在Memtable2写满后，再用Memtable1缓存新写入的数据。</p>
 <p>这么一分析你就知道了，RocksDB会先用Memtable缓存数据，再将数据快速写入SSD，即使数据量再大，所有数据也都能保存到SSD中。而且，Memtable本身容量不大，即使RocksDB使用了两个Memtable，也不会占用过多的内存，这样一来，Pika在保存大容量数据时，也不用占据太大的内存空间了。</p>
 <p>当Pika需要读取数据的时候，RocksDB会先在Memtable中查询是否有要读取的数据。这是因为，最新的数据都是先写入到Memtable中的。如果Memtable中没有要读取的数据，RocksDB会再查询保存在SSD上的数据文件，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/aa/3b/aa70655efbb767af499a83bd6521ee3b.jpg?wh=2479%2A971" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/aa/3b/aa70655efbb767af499a83bd6521ee3b.jpg?wh=2479%2A971" /></p>
 <p>到这里，你就了解了，当使用了RocksDB保存数据后，Pika就可以把大量数据保存到大容量的SSD上了，实现了大容量实例。不过，我刚才向你介绍过，当使用大内存实例保存大量数据时，Redis会面临RDB生成和恢复的效率问题，以及主从同步时的效率和缓冲区溢出问题。那么，当Pika保存大量数据时，还会面临相同的问题吗？</p>
 <p>其实不会了，我们来分析一下。</p>
 <p>一方面，Pika基于RocksDB保存了数据文件，直接读取数据文件就能恢复，不需要再通过内存快照进行恢复了。而且，Pika从库在进行全量同步时，可以直接从主库拷贝数据文件，不需要使用内存快照，这样一来，Pika就避免了大内存快照生成效率低的问题。</p>
@@ -14770,14 +14770,14 @@
 <p>Nemo模块通过转换操作，把这4种集合类型的元素表示为单值的键值对。具体怎么转换呢？下面我们来分别看下每种类型的转换。</p>
 <p>首先我们来看List类型。在Pika中，List集合的key被嵌入到了单值键值对的键当中，用key字段表示；而List集合的元素值，则被嵌入到单值键值对的值当中，用value字段表示。因为List集合中的元素是有序的，所以，Nemo模块还在单值键值对的key后面增加了sequence字段，表示当前元素在List中的顺序，同时，还在value的前面增加了previous sequence和next sequence这两个字段，分别表示当前元素的前一个元素和后一个元素。</p>
 <p>此外，在单值键值对的key前面，Nemo模块还增加了一个值“l”，表示当前数据是List类型，以及增加了一个1字节的size字段，表示List集合key的大小。在单值键值对的value后面，Nemo模块还增加了version和ttl字段，分别表示当前数据的版本号和剩余存活时间（用来支持过期key功能），如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/06/05/066465f1a28b6f14a42c1fc3a3f73105.jpg?wh=3000%2A1056" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/06/05/066465f1a28b6f14a42c1fc3a3f73105.jpg?wh=3000%2A1056" /></p>
 <p>我们再来看看Set集合。</p>
 <p>Set集合的key和元素member值，都被嵌入到了Pika单值键值对的键当中，分别用key和member字段表示。同时，和List集合类似，单值键值对的key前面有值“s”，用来表示数据是Set类型，同时还有size字段，用来表示key的大小。Pika单值键值对的值只保存了数据的版本信息和剩余存活时间，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/aa/71/aa20c1456526dbf3f7d30f9d865f0f71.jpg?wh=2318%2A936" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/aa/71/aa20c1456526dbf3f7d30f9d865f0f71.jpg?wh=2318%2A936" /></p>
 <p>对于Hash类型来说，Hash集合的key被嵌入到单值键值对的键当中，用key字段表示，而Hash集合元素的field也被嵌入到单值键值对的键当中，紧接着key字段，用field字段表示。Hash集合元素的value则是嵌入到单值键值对的值当中，并且也带有版本信息和剩余存活时间，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/63/b9/6378f7045393ae342632189a4ab601b9.jpg?wh=2813%2A851" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/63/b9/6378f7045393ae342632189a4ab601b9.jpg?wh=2813%2A851" /></p>
 <p>最后，对于Sorted Set类型来说，该类型是需要能够按照集合元素的score值排序的，而RocksDB只支持按照单值键值对的键来排序。所以，Nemo模块在转换数据时，就把Sorted Set集合key、元素的score和member值都嵌入到了单值键值对的键当中，此时，单值键值对中的值只保存了数据的版本信息和剩余存活时间，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a0/a8/a0bc4d00a5d95e7fd2699945ff7a56a8.jpg?wh=3000%2A940" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a0/a8/a0bc4d00a5d95e7fd2699945ff7a56a8.jpg?wh=3000%2A940" /></p>
 <p>采用了上面的转换方式之后，Pika不仅能兼容支持Redis的数据类型，而且还保留了这些数据类型的特征，例如List的元素保序、Sorted Set的元素按score排序。了解了Pika的转换机制后，你就会明白，如果你有业务应用计划从使用Redis切换到使用Pika，就不用担心面临因为操作接口不兼容而要修改业务应用的问题了。</p>
 <p>经过刚刚的分析，我们可以知道，Pika能够基于SSD保存大容量数据，而且和Redis兼容，这是它的两个优势。接下来，我们再来看看，跟Redis相比，Pika的其他优势，以及潜在的不足。当在实际应用Pika时，Pika的不足之处是你需要特别注意的地方，这些可能都需要你进行系统配置或参数上的调优。</p>
 <h2 id="pika_1">Pika的其他优势与不足</h2>
@@ -14789,7 +14789,7 @@
 <p>虽然它保持了Redis操作接口，也能实现数据库扩容，但是，当把数据保存到SSD上后，会降低数据的访问性能。这是因为，数据操作毕竟不能在内存中直接执行了，而是要在底层的SSD中进行存取，这肯定会影响，Pika的性能。而且，我们还需要把binlog机制记录的写命令同步到SSD上，这会降低Pika的写性能。</p>
 <p>不过，Pika的多线程模型，可以同时使用多个线程进行数据读写，这在一定程度上弥补了从SSD存取数据造成的性能损失。当然，你也可以使用高配的SSD来提升访问性能，进而减少读写SSD对Pika性能的影响。</p>
 <p>为了帮助你更直观地了解Pika的性能情况，我再给你提供一张表，这是Pika<a href="https://github.com/Qihoo360/pika/wiki/3.2.x-Performance">官网</a>上提供的测试数据。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6f/c5/6fed4a269a79325efd6fa4fb17fc44c5.jpg?wh=1456%2A716" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6f/c5/6fed4a269a79325efd6fa4fb17fc44c5.jpg?wh=1456%2A716" /></p>
 <p>这些数据是在Pika 3.2版本中，String和Hash类型在多线程情况下的基本操作性能结果。从表中可以看到，在不写binlog时，Pika的SET/GET、HSET/HGET的性能都能达到200K OPS以上，而一旦增加了写binlog操作，SET和HSET操作性能大约下降了41%，只有约120K OPS。</p>
 <p>所以，我们在使用Pika时，需要在单实例扩容的必要性和可能的性能损失间做个权衡。如果保存大容量数据是我们的首要需求，那么，Pika是一个不错的解决方案。</p>
 <h2 id="_1">小结</h2>
@@ -14953,8 +14953,6 @@ binlog 机制在 MySQL 那已经玩烂了。。。</p>2020-10-25</li><br/><li><s
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -14548,9 +14548,9 @@
 <h2 id="_2">消费者组状态机</h2>
 <p>重平衡一旦开启，Broker端的协调者组件就要开始忙了，主要涉及到控制消费者组的状态流转。当前，Kafka设计了一套消费者组状态机（State Machine），来帮助协调者完成整个重平衡流程。严格来说，这套状态机属于非常底层的设计，Kafka官网上压根就没有提到过，但你最好还是了解一下，因为<strong>它能够帮助你搞懂消费者组的设计原理，比如消费者组的过期位移（Expired Offsets）删除等</strong>。</p>
 <p>目前，Kafka为消费者组定义了5种状态，它们分别是：Empty、Dead、PreparingRebalance、CompletingRebalance和Stable。那么，这5种状态的含义是什么呢？我们一起来看看下面这张表格。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3c/8b/3c281189cfb1d87173bc2d4b8149f38b.jpeg?wh=529%2A414" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3c/8b/3c281189cfb1d87173bc2d4b8149f38b.jpeg?wh=529%2A414" /></p>
 <p>了解了这些状态的含义之后，我们来看一张图片，它展示了状态机的各个状态流转。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a9/72/a97eb0e0ee2b97abaf2762b6e79d5b72.jpg?wh=3580%2A1505" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a9/72/a97eb0e0ee2b97abaf2762b6e79d5b72.jpg?wh=3580%2A1505" /></p>
 <p>我来解释一下消费者组启动时的状态流转过程。一个消费者组最开始是Empty状态，当重平衡过程开启后，它会被置于PreparingRebalance状态等待成员加入，之后变更到CompletingRebalance状态等待分配方案，最后流转到Stable状态完成重平衡。</p>
 <p>当有新成员加入或已有成员退出时，消费者组的状态从Stable直接跳到PreparingRebalance状态，此时，所有现存成员就必须重新申请加入组。当所有成员都退出组后，消费者组状态变更为Empty。Kafka定期自动删除过期位移的条件就是，组要处于Empty状态。因此，如果你的消费者组停掉了很长时间（超过7天），那么Kafka很可能就把该组的位移数据删除了。我相信，你在Kafka的日志中一定经常看到下面这个输出：</p>
 <blockquote>
@@ -14565,10 +14565,10 @@
 <p>选出领导者之后，协调者会把消费者组订阅信息封装进JoinGroup请求的响应体中，然后发给领导者，由领导者统一做出分配方案后，进入到下一步：发送SyncGroup请求。</p>
 <p>在这一步中，领导者向协调者发送SyncGroup请求，将刚刚做出的分配方案发给协调者。值得注意的是，其他成员也会向协调者发送SyncGroup请求，只不过请求体中并没有实际的内容。这一步的主要目的是让协调者接收分配方案，然后统一以SyncGroup响应的方式分发给所有成员，这样组内所有成员就都知道自己该消费哪些分区了。</p>
 <p>接下来，我用一张图来形象地说明一下JoinGroup请求的处理过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/33/66/33cff6094ce29ec1111c8cdc817bb266.jpg?wh=3320%2A2005" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/33/66/33cff6094ce29ec1111c8cdc817bb266.jpg?wh=3320%2A2005" /></p>
 <p>就像前面说的，JoinGroup请求的主要作用是将组成员订阅信息发送给领导者消费者，待领导者制定好分配方案后，重平衡流程进入到SyncGroup请求阶段。</p>
 <p>下面这张图描述的是SyncGroup请求的处理流程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/84/5b/84b0ffeef5cc382913a4e6cc5a4c675b.jpg?wh=3305%2A1880" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/84/5b/84b0ffeef5cc382913a4e6cc5a4c675b.jpg?wh=3305%2A1880" /></p>
 <p>SyncGroup请求的主要目的，就是让协调者把领导者制定的分配方案下发给各个组内成员。当所有成员都成功接收到分配方案后，消费者组进入到Stable状态，即开始正常的消费工作。</p>
 <p>讲完这里，<strong>消费者端</strong>的重平衡流程我已经介绍完了。接下来，我们从<strong>协调者端</strong>来看一下重平衡是怎么执行的。</p>
 <h2 id="broker">Broker端重平衡场景剖析</h2>
@@ -14576,19 +14576,19 @@
 <p><strong>场景一：新成员入组。</strong></p>
 <p>新成员入组是指组处于Stable状态后，有新成员加入。如果是全新启动一个消费者组，Kafka是有一些自己的小优化的，流程上会有些许的不同。我们这里讨论的是，组稳定了之后有新成员加入的情形。</p>
 <p>当协调者收到新的JoinGroup请求后，它会通过心跳请求响应的方式通知组内现有的所有成员，强制它们开启新一轮的重平衡。具体的过程和之前的客户端重平衡流程是一样的。现在，我用一张时序图来说明协调者一端是如何处理新成员入组的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/27/7e/2792e00ac3206f63d8036802f4fbd77e.jpg?wh=5355%2A2670" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/27/7e/2792e00ac3206f63d8036802f4fbd77e.jpg?wh=5355%2A2670" /></p>
 <p><strong>场景二：组成员主动离组。</strong></p>
 <p>何谓主动离组？就是指消费者实例所在线程或进程调用close()方法主动通知协调者它要退出。这个场景就涉及到了第三类请求：<strong>LeaveGroup请求</strong>。协调者收到LeaveGroup请求后，依然会以心跳响应的方式通知其他成员，因此我就不再赘述了，还是直接用一张图来说明。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b0/59/b0d3bc97d7b59a697yy043f1f6b79059.jpg?wh=5355%2A2670" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b0/59/b0d3bc97d7b59a697yy043f1f6b79059.jpg?wh=5355%2A2670" /></p>
 <p><strong>场景三：组成员崩溃离组。</strong></p>
 <p><strong>崩溃离组是指消费者实例出现严重故障，突然宕机导致的离组</strong>。它和主动离组是有区别的，因为后者是主动发起的离组，协调者能马上感知并处理。但崩溃离组是被动的，协调者通常需要等待一段时间才能感知到，这段时间一般是由消费者端参数session.timeout.ms控制的。也就是说，Kafka一般不会超过session.timeout.ms就能感知到这个崩溃。当然，后面处理崩溃离组的流程与之前是一样的，我们来看看下面这张图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c0/af/c033ea2f7d714fa25eb86e21612e38af.jpg?wh=5355%2A2670" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c0/af/c033ea2f7d714fa25eb86e21612e38af.jpg?wh=5355%2A2670" /></p>
 <p><strong>场景四：重平衡时协调者对组内成员提交位移的处理。</strong></p>
 <p>正常情况下，每个组内成员都会定期汇报位移给协调者。当重平衡开启时，协调者会给予成员一段缓冲时间，要求每个成员必须在这段时间内快速地上报自己的位移信息，然后再开启正常的JoinGroup/SyncGroup请求发送。还是老办法，我们使用一张图来说明。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f6/44/f60a3852e743c0877753141ec5d2d944.jpg?wh=5355%2A2670" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f6/44/f60a3852e743c0877753141ec5d2d944.jpg?wh=5355%2A2670" /></p>
 <h2 id="_4">小结</h2>
 <p>好了，消费者重平衡流程我已经全部讲完了。虽然全程我都是拿两个成员来举例子，但你可以很容易地扩展到多个成员的消费者组，毕竟它们的原理是相同的。我希望你能多看几遍今天的内容，彻底掌握Kafka的消费者重平衡流程。社区正在对目前的重平衡流程做较大程度的改动，如果你不了解这些基础的设计原理，后面想深入学习这部分内容的话，会十分困难。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6f/73/6f0aaf535180899b16923dc3c76ad373.jpg?wh=2069%2A2580" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6f/73/6f0aaf535180899b16923dc3c76ad373.jpg?wh=2069%2A2580" /></p>
 <h2 id="_5">开放讨论</h2>
 <p>在整个重平衡过程中，组内所有消费者实例都会暂停消费，用JVM GC的术语来说就是，重平衡过程是一个stop the world操作。请思考一下，针对这个问题，我们该如何改进这个过程？我们是否能允许部分消费者在重平衡过程中继续消费，以提升消费者端的可用性以及吞吐量？</p>
 <p>欢迎写下你的思考和答案，我们一起讨论。如果你觉得有所收获，也欢迎把文章分享给你的朋友。</p>
@@ -14722,8 +14722,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

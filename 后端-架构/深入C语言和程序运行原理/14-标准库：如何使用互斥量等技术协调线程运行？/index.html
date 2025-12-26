@@ -14628,7 +14628,7 @@
 <p>相反，mtx_recursive 类型的互斥量也被称为“可重入互斥量（Reentrant Mutex）”，顾名思义，它可以被用在需要重复加锁的场景中。该类型互斥量可以被同一个线程重复锁定多次，而不会阻塞线程。但相应地，对它的完全解锁也需要执行对应多次的 mtx_unlock。</p>
 <p>而最后一种是 mtx_timed 类型的互斥量，它具有特殊的“超时属性”。这意味着，通过配合使用 mtx_timedlock 函数，我们可以实现“带超时限制的互斥量加锁”，即线程在尝试给对应互斥量加锁时，只会以阻塞的方式等待一定时间。若超过给定时间后仍未给互斥量成功上锁，则线程继续执行。</p>
 <p>除了上面提到过的函数，C 标准库还提供了另外两个与“互斥”有关的函数。这里，我将它们整理在了下面的表格中，供你参考。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/78/17/78714c4df8217a2fc56b750301722817.jpg?wh=1920x536" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/78/17/78714c4df8217a2fc56b750301722817.jpg?wh=1920x536" /></p>
 <p>利用互斥锁能够帮助我们解决数据竞争问题，但在某些对性能要求更加严苛的场景下，它可能并非最好的选择。接下来，让我们来看看另一种可以避免数据竞争的方式，原子操作。</p>
 <h2 id="_2">使用原子操作</h2>
 <p>原子是化学反应中不可被继续分割的基本微粒，那么顾名思义，“原子操作”的意思就是操作本身无法再被划分为更细的步骤。当我们在多个不同线程中对共享资源进行原子操作时，编译器和 CPU 将会保证这些操作的正确执行，即同一时刻只会有一个线程在进行这些操作。而只有在该线程将整个操作全部执行完毕后，其他线程才可以继续执行同样的操作。</p>
@@ -14693,15 +14693,15 @@
 </code></pre></div>
 <p>可以看到，我们修改了线程 run 和 observe 中对原子类型变量 x 和 y 的读写操作。其中，函数 atomic_load_explicit 用来读取某个原子类型变量的值；而对它们的修改，则使用函数 atomic_store_explicit 进行。除此之外，这两个函数都支持通过它们的最后一个参数，来指定相应操作需要遵循的内存顺序。</p>
 <p>在这段修改后的代码中，一共使用到了三种不同的内存顺序（对应三个枚举值）。首先，我们来看看它们的具体定义。为了方便你观察，我将这些信息整理在了下面的表格中。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/37/3c/377071e6c666ddc088d3ea27f255793c.jpg?wh=1920x689" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/37/3c/377071e6c666ddc088d3ea27f255793c.jpg?wh=1920x689" /></p>
 <p>相信看过这三种内存顺序的定义后，你已经对它们的作用有个大致了解了。其中，对于使用了 memory_order_relaxed 的操作，我们并不需要对它们的执行顺序做任何保证。相反，编译器和处理器可以按照需求进行适当的优化。</p>
 <p>而在 run 线程中，为了保证对变量 x 的修改过程一定发生在变量 y 的值被修改前，我们便需要使用 memory_order_release 来限制对变量 y 的修改，一定要在之前的所有修改都完成后再进行。同样地，对于 observe 线程来说，为了防止处理器提前将变量 x 的值放入缓存，这里，我们也需要通过 memory_order_acquire，来保证对变量 y 进行的读操作一定会比对变量 x 的读操作先发生。你可以通过下面这张图片，直观地理解上面我们提到的各个操作之间的执行关系。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/62/71/6249a06dd718c52159bd57a423005871.jpg?wh=2248x1467" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/62/71/6249a06dd718c52159bd57a423005871.jpg?wh=2248x1467" /></p>
 <p>除了我们在上面的例子中用到的三种内存顺序外，C 语言还提供了另外 3 种不同的内存顺序，供我们在不同的场景中使用。如果想了解关于它们的更多信息，你可以参考<a href="https://en.cppreference.com/w/c/atomic/memory_order">这个链接</a>。</p>
 <p>总的来看，C11 通过 stdatomic.h 头文件为我们提供了大量可用于原子操作的相关类型、宏，以及函数。相较于使用互斥量，原子操作可以让我们更加清晰和方便地抽象并行代码，而不需要频繁进行加锁与释放锁的操作。</p>
 <p>不仅如此，从执行性能角度，原子操作的执行通常直接依赖于 CPU 提供的相应的原子机器指令，比如在 x86-64 平台上，atomic_fetch_add_explicit 函数对应的 <code>lock add</code> 指令。而使用互斥量则需要让线程阻塞，还要频繁进行上下文切换，因此与之相比，原子操作的性能通常会更好。</p>
 <p>这里，我将一些与原子操作相关的常用标准库函数整理在了下面的表格中，供你参考。你也可以点击<a href="https://en.cppreference.com/w/c/atomic">这个链接</a>，查看更多信息。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/01/7a/0162c8f6488551746c1364f39994f47a.jpg?wh=1920x1182" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/01/7a/0162c8f6488551746c1364f39994f47a.jpg?wh=1920x1182" /></p>
 <h2 id="_3">使用条件变量</h2>
 <p>条件变量是一种常用的线程同步机制。通过上一小节的例子，你会发现，在多线程应用中，存在着一种十分常见的线程间同步模式，即某个线程的执行依赖于另一个线程对数据首先进行的预处理。在上面的例子中，observe 线程中某段逻辑的执行需要等待 run 线程将原子变量 y 的值变为 20。这里，我们通过“忙等待（Busy Waiting）”的方式实现了这个效果。</p>
 <p>用忙等待虽然可以达到我们的预期，但这是一种十分“昂贵”的方式，甚至会被认为是一种反模式，应该避免使用。这是因为，忙等待需要让线程反复检查某个条件是否为真，因此，需要浪费大量宝贵的 CPU 资源在无用的活动上。那么，有没有更好的办法，既可以尽量减少处理器资源的浪费，又能够解决线程间数据依赖的问题呢？答案是有的，这个方法就是使用条件变量。</p>
@@ -14743,7 +14743,7 @@
 <p>这里，我向你提一个小问题：为什么我们在代码的第 20 行使用 <code>while</code> 语句，而不是 <code>if</code> 语句呢？欢迎在评论区告诉我你的答案。</p>
 <p>在并发编程中，条件变量是一个十分强大的武器。通过它，我们可以进一步实现监视器（Monitor）、管程等工具和同步原语。而且，它也可以很好地解决经典的生产者-消费者问题。如果你对这部分内容感兴趣，可以参考《C++ Concurrency in Action》和《现代操作系统》等书，来进行更加深入的学习。虽然它们并不会专门介绍基于 C 语言的并发编程，但其中的很多概念，甚至 C++ 接口，与 C 语言都是类似和相通的。</p>
 <p>除了上述代码中用到的条件变量方法外，C 标准库还提供了另外两个常用函数。我将它们整理在了下面的表格中，供你参考。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b8/d9/b86fe8de3106d0430523ea29833d02d9.jpg?wh=1920x666" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b8/d9/b86fe8de3106d0430523ea29833d02d9.jpg?wh=1920x666" /></p>
 <p>最后，让我们再回过头来，看看与线程直接相关的另一个内容，线程本地变量。</p>
 <h2 id="_4">使用线程本地变量</h2>
 <p>除了可以共享存在于进程内的全局变量外，线程还可以拥有属于它自己的线程本地变量（TLS）。</p>
@@ -14775,10 +14775,10 @@
 <p>可以看到，这段代码的逻辑十分简单：我们创建了 10 个（对应 THREAD_COUNT）线程，让它们同时对全局变量 counter 进行累加，并持续 10000 次（对应 THREAD_LOOP）。然后，在 main 线程的最后，我们将累加后的值打印了出来。</p>
 <p>看到这里，相信你的第一感觉肯定是：应该通过互斥锁或原子操作等方式，来防止多个线程在对 counter 变量进行修改时产生数据竞争。但在这里，我却没有这样做，而是采用了一种更加便捷的方式。这一切，都要得益于线程本地变量的存在。</p>
 <p>在代码的第 6 行，我们使用 <code>_Thread_local</code> 关键字（也可以使用宏 thread_local），将全局变量 counter 标记为线程本地变量。这意味着，每个线程都会在创建时生成仅属于当前线程的变量 counter。因此，当本线程在对 counter 变量进行累加时，便不会受到其他线程的影响。而当线程退出时，通过代码第 18 行的 thrd_join，我们得以在 main 线程中将每个结束线程返回的，各自的 counter 值再进行统一累加，从而得到最后的计算结果。你可以通过下图来直观地理解这个过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1e/de/1e4ba90a95a72yyd1a458a50299b6cde.jpg?wh=2248x1764" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1e/de/1e4ba90a95a72yyd1a458a50299b6cde.jpg?wh=2248x1764" /></p>
 <p>总之，线程本地变量为我们提供了另一种可以避免数据竞争的方式。除此之外，它也可以被用来存储线程独有的一些信息，比如 errno 的值。</p>
 <p>我们在上面代码中使用的是<strong>以关键字来定义线程本地变量的方式</strong>，除此之外，标准库还提供了一系列的函数，可以实现同样的目的。但不同之处在于，通过 tss_create 等函数来创建线程本地变量时，还可以为其指定对应的析构函数。这样，当线程退出时，便可以确保相应的线程本地资源（比如堆内存）能够以正确的方式被清理。这里，我将相关的函数列在了下面的表格中，供你参考。你也可以点击<a href="https://en.cppreference.com/w/c/atomic">这个链接</a>查看更多信息。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/00/ec/00980e87a07d7e1f63f4yyc010033eec.jpg?wh=1920x653" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/00/ec/00980e87a07d7e1f63f4yyc010033eec.jpg?wh=1920x653" /></p>
 <h2 id="_5">总结</h2>
 <p>好了，讲到这里，今天的内容也就基本结束了。最后我来给你总结一下。</p>
 <p>在本讲中，我主要介绍了有关互斥量、原子操作、条件变量，以及线程本地变量的相关内容。合理地使用这些方式，我们就可以避免多线程应用经常会遇到的，由于数据竞争、竞态条件，以及指令重排引起的问题。</p>
@@ -14940,8 +14940,6 @@ return counter;
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

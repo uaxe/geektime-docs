@@ -6855,7 +6855,7 @@
 <p>你好，我是LMOS。</p>
 <p>从前面的课程我们得知，CPU执行程序、处理数据都要和内存打交道，这个打交道的方式就是内存地址。</p>
 <p>读取指令、读写数据都需要首先告诉内存芯片：hi，内存老哥请你把0x10000地址处的数据交给我……hi，内存老哥，我已经计算完成，请让我把结果写回0x200000地址的空间。这些地址存在于代码指令字段后的常数，或者存在于某个寄存器中。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b0/fc/b0e93b744dfdc62c4a3ce8816b25b1fc.jpg?wh=1736%2A1350" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b0/fc/b0e93b744dfdc62c4a3ce8816b25b1fc.jpg?wh=1736%2A1350" /></p>
 <p>今天，我们就来专门研究一下程序中的地址。说起程序中的地址，不知道你是否好奇过，为啥系统设计者要引入虚拟地址呢？</p>
 <p>我会先带你从一个多程序并发的场景热身，一起思考这会导致哪些问题，为什么能用虚拟地址解决这些问题。</p>
 <p>搞懂原理之后，我还会带你一起探索<strong>虚拟地址和物理地址的关系和转换机制</strong>。在后面的课里，你会发现，我们最宝贵的内存资源正是通过这些机制来管理的。</p>
@@ -6895,14 +6895,14 @@
 <p>那么要怎么实现这个函数呢？</p>
 <p>用软件方式实现太低效，用硬件实现没有灵活性，最终就用了软硬件结合的方式实现，它就是MMU（内存管理单元）。MMU可以接受软件给出的地址对应关系数据，进行地址转换。</p>
 <p>我们先来看看逻辑上的MMU工作原理框架图。如下图所示：
-<img alt="" src="https://static001.geekbang.org/resource/image/d5/99/d582ff647549b8yy986d90e697d33499.jpg?wh=3525%2A1955" title="MMU工作原理图" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d5/99/d582ff647549b8yy986d90e697d33499.jpg?wh=3525%2A1955" title="MMU工作原理图" /></p>
 <p>上图中展示了MMU通过地址关系转换表，将0x80000~0x84000的虚拟地址空间转换成 0x10000~0x14000的物理地址空间，而地址关系转换表本身则是放物理内存中的。</p>
 <p>下面我们不妨想一想地址关系转换表的实现.如果在地址关系转换表中，这样来存放：一个虚拟地址对应一个物理地址。</p>
 <p>那么问题来了，32位地址空间下，4GB虚拟地址的地址关系转换表就会把整个32位物理地址空间用完，这显然不行。</p>
 <p>要是结合前面的保护模式下分段方式呢，地址关系转换表中存放：一个虚拟段基址对应一个物理段基址，这样看似可以，但是因为段长度各不相同，所以依然不可取。</p>
 <p>综合刚才的分析，系统设计者最后采用一个折中的方案，即<strong>把虚拟地址空间和物理地址空间都分成同等大小的块，也称为页，按照虚拟页和物理页进行转换。</strong>根据软件配置不同，这个页的大小可以设置为4KB、2MB、4MB、1GB，这样就进入了现代内存管理模式——<strong>分页模型</strong>。</p>
 <p>下面来看看分页模型框架，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9b/d0/9b19677448ee973c4f3yya6b3af7b4d0.jpg?wh=2801%2A1955" title="分页模型框架图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9b/d0/9b19677448ee973c4f3yya6b3af7b4d0.jpg?wh=2801%2A1955" title="分页模型框架图" /></p>
 <p>结合图片可以看出，一个虚拟页可以对应到一个物理页，由于页大小一经配置就是固定的，所以在地址关系转换表中，只要存放<strong>虚拟页地址对应的物理页地址</strong>就行了。</p>
 <p>我知道，说到这里，也许你仍然没搞清楚MMU和地址关系转换表的细节，别急，我们现在已经具备了研究它们的基础，下面我们就去探索它们。</p>
 <h2 id="mmu">MMU</h2>
@@ -6910,13 +6910,13 @@
 <p>根据实现方式的不同，MMU可以是独立的芯片，也可以是集成在其它芯片内部的，比如集成在CPU内部，x86、ARM系列的CPU就是将MMU集成在CPU核心中的。</p>
 <p>SUN公司的CPU是将独立的MMU芯片卡在总线上的，有一夫当关的架势。下面我们只研究x86 CPU中的MMU。x86 CPU要想开启MMU，就必须先开启保护模式或者长模式，实模式下是不能开启MMU的。</p>
 <p>由于保护模式的内存模型是分段模型，它并不适合于MMU的分页模型，所以我们要使用保护模式的平坦模式，这样就绕过了分段模型。这个平坦模型和长模式下忽略段基址和段长度是异曲同工的。地址产生的过程如下所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b4/88/b41a2bb00e19e662b34a1b7b7c0ae288.jpg?wh=3861%2A1276" title="CPU地址转换图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b4/88/b41a2bb00e19e662b34a1b7b7c0ae288.jpg?wh=3861%2A1276" title="CPU地址转换图" /></p>
 <p>上图中，程序代码中的虚拟地址，经过CPU的分段机制产生了线性地址，平坦模式和长模式下线性地址和虚拟地址是相等的。</p>
 <p>如果不开启MMU，在保护模式下可以关闭MMU，这个线性地址就是物理地址。因为长模式下的分段<strong>弱化了地址空间的隔离</strong>，所以开启MMU是必须要做的，开启MMU才能访问内存地址空间。</p>
 <h3 id="mmu_1">MMU页表</h3>
 <p>现在我们开始研究地址关系转换表，其实它有个更加专业的名字——<strong>页表</strong>。它描述了虚拟地址到物理地址的转换关系，也可以说是虚拟页到物理页的映射关系，所以称为页表。</p>
 <p>为了增加灵活性和节约物理内存空间（因为页表是放在物理内存中的），所以页表中并不存放虚拟地址和物理地址的对应关系，只存放物理页面的地址，MMU以虚拟地址为索引去查表返回物理页面地址，而且页表是分级的，总体分为三个部分：一个顶级页目录，多个中级页目录，最后才是页表，逻辑结构图如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2d/yf/2df904c8ba75065e1491138d63820yyf.jpg?wh=5045%2A3212" title="MMU页表原理图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2d/yf/2df904c8ba75065e1491138d63820yyf.jpg?wh=5045%2A3212" title="MMU页表原理图" /></p>
 <p>从上面可以看出，一个虚拟地址被分成从左至右四个位段。</p>
 <p>第一个位段索引顶级页目录中一个项，该项指向一个中级页目录，然后用第二个位段去索引中级页目录中的一个项，该项指向一个页目录，再用第三个位段去索引页目录中的项，该项指向一个物理页地址，最后用第四个位段作该物理页内的偏移去访问物理内存。<strong>这就是MMU的工作流程。</strong></p>
 <h2 id="_5">保护模式下的分页</h2>
@@ -6927,15 +6927,15 @@
 <p>保护模式下的分页大小通常有两种，一种是4KB大小的页，一种是4MB大小的页。分页大小的不同，会导致虚拟地址位段的分隔和页目录的层级不同，但虚拟页和物理页的大小始终是等同的。</p>
 <h3 id="4kb">保护模式下的分页——4KB页</h3>
 <p>该分页方式下，32位虚拟地址被分为三个位段：<strong>页目录索引、页表索引、页内偏移</strong>，只有一级页目录，其中包含1024个条目 ，每个条目指向一个页表，每个页表中有1024个条目。其中一个条目就指向一个物理页，每个物理页4KB。这正好是4GB地址空间，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/00/f8/00b7f1ef4a1c4f6fc9e6b69109ae0bf8.jpg?wh=4005%2A1450" title="保护模式下的4KB分页" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/00/f8/00b7f1ef4a1c4f6fc9e6b69109ae0bf8.jpg?wh=4005%2A1450" title="保护模式下的4KB分页" /></p>
 <p>上图中CR3就是CPU的一个32位的寄存器，MMU就是根据这个寄存器找到页目录的。下面，我们看看当前分页模式下的CR3、页目录项、页表项的格式。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/36/c9/361c48e1876a412f9ff9f29bf2dbecc9.jpg?wh=4230%2A6255" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/36/c9/361c48e1876a412f9ff9f29bf2dbecc9.jpg?wh=4230%2A6255" /></p>
 <p>可以看到，页目录项、页表项都是4字节32位，1024个项正好是4KB（一个页），因此它们的地址始终是4KB对齐的，所以低12位才可以另作它用，形成了页面的相关属性，如是否存在、是否可读可写、是用户页还是内核页、是否已写入、是否已访问等。</p>
 <h3 id="4mb">保护模式下的分页——4MB页</h3>
 <p>该分页方式下，32位虚拟地址被分为两个位段：<strong>页表索引、页内偏移</strong>，只有一级页目录，其中包含1024个条目。其中一个条目指向一个物理页，每个物理页4MB，正好为4GB地址空间，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/76/52/76932c52a7b6109854f2de72d71bba52.jpg?wh=4005%2A1405" title="保护模式下的4MB分页" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/76/52/76932c52a7b6109854f2de72d71bba52.jpg?wh=4005%2A1405" title="保护模式下的4MB分页" /></p>
 <p>CR3还是32位的寄存器，只不过不再指向顶级页目录了，而是指向一个4KB大小的页表，这个页表依然要4KB地址对齐，其中包含1024个页表项，格式如下图。
-<img alt="" src="https://static001.geekbang.org/resource/image/9a/08/9a4afdc60b790c3e2b7e94b0c7fd4208.jpg?wh=4174%2A4044" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9a/08/9a4afdc60b790c3e2b7e94b0c7fd4208.jpg?wh=4174%2A4044" /></p>
 <p>可以发现，4MB大小的页面下，页表项还是4字节32位，但只需要用高10位来保存物理页面的基地址就可以。因为每个物理页面都是4MB，所以低22位始终为0，为了兼容4MB页表项低8位和4KB页表项一样，只不过第7位变成了PS位，且必须为1，而PAT位移到了12位。</p>
 <h2 id="_6">长模式下的分页</h2>
 <p>如果开启了长模式，则必须同时开启分页模式，因为长模式弱化了分段模型，而分段模型也确实有很多不足，不适应现在操作系统和应用软件的发展。</p>
@@ -6943,19 +6943,19 @@
 <p>长模式下的分页大小通常也有两种，4KB大小的页和2MB大小的页。</p>
 <h3 id="4kb_1">长模式下的分页——4KB页</h3>
 <p>该分页方式下，64位虚拟地址被分为6个位段，分别是：保留位段，顶级页目录索引、页目录指针索引、页目录索引、页表索引、页内偏移，顶级页目录、页目录指针、页目录、页表各占有4KB大小，其中各有512个条目，每个条目8字节64位大小，如下图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ec/c9/ecdea93c2544cf9c1d84461b602b03c9.jpg?wh=4605%2A1845" title="长模式下的4KB分页" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ec/c9/ecdea93c2544cf9c1d84461b602b03c9.jpg?wh=4605%2A1845" title="长模式下的4KB分页" /></p>
 <p>上面图中CR3已经变成64位的CPU的寄存器，它指向一个顶级页目录，里面的顶级页目项指向页目录指针，依次类推。</p>
 <p>需要注意的是，虚拟地址48到63这16位是根据<strong>第47位</strong>来决定的，47位为1，它们就为1，反之为0，这是因为x86 CPU并没有实现全64位的地址总线，而是只实现了48位，但是CPU的寄存器却是64位的。</p>
 <p>这种最高有效位填充的方式，即使后面扩展CPU的地址总线也不会有任何影响，下面我们去看看当前分页模式下的CR3、顶级页目录项、页目录指针项、页目录项、页表项的格式，我画了一张图帮你理解。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e3/55/e342246f5cfa21c5b5173b9e494bdc55.jpg?wh=3750%2A12855" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e3/55/e342246f5cfa21c5b5173b9e494bdc55.jpg?wh=3750%2A12855" /></p>
 <p>由上图可知，长模式下的4KB分页下，由一个顶层目录、二级中间层目录和一层页表组成了64位地址翻译过程。</p>
 <p>顶级页目录项指向页目录指针页，页目录指针项指向页目录页，页目录项指向页表页，页表项指向一个4KB大小的物理页，各级页目录项中和页表项中依然存在各种属性位，这在图中已经说明。其中的XD位，可以控制代码页面是否能够运行。</p>
 <h3 id="2mb">长模式下的分页——2MB页</h3>
 <p>在这种分页方式下，64位虚拟地址被分为5个位段 ：保留位段、顶级页目录索引、页目录指针索引、页目录索引，页内偏移，顶级页目录、页目录指针、页目录各占有4KB大小，其中各有512个条目，每个条目8字节64位大小。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/68/ea/68bf70d8bcae7802e5291140ac1ec6ea.jpg?wh=4405%2A1545" title="长模式下的2MB分页" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/68/ea/68bf70d8bcae7802e5291140ac1ec6ea.jpg?wh=4405%2A1545" title="长模式下的2MB分页" /></p>
 <p>可以发现，长模式下2MB和4KB分页的区别是，2MB分页下是页目录项直接指向了2MB大小的物理页面，放弃了<strong>页表项</strong>，然后把虚拟地址的低21位作为页内偏移，21位正好索引2MB大小的地址空间。</p>
 <p>下面我们还是要去看看2MB分页模式下的CR3、顶级页目录项、页目录指针项、页目录项的格式，格式如下图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/45/0b/457f6965d0f25bf64bfb9ec698ab7e0b.jpg?wh=4640%2A12490" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/45/0b/457f6965d0f25bf64bfb9ec698ab7e0b.jpg?wh=4640%2A12490" /></p>
 <p>上图中没有了页表项，取而代之的是，页目录项中直接存放了2MB物理页基地址。由于物理页始终2MB对齐，所以其地址的低21位为0，用于存放页面属性位。</p>
 <h2 id="mmu_2">开启MMU</h2>
 <p>要使用分页模式就必先开启MMU，但是开启MMU的前提是CPU进入保护模式或者长模式，开启CPU这两种模式的方法，我们在前面<a href="https://time.geekbang.org/column/article/375278">第五节课</a>已经讲过了，下面我们就来开启MMU，步骤如下：</p>
@@ -7158,8 +7158,6 @@ MMU:
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -14684,7 +14684,7 @@
 <li><strong>读操作</strong>：主库、从库都可以接收；</li>
 <li><strong>写操作</strong>：首先到主库执行，然后，主库将写操作同步给从库。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/80/2f/809d6707404731f7e493b832aa573a2f.jpg?wh=3214%2A2119" title="Redis主从库和读写分离" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/80/2f/809d6707404731f7e493b832aa573a2f.jpg?wh=3214%2A2119" title="Redis主从库和读写分离" /></p>
 <p>那么，为什么要采用读写分离的方式呢？</p>
 <p>你可以设想一下，如果在上图中，不管是主库还是从库，都能接收客户端的写操作，那么，一个直接的问题就是：如果客户端对同一个数据（例如k1）前后修改了三次，每一次的修改请求都发送到不同的实例上，在不同的实例上执行，那么，这个数据在这三个实例上的副本就不一致了（分别是v1、v2和v3）。在读取这个数据的时候，就可能读取到旧的值。</p>
 <p>如果我们非要保持这个数据在三个实例上一致，就要涉及到加锁、实例间协商是否完成修改等一系列操作，但这会带来巨额的开销，当然是不太能接受的。</p>
@@ -14697,7 +14697,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>replicaof  172.16.19.3  6379
 </code></pre></div>
 <p>接下来，我们就要学习主从库间数据第一次同步的三个阶段了。你可以先看一下下面这张图，有个整体感知，接下来我再具体介绍。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/63/a1/63d18fd41efc9635e7e9105ce1c33da1.jpg?wh=3765%2A1676" title="主从库第一次同步的流程" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/63/a1/63d18fd41efc9635e7e9105ce1c33da1.jpg?wh=3765%2A1676" title="主从库第一次同步的流程" /></p>
 <p>第一阶段是主从库间建立连接、协商同步的过程，主要是为全量复制做准备。在这一步，<strong>从库和主库建立起连接，并告诉主库即将进行同步，主库确认回复后，主从库间就可以开始同步了</strong>。</p>
 <p>具体来说，从库给主库发送psync命令，表示要进行数据同步，主库根据这个命令的参数来启动复制。psync命令包含了<strong>主库的runID</strong>和<strong>复制进度offset</strong>两个参数。</p>
 <ul>
@@ -14719,7 +14719,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>replicaof  所选从库的IP 6379
 </code></pre></div>
 <p>这样一来，这些从库就会知道，在进行同步时，不用再和主库进行交互了，只要和级联的从库进行写操作同步就行了，这就可以减轻主库上的压力，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/40/45/403c2ab725dca8d44439f8994959af45.jpg?wh=3543%2A1791" title="级联的“主-从-从”模式" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/40/45/403c2ab725dca8d44439f8994959af45.jpg?wh=3543%2A1791" title="级联的“主-从-从”模式" /></p>
 <p>好了，到这里，我们了解了主从库间通过全量复制实现数据同步的过程，以及通过“主-从-从”模式分担主库压力的方式。那么，一旦主从库完成了全量复制，它们之间就会一直维护一个网络连接，主库会通过这个连接将后续陆续收到的命令操作再同步给从库，这个过程也称为<strong>基于长连接的命令传播</strong>，可以避免频繁建立连接的开销。</p>
 <p>听上去好像很简单，但不可忽视的是，这个过程中存在着风险点，最常见的就是<strong>网络断连或阻塞</strong>。如果网络断连，主从库之间就无法进行命令传播了，从库的数据自然也就没办法和主库保持一致了，客户端就可能从从库读到旧数据。</p>
 <p>接下来，我们就来聊聊网络断连后的解决办法。</p>
@@ -14731,12 +14731,12 @@
 <p>repl_backlog_buffer是一个环形缓冲区，<strong>主库会记录自己写到的位置，从库则会记录自己已经读到的位置</strong>。</p>
 <p>刚开始的时候，主库和从库的写读位置在一起，这算是它们的起始位置。随着主库不断接收新的写操作，它在缓冲区中的写位置会逐步偏离起始位置，我们通常用偏移量来衡量这个偏移距离的大小，对主库来说，对应的偏移量就是master_repl_offset。主库接收的新写操作越多，这个值就会越大。</p>
 <p>同样，从库在复制完写操作命令后，它在缓冲区中的读位置也开始逐步偏移刚才的起始位置，此时，从库已复制的偏移量slave_repl_offset也在不断增加。正常情况下，这两个偏移量基本相等。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/13/37/13f26570a1b90549e6171ea24554b737.jpg?wh=4000%2A1065" title="Redis repl_backlog_buffer的使用" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/13/37/13f26570a1b90549e6171ea24554b737.jpg?wh=4000%2A1065" title="Redis repl_backlog_buffer的使用" /></p>
 <p>主从库的连接恢复之后，从库首先会给主库发送psync命令，并把自己当前的slave_repl_offset发给主库，主库会判断自己的master_repl_offset和slave_repl_offset之间的差距。</p>
 <p>在网络断连阶段，主库可能会收到新的写操作命令，所以，一般来说，master_repl_offset会大于slave_repl_offset。此时，主库只用把master_repl_offset和slave_repl_offset之间的命令操作同步给从库就行。</p>
 <p>就像刚刚示意图的中间部分，主库和从库之间相差了put d e和put d f两个操作，在增量复制时，主库只需要把它们同步给从库，就行了。</p>
 <p>说到这里，我们再借助一张图，回顾下增量复制的流程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/20/16/20e233bd30c3dacb0221yy0c77780b16.jpg?wh=3328%2A1689" title="Redis增量复制流程" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/20/16/20e233bd30c3dacb0221yy0c77780b16.jpg?wh=3328%2A1689" title="Redis增量复制流程" /></p>
 <p>不过，有一个地方我要强调一下，因为repl_backlog_buffer是一个环形缓冲区，所以在缓冲区写满后，主库会继续写入，此时，就会覆盖掉之前写入的操作。<strong>如果从库的读取速度比较慢，就有可能导致从库还未读取的操作被主库新写的操作覆盖了，这会导致主从库间的数据不一致</strong>。</p>
 <p>因此，我们要想办法避免这一情况，一般而言，我们可以调整<strong>repl_backlog_size</strong>这个参数。这个参数和所需的缓冲空间大小有关。缓冲空间的计算公式是：缓冲空间大小 = 主库写入命令速度 * 操作大小 - 主从库间网络传输命令速度 * 操作大小。在实际应用中，考虑到可能存在一些突发的请求压力，我们通常需要把这个缓冲空间扩大一倍，即repl_backlog_size = 缓冲空间大小 * 2，这也就是repl_backlog_size的最终值。</p>
 <p>举个例子，如果主库每秒写入2000个操作，每个操作的大小为2KB，网络每秒能传输1000个操作，那么，有1000个操作需要缓冲起来，这就至少需要2MB的缓冲空间。否则，新写的命令就会覆盖掉旧操作了。为了应对可能的突发压力，我们最终把repl_backlog_size设为4MB。</p>
@@ -14887,8 +14887,6 @@ aof记录的是命令，如果是首次主从全量复制，而且如果aof文�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

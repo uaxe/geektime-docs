@@ -15086,10 +15086,10 @@
 <p>我们再进一步分析一下调度器的细节。如下面的启动指令，在程序启动时加入环境变量GODEBUG=schedtrace=1000,scheddetail=1，这时程序每隔一秒就会打印出调度器的细节。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>GOMAXPROCS=8 GODEBUG=schedtrace=1000,scheddetail=1 nohup ./main -config conf/conf.test.toml &gt; runoob.log 2&gt;&amp;1 &amp;
 </code></pre></div>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b0/b6/b0263a7cdfa79561ca0c1da357daa1b6.png?wh=1920x766" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b0/b6/b0263a7cdfa79561ca0c1da357daa1b6.png?wh=1920x766" /></p>
 <p>通过打印出的日志我们发现，协程等待队列中基本没有等待运行的协程，这从侧面证明，当前程序有极大的QPS提升空间。这个现象也解释了为什么在压测情况下 cpu idle仍然很高，因为程序没有满负载运行。</p>
 <p>我们使用trace工具进行分析，能够更直观地分析出程序负载不足的情况。瞬时可运行协程数量小于逻辑处理器P的数量，并且P运行协程有大量的间隙。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/49/f7/49ba2b1fc2a80cdb99c039ee92d9a5f7.png?wh=1920x870" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/49/f7/49ba2b1fc2a80cdb99c039ee92d9a5f7.png?wh=1920x870" /></p>
 <h3 id="cpu">请求消耗过多CPU的问题</h3>
 <p>在压测时，我们收集了pprof火焰图，并把它和正常负载下的火焰图进行了对比，没有发现明显变化。</p>
 <h3 id="_5"><strong>并发导致的锁问题</strong></h3>
@@ -15130,18 +15130,18 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>curl -o trace.out http://127.0.0.1:9981/debug/pprof/trace?seconds=30
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>go tool trace -http=localhost:8000  trace.out
 </code></pre></div>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/06/b5/069a2d5904b115cb6d89afb53f433eb5.jpg?wh=1920x1744" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/06/b5/069a2d5904b115cb6d89afb53f433eb5.jpg?wh=1920x1744" /></p>
 <p>我们要做的是，找到我们想要分析的那个函数对应的协程。如下所示，A.func6是A函数的第6个协程，样本数有五百多个。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a7/97/a7059a8b9344843a924e0a15aa8f6397.jpg?wh=1920x308" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a7/97/a7059a8b9344843a924e0a15aa8f6397.jpg?wh=1920x308" /></p>
 <p>接下来，分析一下这些样本协程的耗时情况。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0f/c1/0fcee1a0de68f933a3aef8541193fac1.png?wh=1920x718" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0f/c1/0fcee1a0de68f933a3aef8541193fac1.png?wh=1920x718" /></p>
 <p>从图中可以看出，一些协程的最大函数耗时超过了300毫秒，这些协程会导致p99的飙升，和现象是对应的。同时，点击耗时比较大的协程，可以看到协程的耗时花在了哪些地方。可以看到，协程的耗时主要花费在了Execution执行阶段，比较奇怪的是，这一阶段的大部分时间都处于GC阶段。</p>
 <p>点击某一个协程的详细信息，可以看到协程在当前一段时间内的运行状态。等等，这密密麻麻的绿色线条是怎么回事，放大以后特别吓人，大部分时间都在Mark Assisst。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/03/e8/03ec937c57181e0053116cedcd1dcce8.png?wh=1920x270" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/03/e8/03ec937c57181e0053116cedcd1dcce8.png?wh=1920x270" /></p>
 <p>也就是说，程序在已经GC的情况下，由于疯狂的内存分配导致的Mark Assisst问题非常严重，这也就解释了为什么只有负载上来了才会导致P99问题。</p>
 <h2 id="_10">进一步分析与修复问题</h2>
 <p>再总结一下问题的根源就是：GC阶段下，大量的内存分配导致了大量的辅助标记，加上25%的专有GC处理占用了2个线程，程序运行状态会迅速恶化。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7f/c2/7fef82aa3b2b3216a6c01ffe0b60d5c2.png?wh=1920x677" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7f/c2/7fef82aa3b2b3216a6c01ffe0b60d5c2.png?wh=1920x677" /></p>
 <p>上一节课程我们就已经介绍过辅助标记。在并发标记阶段，扫描内存的同时，用户协程也会不断被分配内存，当用户协程的内存分配速度快到后台标记协程来不及扫描时，GC 标记阶段将永远不会结束。这样一来，GC 周期就无法完整，还会进一步造成内存泄漏。</p>
 <p>为了解决这样的问题，Go1.5引入了辅助标记算法。用户协程被分配了超过限度的内存，运行时不得不将协程暂停，并切换去执行辅助标记工作。而由于我们当前程序的特性会频繁地分配内存，超过了内存扫描的速度，导致协程执行一段时间后就不得不切换到辅助标记工作，这增加了协程运行的时间，并最终导致了p99耗时非常严重。</p>
 <p>这个问题的根源是内存的频繁释放和分配。在实践中我们发现，频繁的内存分配导致的程序问题经常会出现。举一个例子，我遇到过一个由于内存分配不合理导致程序直接OOM的问题。容器的内存容量本身为16G，但是当程序内存达到8G之后，下一次GC的目标内存到达了16G。在这段时间里，内存频繁分配，不到两分钟就上涨到了16G，直接导致了程序的崩溃。Go运行时本身有一个定时监控服务，每2分钟会强制触发一次GC，但是程序的特性却导致不到2分钟就把内存打满了。</p>
@@ -15306,8 +15306,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

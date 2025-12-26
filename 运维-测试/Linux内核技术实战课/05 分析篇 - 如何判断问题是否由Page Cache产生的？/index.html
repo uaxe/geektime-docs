@@ -5901,12 +5901,12 @@
 <p>那么当问题发生时，我们如何判断它是不是由Page Cache引起的呢？</p>
 <h2 id="linux">Linux问题的典型分析手段</h2>
 <p>Linux上有一些典型的问题分析手段，从这些基本的分析方法入手，你可以一步步判断出问题根因。这些分析手段，可以简单地归纳为下图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ee/c1/ee08329fc5eb7fb8ddff14dba9ebf0c1.jpg?wh=2200%2A1184" title="Linux的典型分析手段" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ee/c1/ee08329fc5eb7fb8ddff14dba9ebf0c1.jpg?wh=2200%2A1184" title="Linux的典型分析手段" /></p>
 <p>从这张图中我们可以看到，Linux内核主要是通过/proc和/sys把系统信息导出给用户，当你不清楚问题发生的原因时，你就可以试着去这几个目录下读取一下系统信息，看看哪些指标异常。比如当你不清楚问题是否由Page Cache引起时，你可以试着去把/proc/vmstat里面的信息给读取出来，看看哪些指标单位时间内变化较大。如果pgscan相关指标变化较大，那就可能是Page Cache引起的，因为pgscan代表了Page Cache的内存回收行为，它变化较大往往意味着系统内存压力很紧张。</p>
 <p>/proc和/sys里面的信息可以给我们指出一个问题分析的大致方向，我们可以判断出问题是不是由Page Cache引起的，但是如果想要深入地分析问题，知道Page Cache是如何引起问题的，我们还需要掌握更加专业的分析手段，专业的分析工具有ftrace，ebpf，perf等。</p>
 <p>当然了，这些专业工具的学习成本也相对略高一些，但你不能觉得它难、成本高，就不学了，因为掌握了这些分析工具后，再遇到疑难杂症，你分析起来会更加得心应手。</p>
 <p>为了让你在遇到问题时更加方便地找到合适的分析工具，我借用<a href="https://www.slideshare.net/brendangregg/velocity-2015-linux-perf-tools/107">Bredan Gregg的一张图</a>，并根据自己的经验，把这张图略作了一些改进，帮助你学习该如何使用这些分析工具：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0c/97/0ccc072485d8ca2b995a6e7b6a75da97.jpg?wh=3104%2A1714" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0c/97/0ccc072485d8ca2b995a6e7b6a75da97.jpg?wh=3104%2A1714" /></p>
 <p>在这张图里，整体上追踪方式分为了静态追踪（预置了追踪点）和动态追踪（需要借助probe）：</p>
 <ul>
 <li>如果你想要追踪的东西已经有了预置的追踪点，那你直接使用这些预置追踪点就可以了；</li>
@@ -5926,10 +5926,10 @@
 <p>你需要重点关注avg10这一列，它表示最近10s内存的平均压力情况，如果它很大（比如大于40）那load飙高大概率是由于内存压力，尤其是Page Cache的压力引起的。</p>
 <p>明白了概况之后，我们还需要进一步查看究竟是Page Cache的什么行为引起的系统压力。</p>
 <p>因为sar采集的只是一些常用的指标，它并没有覆盖Page Cache的所有行为，比如说内存规整（memory compaction）、业务workingset等这些容易引起load飙高的问题点。在我们想要分析更加具体的原因时，就需要去采集这些指标了。通常在Page Cache出问题时，这些指标中的一个或多个都会有异常，这里我给你列出一些常见指标：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ed/bb/ed990308aef09a5918e6855362284dbb.jpg?wh=3370%2A2529" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ed/bb/ed990308aef09a5918e6855362284dbb.jpg?wh=3370%2A2529" /></p>
 <p>采集完这些指标后，我们就可以分析Page Cache异常是由什么引起的了。比如说，当我们发现，单位时间内compact_fail变化很大时，那往往意味着系统内存碎片很严重，已经很难申请到连续物理内存了，这时你就需要去调整碎片指数或者手动触发内存规整，来减缓因为内存碎片引起的压力了。</p>
 <p>我们在前面的步骤中采集的数据指标，可以帮助我们来定位到问题点究竟是什么，比如下面这些问题点。但是有的时候，我们还需要知道是什么东西在进行连续内存的申请，从而来做更加有针对性的调整，这就需要进行进一步的观察了。我们可以利用内核预置的相关tracepoint来做更加细致的分析。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f1/f0/f14faca88b5a765690a6c1540517def0.jpg?wh=3209%2A1913" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f1/f0/f14faca88b5a765690a6c1540517def0.jpg?wh=3209%2A1913" /></p>
 <p>我们继续以内存规整(memory compaction)为例，来看下如何利用tracepoint来对它进行观察：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>#首先来使能compcation相关的一些tracepoing
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>$ echo 1 &gt;
@@ -6137,8 +6137,6 @@ cat &#47;sys&#47;kernel&#47;debug&#47;tracing&#47;trace_pipe
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

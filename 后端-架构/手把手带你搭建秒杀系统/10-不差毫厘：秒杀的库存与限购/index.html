@@ -13704,16 +13704,16 @@
 <p><strong>个人维度限制：</strong>就是以个人维度来做限制，这里不单单指同一用户ID，还会从同一手机号、同一收货地址、同一设备IP等维度来做限制。比如限制同一手机号每天只能下1单，每单只能购买1件，并且一个月内只能购买2件等。个人维度的限购，体现了秒杀的公平性。</p>
 <p>有了这些功能支持之后，再做一个热门秒杀活动时，首先会在限购系统中配置活动库存以及各种个人维度的限购策略；然后在用户提单时，走下限购系统，通过限购的请求，再去做真实库存的扣减，这个时候到库存系统的量已经是非常小了。</p>
 <p>该限购流程如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a7/b1/a755edd995f37468850dc23338bd53b1.jpg?wh=1234x732" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a7/b1/a755edd995f37468850dc23338bd53b1.jpg?wh=1234x732" /></p>
 <p>那么在介绍完限购之后，下面我再来详细说一下上图中活动库存扣减的实现方案。</p>
 <h2 id="_2"><strong>活动库存扣减方案</strong></h2>
 <p>我们都知道，用户成功购买一个商品，对应的库存就要完成相应的扣减。而库存的扣减主要涉及到两个核心操作，一个是查询商品库存，另一个是在活动库存充足的情况下，做对应数量的扣减。两个操作拆分开来，都是非常简单的操作，但是在高并发场景下，不好的事情就发生了。</p>
 <p>举个简单的例子，比如现在活动商品有2件库存，此时有两个并发请求过来，其中请求A要抢购1件，请求B要抢购2件，然后大家都去调用活动查询接口，发现库存都够，紧接着就都去调用对应的库存扣减接口，这个时候，两个都会扣减成功，但库存却变成了-1，也就是超卖了。</p>
 <p>整个过程如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/34/65/3432cfe3769def280f570ab27a550365.jpg?wh=1178x622" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/34/65/3432cfe3769def280f570ab27a550365.jpg?wh=1178x622" /></p>
 <p>从图中我们可以看到，库存超卖的问题主要是由两个原因引起的，一个是查询和扣减不是原子操作，另一个是并发引起的请求无序。</p>
 <p>所以要解决这个问题，我们就得<strong>做到库存扣减的原子性和有序性</strong>。理想过程应该如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1e/31/1e42d6e7e2bb5efc95d789b71278c331.jpg?wh=1508x1060" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1e/31/1e42d6e7e2bb5efc95d789b71278c331.jpg?wh=1508x1060" /></p>
 <p>当然理想很美好，那我们该怎么去实现它呢？</p>
 <p>你首先可能会想到利用数据库的行锁机制。这种方式的优点是简单安全，但是其性能比较差，无法适用于我们秒杀业务场景，在请求量比较小的业务场景下，是可以考虑的。</p>
 <p>既然数据库不行，那能使用分布式锁吗？即通过Redis或者ZooKeeper来实现一个分布式锁，以商品维度来加锁，在获取到锁的线程中，按顺序去执行商品库存的查询和扣减，这样就同时实现了顺序性和原子性。</p>
@@ -13747,11 +13747,11 @@
 </code></pre></div>
 <p>然后我们将Lua脚本转成字符串，并添加脚本预加载机制。</p>
 <p>预加载可以有多种实现方式，一个是外部预加载好，生成了sha1然后配置到配置中心，这样Java代码从配置中心拉取最新sha1即可。另一种方式是在服务启动时，来完成脚本的预加载，并生成单机全局变量sha1。我们这里先采取第二种方式，代码结构如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/47/7d/47c9b70d3ee184f6f822cf93a7dd997d.png?wh=849x624" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/47/7d/47c9b70d3ee184f6f822cf93a7dd997d.png?wh=849x624" /></p>
 <p>以上是将Lua脚本转成字符串形式，并通过@PostConstruct完成脚本的预加载。然后新增EVALSHA方法，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1a/62/1a1371b717a91yy229c6bfe09afbe762.png?wh=891x522" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1a/62/1a1371b717a91yy229c6bfe09afbe762.png?wh=891x522" /></p>
 <p>方法入参为活动商品库存key以及单次抢购数量，并在内部调用Lua脚本执行库存扣减操作。看起来是不是很简单？在写完底层核心方法之后，我们只需要在下单之前，调用该方法即可，具体如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/20/76/20a3cd59468619a6b2f55732458f2276.png?wh=879x309" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/20/76/20a3cd59468619a6b2f55732458f2276.png?wh=879x309" /></p>
 <p>一切完成后，接下来就让我们来验证一下，是否会出现超卖的情况吧。</p>
 <h2 id="_3">模拟场景</h2>
 <p>我们模拟的场景是这样的：</p>
@@ -13762,18 +13762,18 @@
 <li>最后，请求在经过限购（代码中直接调用EVALSHA核心方法模拟）时，判断是否通过，如果通过就继续下单，并完成数据库中库存的扣减，如果售空，则返回失败。</li>
 </ul>
 <p>我们按照模拟思路，先创建一个活动，数据库库存为4，然后调用活动开始接口，活动信息如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3b/df/3b0072f152aacb4d9096df46d6f93bdf.png?wh=832x314" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3b/df/3b0072f152aacb4d9096df46d6f93bdf.png?wh=832x314" /></p>
 <p>再查看一下该活动对应的Redis活动库存，也是4件，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/57/65/57239bdc7c8ed19c9759094f432aa965.png?wh=832x134" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/57/65/57239bdc7c8ed19c9759094f432aa965.png?wh=832x134" /></p>
 <p>然后我们开始模拟1秒内发出多个并发请求，每个请求抢购2件商品。我这里使用的是wrk工具做的测试，测试命令如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>wrk -t3 -c3 -d1s http://localhost:8080//settlement/submitData?productId=20002001
 </code></pre></div>
 <p>以上命令的大概意思是使用3个线程来做压测，持续时间1秒。执行后的测试结果如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c4/d0/c4a65e2b027d025af53152c5ec13cfd0.png?wh=832x206" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c4/d0/c4a65e2b027d025af53152c5ec13cfd0.png?wh=832x206" /></p>
 <p>从上图可以看到，在1秒内发出了15个请求。现在我们看下限购的结果，1代表通过，0代表不通过，具体如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/fc/62/fc2835653c7412c22dc5b73b043f9862.png?wh=845x193" /></p>
-<p>确实只有2个请求通过限购，其他的全部被拦截了。这个时候，我们再分别查看下Redis活动库存和数据库库存，如下图所示：<img alt="图片" src="https://static001.geekbang.org/resource/image/4c/4d/4c86e82e0a4dba7880b8d3ca3abb9d4d.png?wh=758x202" /></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/49/d7/49dd3bbd73be597622432859da5a72d7.png?wh=851x334" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fc/62/fc2835653c7412c22dc5b73b043f9862.png?wh=845x193" /></p>
+<p>确实只有2个请求通过限购，其他的全部被拦截了。这个时候，我们再分别查看下Redis活动库存和数据库库存，如下图所示：<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4c/4d/4c86e82e0a4dba7880b8d3ca3abb9d4d.png?wh=758x202" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/49/d7/49dd3bbd73be597622432859da5a72d7.png?wh=851x334" /></p>
 <p>库存数量都变成了0，没有出现超卖的情况！一切都完美符合我们的预期。</p>
 <h2 id="_4"><strong>总结</strong></h2>
 <p>这节课我们分析了库存系统的业务边界，由于是电商平台的基础系统，并且基于秒杀业务隔离的原则，使得库存系统不太适合直接承接秒杀的高并发流量，需要有个过滤层。而限购系统刚好可以胜任这样的角色，限购可以从商品和个人的维度来做商品的限制性购买，从而可以帮库存系统抵挡住无效的流量，只放过和商品库存相匹配的请求数量。</p>
@@ -13781,7 +13781,7 @@
 <p>所以我们的应对方案是利用Redis的单线程原理，以及提供的原生EVALSHA和SCRIPT LOAD 命令来实现库存扣减的原子性和顺序性，并且经过实测也确实能达到我们的预期，且性能良好，从而有效地解决了秒杀系统所面临的库存超卖挑战。以后再遇到类似的问题，你也可以用同样的解决思路来应对。</p>
 <h2 id="_5">思考题</h2>
 <p>请你思考一下，根据我们校验前置的原则，是否可以仅仅将库存的校验前置到demo-nginx或demo-web中，像下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4c/c6/4c6ef532c64c3ddc2a54a6e05deee4c6.jpg?wh=1814x858" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4c/c6/4c6ef532c64c3ddc2a54a6e05deee4c6.jpg?wh=1814x858" /></p>
 <p>如果可以，该如何具体实现它？</p>
 <p>期待你的思考和方案，也欢迎你在留言区中与我交流，我们下节课再见！</p>
 <div><strong>精选留言（15）</strong></div>
@@ -13908,8 +13908,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

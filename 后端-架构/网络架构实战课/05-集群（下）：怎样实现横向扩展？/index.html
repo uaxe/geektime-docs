@@ -13584,11 +13584,11 @@
 <p>当请求到达机房时，LB通常是第一个代理设备。请求会先由路由器转发给LB。之前<a href="https://time.geekbang.org/column/article/852092">第三节课</a>我们说过，在主备机房架构中，路由器会根据最长掩码匹配的原则选择路由。那如果存在多个等长掩码的路由，路由器会怎样选择呢？</p>
 <h3 id="ecmp">ECMP</h3>
 <p>这时，路由器就会在这些路由之间进行负载分担。这一特性为负载均衡器的横向扩展提供了可能。通过 <strong>ECMP（等价多路径路由）</strong>，可以在多个路由之间分担流量 ，从而实现负载均衡器的横向扩展，提升系统的吞吐量和容错能力。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/50/e4/5060a14094f344ac0f372cd37158b3e4.jpg?wh=3900x1714" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/50/e4/5060a14094f344ac0f372cd37158b3e4.jpg?wh=3900x1714" /></p>
 <p>现在我们已经知道怎样让请求包负载分担地到达LB上了，接下来我们会使用LVS作为LB，分析其工作原理。</p>
 <h3 id="netfilter">Netfilter框架</h3>
 <p>LVS是集成到Linux内核的一个功能，它依赖于 <a href="https://docs.kernel.org/networking/nf_flowtable.html">Netfilter框架</a>，所以我们要先熟悉一下这个框架。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2d/dd/2d215d6988a4c4d8c164b83fa81b18dd.jpg?wh=6088x3077" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2d/dd/2d215d6988a4c4d8c164b83fa81b18dd.jpg?wh=6088x3077" /></p>
 <p>如图所示，Linux 内核处理进出网络协议栈的数据包分为5个不同的阶段，Netfilter 通过这5个阶段注入钩子函数来实现对数据包的过滤和修改。</p>
 <p>这5个阶段分别是：</p>
 <ul>
@@ -13603,27 +13603,27 @@
 <p>接下来我们看看LVS是怎样通过Netfilter框架实现转发的，其对应的内核实现IPVS在Netfilter的input、forward和posting阶段都进行hook来实现自己的逻辑，也就是说LVS可以对发给其本机和经过其转发的报文进行修改，来达到负载均衡的功能。</p>
 <p>LVS有4种工作模式，我们逐一分析看看 。</p>
 <p>第一种是 <strong>DR 模式</strong>（Direct Route）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4e/88/4ecc1782db0f10668fba5a9823458588.jpg?wh=4213x1965" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4e/88/4ecc1782db0f10668fba5a9823458588.jpg?wh=4213x1965" /></p>
 <p>客户端发送的报文目标 IP 是 VIP，报文首先会到达 LVS。接着，LVS 会将报文中的目标 MAC 地址替换为一个后端服务器的 MAC 地址，并将报文转发出去。由于报文的目标 MAC 地址是服务器的地址，报文最终会到达目标服务器。</p>
 <p>由于 LVS 并没有修改报文的 IP 地址，服务器收到的报文四元组为：客户端 IP 地址、客户端端口、VIP 地址和目标端口。服务器会根据这个四元组进行响应，并将响应发送到客户端的 IP 地址。此时，响应报文会直接返回客户端，而无需经过 LVS，因为响应是直接从服务器发出的。</p>
 <p>需要注意的是，虽然服务器接收到的报文目的地址是 VIP，但根据 Netfilter 的处理流程，服务器必须路由到 INPUT 链，才能进入本机处理流程。因此，<strong>服务器的网络接口上也需要配置 VIP，但不能通过 ARP 广播将 VIP 公开，以避免请求直接到达服务器而绕过 LVS</strong>。</p>
 <p>这种转发方式的优势是，<strong>只修改MAC地址，不涉及IP层的改动，且响应不经过 LVS，直接返回客户端，这样就提高了效率。</strong>但是因为LVS必须知道Server的MAC地址，所以它们必须部署在同一个局域网。</p>
 <p>接下来我们看 <strong>DNAT 模式</strong>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/de/d4/ded4cc573984e5bb9dd27531788095d4.jpg?wh=4134x1808" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/de/d4/ded4cc573984e5bb9dd27531788095d4.jpg?wh=4134x1808" /></p>
 <p>在这种模式下，LVS 会将收到的报文目标 IP 修改为服务器的 IP 地址。当服务器收到报文后，会根据源 IP 进行应答。从四层协议的角度来看，这个应答报文是直接发送到客户端的。然而，由于客户端发送报文时目标 IP 是 VIP，如果应答报文的源 IP 是服务器的 IP，则 TCP 四元组将不匹配，导致客户端无法正确识别应答报文，最终丢弃这个包。</p>
 <p>为了避免这种情况，应答报文必须再次经过 LVS 进行处理。具体来说，尽管从四层的角度应答报文不经过 LVS，但从三层的角度，应答报文必须经过 LVS。</p>
 <p>那应该如何解决这个问题呢？</p>
 <p>一个有效的解决方案是通过路由配置，<strong>将 LVS 设置为服务器发送到客户端的默认网关</strong>。这样，经过 LVS 的报文会触发 LVS 内核中的 Netfilter forward 钩子进行处理，LVS 会在此过程中将报文的源 IP 地址替换回 VIP。这样就确保了报文能够正确地传递回客户端，并且保持四元组的一致性。</p>
 <p>看懂了DNAT模式，我们再看 <strong>FULLNAT模式</strong>就简单多了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cc/fc/cc1dc338c5yy4ca30831d3f9371572fc.jpg?wh=4213x1965" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cc/fc/cc1dc338c5yy4ca30831d3f9371572fc.jpg?wh=4213x1965" /></p>
 <p>可以看到FULLNAT与DNAT的区别在于，LVS不仅把请求的目的ip换成Server，同时还把源IP换成自己的IP了。这样Server的应答报文就顺理成章地到达LVS，LVS再做一次转化将目的IP换成客户端IP，源IP换成vip就可以了。</p>
 <p>最后，我们看一下 <strong>Tunnel 模式</strong>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9c/02/9c00d1b5b932be8d8f8f75afab15eb02.jpg?wh=4213x1965" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9c/02/9c00d1b5b932be8d8f8f75afab15eb02.jpg?wh=4213x1965" /></p>
 <p>Tunnel（隧道）模式是指LVS将发往Server的报文外面又封装了一层报文，原来的报文变成了新报文的数据部分，这就要求Server上必须有对应tunnel的解封装软件将tunnel头剥离，然后剩下的包就和DR模式一样了，应答也和DR模式一样。这样加一层tunnel的好处是LVS机器和Server机器不必非要部署在同一个局域网里面了。</p>
 <h2 id="lb_1">LB横向扩展实战</h2>
 <p>搞清楚理论后，我们开始今天的实战环节。</p>
 <h3 id="_1">实验设计</h3>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/yy/11/yy2197f27a4bfb4be91819e368a01911.jpg?wh=3946x825" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/yy/11/yy2197f27a4bfb4be91819e368a01911.jpg?wh=3946x825" /></p>
 <p>本次实验的目的是实现LB的横向扩展，最终期望看到的结果是通过vip访问LB集群的时候，一部分流量经过LB1、一部分流量经过LB2。为了方便观察到这个结果，我们让LB1收到请求后只转发给server1，LB2收到请求后只转发给server2，然后server1和server2收到请求后返回header中X-Host带有不同的值。</p>
 <p>路由部分，router、LB1和LB2之间通过OSPF动态路由协议相互发布路由，OSPF功能通过Linux的开源软件 <a href="https://github.com/FRRouting/frr">frr</a> 来实现。虚拟LB部分，LB1、LB2之间还是通过keepalived来组成一个虚拟的LB，有了ECMP来横向扩展，我们就不需要再使用VRRP功能了，而是使用virtual server组网。本次实验我们使用LVS的DR模式转发。server1、server2还是使用Nginx来实现http server，当然，这部分你也可以使用其他任意方式实现。</p>
 <p>根据LVS的转发原理，我们已经知道LVS的DR模式不会修改IP地址，只是修改了MAC，所以server上收到请求的目的IP就是vip。为了能让Server处理该报文，我们需要在Server的接口上配置vip，但是为了防止报文不经过LB直接到达Server，需要关闭其ARP广播功能。</p>
@@ -13863,7 +13863,7 @@
 </code></pre></div>
 <p>如果你多执行几次，可能会发现请求总是经过同一个LB转发到server的，而不是我们期待的负载分担，这是为什么呢？</p>
 <p>这与ECMP的实现有关，我们在<a href="https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/7/html/7.6_release_notes/new_features_networking#new_features_networking">redhat的文档</a>可以看到后面这段描述。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/99/5c/99e1d653c9e10b5da1eyy84e4321505c.jpg?wh=3009x2453" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/99/5c/99e1d653c9e10b5da1eyy84e4321505c.jpg?wh=3009x2453" /></p>
 <p>这段内容大致可以这样理解。Linux在处理ECMP路由的时候不是逐包负载分担转发的，而是根据一些转发数据进行hash，碰撞到哪个路径，就走哪个路径。hash参数和net.ipv4.fib_multipath_hash_policy的配置有关。如果该值为0，只按照源、目的IP进行hash；如果该值为1，会按照5元组（源IP、源端口、目的IP、目的端口、协议类型）进行hash。</p>
 <p>我们可以用后面的命令查询一下该值。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>$ sysctl net.ipv4.fib_multipath_hash_policy
@@ -13895,7 +13895,7 @@
 </code></pre></div>
 <h2 id="_3">小结</h2>
 <p>今天的内容就是这些，我给你准备了一个思维导图回顾要点。
-<img alt="" src="https://static001.geekbang.org/resource/image/4d/f6/4d57ab5d86a15b64820980852b6204f6.jpg?wh=3917x3632" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4d/f6/4d57ab5d86a15b64820980852b6204f6.jpg?wh=3917x3632" /></p>
 <p>今天这节课中，我们深入探讨了负载均衡（LB）如何进行横向扩展。</p>
 <p>首先，我们讨论了ECMP（等价多路径路由）如何支持流量分担。当多个等长掩码的路由存在时，路由器会选择进行负载分担，这样可以在多个路径之间均匀分配流量，确保系统的高效运行。</p>
 <p>之后我们又深入学习LVS（Linux Virtual Server）作为负载均衡器的工作原理，重点讲解了其依赖的Netfilter框架。通过Netfilter框架的不同阶段（如prerouting、input、forward和postrouting），LVS能够对数据包进行精确地转发和修改，实现负载均衡功能。</p>
@@ -14026,8 +14026,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

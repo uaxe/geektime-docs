@@ -6866,14 +6866,14 @@
 <p>清晰的分层对于一个 Autonomous Agent 应用来说同样重要，我们从确定 AI 助理的分层架构开始开发。</p>
 <h3 id="_1">第一版——四层架构</h3>
 <p>根据上节课的内容，我画了一个 AI 助理的部署图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f2/5e/f274d0b0fcfd1a889f21yy14b4629d5e.png?wh=461x538" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f2/5e/f274d0b0fcfd1a889f21yy14b4629d5e.png?wh=461x538" /></p>
 <p>按照这个部署图，AI 助理可以简单划分为 4 层，从上到下单向依赖。最上层是 Web 前端 PWA 应用（JS语言实现），为 AI 助理提供 UI，包括 GUI 和 VUI（语音用户界面）。第二层是 Web 后端 FastAPI 应用（Python语言实现），为 Web 前端应用提供 RESTful API 和 WebSocket API。第三层是 AutoGPT Server，在其中运行多个业务相关 Agent，为 Web 后端提供 RESTful API 和 WebSocket API。最下面的第四层是基础设施层，包括关系数据库、外部服务适配器等等。</p>
 <p>这个分层架构非常容易理解。 支持 WebSocket API 是为了获得更好的用户体验。当运行于 AutoGPT Server 中的某个 Agent 需要向 Web 前端的用户提供反馈（通知、建议、求助等等）时，使用以“推”方式工作的 WebSocket API 会比使用以 “拉” 方式工作的 RESTful API 更加高效。</p>
 <p>尽管实现了系统分层，AI 助理仍然是一个单体应用（Monolith Application），而不是分布式应用（Distributed Application）。要实现应用的水平扩展（Scale Out），服务器端应用应该尽量做到无状态（Stateless）和 Share Nothing。关于 Share Nothing 架构可参考这篇文档：<a href="https://zhuanlan.zhihu.com/p/10540996178">分布式系统的先见之明：Shared Nothing架构</a>。</p>
 <h3 id="_2">第二版——三层架构</h3>
 <p>不过上述四层架构看起来还是有些复杂。虽然分层是计算机行业解决复杂问题的常用方法，应用的分层并非越多越好，多分出来一层就会多出来不少复杂度。按照著名的“奥卡姆剃刀原则”，我们应该在满足业务需求的前提下，持续不懈地追求最简化的架构。</p>
 <p>AutoGPT Server（backend）本身就是一个 Web 应用，同样基于 FastAPI 开发。我们可以考虑把 Web 后端应用与 AutoGPT Server 合并在一起。Web 后端应用不再通过 RESTful API 来调用 AutoGPT Server，而是通过本地 API 调用 AutoGPT Server。按照这种设想的新的分层架构如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/84/b5/848e8e492774c97f4f332db4d2d809b5.png?wh=461x550" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/84/b5/848e8e492774c97f4f332db4d2d809b5.png?wh=461x550" /></p>
 <p>按照新的部署图，Web 后端应用与 AutoGPT Server 合并为一层，AI 助理一共只有三层。</p>
 <p>那么具体如何实现 Web 后端应用与 AutoGPT Server 的合并呢？我们需要把上节课创建的 ai-assistant 项目与 AutoGPT Server 合并在一起。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>cd ~/work/ai-assistant
@@ -6914,7 +6914,7 @@
 <a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>app.mount(&quot;/customized&quot;, customized_app) # 新增一行
 </code></pre></div>
 <p>完成了上述修改后，使用 poetry run app 重新启动 AutoGPT Server。在另外一台客户端机器，打开浏览器，访问：http://&lt;server_host_ip&gt;:8006/customized/。server_host_ip 需要替换为 Linux 主机的 IP 地址。如果一切正常，浏览器会打开上节课我介绍过的 Whisper 测试页面。重新上传那个《让子弹飞》台词片段文件做一下测试。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f0/5c/f0c2cae9f723de948c716619d2519b5c.png?wh=1458x1278" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f0/5c/f0c2cae9f723de948c716619d2519b5c.png?wh=1458x1278" /></p>
 <p>测试过程与上节课一样。如果成功下载到了翻译为英文的字幕文件 test_audio.srt，那么 Web 后端应用与 AutoGPT Server 的合并工作就成功了。我们在 AutoGPT Server 原有的 RESTful API 中添加了一套前缀为 “/customized” 的新 API，用来支持 Web 前端应用。</p>
 <p>所有 Web 后端应用相关代码都在 ~/work/ai-assistant 目录内，通过符号连接添加到 AutoGPT Server 的目录 ~/work/AutoGPT/autogpt_platform/backend 下，这样可以有效地分离关注点，不至于对 AutoGPT Server 做过多修改，影响到日后更新官方代码。目前 AutoGPT Platform 处于高速开发阶段，因此时常更新官方代码是非常重要的。</p>
 <p>注意：将 Web 后端应用合并到 AutoGPT Server 之后，如果面向外网暴露 AutoGPT Server，必须把身份认证设置打开 (.env 文件中 ENABLE_AUTH=true)，否则会有严重的安全问题。</p>
@@ -7034,7 +7034,7 @@
 <a id="__codelineno-4-67" name="__codelineno-4-67" href="#__codelineno-4-67"></a>yield &quot;collection_output&quot;, collection_output
 </code></pre></div>
 <p>重新启动 AutoGPT Server，在客户端启动 AutoGPT Frontent。在浏览器中使用 Agent Builder 创建一个 CollectionAgent。保存之后点击 Run 按钮运行，确保运行成功，如下图所示。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/fa/11/fa12e41d6d13ecfe67a41815317b2411.png?wh=1920x1024" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fa/11/fa12e41d6d13ecfe67a41815317b2411.png?wh=1920x1024" /></p>
 <p>注意，在保存 CollectionAgent 之前，Collection Facade 这个 Block 的 LLM 应该选择 Qwen2.5，详情请参考 <a href="https://time.geekbang.org/column/article/841814">07 课</a>内容。</p>
 <h3 id="notificationagent">创建 NotificationAgent 的框架代码</h3>
 <p>我们再实现一个 NotificationAgent 的入口 Block，取名为 NotificationFacadeBlock。代码在 ~/work/ai-assistant/backend/blocks/customized/ai_assistant/notification_blocks.py 中。</p>
@@ -7232,8 +7232,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

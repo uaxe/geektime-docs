@@ -15096,9 +15096,9 @@
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>}
 </code></pre></div>
 <p>count++操作看起来是一条指令，但是对 CPU 来说，需要先读取 count 的值，执行 +1 操作，再将 count 的值写回内存。大部分人期望的操作可能是： R←0 代表读取到0，w→1 代表写入count 为1；协程 1 写入数据 1 后，协程 2 再写入，count 最后的值为 2。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f2/b3/f29cafb185aabae82214yye4040a82b3.jpg?wh=1920x595" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f2/b3/f29cafb185aabae82214yye4040a82b3.jpg?wh=1920x595" /></p>
 <p>但是当两个协程并行时，情况开始变得复杂了。如果执行的流程如下所示，那么 count 最后的值为1，这说明如果并发设计不合理会带来不确定性的结果。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6d/e4/6dabd7026c17570bb8e50c7782d4b4e4.jpg?wh=1920x595" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6d/e4/6dabd7026c17570bb8e50c7782d4b4e4.jpg?wh=1920x595" /></p>
 <p>数据争用可谓高并发程序中最难排查的问题。因为它的结果是不明确的，而且可能只在特定条件下出错。这就导致很难复现相同的错误，在测试阶段也不一定能测试出问题。而要解决数据争用问题，我们需要一些机制来保证某一时刻只能有一个协程执行特定操作，我们比较熟悉的传统解决手段就是锁，它包括原子锁、互斥锁与读写锁。</p>
 <h2 id="_2">原子锁</h2>
 <p>就像我们刚才看到的，即便是简单的像 count++ 这样的操作，在底层也经历了读取数据、 更新 CPU 缓存、存入内存这一系列操作。这些操作如果并发进行可能出现严重错误。这种情况就可以用原子锁来保证并发的安全。</p>
@@ -15316,7 +15316,7 @@
 <p>通道的厉害之处在于，在通信的过程中完成了数据所有权的转移。数据只可能在某一个协程中执行，这就在无形中消除了并发访问数据的问题，数据争用问题仍然存在，例如通道内部仍然需要使用锁，但Go语言已经为我们屏蔽了底层锁实现的细节。借助通道，我们可以创造出许多有表现力的高并发模型。</p>
 <h3 id="ping-pong">ping-pong模式</h3>
 <p>ping-pong模式即乒乓球模式，它比较形象地呈现了数据之间一来一回的关系。收到数据的协程可以在不加锁的情况下对数据进行处理，而不必担心有并发冲突。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7e/57/7ec1514a0d294c7f0958d1e836370657.jpg?wh=1920x1412" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7e/57/7ec1514a0d294c7f0958d1e836370657.jpg?wh=1920x1412" /></p>
 <p>实例代码如下所示。两个协程player就相当于两个球员，而通道table则类似于球桌。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>func main(){
 <a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>
@@ -15345,7 +15345,7 @@
 <p>你可以想一想，如果我们把两个 player 扩展为多个 player，是不是就有点像很多人在踢毽子了。当我们遇到类型的问题，可以用这一简单的模式来进行抽象。</p>
 <h3 id="fan-in">fan-in 模式</h3>
 <p>fan-in模式又叫扇入模式，意思是多个协程把数据写入到通道中，但只有一个协程等待读取通道数据。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a9/28/a9cc4213619ed3bedc6a660a6fe4bc28.jpg?wh=1920x1242" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a9/28/a9cc4213619ed3bedc6a660a6fe4bc28.jpg?wh=1920x1242" /></p>
 <p>这种模式在实践中有很多应用场景。举个例子，我们想查找某一个文件夹中有没有特殊的关键字。当文件数量很多时，我们可以用并发的方式去查找，找到结果后输出到相同的通道中打印出来。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>func search(ch chan string, msg string) {
 <a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>var i int
@@ -15398,7 +15398,7 @@
 <p>fan-in模式比较清晰，在实际中也是很常见的。例如我们之后在项目中会看到，通过fan-in模式来整合爬取到的数据，并存储起来。</p>
 <h3 id="fan-out">fan-out 模式</h3>
 <p>fan-out模式与fan-in模式相反，它描述的是一个协程完成数据的写入，但是多个协程抢夺同一个通道中的数据的场景。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e3/84/e335ba2984438618a5f51a44342de084.jpg?wh=1920x1242" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e3/84/e335ba2984438618a5f51a44342de084.jpg?wh=1920x1242" /></p>
 <p><strong>Fan-out模式通常会用在任务的分配中。</strong>比方说，程序消费Kafka、NATS等中间件的数据，多个协程就会监听同一个通道中的数据，读到数据后立即进行后续的处理，处理完毕后再继续读取，循环往复。</p>
 <p>以下面的代码为例。多个Worker监听同一个协程，而 <code>tasksCh &lt;- i</code> 会把任务分配到Worker中去。fan-out模式使 Worker 得到了充分的利用，并且任务的分配也实现了负载均衡，哪一个 Worker 闲下来了就会自动去领取新的任务（注意，示例代码中的 sync.WaitGroup 只是为了防止main函数提前退出）：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>func worker(tasksCh &lt;-chan int, wg *sync.WaitGroup) {
@@ -15436,7 +15436,7 @@
 <a id="__codelineno-16-33" name="__codelineno-16-33" href="#__codelineno-16-33"></a>}
 </code></pre></div>
 <p>在生产实践中，我们还可以在上面这个例子的基础上构建出更复杂的模型，例如每一个Worker中还可以分出多个Subwoker。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/77/75/77f551c2e5040bf455eb6d9f16bb5d75.jpg?wh=1920x1027" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/77/75/77f551c2e5040bf455eb6d9f16bb5d75.jpg?wh=1920x1027" /></p>
 <p>接下来我们就尝试在前例的基础上构建出具有Subworker的并发模式。</p>
 <p>如下所示，Worker也变成了类似调度的模式，Worker创建出了多个Subworker的工作线程，并通过subtasks &lt;- task1将任务分发到了Subworker中。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>const (
@@ -15496,7 +15496,7 @@
 </code></pre></div>
 <h3 id="pipeline">pipeline模式</h3>
 <p>pipeline模式即管道模式，指的是由通道连接的一系列连续的阶段，以类似流的形式进行计算。每个阶段是一组执行特定任务的协程，每个阶段的协程都会通过通道获取从上游传递过来的值，经过处理后，再把新的值发送给下游。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/97/f8/974340f7b922112b8eeyy9605ee381f8.jpg?wh=1920x428" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/97/f8/974340f7b922112b8eeyy9605ee381f8.jpg?wh=1920x428" /></p>
 <p>其实我们平时的四则运算就很像一个管道。举个例子，我们要计算 2*(2*number+1) 这串数字就可以用下面的方式实现。可以看到，<code>multiply(v, 2)</code> 首先被计算出来，计算的结果会紧接着被送入add函数中执行加1操作。之后，生成的结果将继续作为multiply函数的参数被处理。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>func main() {
 <a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>multiply := func(value, multiplier int) int {
@@ -15582,7 +15582,7 @@
 </code></pre></div>
 <p>在管道中还有一个经典的案例：求素数。对于一个大于1的自然数，除了1和它自身外，不能被其他自然数整除的数就叫做素数。那我们怎么利用管道来计算前1万个素数呢？</p>
 <p>我们可以在管道的每一个阶段都进行筛选。第一个阶段为数字的生成器，第二个阶段我们首先找到第1个素数2，在这个阶段过滤出所有能够被2整除的数，这样我们就过滤出了 4、6、8 等偶数。这样我们也就能找到第一个不能被2整除的数字3，可以推断出它一定是素数。因此第三个阶段，我们要排除所有能够被3整除的数字，这样就能够排除9、15等数字，而下一个不能被3整除的数是5，它也一定是素数。把它作为第四个阶段筛选的依据，以此类推。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b3/be/b3a0877c44cb343c77f0f08d887cdebe.jpg?wh=1920x1242" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b3/be/b3a0877c44cb343c77f0f08d887cdebe.jpg?wh=1920x1242" /></p>
 <p>这个过程我们要怎么用代码实现呢？这段代码非常巧妙，我建议你细细品味一下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>// 第一个阶段，数字的生成器
 <a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>func Generate(ch chan&lt;- int) {
@@ -15782,8 +15782,6 @@ go c改成go worker？</p>2022-12-08</li><br/>
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

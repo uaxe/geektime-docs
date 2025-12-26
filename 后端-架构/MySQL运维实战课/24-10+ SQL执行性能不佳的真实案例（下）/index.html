@@ -14752,7 +14752,7 @@
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>OR t_group.gmt_modified &gt;= date_sub(&#39;2018-05-20 09:31:45&#39;, INTERVAL 30 SECOND)
 </code></pre></div>
 <p>业务的需求，是查询最近半分钟内发生过变化的数据。这个SQL的where条件中，用到了3个表的gmt_modified字段来过滤数据，而且这些条件使用or相连。看一下下面的示意图，业务关心的是新数据，每个表中，最近修改过的数据都只占了整个表数据的一小部分。而且t_user、t_group表的数据很少更新。但由于SQL的写法，每次都需要连接全量的数据，然后再过滤出一小部分数据，因此SQL的效率很低。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c0/43/c0a2ayy449a7093714ff7102f920b743.jpg?wh=1470x564" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c0/43/c0a2ayy449a7093714ff7102f920b743.jpg?wh=1470x564" /></p>
 <p>我们将SQL拆分成3个部分。</p>
 <ul>
 <li>SQL片段1</li>
@@ -14764,7 +14764,7 @@
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>WHERE t_msg.gmt_modified &gt;= date_sub(&#39;2018-05-20 09:31:45&#39;, INTERVAL 30 SECOND)
 </code></pre></div>
 <p>SQL片段1以t_msg表作为驱动表，先过滤出表中gmt_modified在半分钟之内的数据，然后再去连接t_user和t_group表，大大减少了连接的数据。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f3/31/f3c4yy06a6a611f2425c718937858a31.jpg?wh=1458x568" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f3/31/f3c4yy06a6a611f2425c718937858a31.jpg?wh=1458x568" /></p>
 <ul>
 <li>SQL片段2</li>
 </ul>
@@ -14775,7 +14775,7 @@
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>WHERE t_user.gmt_modified &gt;= date_sub(&#39;2018-04-29 09:31:44&#39;, INTERVAL 30 SECOND)
 </code></pre></div>
 <p>SQL片段2中，对t_user表的left join等价于普通join。以t_user表为驱动表，先过滤t_user表最近修改过的数据，再去连接t_msg和t_group表。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/87/64/87f233fee5a4609802afd00db65aa464.jpg?wh=1486x608" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/87/64/87f233fee5a4609802afd00db65aa464.jpg?wh=1486x608" /></p>
 <ul>
 <li>SQL片段3</li>
 </ul>
@@ -14786,7 +14786,7 @@
 <a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>WHERE t_group.gmt_modified &gt;= date_sub(&#39;2018-04-29 09:31:44&#39;, INTERVAL 30 SECOND)
 </code></pre></div>
 <p>SQL片段3中，对t_group表的left join等价于普通join。以t_group表为驱动表，先过滤t_group表最近修改过的数据，再去连接t_msg和t_user表。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ee/68/eee9ae458224de2a85867b0f98236668.jpg?wh=1458x568" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ee/68/eee9ae458224de2a85867b0f98236668.jpg?wh=1458x568" /></p>
 <p>将SQL拆分成3个部分后，优化器可以对这3个SQL片段分别优化，选取不同的表关联顺序。在这个业务场景下，由于t_user和t_group表的数据很少有变化，因此SQL片段2和SQL片段3大部分时间没有数据返回。</p>
 <p>SQL的写法灵活，但是在有些场景下，我们需要拆分SQL，使优化器可以选择到更好的执行计划。</p>
 <h2 id="exists">案例八：exists子查询优化一例</h2>
@@ -14803,7 +14803,7 @@
 <a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>ORDER BY u.id limit 13;
 </code></pre></div>
 <p>我们来看一下执行计划，要扫描的记录数好像（rows 13）很少，连接的几个表也都有索引，索引的过滤性也都很好（rows=1）。这个SQL性能应该是比较好的，为什么执行需要120s 的时间呢？</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a2/dd/a2e99857b7ab7f1648b9ee1784b6d8dd.png?wh=1806x304" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a2/dd/a2e99857b7ab7f1648b9ee1784b6d8dd.png?wh=1806x304" /></p>
 <p>我们来分析一下这个SQL的执行过程：先执行主查询，从user表获取一行记录，再执行exists里的子查询，检查是否有匹配的记录。如果匹配了，检查已经获取到的记录数是否已经达到limit的要求。如果没匹配，那么从user表获取下一行记录，继续这个过程。如果主表的记录数比较大，而且在执行exists子查询时一直没有匹配到记录，那么整个查询的执行时间就会比较长。</p>
 <p>上一讲中，我们提到了，从5.6开始，MySQL会自动将子查询转换为半连接。但是为什么这个SQL没有被转化为半连接呢？</p>
 <p>原因是8.0之前的版本，MySQL还不支持转换exists子查询。在上面这个例子中，exists子查询中有一个b.borrow_no的条件，看起来过滤性比较高，因此我们手动改写了SQL。原始SQL中的LEFT JOIN user_cash_detail实际上是多余的，SQL改写为这个样子。</p>
@@ -14814,7 +14814,7 @@
 <a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>order by u.id limit 13
 </code></pre></div>
 <p>改写后，SQL的执行时间从120秒降到了3毫秒。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9f/16/9fb4f250c0e0884dab71fce5d15b7616.png?wh=1736x262" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9f/16/9fb4f250c0e0884dab71fce5d15b7616.png?wh=1736x262" /></p>
 <p>将exists子查询改写为常规的表关联，有几个地方要注意。</p>
 <ol>
 <li>原始SQL中并没有使用到user_cash_detail表，可以将left join去掉。</li>
@@ -15040,15 +15040,15 @@
 <li>使用全表扫描时的跟踪信息</li>
 </ul>
 <p>当IN传入的参数超过一定的个数后，优化器只考虑了全表扫描。从considered_execution_plans中可以看出这一点。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/99/d4/997f695c15fe43546a8c867e6a8ddbd4.png?wh=884x800" /></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/75/4b/756d79ec6de5ac7f25e4e5f585b8004b.png?wh=684x698" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/99/d4/997f695c15fe43546a8c867e6a8ddbd4.png?wh=884x800" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/75/4b/756d79ec6de5ac7f25e4e5f585b8004b.png?wh=684x698" /></p>
 <ul>
 <li>使用索引时的跟踪信息</li>
 </ul>
 <p>将IN的参数减少到某个临界值之后，优化器考虑了range访问路径，并且基于成本，选择了range执行计划。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/80/c4/8001e3be24849ddd22032fcf46f998c4.png?wh=1820x690" />
-<img alt="图片" src="https://static001.geekbang.org/resource/image/e3/c5/e33a4bca4d29f4946e1cca5d77dc40c5.png?wh=872x798" />
-<img alt="图片" src="https://static001.geekbang.org/resource/image/22/17/220a5545364818d9c76581d10f1d4217.png?wh=692x706" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/80/c4/8001e3be24849ddd22032fcf46f998c4.png?wh=1820x690" />
+<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e3/c5/e33a4bca4d29f4946e1cca5d77dc40c5.png?wh=872x798" />
+<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/22/17/220a5545364818d9c76581d10f1d4217.png?wh=692x706" /></p>
 <p>当in条件中的值超过一定数量时，优化器会放弃使用range执行计划。原因是MySQL限制了生成range执行计划时使用的内存，当IN参数列表太长时，消耗的内存太多，超出了限制，因此放弃使用range执行计划，最终使用了全表扫描。MySQL 5.6中，range优化内存的上限是固定的。MySQL 5.7引入了参数range_optimizer_max_mem_size，我们可以调整这个参数来解决in参数列表过长无法使用索引的问题。实际上，在5.7版本中，如果in参数列表过长导致无法使用range优化，会有这样的warning信息。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>Warning    3170    Memory capacity of N bytes for
 <a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>&#39;range_optimizer_max_mem_size&#39; exceeded. Range
@@ -15091,7 +15091,7 @@
 <a id="__codelineno-20-12" name="__codelineno-20-12" href="#__codelineno-20-12"></a>AND a.trans_date = &#39;20180921&#39;;
 </code></pre></div>
 <p>这是一个两表连接的SQL，当时这个SQL执行了两百多秒，从慢日志中看到扫描行数有1.1亿。下面是当时诊断报告的输出。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3b/6d/3b66489b25903a17facc101a80c5a16d.png?wh=964x412" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3b/6d/3b66489b25903a17facc101a80c5a16d.png?wh=964x412" /></p>
 <p>这个系统使用了分库分表，这两个表大概有几十万行数据。SQL的执行计划并没有问题，连接条件中的字段上也建立了正确的联合索引。但是为什么扫描行数会这么高呢？你是不是会怀疑慢SQL的输出有问题？</p>
 <p>有经验的同学可能已经想到原因了，这其实是数据倾斜引起的问题。分别查看2个表中连接条件上的数据分布就能发现问题。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>select serial_no, dist_name, alino, count(*)
@@ -15120,7 +15120,7 @@
 <a id="__codelineno-22-10" name="__codelineno-22-10" href="#__codelineno-22-10"></a>where pay_date is not null
 <a id="__codelineno-22-11" name="__codelineno-22-11" href="#__codelineno-22-11"></a>) t1
 </code></pre></div>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1f/yy/1f3c045f96b313fee457f639caa9b0yy.png?wh=1920x432" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1f/yy/1f3c045f96b313fee457f639caa9b0yy.png?wh=1920x432" /></p>
 <p>这样的SQL还有优化的空间吗？我们来尝试一下。先准备一点测试数据。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>create table t_order(
 <a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>id int not null auto_increment,
@@ -15330,8 +15330,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

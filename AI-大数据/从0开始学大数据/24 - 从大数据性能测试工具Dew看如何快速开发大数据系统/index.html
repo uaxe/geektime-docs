@@ -7383,17 +7383,17 @@
   <h1>24   从大数据性能测试工具Dew看如何快速开发大数据系统</h1>
 
 <p>我们在<a href="http://time.geekbang.org/column/article/72056">Spark性能优化案例分析</a>这一期中，通过对大量的Spark服务器的性能数据进行可视化分析，发现了Spark在程序代码和运行环境中的各种性能问题，并做了相应优化，使Spark运行效率得到了极大提升。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7a/cc/7af885b0492aa68ffbe05bee7e04cdcc.png?wh=552%2A156" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7a/cc/7af885b0492aa68ffbe05bee7e04cdcc.png?wh=552%2A156" /></p>
 <p>很多同学也在问，这些可视化的性能数据从何而来呢？如何在图中将性能指标和任务进度结合起来，可以一目了然看清应用在不同运行阶段的资源使用状况呢？事实上，当时为了进行Spark性能优化，我和团队小伙伴们开发了一个专门的大数据性能测试工具<a href="https://github.com/zhihuili/Dew">Dew</a>。</p>
 <h2 id="dew">Dew设计与开发</h2>
 <p>Dew自身也是一个分布式的大数据系统，部署在整个Hadoop大数据集群的所有服务器上。它可以实时采集服务器上的性能数据和作业日志，收集起来以后解析这些日志数据，将作业运行时间和采集性能指标的时间在同一个坐标系绘制出来，就得到上面的可视化性能图表。Dew的部署模型如下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7f/81/7f0cf1566ba2f7fccd41b036112e7f81.png?wh=930%2A342" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7f/81/7f0cf1566ba2f7fccd41b036112e7f81.png?wh=930%2A342" /></p>
 <p>从图中看，Dew的核心进程有两种，一种是Dew Master进程Herse，另一种是管理集群中每台服务器的Dew Agent进程DewDrop，Dew Agent监控整个Hadoop集群的每台服务器。Herse独立部署一台服务器，而DewDrop则和HDFS的DataNode、Yarn的NodeManager部署在大数据集群的其他所有服务器上，也就是每台服务器都同时运行DataNode、NodeManager、DewDrop进程。</p>
 <p>Dew Master服务器上配置好Agent服务器的IP，运行下面的命令就可以启动整个Dew集群。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>sbin/start-all.sh
 </code></pre></div>
 <p>Master进程Herse和每一台服务器上的Agent进程DewDrop都会启动起来，DewDrop进程会向Herse进程注册，获取自身需要执行的任务，根据任务指令，加载任务可执行代码，启动Drop进程内的service，或者独立进程service，即各种App。整个启动和注册时序请看下面这张图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/41/6d/41bcd70f741ab4a445c368565a67586d.png?wh=1282%2A856" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/41/6d/41bcd70f741ab4a445c368565a67586d.png?wh=1282%2A856" /></p>
 <p>所以我们看Dew的架构，其自身也是一个典型的主从结构的大数据系统。跟所有其他的大数据系统一样，Dew也要有一套底层通信体系和消息传输机制。</p>
 <p>当时我们的目标只是想做大数据性能测试与分析，进而优化Spark源代码。所以开发一个分布式大数据性能测试工具是辅助手段，本身不是最主要的目标，所以不可能花太多精力在系统开发上。所以需要寻找一个可以快速开发分布式底层通信体系和消息传输机制的编程框架。</p>
 <p>很快，我们将目标锁定在Akka，这是一个可以同时支持并发编程、异步编程、分布式编程的编程框架，提供了Java和Scala两种编程语言接口，最关键的是Akka非常简单易用。</p>
@@ -7418,7 +7418,7 @@
 <p>Actor之间互相发送消息全部都是异步的，也就是说，一个Actor给另一个Actor发送消息，并不需要等待另一个Actor返回结果，发送完了就结束了，自己继续处理别的事情。另一个Actor收到发送者的消息后进行计算，如果想把计算结果返回给发送者，只需要给发送者再发送一个消息就可以了，而这个消息依然是异步的。</p>
 <p>这种全部消息都是异步，通过异步消息完成业务处理的编程方式也叫<strong>响应式编程</strong>，Akka的Actor编程就是响应式编程的一种。目前已经有公司在尝试用响应式编程代替传统的面向对象编程，去开发企业应用和网站系统，如果这种尝试成功了，可能会对整个编程行业产生巨大的影响。</p>
 <p>Akka实现异步消息的主要原理是，Actor之间的消息传输是通过一个收件箱Mailbox完成的，发送者Actor的消息发到接收者Actor的收件箱，接收者Actor一个接一个地串行从收件箱取消息调用自己的receive方法进行处理。这个过程请看下面的图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/26/13/269b28c63c69444dd9dcb0c3124e0713.png?wh=1920%2A767" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/26/13/269b28c63c69444dd9dcb0c3124e0713.png?wh=1920%2A767" /></p>
 <p>发送者通过调用一个Actor的引用ActorRef来发送消息，ActorRef将消息放到Actor的Mailbox里就返回了，发送者不需要阻塞等待消息被处理，这是和传统的面向对象编程最大的不同，对象一定要等到被调用者返回结果才继续向下执行。</p>
 <p>通过这种异步消息方式，Akka也顺便实现了并发编程：消息同时异步发送给多个Actor，这些Actor看起来就是在同时执行，即并发执行。</p>
 <p>当时Dew使用Akka，主要用途并不是需要Akka的并发、异步特性，而是主要用到它的分布式特性。</p>
@@ -7573,8 +7573,6 @@ A，b两个actor处于不同的进程中，a向b发信息，现在邮箱有未�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

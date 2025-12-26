@@ -14443,7 +14443,7 @@
 <p>TCP连接建立之后，能感知TCP链路的方式是有限的，一种是以read为核心的读操作，另一种是以write为核心的写操作。接下来，我们就看下如何通过读写操作来感知异常情况，以及对应的处理方式。</p>
 <h2 id="_1">故障模式总结</h2>
 <p>在实际情景中，我们会碰到各种异常的情况。在这里我把这几种异常情况归结为两大类：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/39/af/39b060fa90628db95fd33305dc6fc7af.png?wh=1466%2A490" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/39/af/39b060fa90628db95fd33305dc6fc7af.png?wh=1466%2A490" />
 第一类，是对端无FIN包发送出来的情况；第二类是对端有FIN包发送出来。而这两大类情况又可以根据应用程序的场景细分，接下来我们详细讨论。</p>
 <h2 id="fin">网络中断造成的对端无FIN包</h2>
 <p>很多原因都会造成网络中断，在这种情况下，TCP程序并不能及时感知到异常信息。除非网络中的其他设备，如路由器发出一条ICMP报文，说明目的网络或主机不可达，这个时候通过read或write调用就会返回Unreachable的错误。</p>
@@ -14523,7 +14523,7 @@
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>$ peer connection closed
 </code></pre></div>
 <p>这说明客户端程序通过read调用，感知到了服务端发送的FIN包，于是正常退出了客户端程序。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b0/ec/b0922e1b1824f1e4735f2788eb3527ec.png?wh=636%2A466" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b0/ec/b0922e1b1824f1e4735f2788eb3527ec.png?wh=636%2A466" />
 注意如果我们的速度不够快，导致服务器端从睡眠中苏醒，并成功将报文发送出来后，客户端会正常显示，此时我们停留，等待标准输入。如果不继续通过read或write操作对套接字进行读写，是无法感知服务器端已经关闭套接字这个事实的。</p>
 <h3 id="writerstreadrst">通过write产生RST，read调用感知RST</h3>
 <p>这一次，我们仍然依次启动服务器端和客户端程序，在客户端输入bad字符之后，等待一段时间，直到客户端正确显示了服务端的回应“bad”字符之后，再杀死服务器程序。客户端再次输入bad2，这时屏幕上打印出”peer connection closed“。</p>
@@ -14534,7 +14534,7 @@
 <a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>$bad2
 <a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>$peer connection closed
 </code></pre></div>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a9/f2/a95d3b87a9a93421774d7aeade8efbf2.png?wh=1438%2A760" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a9/f2/a95d3b87a9a93421774d7aeade8efbf2.png?wh=1438%2A760" />
 在很多书籍和文章中，对这个程序的解读是，收到FIN包的客户端继续合法地向服务器端发送数据，服务器端在无法定位该TCP连接信息的情况下，发送了RST信息，当程序调用read操作时，内核会将RST错误信息通知给应用程序。这是一个典型的write操作造成异常，再通过read操作来感知异常的样例。</p>
 <p>不过，我在Linux 4.4内核上实验这个程序，多次的结果都是，内核正常将EOF信息通知给应用程序，而不是RST错误信息。</p>
 <p>我又在Max OS 10.13.6上尝试这个程序，read操作可以返回RST异常信息。输出和时序图也已经给出。</p>
@@ -14605,7 +14605,7 @@
 <p>这是因为服务端程序被杀死之后，操作系统内核会做一些清理的事情，为这个套接字发送一个FIN包，但是，客户端在收到FIN包之后，没有read操作，还是会继续往这个套接字写入数据。这是因为根据TCP协议，连接是双向的，收到对方的FIN包只意味着<strong>对方不会再发送任何消息</strong>。 在一个双方正常关闭的流程中，收到FIN包的一端将剩余数据发送给对面（通过一次或多次write），然后关闭套接字。</p>
 <p>当数据到达服务器端时，操作系统内核发现这是一个指向关闭的套接字，会再次向客户端发送一个RST包，对于发送端而言如果此时再执行write操作，立即会返回一个RST错误信息。</p>
 <p>你可以看到针对这个全过程的一张描述图，你可以参考这张图好好理解一下这个过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/eb/42/ebf533a453573b85ff03a46103fc5b42.png?wh=1436%2A528" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/eb/42/ebf533a453573b85ff03a46103fc5b42.png?wh=1436%2A528" />
 以上是在Linux 4.4内核上测试的结果。</p>
 <p>在很多书籍和文章中，对这个实验的期望结果不是这样的。大部分的教程是这样说的：在第二次write操作时，由于服务器端无法查询到对应的TCP连接信息，于是发送了一个RST包给客户端，客户端第二次操作时，应用程序会收到一个SIGPIPE信号。如果不捕捉这个信号，应用程序会在毫无征兆的情况下直接退出。</p>
 <p>我在Max OS 10.13.6上尝试这个程序，得到的结果确实如此。你可以看到屏幕显示和时序图。</p>
@@ -14774,8 +14774,6 @@ send error: Connection reset by peer (104)
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

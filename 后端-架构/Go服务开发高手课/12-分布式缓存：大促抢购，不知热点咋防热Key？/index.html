@@ -14149,7 +14149,7 @@
 <h2 id="key">什么是热 Key 问题</h2>
 <p>在讨论具体方案之前，你不妨先想一想：要是Redis中某个Key的访问QPS突然变得很高，会给我们的系统带来怎样的影响？</p>
 <p>就像下面的图展示的一样，当从 Redis 读取数据时，Redis 代理服务会基于 Key 进行 Hash 计算，以此定位到 Redis 中实际存放数据的后端 Redis Server。所以，要是某个 Key 的访问 QPS 突然大幅攀升，那么这个 Key 所在的 Redis Server 就会有部分请求被迫排队，进而导致延迟升高，严重时还会出现超时失败的状况。这便是我们平常所说的热 Key 问题，而那些<strong>被高频率访问的 Key 就是热 Key</strong>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/71/36/71fb5bb42c689ce7c4725732bfd2b336.jpg?wh=3400x2630" title="图1 Redis 分片架构" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/71/36/71fb5bb42c689ce7c4725732bfd2b336.jpg?wh=3400x2630" title="图1 Redis 分片架构" /></p>
 <p>在应对突发热 Key 所引发的性能难题时，各个公司所采用的解决方案可谓是各有千秋。不过，它们的核心思路却殊途同归，那便是<strong>借助更多的机器资源，来分担热 Key 的访问流量</strong>。这些方案大致能够归为以下两类。</p>
 <ul>
 <li>第一类是在业务层进行改造，从而解决热Key问题的方案。</li>
@@ -14159,7 +14159,7 @@
 <p>我们先来看看业务层方案的具体情况。</p>
 <h3 id="_2">本地缓存全量数据</h3>
 <p>对于业务层的方案，最为简单的是服务<strong>本地缓存全量数据</strong>的方案。<strong>也就是在服务的各个实例内存中，把所有数据都缓存起来</strong>。这样当请求访问时，就可以直接从服务实例的本地缓存中获取数据，而不用请求Redis，防止发生热 Key 问题。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/dc/4e/dc31f852df6983f520b798fb1a37e34e.jpg?wh=3593x2722" title="图2 localcache 全量缓存" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dc/4e/dc31f852df6983f520b798fb1a37e34e.jpg?wh=3593x2722" title="图2 localcache 全量缓存" /></p>
 <p>然而，要是服务本地没办法缓存全部数据，像数据量超大，超出内存规格所能承受的范围，又或者是为了避开 Golang的GC（垃圾回收）带来的影响，这种情况下，在本地缓存全量数据的方案就行不通了。</p>
 <h3 id="_3">本地缓存部分数据</h3>
 <p>为了应对服务本地内存无法缓存全量数据这一困境，在业务层的方案中，还存在一种仅对部分数据进行缓存的策略，即<strong>专门针对热 Key 数据进行缓存，而将其他数据排除在缓存范围之外</strong>。</p>
@@ -14167,7 +14167,7 @@
 <p>那么，到底存不存在能够实现热 Key 探测的框架呢？</p>
 <p>实际上，<a href="https://gitee.com/jd-platform-opensource/hotkey">京东推出了一个开源的热 Key 探测框架—— JdHotkey</a>，有了它，我们的服务端就能及时地感知到热 Key。接下来咱们就来研究一下它是怎么做热 Key 探测的。使用 JdHotkey 框架来实现热 Key 的探测，主要包含两个关键步骤。</p>
 <p>首先是 <strong>Key 访问的上报与统计</strong>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0a/a1/0a3bac0944723674422908bae988f4a1.jpg?wh=3366x2679" title="图3 Key 访问上报" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0a/a1/0a3bac0944723674422908bae988f4a1.jpg?wh=3366x2679" title="图3 Key 访问上报" /></p>
 <p>正如前面的图里所展示的那样，由于同一个 Key 会在不同的服务实例中被访问，所以仅仅依靠单个客户端或者 Redis Proxy 难以完成热 Key 的统计工作。</p>
 <p>为了能够精准地统计热 Key，就必须单独部署一个专门的 worker 服务。当我们访问某个Key时，需要调用JdHotkey框架提供的SDK进行上报。SDK底层会周期性地把收集到的Key访问数据上报至这个统一的 worker 服务，以便开展聚合计算。需要注意的是，已经热了的Key不会再次发送给worker服务，除非Client本地该Key缓存已过期。</p>
 <p>当然，针对不同服务实例访问相同Key的情况，框架SDK会根据类似下面的伪代码，将相同Key的访问上报到同一个 worker 实例。这样一来，就能够有效对 Key 访问频率做出精确统计，为后续热 Key 的判定与处理提供可靠的数据支撑。</p>
@@ -14178,22 +14178,22 @@
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="nx">worker</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nx">workers</span><span class="p">[</span><span class="nx">index</span><span class="p">]</span><span class="w"> </span><span class="c1">// 上报的worker</span>
 </code></pre></div>
 <p>第二步就是<strong>热 Key 的判断与推送</strong>。当专门负责统计的 worker 服务监测到热 Key 出现时，它会主动地将热 Key 信息推送到所有相关的业务服务实例，从而确保各个业务服务实例能够及时知晓热 Key 的情况，并据此做出相应的处理策略调整。这个过程的示意图如下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3e/24/3ec1ac71840c2a1ebc2f5584edc02024.jpg?wh=3366x2679" title="图4 热 Key 推送" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3e/24/3ec1ac71840c2a1ebc2f5584edc02024.jpg?wh=3366x2679" title="图4 热 Key 推送" /></p>
 <p>为了让你有个直观的感知，下面的图里，我给出了服务端接入热Key探测之后的Redis访问流程图，供你参考。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a8/2f/a8de16e2ce2fb6faf4418d366yyd792f.jpg?wh=4000x1135" title="图5 服务端 Redis 访问流程图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a8/2f/a8de16e2ce2fb6faf4418d366yyd792f.jpg?wh=4000x1135" title="图5 服务端 Redis 访问流程图" /></p>
 <p>在业务层接入热Key的探测框架，虽然可以解决热Key问题，但是给我们带来了额外的复杂度。比如我们需要接入特定的SDK才能使用，而且还需要部署一个额外的worker服务来做统计。</p>
 <p>那我们有没有办法避免对业务层的改造，在Redis数据库层解决热Key问题呢？</p>
 <h2 id="redis">Redis层解决方案</h2>
 <p>实际上，我们可以利用各个云厂商的Redis所提供的功能，来解决热Key问题，从而避免增加业务逻辑的复杂性。而利用云Redis解决热Key问题，通常有两种比较常用的方案。</p>
 <h3 id="_4">读写分离</h3>
 <p>首先是读写分离方案。就像下面的图一样，我们可以<strong>给分片Server增加更多的从库，让从库来承载Key的读访问</strong>，从而避免热Key访问影响单台Redis Server的性能。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/03/f3/036f05f7a556299655f7b2a7debfa1f3.jpg?wh=3912x2540" title="图6 读写分离架构" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/03/f3/036f05f7a556299655f7b2a7debfa1f3.jpg?wh=3912x2540" title="图6 读写分离架构" /></p>
 <p>不过呢，在采用读写分离这种架构的时候，由于我们事先没办法确定究竟哪些 Key 会成为热 Key，所以为了保险起见，我们就只能对所有的 Redis Server 都进行扩充从库的操作。这样一来，必然会使得所耗费的Redis资源成本大幅增加。</p>
 <p>那么，我们究竟应该采用什么样的方法，才能有效解决这样的问题呢？</p>
 <h3 id="proxykey">Proxy热Key承载</h3>
 <p>实际上，不少云厂商都额外提供了一种借助 Proxy 来承载热 Key 的方案。</p>
 <p>就拿阿里云Redis的 <a href="https://help.aliyun.com/zh/redis/user-guide/use-proxy-query-cache-to-address-issues-caused-by-hotkeys?spm=a2c4g.11186623.help-menu-26340.d_2_11_4_0.60a8181cJR2s8w&amp;scm=20140722.H_216309._.OR_help-T_cn-DAS-zh-V_1">Proxy Query Cache</a> 特性来说，这类方案的核心思路在于，并非针对每个Redis Server都去扩充从库，而是巧妙地<strong>利用 Proxy来缓存热Key数据，承担热 Key 访问所带来的压力</strong>。这样在应对热 Key 问题时，既能有效缓解系统压力，又能避免因大规模扩充从库而导致的资源浪费。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9f/69/9fbfa40d3f80672d9d5d8c2954b27d69.jpg?wh=3319x2540" title="图7 Proxy 热 Key 承载方案" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9f/69/9fbfa40d3f80672d9d5d8c2954b27d69.jpg?wh=3319x2540" title="图7 Proxy 热 Key 承载方案" /></p>
 <p>那么，这类方案究竟是怎样实现的呢？</p>
 <p>实际上，虽然这类方案的实现细节各有不同，但大致都可以分为下面几步。</p>
 <p>首先，当对Key进行访问时，在Redis Server端进行Key访问频率统计。</p>
@@ -14331,8 +14331,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

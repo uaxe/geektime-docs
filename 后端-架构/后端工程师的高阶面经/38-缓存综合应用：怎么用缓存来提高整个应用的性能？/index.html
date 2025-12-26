@@ -14846,13 +14846,13 @@
 <blockquote>
 <p>我有一个接口，性能要求十分苛刻。最开始的时候，只用了 Redis 缓存，性能其实也还说得过去。但是后面想要进一步提升性能的时候，我就只能考虑引入本地缓存。而为了避免本地缓存命中率不高还有内存浪费的问题，我就进一步在客户端利用一致性哈希负载均衡算法，确保同一个业务的请求总是落到同一个节点上。经过改进之后，性能果然提高了 40%。而且，因为使用一致性哈希负载均衡，所以本地缓存的命中率也很高。</p>
 </blockquote>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/bd/af/bd40a37e50e05cc8ff88e28fc8ac25af.png?wh=1920x1074" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bd/af/bd40a37e50e05cc8ff88e28fc8ac25af.png?wh=1920x1074" /></p>
 <p>这个方案的好处就是适用性广泛，基本上你只要使用了本地缓存和 Redis，就可以在前面加一个一致性哈希负载均衡。</p>
 <p>在使用这个方案的时候，要记得深入讨论一下数据一致性的问题，尤其是上线新节点会发生什么。这个问题在前面的内容里面已经讨论过了，我就不再重复了。</p>
 <h3 id="redis_1">Redis 缓存降级成本地缓存</h3>
 <p>在<a href="https://time.geekbang.org/column/article/698514">第 35 讲</a>那里，我提到过一个案例，是使用一个廉价的 Redis 来作为备份。一旦生产用的 Redis 崩溃了就直接替换到备份上。实际上，你直接用本地缓存也可以。但是这个本地缓存并不是为了性能，而是在 Redis 崩溃之后作为容错。也就是在正常的情况下，如果 Redis 运作良好，那么查询的都是 Redis，如果 Redis 里没有数据，那就查询数据库。</p>
 <p>但是如果 Redis 崩溃了，或者说因为网络问题长时间连不上去，就会启用本地缓存。这时候，查询会先查询本地缓存，本地缓存中没有数据，就会查询数据库。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a6/9c/a69dcbc1a92a688c32b8f20c7279379c.png?wh=1920x1074" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a6/9c/a69dcbc1a92a688c32b8f20c7279379c.png?wh=1920x1074" /></p>
 <p>正常用法都是先查询本地缓存，再查询 Redis，而这个方案反其道而行之，能够达到出其不意的效果。</p>
 <p>所以你可以这样来介绍这个方案。</p>
 <blockquote>
@@ -14873,9 +14873,9 @@
 <p>我来给你解释一下这种缓存的基本原理。使用这种缓存方案的前提是，你在一个请求里面会反复查询同一个数据多次。比如说，因为模块划分之后要恪守边界，所以每个模块都会自己去调用接口来获得同一份数据。</p>
 <p>那么你就可以考虑将数据和请求关联在一起，做成一个在请求生命周期内有效的缓存。</p>
 <p>举例来说，你有两个模块，一个是订单模块，一个是支付模块。这两个模块因为封装得都非常好，所以它们都只需要你传入一个 user_id，这两个模块拿着 user_id 去查询对应的用户信息，完成对应的业务。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/cb/5b/cb5261db69133325d77f5d5543041d5b.png?wh=1920x960" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cb/5b/cb5261db69133325d77f5d5543041d5b.png?wh=1920x960" /></p>
 <p>当你没有使用请求级别缓存的时候，它们一共发出两次数据库查询。当你用了请求级别缓存的时候，订单模块查询到之后，支付模块只需要直接用就可以。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/55/9a/55134400ba72fb9711b096c0d06e9f9a.png?wh=1920x1079" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/55/9a/55134400ba72fb9711b096c0d06e9f9a.png?wh=1920x1079" /></p>
 <p>这个东西一般是需要特殊的中间件来支持的。比如说在 Java 里面可以直接借助 Request-Scope 的 Bean 来缓存数据。而在 Go 里面可以借助 context.Context 来完成。</p>
 <p>这时候你可能会问，为什么不直接使用缓存呢？比如说本地缓存。因为和本地缓存之类的方案比起来，请求级别的缓存不需要考虑一致性的问题。因为你的缓存数据在请求返回响应之后就无效了，撑死了就是有人在你处理这个请求的过程中修改了数据，但是你并不知道。而大多数的时候，你可能并不在意这么一点不一致。</p>
 <p>不过总的来说，这个方案的应用面还是比较狭窄的。你可以考虑在自己的业务里面找到了真实场景之后再来使用这个方案面试。</p>
@@ -14883,7 +14883,7 @@
 <h3 id="_4">会话级别缓存</h3>
 <p>类似于请求级别缓存，这个级别的缓存是在用户和系统的会话结束之后，就失效了。</p>
 <p>简单来说，就是你把缓存做成类似于登录态里 Session 那种东西，Session 结束了，那么缓存的数据也失效了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/96/94/96c0e697bba8afae507149603254d794.png?wh=1920x1074" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/96/94/96c0e697bba8afae507149603254d794.png?wh=1920x1074" /></p>
 <p>这个在 Java 里面也很好落地，因为 Java 的 Spring 支持 Session-Scope 的 Bean。你只需要把数据放到这种 Bean 里面就可以。</p>
 <p>它的好处同样是数据一致性问题没那么严重。它相当于在用户和你的系统保持会话的期间，使用的数据始终是同一份。比如说用户权限信息，它对一致性的要求很高，但是使用又非常频繁。</p>
 <p>你可以参考这段话，然后根据自己的业务实际情况替换就可以。</p>
@@ -14894,7 +14894,7 @@
 </blockquote>
 <h3 id="_5">客户端缓存</h3>
 <p>在微服务架构里面，有些时候性能要求非常苛刻，又或者你对一致性要求不是特别高，于是你就会想在调用别人的微服务的时候把结果缓存下来。等到下一次有类似的请求过来，就可以直接用自己缓存的数据了。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/46/73/467d1293a998e794fdffc07828b1c873.png?wh=1920x1079" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/46/73/467d1293a998e794fdffc07828b1c873.png?wh=1920x1079" /></p>
 <p>你可以沿用优化性能的思路。</p>
 <blockquote>
 <p>之前我还优化过一个服务的接口。这个服务有很多接口，但是大部分接口都需要用到用户的信息，所以我就做了一个客户端缓存。思路是这样的，每次我发起调用查询了用户的信息之后，我就会把它缓存起来，设置一个比较短的过期时间，比如说一分钟。后续如果需要这个数据的时候，我就先从缓存里拿数据，如果缓存里没有数据，再调用用户服务的接口。这种做法最大好处的是省了一次微服务调用的开销。</p>
@@ -14906,14 +14906,14 @@
 <p>我举个例子，虽然服务端也缓存了数据，但是因为服务端是给很多业务提供服务的。那么就可能出现这种问题：某个业务的查询相对我的业务的查询来说，非常高频，或者优先级更高，导致服务端在淘汰键值对的时候，总是优先淘汰我用的键值对。</p>
 <p>那么就会出现，服务端整体上缓存命中率很高，但是我这个特定的业务方，缓存命中率很低的问题。而我自己缓存的话，淘汰的肯定就是我这个业务不怎么需要的。</p>
 </blockquote>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ab/65/abde5d01cf44ea2b12d11f96b9223765.png?wh=1920x1079" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ab/65/abde5d01cf44ea2b12d11f96b9223765.png?wh=1920x1079" /></p>
 <p>总的来说，客户端缓存是一种反范式的用法，因为它会加剧数据一致性的问题。</p>
 <blockquote>
 <p>这种用法也是一种反范式的用法。因为按照正统的微服务理论来说，应该是服务端缓存数据，而不是在客户端缓存数据。否则的话，如果服务端接收到了请求，修改了数据，客户端这边是没有感知的。</p>
 </blockquote>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/91/79/916fa324a60c7c99bb2f90b9a4a9ac79.png?wh=1920x1079" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/91/79/916fa324a60c7c99bb2f90b9a4a9ac79.png?wh=1920x1079" /></p>
 <p>为了解决这个问题，我们又引入了一个变种，也是在客户端这边缓存，但这个缓存是服务端提供的依赖来管理的。比如说在 Java 这边，引入服务端的 Jar 包，服务端的 Jar 包会自己先查询缓存，当缓存没有数据的时候，才会真的发出请求到服务端。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b1/25/b154e53568e8d740d916954cf797e625.png?wh=1920x927" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b1/25/b154e53568e8d740d916954cf797e625.png?wh=1920x927" /></p>
 <p>正常来说，除非你同时是服务端的研发，不然很难要求别的组或者别的部门给你提供这样一个依赖。</p>
 <p>客户端缓存还可以利用业务相关性来进一步提升缓存的命中率和接口的性能。</p>
 <h3 id="_6">业务相关缓存预加载</h3>
@@ -14922,7 +14922,7 @@
 <p>早期我还利用业务的关联性来优化过系统的性能。在我的系统里面，用户调用 A 接口之后，大概率会调用 B 接口。所以我就做了两件事，A 接口和 B 接口都需要的数据，我直接缓存起来。如果 B 接口还需要一些额外的数据，那么我可以提前发起微服务调用，拿到数据之后一起缓存起来。</p>
 <p>后续用户真的调用了 B 接口，就直接从缓存里拿数据，性能很好。就算没有调用 B 接口，我在缓存的时候，设置的过期时间也很短，也不会有什么问题。</p>
 </blockquote>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/fe/41/fefe52af6d74d96979c4ee40fbba3841.png?wh=1920x1074" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fe/41/fefe52af6d74d96979c4ee40fbba3841.png?wh=1920x1074" /></p>
 <p>你可以进一步谈谈个人理解。</p>
 <blockquote>
 <p>我个人认为，利用业务之间的关联性来缓存、或者提前加载缓存数据，是很好的优化性能的手段。</p>
@@ -14934,7 +14934,7 @@
 <li>在启动的时候，就直接把缓存加载到缓存中。可以全量加载，也可以只加载热点数据。在使用这种策略的时候，就要小心缓存雪崩的问题。</li>
 <li>启动之后，不是立刻就打过来 100% 的流量，而是先小比例地把流量打过来，在处理这些请求的过程中，缓存中的数据会慢慢加载好。</li>
 </ul>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/df/80/dfcf9c0d26abb8c1b4cdefbcd2657c80.png?wh=1920x1077" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/df/80/dfcf9c0d26abb8c1b4cdefbcd2657c80.png?wh=1920x1077" /></p>
 <p>你可以这么介绍这个方案。</p>
 <blockquote>
 <p>之前我使用的本地缓存来优化性能的时候，为了防止在节点刚启动的时候本地缓存中还没有数据，导致性能抖动，我引入了缓存预热的机制。</p>
@@ -14951,7 +14951,7 @@
 <li>在任何第三方中间件上，你都可以通过调整它们的缓存设置来提高性能。比如说在 MySQL 你已经学到了通过调整 InnoDB 引擎里 buffer pool 的配置来提升性能了。</li>
 </ul>
 <p>你要在面试之前，把整个方案好好整理出来。这样面试就能做到有备无患，回答也能做到井井有条。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1b/2d/1b45cb6aedc1df45bc024329e625762d.jpg?wh=2316x2379" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1b/2d/1b45cb6aedc1df45bc024329e625762d.jpg?wh=2316x2379" /></p>
 <h2 id="_9">思考题</h2>
 <p>最后请你来思考两个问题。</p>
 <ul>
@@ -15078,8 +15078,6 @@ Q3：客户端采用服务端的jar包，怎么就能够解决“服务端修改
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

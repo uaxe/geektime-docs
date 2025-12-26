@@ -14296,12 +14296,12 @@
 
 <p>你好，我是何辉。今天我们探索Dubbo框架的第五道特色风味，事件通知。</p>
 <p>如果你用过Spring的Event事件，想必对事件通知不陌生，我们看个项目例子回顾一下，比如有个支付系统提供了一个商品支付功能：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/03/6d/034d9d2fe33b9aaa3e0f7b59c8bf9d6d.jpg?wh=1920x686" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/03/6d/034d9d2fe33b9aaa3e0f7b59c8bf9d6d.jpg?wh=1920x686" /></p>
 <p>图中的支付系统暴露了一个支付请求的Dubbo接口，支付核心业务逻辑是调用核心支付系统完成，当支付状态翻转为支付成功后，还需要额外做些事情，比如埋点商品信息、短信告知用户和通知物流派件。</p>
 <p>面对这样一个完成核心功能后还需要额外处理多个事件的需求，你会怎么优雅地快速处理呢？</p>
 <h2 id="_1">面向过程编程</h2>
 <p>商品支付成功后需要处理三件事（埋点、发短信、通知物流），这样的需求，你一定觉得简直太小儿科了，从上到下写就完事了。实现体逻辑就是图中线性的形式：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ec/31/ec1ab2fd0656de8ayy2f8a4e619fa531.jpg?wh=1920x879" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ec/31/ec1ab2fd0656de8ayy2f8a4e619fa531.jpg?wh=1920x879" /></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nd">@DubboService</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nd">@Component</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">PayFacadeImpl</span><span class="w"> </span><span class="kd">implements</span><span class="w"> </span><span class="n">PayFacade</span><span class="w"> </span><span class="p">{</span>
@@ -14329,7 +14329,7 @@
 <p>但是细想一下，一个大方法里写完所有功能逻辑，搞不好会有几千行代码。这种面向过程的写法，虽然写代码的人很爽，但是看代码的人可能会迷失方向，更重要的是可读性变差，增加了维护成本，也延长了维护周期。</p>
 <p>机智的你要补充了，那就<strong>用面向对象编程的思路，把一些小功能用小方法封装一下</strong>，让那一大坨代码整体看起来整洁点。</p>
 <p>好，我们整顿一下，把原来的大方法做细粒度的拆分：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ff/b5/ff3a924aa949318165a2cd1c08d5d7b5.jpg?wh=1920x879" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ff/b5/ff3a924aa949318165a2cd1c08d5d7b5.jpg?wh=1920x879" /></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nd">@DubboService</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nd">@Component</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">PayFacadeImpl</span><span class="w"> </span><span class="kd">implements</span><span class="w"> </span><span class="n">PayFacade</span><span class="w"> </span><span class="p">{</span>
@@ -14373,7 +14373,7 @@
 <li><strong>状态变更性</strong>。按照是否有明显业务状态的先后变更，将一个个小功能再归类。</li>
 </ol>
 <p>按照小技巧我们再梳理一下这4个功能：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e5/5a/e518a40f98219a699789a42bfba2a95a.jpg?wh=1920x692" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e5/5a/e518a40f98219a699789a42bfba2a95a.jpg?wh=1920x692" /></p>
 <p>先看功能相关性，四个小功能的拆分没问题；再看密切相关性，支付核心业务逻辑是最重要的，其他三个事件的重要程度和迫切性并不高；最后看状态变更性，核心业务逻辑有了明显的状态变更后，在支付成功的关键节点后，驱动着继续做另外三件事。</p>
 <p>所以如何解耦呢？<strong>我们可以将核心逻辑与三个事件剥离开，只有核心逻辑翻转为支付成功时才处理三个事件。</strong></p>
 <p>这个例子的需求比较简单，你可以重点体会这个解耦技巧的思想，实际开发过程中的需求会复杂的多，用这个方法能很好地辅助你解耦需求问题。</p>
@@ -14412,7 +14412,7 @@
 <p>按照6W中Who，这三个事件是商品支付功能支付完成后需要去完成的事件，即我们需要在商品支付功能中提供这样的机制。但recvPay方法主体是用来体现核心支付逻辑的，这个模块中已经没法再追加代码了。那怎么办呢？</p>
 <p>考虑到商品支付这个功能也只是Dubbo众多接口中的一个，我们不妨升维思考，站在Dubbo接口的框架调用流程中，看看是否可以在商品支付功能method1远程调用的前后做点事情来提供事件通知的入口。</p>
 <p>回忆Dubbo调用远程的整个流程：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e1/f5/e1eb8d4f8f5ff3fyye575cf3ff8e24f5.png?wh=1920x488" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e1/f5/e1eb8d4f8f5ff3fyye575cf3ff8e24f5.png?wh=1920x488" /></p>
 <p>从商品支付功能的处理，到拦截模块，到代理模块，到网络模块，最后经过公网发送至核心支付系统。</p>
 <p>从这张图中，你能看到业务模块是触发事件的源头，调用出去时经过拦截模块，返回也经过拦截模块，所以似乎可以借助拦截模块，实现一种新机制拦截Dubbo接口，类似面向切面编程的思想。</p>
 <p>一想到AOP，我们就有想法了：</p>
@@ -14433,7 +14433,7 @@
 <a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="p">}</span>
 </code></pre></div>
 <p>底层标准接口里面有调用前、调用完成、调用异常的三个方法，然后让各自接口去实现标准接口，呈现出来的代码调用形式如图：
-<img alt="图片" src="https://static001.geekbang.org/resource/image/31/54/311b4df4398dbdfyydb586e483e35254.png?wh=1853x1400" /></p>
+<img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/31/54/311b4df4398dbdfyydb586e483e35254.png?wh=1853x1400" /></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nd">@DubboService</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nd">@Component</span>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">PayFacadeImpl</span><span class="w"> </span><span class="kd">implements</span><span class="w"> </span><span class="n">PayFacade</span><span class="p">,</span><span class="w"> </span><span class="n">FrameworkNotifyService</span><span class="w"> </span><span class="p">{</span>
@@ -14484,12 +14484,12 @@
 <p>即使假设可以在 PayFacadeImpl 中声明 3 个 FrameworkNotifyService 标准接口，那么会出现 3 个一模一样的 onInvoke 方法需要被重写，到时候我们怎么分清哪个 onInvoke 是属于 recvPay 方法的接口回调呢？明显更加不合理了，想法一PASS。</p>
 <h3 id="_6">想法二反射调用</h3>
 <p>那就看想法二，在接口级别配置回调方法，配置是开发人员配的：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c3/30/c3e95912b1d28b79ed893bb550c3c330.png?wh=1920x941" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c3/30/c3e95912b1d28b79ed893bb550c3c330.png?wh=1920x941" /></p>
 <p>在前置、后置、异常时都去读取配置回调指定的方法，即使将来配错了出现bug也是开发人员的问题，并不是我们框架的问题，框架只需要把这套反射回调的逻辑做稳定。这样一来<strong>6W中Why</strong>落地了。</p>
 <p>这套反射回调方法的机制是在实现体调用的前、后和异常时被触发的，那<strong>6W中When和How</strong>也落地了。至于<strong>Where，</strong>要想拥有这样的环绕切面效果，自然得在过滤器里面的 invoker.invoke(invocation) 方法前后执行。</p>
 <p>就剩下<strong>6W中What</strong>，事件信息该怎么传递到回调方法里。如果底层框架定制一套事件对象，不可避免将来要为维护事件对象买单，所以简单起见，不如跟随Dubbo接口的入参和反参来定义事件信息，免去后顾之忧。</p>
 <p>好6W都想清楚了，按照想法二，我们画出逻辑图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/43/08/4397d2b52f1a3c3345ca5889c3427808.jpg?wh=1920x791" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/43/08/4397d2b52f1a3c3345ca5889c3427808.jpg?wh=1920x791" /></p>
 <p>把AOP的思想充分应用到了拦截模块中，在执行下一步调用之前、之后、异常时包裹了一层。</p>
 <p>那过滤器的代码该怎么写呢？其实Dubbo底层的源码已经按照我们的预想实现了一番：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nd">@Activate</span><span class="p">(</span><span class="n">group</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">CommonConstants</span><span class="p">.</span><span class="na">CONSUMER</span><span class="p">)</span>
@@ -14797,8 +14797,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

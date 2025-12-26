@@ -5516,21 +5516,21 @@
 
 <p>你好，我是陈旭。</p>
 <p>上一讲我们用下面这图定义了被测功能。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/20/10/20e06b19b290cd365yy374608704f810.jpg?wh=10666x2238" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/20/10/20e06b19b290cd365yy374608704f810.jpg?wh=10666x2238" /></p>
 <p>我们抓住了触发功能这个关键环节，由于GUI中的各个功能的触发，往往是通过事件来驱动，于是，我们通过跟踪事件，顺藤摸瓜找出被测功能，并采用事件链的形式来标记一个被测功能。在多个事件链中，将相同事件叠在一起，多个事件链就可以组成了一棵事件树。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ey/9a/eyy6b23a023bfe5bf8c214bc198c2f9a.jpg?wh=10666x4735" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ey/9a/eyy6b23a023bfe5bf8c214bc198c2f9a.jpg?wh=10666x4735" /></p>
 <p>在这个推理过程中，我为了可以流畅地讲解这个过程，我故意遗漏了一个重要的技术实现难点，也就是上一讲的思考题：<strong>如何分析事件处理逻辑。</strong>这一讲我们就来解决这个问题，并更进一步，给出如何检测副作用的方法。</p>
 <h2 id="_1">如何分析事件处理逻辑</h2>
 <p>为了找到事件链的下一级，我们势必要去分析处理上一级事件的逻辑，这样才能从处理逻辑中找出它是否发送了下一级事件，以及事件名是啥，这样才能一级一级找下去。在传统纯代码实现的App中，事件处理逻辑就是一个代码块。而在低代码实现的App中，处理事件的方式比纯代码要更加复杂，不仅有纯代码的处理方式，还有各种一键绑定、自动更新等非代码处理。我们分开讨论。</p>
 <p>要准确地分析一整块代码（包含函数、类定义等任何语法），正则表达式是搞不定的，更不要说最基础的字符串搜索。<strong>唯有祭出</strong> <strong>AST</strong> <strong>大法了。</strong></p>
 <p>AST，全称为抽象语法树（Abstract Syntax Tree），是在计算机科学中广泛使用的一种数据结构。它用于表示程序代码的语法结构，以便更方便地进行分析和处理。AST由节点组成，每个节点代表程序代码中的一个语法结构。节点之间通过父子关系相连，形成树的结构。树的根节点代表整个程序的起点，而叶节点代表最小的语法单元。</p>
 <p>这样说比较抽象，可以看一下下面这个图，它可以有效帮助你理解这段文字。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f7/8a/f720ef0bd00c6cc66cfd146d51bd478a.png?wh=903x567" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f7/8a/f720ef0bd00c6cc66cfd146d51bd478a.png?wh=903x567" /></p>
 <p>这图左右两边采用了两种不同的方式来描述同一段递归生成斐波那契数列的代码。左边的是你熟悉的代码的样子，对人类友好但对编译器不友好。右侧是一棵树，从树根SourceFile开始，每一级有数量不等的节点，没错，这就是左侧代码对应的抽象语法树。这棵树表达的逻辑和左侧接近自然语言的代码是完全一样的，但显然这不是给人类准备的，它是给编译器准备的。编译器能快速准确地处理右侧的代码，但你我却不行。</p>
 <p>你仔细观察，代码中的任何关键字、常量、符号，都可在右侧的AST树上找到对应的节点。所以，通过遍历AST，就可以非常快速、准确地找出是否有哪个节点调用了发送自定义事件的API（这个API当然是已知的），如图倒数第4个节点的CallExpression节点，就是一个调用API节点，并且通过读取这个节点的子级节点，就可以轻松获得发送自定义事件的事件等信息。</p>
 <p>还记得上一讲我根据事件的创建者将事件分成了两组吗？第一组是系统创建的，第二组是自定义事件，是由应用开发人员创建的。这样分组后，我们会发现，第一组事件往往是一个事件链的起点，而第二组自定义事件则只出现在事件链的中间位置，当时我说这样个特点可以帮助我们大幅降低事件链的发现复杂度，现在可以解释清楚这个说法背后的原因了。那就是，<strong>我们在遍历</strong> <strong>AST</strong> <strong>树的时候，只需要寻找调用了发送自定义事件的API节点即可，这样会使得判断逻辑大幅简化。</strong></p>
 <p>现在，事件处理逻辑中最复杂的一类——自定义代码块的分析已经被我们用AST克服了，还剩下各种一键绑定、自动更新等非代码处理方式了，比如下面这个配置界面就是一个典型。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/21/cb/21e42138721e59e9eca38ff3cb3578cb.png?wh=1115x212" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/21/cb/21e42138721e59e9eca38ff3cb3578cb.png?wh=1115x212" /></p>
 <p>请注意更新时机这个配置项，就是一个自定义事件，事件名是 this.jigsawButton261.click。在这个界面确定保存时，显然低代码平台不会将生成的代码保存下来，而是会将这个界面对应的结构化信息（JSON对象）保存下来。类似这样的结构：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">export</span><span class="w"> </span><span class="kd">class</span><span class="w"> </span><span class="nx">InteractiveConfig</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="p">...</span>
@@ -5572,7 +5572,7 @@
 <h2 id="_2">副作用与断言</h2>
 <p>我们依然回到我们的终极目标上：自动生成自动化测试用例代码，而断言是自动化测试的核心目的（没有之一），没有断言的测试用例是毫无意义的。那么，如何生成断言呢？</p>
 <p>为了解答这个问题，我们来回顾一下被测功能的定义，尝试从中找出蛛丝马迹。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/20/10/20e06b19b290cd365yy374608704f810.jpg?wh=10666x2238" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/20/10/20e06b19b290cd365yy374608704f810.jpg?wh=10666x2238" /></p>
 <p>我们发现，副作用是被测功能的基本特征之一，而且副作用是否符合我们的预期，是检查一个被测功能是否满足需求的关键特征。所以，检查副作用是否符合预期的逻辑，就是测试用例中的断言！</p>
 <p>好了，现在我们的目标非常明确，那就是要检查副作用，但是，副作用到底是啥？它又在哪呢？</p>
 <p>我们前文所提及的“副作用”都是采用的比喻说法，此前这个修辞有利于你的学习，但现在我们要实打实去寻找副作用这个实体，那就不能再比喻了，所以现在得从看得到、摸得着的角度来说说到底啥是副作用了。</p>
@@ -5742,8 +5742,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

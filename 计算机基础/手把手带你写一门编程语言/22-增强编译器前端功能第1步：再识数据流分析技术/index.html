@@ -6319,7 +6319,7 @@
 </code></pre></div>
 <p>你可以看一下，这段代码有什么问题呢？</p>
 <p>首先，你会发现，这段代码里只有在if语句块有return语句。所以，当不满足if条件的时候，程序的执行流程就不会遇到这个return语句。那根据TypeScript的语义，此时的返回值是undefined。而函数的返回值类型里呢，又不包含undefined。所以这时，如果你用“tsc --strict example_return.ts”命令去编译它，tsc会报下面的错误：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/2b/ec/2b4d8f55fb256a1359814d7031316eec.png?wh=1398x232" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2b/ec/2b4d8f55fb256a1359814d7031316eec.png?wh=1398x232" /></p>
 <p>当然，如果函数的前面是下面的样子，在返回值里包含undefined，那就是正确的。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>function foo(a:number):number|undefined
 </code></pre></div>
@@ -6328,7 +6328,7 @@
 <p>那如何检查出上面这些语义问题呢？那又需要用到<strong>数据流分析技术</strong>了。</p>
 <p>到目前为止，我们已经多次接触到数据流分析技术了。在进行变量引用分析的时候，我们就曾实现过一个功能，检查出“变量是否在声明前就被引用”的错误。</p>
 <p>它的处理逻辑是：语义分析程序遍历整个AST，相当于自上而下地分析每一条代码。当程序遇到变量声明节点的时候，就会标记该变量已经被声明了。而当程序遇到变量引用节点时，如果它发现该变量虽然属于某个作用域，但它当前还没有被声明，那么它就会报语义分析错误。具体的实现，你可以参考RefResolver类中的代码。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b8/2d/b88d7f2b46c63e7ff0aa71cb37c4902d.png?wh=946x322" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b8/2d/b88d7f2b46c63e7ff0aa71cb37c4902d.png?wh=946x322" /></p>
 <p>另外，在实现寄存器分配算法时，我们也曾经使用过数据流分析技术，来计算每个变量的生存期，从而确定多个变量如何共享寄存器。在那个时候，我们是在CFG上进行数据流分析的，并且分析方向是自下而上的顺序。</p>
 <p>针对我们前面实操过的这两个例子，你可以总结出来数据流分析的几个特点：</p>
 <p><strong>首先，数据流分析技术可以用在像AST和CFG等多种数据结构上</strong>，未来你还会见到我们把它用到其他的数据结构上；</p>
@@ -6336,13 +6336,13 @@
 <p><strong>第三，数据流分析的过程，都会针对一个分析变量，并会不断改变这个变量的值。</strong>分析变量可能是一个单个的值，或者叫做标量，也可能是一组数值，比如向量和集合。在我们的前面的两个例子中，这个变量都是集合。第一个例子的分析变量是“已声明的变量的集合”，第二个例子的分析变量是“活跃变量集合”。</p>
 <p><strong>第四，我们需要有一个规则或函数，基于这个规则来处理每行代码，从而计算新的变量值。</strong>比如，在变量活跃性分析中，这个规则是只要遇到变量使用的语句，就往集合里添加该变量，遇到变量声明的语句，就从集合中去掉该变量。</p>
 <p><strong>第五，要确定变量的初始值</strong>。在第一个例子中，初始值是一个空集。在第二个例子中，每个基本块可能会有一个活跃变量的初始值，这些初始值是由CFG中的其他基本块决定的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b4/32/b4065beb36c5yyf0f422b4772c397b32.jpg?wh=1920x1080" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b4/32/b4065beb36c5yyf0f422b4772c397b32.jpg?wh=1920x1080" /></p>
 <p><strong>还有最后一个共性，它们都有交汇函数</strong>。交汇函数是用来在多个控制流交汇的时候，计算出交汇的值。在第二个例子中，当两个基本块交汇的时候，活跃变量集合是取两个集合的并集。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d9/53/d947a156d103ffa007c610625a2e4d53.jpg?wh=1920x1080" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d9/53/d947a156d103ffa007c610625a2e4d53.jpg?wh=1920x1080" /></p>
 <p>好了，上面这些就是数据流分析技术的核心特点。抓住这些核心特点，我们可以把这个技术用于更多的场景。比如说，我们就可以用这些特性解决上面这个程序是否正确return的问题。</p>
 <p>在开始解决这个问题之前，我们先来梳理一个分析框架，看看我们具体要从哪些方面着手。</p>
 <p>我们可以把一个程序在执行过程中是否遇到了return语句，用一个变量来描述，就是当前执行流程是不是alive的。我们从程序的开头，一行行代码的往下分析。在一开始，alive的初始值是true。当遇到return语句以后，alive就变成了false。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9e/f0/9e5dbae671a5ee722ba713ab6a3c67f0.png?wh=770x330" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9e/f0/9e5dbae671a5ee722ba713ab6a3c67f0.png?wh=770x330" /></p>
 <p>对于分支语句，比如if分支语句，则需要每个分支都要遇到一个return语句。如果一个分支的alive值是alive1，另一个分支的alive值是alive2，那么合起来的alive值是什么呢？是alive1 || alive2。也就是说，必须每个分支都遇到return语句后，总的alive才是false。这就是我们的交汇函数。</p>
 <p>现在你应该就明白了，我们这次的数据流分析框架中需要具备这几个关键要素：</p>
 <ul>
@@ -6384,7 +6384,7 @@
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>alive = alive1 || alive2;  //只有两个分支都是false，才返回false；
 </code></pre></div>
 <p>你可以用node play example_return.ts命令，编译一下试一试。我们的编译器就会报一个Error和一个Warning，你可以看一下截屏。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6c/c0/6c83c07217f4b241635babcce342c5c0.png?wh=1354x224" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6c/c0/6c83c07217f4b241635babcce342c5c0.png?wh=1354x224" /></p>
 <p>好了，现在我们已经解决了与return有关的分析工作了。那还有没有别的场景可以发挥数据流分析技术的威力呢？</p>
 <p>有的。我们再来做一个变量赋值的分析看看。</p>
 <h2 id="_2">场景二：变量赋值分析</h2>
@@ -6404,7 +6404,7 @@
 </code></pre></div>
 <p>在这个示例程序中，我们在第一个行声明了一个变量b，但并没有给它赋值。接着，在第二个语句中，我们引用了b。另外，在if语句之后，let d = a-b语句也引用了变量b。</p>
 <p>你如果运行命令tsc --strict example_assign.ts，那么tsc编译器会报错：“Variable ‘b’ is used before being assigned.”。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f8/7c/f8e2e163a2c9d4e742018230e0f03b7c.png?wh=1360x554" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f8/7c/f8e2e163a2c9d4e742018230e0f03b7c.png?wh=1360x554" /></p>
 <p>相信你看完这个例子就明白了，变量赋值分析要解决的就是变量被赋值之前就已经被使用的问题。这个问题也适合用数据流分析技术来解决，因为我们只要顺序查找对变量进行赋值和使用的代码，就能知道是否存在错误了。</p>
 <p><strong>那么，我们该如何套用前面说过的数据流分析框架，来解决赋值分析问题呢？</strong></p>
 <hr />
@@ -6617,8 +6617,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

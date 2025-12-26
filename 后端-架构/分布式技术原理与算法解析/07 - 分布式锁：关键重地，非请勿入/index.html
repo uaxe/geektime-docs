@@ -14529,7 +14529,7 @@
 <p>用户A和用户B几乎同时下单，但用户A的下单请求最先到达服务器。因此，该商家的产品数据库中增加了一条关于用户A的记录，用户A获得了锁，他的订单请求被处理，服务器修改吹风机库存数，减去1后还剩下1个。</p>
 <p>当用户A的订单请求处理完成后，有关用户A的记录被删除，服务器开始处理用户B的订单请求。这时，库存只有1个了，无法满足用户B的订单需求，因此用户B购买失败。</p>
 <p>从数据库中，删除用户B的记录，服务器开始处理用户C的订单请求，库存中1个吹风机满足用户C的订单需求。所以，数据库中增加了一条关于用户C的记录，用户C获得了锁，他的订单请求被处理，服务器修改吹风机数量，减去1后还剩下0个。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f5/aa/f58d1ef2d7896a9da85dbbe98f8de9aa.png?wh=736%2A635" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f5/aa/f58d1ef2d7896a9da85dbbe98f8de9aa.png?wh=736%2A635" /></p>
 <p>可以看出，<strong>基于数据库实现分布式锁比较简单，绝招在于创建一张锁表，为申请者在锁表里建立一条记录，记录建立成功则获得锁，消除记录则释放锁。</strong>该方法依赖于数据库，主要有两个缺点：</p>
 <ul>
 <li><strong>单点故障问题</strong>。一旦数据库不可用，会导致整个系统崩溃。</li>
@@ -14548,7 +14548,7 @@
 <p>用户A的请求因为网速快，最先到达Server2，setnx操作返回1，并获取到购买吹风机的锁；用户B和用户C的请求，几乎同时到达了Server1和Server3，但因为这时Server2获取到了吹风机数据的锁，所以只能加入等待队列。</p>
 <p>Server2获取到锁后，负责管理吹风机的服务器执行业务逻辑，只用了1s就完成了订单。订单请求完成后，删除锁的key，从而释放锁。此时，排在第二顺位的Server1获得了锁，可以访问吹风机的数据资源。但不巧的是，Server1在完成订单后发生了故障，无法主动释放锁。</p>
 <p>于是，排在第三顺位的Server3只能等设定的有效时间（比如30分钟）到期，锁自动释放后，才能访问吹风机的数据资源，也就是说用户C只能到00:30:01以后才能继续抢购。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a5/0c/a5565f3f58ce13d7ce2f9679af6e730c.png?wh=763%2A683" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a5/0c/a5565f3f58ce13d7ce2f9679af6e730c.png?wh=763%2A683" /></p>
 <p>总结来说，<strong>Redis通过队列来维持进程访问共享资源的先后顺序</strong>。Redis锁主要基于setnx函数实现分布式锁，当进程通过setnx&lt;key,value&gt;函数返回1时，表示已经获得锁。排在后面的进程只能等待前面的进程主动释放锁，或者等到时间超时才能获得锁。</p>
 <p>相对于基于数据库实现分布式锁的方案来说，<strong>基于缓存实现的分布式锁的优势</strong>表现在以下几个方面：</p>
 <ul>
@@ -14582,11 +14582,11 @@
 <li>本进程为写请求，如果比自己序号小的节点中有请求，则等待。</li>
 </ol>
 <p>例如，用户B也想要买吹风机，但在他之前，用户C想看看吹风机的库存量。因此，用户B只能等用户A买完吹风机、用户C查询完库存量后，才能购买吹风机。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b1/4f/b1404782160c8f79a19a9d289d73234f.png?wh=661%2A547" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b1/4f/b1404782160c8f79a19a9d289d73234f.png?wh=661%2A547" /></p>
 <p>可以看到，使用ZooKeeper实现的分布式锁，可以解决前两种方法提到的各种问题，比如单点故障、不可重入、死锁等问题。但该方法实现较复杂，且需要频繁地添加和删除节点，所以性能不如基于缓存实现的分布式锁。</p>
 <h3 id="_5">三种实现方式对比</h3>
 <p>我通过一张表格来对比一下这三种方式的特点，以方便你理解、记忆。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/da/b9/daea1d41a6b72c288d292adf45ad4bb9.jpg?wh=2782%2A1142" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/da/b9/daea1d41a6b72c288d292adf45ad4bb9.jpg?wh=2782%2A1142" /></p>
 <p>值得注意的是，<strong>这里的实现复杂性，是针对同样的分布式锁的实现复杂性，与之前提到的基于数据库的实现非常简易不一样。</strong></p>
 <p>基于数据库实现的分布式锁存在单点故障和死锁问题，仅仅利用数据库技术去解决单点故障和死锁问题，是非常复杂的。而ZooKeeper已定义相关的功能组件，因此可以很轻易地解决设计分布式锁时遇到的各种问题。所以说，要实现一个完整的、无任何缺陷的分布式锁，ZooKeeper是一个最简单的选择。</p>
 <p>总结来说，<strong>ZooKeeper分布式锁的可靠性最高，有封装好的框架，很容易实现分布式锁的功能，并且几乎解决了数据库锁和缓存式锁的不足，因此是实现分布式锁的首选方法。</strong></p>
@@ -14611,7 +14611,7 @@
 <p>我以电商购物为例，首先带你剖析了什么是分布式锁，以及为什么需要分布式锁；然后，与你介绍了三种实现分布式锁的方法，包括基于数据库实现、基于缓存实现（以Redis为例），以及基于ZooKeeper实现。</p>
 <p>分布式锁是解决多个进程同时访问临界资源的常用方法，在分布式系统中非常常见，比如开源的ZooKeeper、Redis中就有所涉及。通过今天这篇文章对分布式锁原理及方法的讲解，我相信你会发现分布式锁不再那么神秘、难懂，然后以此为基础对分布式锁进行更深入的学习和应用。</p>
 <p>接下来，我把今天的内容通过下面的一张思维导图再全面总结下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0a/87/0ac5f2ac38f1eb46cf5ad681d5153887.png?wh=1979%2A2119" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0a/87/0ac5f2ac38f1eb46cf5ad681d5153887.png?wh=1979%2A2119" /></p>
 <h2 id="_8">思考题</h2>
 <p>分布式锁与分布式互斥的关系是什么呢？</p>
 <p>我是聂鹏程，感谢你的收听，欢迎你在评论区给我留言分享你的观点，也欢迎你把这篇文章分享给更多的朋友一起阅读。我们下期再会！</p>
@@ -14770,8 +14770,6 @@ DPos（委托权益证明：比特股）
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -15374,16 +15374,16 @@
 </ul>
 <p>为了让你更好地理解泛型实现原理，我先来逐一对上述方案做个简单介绍。我们首先看一下Stenciling方案。</p>
 <h4 id="stenciling">Stenciling方案</h4>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a5/70/a5613f1568aa4faf23a10be88206a470.png?wh=839x945" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a5/70/a5613f1568aa4faf23a10be88206a470.png?wh=839x945" /></p>
 <p>Stenciling方案也称为模板方案（如上图）， 它也是C++、Rust等语言使用的实现方案。其主要思路就是在编译阶段，根据泛型函数调用时类型实参或约束中的类型元素，为每个实参类型或类型元素中的类型生成一份单独实现。这么说还是很抽象，下图很形象地说明了这一过程：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/58/80/587fa465f4ceedb1bc7807e116012980.jpg?wh=841x496" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/58/80/587fa465f4ceedb1bc7807e116012980.jpg?wh=841x496" /></p>
 <p>我们看到，Go编译器为每个调用生成一个单独的函数副本（图中函数名称并非真实的，仅为便于说明而做的命名），相同类型实参的函数只生成一次，或通过链接器消除不同包的相同函数实现。</p>
 <p>图示的这一过程在其他编程语言中也被称为“单态化（monomorphization）”。单态是相对于泛型函数的参数化多态（parametric polymorphism）而言的。</p>
 <p>Randall博士也提到了这种方案的不足，那就是<strong>拖慢编译器</strong>。泛型函数需要针对不同类型进行单独编译并生成一份独立的代码。如果类型非常多，那么编译出来的最终文件可能会非常大。同时由于CPU缓存无法命中、指令分支预测等问题，可能导致生成的代码运行效率不高。</p>
 <p>当然，对于性能不高这个说辞，我个人持保留态度，因为模板方案在其他编程语言中基本上是没有额外的运行时开销的，并且是应该是对编译器优化友好的。很多面向系统编程的语言都选择该方案，比如C++、D语言、Rust等。</p>
 <h4 id="dictionaries">Dictionaries方案</h4>
 <p>Dictionaries方案与Stenciling方案的实现思路正相反，它不会为每个类型实参单独创建一套代码，反之它仅会有一套函数逻辑，但这个函数会多出一个参数dict，这个参数会作为该函数的第一个参数，这和Go方法的receiver参数在方法调用时自动作为第一个参数有些类似。这个dict参数中保存泛型函数调用时的类型实参的类型相关信息。下面是Dictionaries方案的示意图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/61/34/614a821e9bf836fd6f7b689c178aec34.png?wh=991x556" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/61/34/614a821e9bf836fd6f7b689c178aec34.png?wh=991x556" /></p>
 <p>包含类型信息的字典是Go编译器在编译期间生成的，并且被保存在ELF的只读数据区段（.data）中，传给函数的dict参数中包含了到特定字典的指针。从方案描述来看，每个dict中的类型信息还是十分复杂的，不过我们了解这些就够了，对dict的结构就不展开说明了。</p>
 <p>这种方案也有自身的问题，比如<strong>字典递归</strong>的问题，如果调用某个泛型函数的类型实参有很多，那么dict信息也会过多等等。更重要的是它对<strong>性能</strong>可能有比较大的影响，比如通过dict的指针的间接类型信息和方法的访问导致运行时开销较大；再比如，如果泛型函数调用时的类型实参是int，那么如果使用Stenciling方案，我们可以通过寄存器复制即可实现x=y的操作，但在Dictionaries方案中，必须通过memmove了。</p>
 <h4 id="gogc-shape-stenciling">Go最终采用的方案：GC Shape Stenciling方案</h4>
@@ -15391,7 +15391,7 @@
 <p>这样一来势必就有GC Shape相同的类型共享一个实例化后的函数代码，那么泛型调用时又是如何区分这些类型的呢？</p>
 <p>答案就是字典。该方案同样在每个实例化后的函数代码中自动增加了一个dict参数，用于区别GC Shape相同的不同类型。可见，GC Shape Stenciling方案本质上是Stenciling方案和Dictionaries方案的混合版，它也是Go 1.18泛型最终采用的实现方案，为此Go团队还给出<a href="https://github.com/golang/proposal/blob/master/design/generics-implementation-dictionaries-go1.18.md">一个更细化、更接近于实现的GC Shape Stenciling实现方案</a>。</p>
 <p>下面是GC Shape Stenciling方案的示意图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/44/01/445f90d42868f0b653371ef4a2cc3701.jpg?wh=1192x839" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/44/01/445f90d42868f0b653371ef4a2cc3701.jpg?wh=1192x839" /></p>
 <p>那么如今的Go版本（Go 1.19.x）究竟会为哪些类型实例化出一份独立的函数代码呢？我们通过下面示例来看一下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>// gcshape.go
 <a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>func f[T any](t T) T {
@@ -15423,7 +15423,7 @@
 <a id="__codelineno-9-28" name="__codelineno-9-28" href="#__codelineno-9-28"></a>}
 </code></pre></div>
 <p>在这个示例中，我们声明了一个简单的泛型函数f，然后分别用不同的Go原生类型、自定义类型以及指针类型作为类型实参对f进行调用，我们通过工具为上述goshape.go生成的汇编代码如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0e/22/0ee0bc5b7f34670c1d03795a97628e22.jpg?wh=1540x1678" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0e/22/0ee0bc5b7f34670c1d03795a97628e22.jpg?wh=1540x1678" /></p>
 <p>从上图我们看到，Go编译器为每个底层类型相同的类型生成一份函数代码，像MyInt和int、rune和 int32；对于所有指针类型，像上面的*float64、*int和 *int32，仅生成一份名为 main.f[go.shape.*uint8_0] 的函数代码。</p>
 <p>这与<a href="https://github.com/golang/proposal/blob/master/design/generics-implementation-dictionaries-go1.18.md">新版GC Shape方案</a>中的描述是一致的：“我们目前正在以一种相当精细的方式实现GC Shapes。当且仅当两个具体类型具有相同的底层类型或者它们都是指针类型时，它们才会在同一个GC Shape分组中”。</p>
 <h2 id="_4">泛型对执行效率的影响</h2>
@@ -15657,8 +15657,6 @@ t.Logf(&quot;[]~string x = %#v&quot;, x2)
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

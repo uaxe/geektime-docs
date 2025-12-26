@@ -14622,7 +14622,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>int execve(const char *filename, char *const argv[], char *const envp[]))
 </code></pre></div>
 <p>下图显示了从shell执行命令到创建Redis进程的过程，你可以看下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d7/b5/d7ec5ef2698cyyd1973a6afbb0c7dfb5.jpg?wh=2000x510" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d7/b5/d7ec5ef2698cyyd1973a6afbb0c7dfb5.jpg?wh=2000x510" /></p>
 <p>当我们用刚才介绍的shell命令运行Redis server后，我们会看到Redis server启动后的日志输出会打印到终端屏幕上，如下所示：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>37807:M 19 Aug 2021 07:29:36.372 # Server initialized
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>37807:M 19 Aug 2021 07:29:36.372 * DB loaded from disk: 0.000 seconds
@@ -14729,7 +14729,7 @@
 <p>好了，到这里，我们就了解了，Redis的main函数会根据配置参数daemonize和supervised，来判断是否以守护进程方式运行Redis。</p>
 <p>那么，一旦Redis要以守护进程方式运行，main函数会调用daemonize函数。daemonize函数会进一步调用fork函数创建子进程，并根据返回值，分别执行父进程和子进程的代码分支。其中，父进程会退出。而子进程会代替原来的父进程，继续执行main函数的代码。</p>
 <p>下面的图展示了daemonize函数调用fork函数后的两个分支的执行逻辑，你可以再回顾下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b9/11/b9fa1ea3962e18be5ca9973a2feeb111.jpg?wh=2000x947" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b9/11/b9fa1ea3962e18be5ca9973a2feeb111.jpg?wh=2000x947" /></p>
 <p>事实上，Redis server启动后无论是否以守护进程形式运行，都还是一个进程在运行。对于一个进程来说，如果该进程启动后没有创建新的线程，那么这个进程的工作任务默认就是由一个线程来执行的，而这个线程我一般也称它为主线程。</p>
 <p>对于Redis来说，它的主要工作，包括接收客户端请求、解析请求和进行数据读写等操作，都没有创建新线程来执行，所以，Redis主要工作的确是由单线程来执行的，这也是我们常说Redis是单线程程序的原因。因为Redis主要工作都是IO读写操作，所以，我也会把这个单线程称为主IO线程。</p>
 <p>但其实，Redis 在3.0版本后，除了主IO线程外，的确还会启动一些后台线程来处理部分任务，从而避免这些任务对主IO线程的影响。那么，这些后台线程是在哪里启动的，又是如何执行的呢？</p>
@@ -14816,7 +14816,7 @@
 <a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>pthread_attr_setstacksize(&amp;attr, stacksize);
 </code></pre></div>
 <p>我也画了一张图，展示了线程属性的这一操作过程，你可以看下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0c/9a/0c9a1dd6f5038f05716d916c588d599a.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0c/9a/0c9a1dd6f5038f05716d916c588d599a.jpg?wh=2000x1125" /></p>
 <p>在完成线程属性的设置后，接下来，bioInit函数会通过一个for循环，来依次为每种后台任务创建一个线程。循环的次数是由BIO_NUM_OPS宏定义决定的，也就是3次。相应的，bioInit函数就会调用3次pthread_create函数，并创建3个线程。bioInit函数让这3个线程执行的函数都是<strong>bioProcessBackgroundJobs</strong>。</p>
 <p>不过这里要注意一点，就是在这三次线程的创建过程中，传给这个函数的参数分别是0、1、2。这个创建过程如下所示：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>for (j = 0; j &lt; BIO_NUM_OPS; j++) {
@@ -14883,7 +14883,7 @@
 </code></pre></div>
 <p>所以说，bioInit函数其实就是创建了3个线程，每个线程不停地去查看任务队列中是否有任务，如果有任务，就调用具体函数执行。</p>
 <p>你可以再参考回顾下图所展示的bioInit函数和bioProcessBackgroundJobs函数的基本处理流程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d8/c4/d8cb6f9f2e410e7680ef0e674b50efc4.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d8/c4/d8cb6f9f2e410e7680ef0e674b50efc4.jpg?wh=2000x1125" /></p>
 <p>不过接下来你或许还会疑惑：既然bioProcessBackgroundJobs函数是负责执行任务的，<strong>那么哪个函数负责生成任务呢？</strong></p>
 <p>这就是下面，我要给你介绍的<strong>后台任务创建函数bioCreateBackgroundJob</strong>。</p>
 <h3 id="biocreatebackgroundjob">bioCreateBackgroundJob函数：创建后台任务</h3>
@@ -14910,7 +14910,7 @@
 <p>好了，这样一来，当Redis进程想要启动一个后台任务时，只要调用bioCreateBackgroundJob函数，并设置好该任务对应的类型和参数即可。然后，bioCreateBackgroundJob函数就会把创建好的任务数据结构，放到后台任务对应的队列中。另一方面，bioInit函数在Redis server启动时，创建的线程会不断地轮询后台任务队列，一旦发现有任务可以执行，就会将该任务取出并执行。</p>
 <p>其实，这种设计方式是典型的<strong>生产者-消费者模型</strong>。bioCreateBackgroundJob函数是生产者，负责往每种任务队列中加入要执行的后台任务，而bioProcessBackgroundJobs函数是消费者，负责从每种任务队列中取出任务来执行。然后Redis创建的后台线程，会调用bioProcessBackgroundJobs函数，从而实现一直循环检查任务队列。</p>
 <p>下图展示的就是bioCreateBackgroundJob和bioProcessBackgroundJobs两者间的生产者-消费者模型，你可以看下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f5/ab/f5a7c20b6a826cf79c0675d11ea037ab.jpg?wh=2000x850" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f5/ab/f5a7c20b6a826cf79c0675d11ea037ab.jpg?wh=2000x850" /></p>
 <p>好了，到这里，我们就学习了Redis后台线程的创建和运行机制。简单来说，主要是以下三个关键点：</p>
 <ul>
 <li>Redis是先通过bioInit函数初始化和创建后台线程；</li>
@@ -15095,8 +15095,6 @@ bio_job里面包含了fd（给关闭文件和异步刷盘用的），lazy_free_f
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

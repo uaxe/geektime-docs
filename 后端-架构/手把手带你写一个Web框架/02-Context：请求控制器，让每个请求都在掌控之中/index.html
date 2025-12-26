@@ -14582,7 +14582,7 @@
 <p>上一讲我们使用 net/http 搭建了一个最简单的 HTTP 服务，为了帮你理解服务启动逻辑，我用思维导图梳理了主流程，如果你还有不熟悉，可以再回顾一下。</p>
 <p>今天我将带你进一步丰富我们的框架，添加上下文 Context 为请求设置超时时间。</p>
 <p>从主流程中我们知道（第三层关键结论），HTTP 服务会为每个请求创建一个 Goroutine 进行服务处理。在服务处理的过程中，有可能就在本地执行业务逻辑，也有可能再去下游服务获取数据。如下图，本地处理逻辑 A，下游服务 a/b/c/d， 会形成一个标准的树形逻辑链条。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/33/71/33361f90298865f98e3038f11f02e671.jpg?wh=1920x1080" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/33/71/33361f90298865f98e3038f11f02e671.jpg?wh=1920x1080" /></p>
 <p>在这个逻辑链条中，每个本地处理逻辑，或者下游服务请求节点，都有可能存在超时问题。<strong>而对于 HTTP 服务而言，超时往往是造成服务不可用、甚至系统瘫痪的罪魁祸首</strong>。</p>
 <p>系统瘫痪也就是我们俗称的雪崩，某个服务的不可用引发了其他服务的不可用。比如上图中，如果服务 d 超时，导致请求处理缓慢甚至不可用，加剧了 Goroutine 堆积，同时也造成了服务 a/b/c 的请求堆积，Goroutine 堆积，瞬时请求数加大，导致 a/b/c 的服务都不可用，整个系统瘫痪，怎么办？</p>
 <p>最有效的方法就是从源头上控制一个请求的“最大处理时长”，所以，对于一个 Web 框架而言，“超时控制”能力是必备的。今天我们就用 Context 为框架增加这个能力。</p>
@@ -14651,17 +14651,17 @@
 <p>搞懂了具体实现方法，我们回过头来看这三个库函数 WithCancel / WithDeadline / WithTimeout 就很好理解了。</p>
 <p>它们的本质就是“通过定时器来自动触发终结通知”，WithTimeout 设置若干秒后通知触发终结，WithDeadline 设置未来某个时间点触发终结。</p>
 <p>对应到 Context 代码中，它们的功能就是：<strong>为一个父节点生成一个带有 Done 方法的子节点，并且返回子节点的 CancelFunc 函数句柄</strong>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/90/c5/900361486571bb703261d2cfd56e87c5.jpg?wh=1920x1080" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/90/c5/900361486571bb703261d2cfd56e87c5.jpg?wh=1920x1080" />
 我们用一张图来辅助解释一下，Context的使用会形成一个树形结构，下游指的是树形结构中的子节点及所有子节点的子树，而上游指的是当前节点的父节点。比如图中圈起来的部分，当WithTimeout调用CancelFunc的时候，所有下游的With系列产生的Context都会从Done中收到消息。</p>
 <h2 id="context_1">Context 是怎么产生的</h2>
 <p>现在我们已经了解标准库 context 的设计思路了，在开始写代码之前，我们还要把 Context 放到 net/http 的主流程逻辑中，其中有两个问题要搞清楚：<strong>Context 在哪里产生？它的上下游逻辑是什么？</strong></p>
 <p>要回答这两个问题，可以用我们在上一讲介绍的思维导图方法，因为主流程已经拎清楚了，现在你只需要把其中 Context 有关的代码再详细过一遍，然后在思维导图上标记出来就可以了。</p>
 <p>这里，我已经把 Context 的关键代码都用蓝色背景做了标记，你可以检查一下自己有没有标漏。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/79/a4/79a3c7eafc3ccfbe1b162e646902c5a4.png?wh=1413x906" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/79/a4/79a3c7eafc3ccfbe1b162e646902c5a4.png?wh=1413x906" /></p>
 <p>照旧看图梳理代码流程，来看蓝色部分，从前到后的层级梳理就不再重复讲了，我们看关键位置。</p>
 <p>从图中最后一层的代码 req.ctx = ctx 中看到，每个连接的 Context 最终是放在 request 结构体中的。</p>
 <p>而且这个时候， Context 已经有多层父节点。因为，在代码中，每执行一次 WithCancel、WithValue，就封装了一层 Context，我们通过这一张流程图能清晰看到最终 Context 的生成层次。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/dd/22/ddbca0e4d1c66ed417b9de97c338ae22.jpg?wh=1920x1080" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dd/22/ddbca0e4d1c66ed417b9de97c338ae22.jpg?wh=1920x1080" /></p>
 <p>你发现了吗，<strong>其实每个连接的 Context 都是基于 baseContext 复制来的</strong>。对应到代码中就是，在为某个连接开启 Goroutine 的时候，为当前连接创建了一个 connContext，这个 connContext 是基于 server 中的 Context 而来，而 server 中 Context 的基础就是 baseContext。</p>
 <p>所以，Context 从哪里产生这个问题，我们就解决了，但是如果我们想要对 Context 进行必要的修改，还要从上下游逻辑中，找到它的修改点在哪里。</p>
 <p>生成最终的 Context 的流程中，net/http 设计了<strong>两处可以注入修改</strong>的地方，都在 Server 结构里面，一处是 BaseContext，另一处是 ConnContext。</p>
@@ -14683,7 +14683,7 @@
 <a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="o">...</span>
 <a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="p">}</span>
 </code></pre></div>
-<p>最后，我们回看一下 req.ctx 是否能感知连接异常。<img alt="" src="https://static001.geekbang.org/resource/image/a1/fc/a1d0ece41997ac873a5292301ee988fc.jpg?wh=1920x1080" />
+<p>最后，我们回看一下 req.ctx 是否能感知连接异常。<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a1/fc/a1d0ece41997ac873a5292301ee988fc.jpg?wh=1920x1080" />
 是可以的，因为链条中一个父节点为 CancelContext，其 cancelFunc 存储在代表连接的 conn 结构中，连接异常的时候，会触发这个函数句柄。</p>
 <p>好，讲完 context 库的核心设计思想，以及在 net/http 的主流程逻辑中嵌入 context 库的关键实现，我们现在心中有图了，就可以撸起袖子开始写框架代码了。</p>
 <p>你是不是有点疑惑，为啥要自己先理解一遍 context 标准库的生成流程，咱们直接动手干不是更快？有句老话说得好，磨刀不误砍柴功。</p>
@@ -14781,7 +14781,7 @@
 <li>request 封装了 http.Request 的对外接口</li>
 <li>response 封装了 http.ResponseWriter 对外接口</li>
 </ul>
-<p>完成之后，使用我们的IDE里面的结构查看器（每个IDE显示都不同），就能查看到如下的函数列表：<img alt="" src="https://static001.geekbang.org/resource/image/3c/cc/3c0c98741275beb7bdf5d6333b0c91cc.jpg?wh=1248x1456" /></p>
+<p>完成之后，使用我们的IDE里面的结构查看器（每个IDE显示都不同），就能查看到如下的函数列表：<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3c/cc/3c0c98741275beb7bdf5d6333b0c91cc.jpg?wh=1248x1456" /></p>
 <p>有了我们自己封装的 Context 之后，控制器就非常简化了。把框架定义的 ControllerHandler 放在框架目录下的controller.go文件中：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kd">type</span><span class="w"> </span><span class="nx">ControllerHandler</span><span class="w"> </span><span class="kd">func</span><span class="p">(</span><span class="nx">c</span><span class="w"> </span><span class="o">*</span><span class="nx">Context</span><span class="p">)</span><span class="w"> </span><span class="kt">error</span>
 </code></pre></div>
@@ -14959,7 +14959,7 @@
 <a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a><span class="p">}</span>
 </code></pre></div>
 <p>就可以运行了。完整代码照旧放在GitHub的 <a href="https://github.com/gohade/coredemo/tree/geekbang/02">geekbang/02 分支</a>上了。
-<img alt="" src="https://static001.geekbang.org/resource/image/72/e4/7277357c506bc95b9155d6a35cdee3e4.png?wh=714x656" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/72/e4/7277357c506bc95b9155d6a35cdee3e4.png?wh=714x656" /></p>
 <h2 id="_3">小结</h2>
 <p>今天，我们定义了一个属于自己框架的 Context，它有两个功能：在各个 Goroutine 间传递数据；控制各个 Goroutine，也就是是超时控制。</p>
 <p>这个自定义 Context 结构封装了 net/http 标准库主逻辑流程产生的 Context，与主逻辑流程完美对接。它除了实现了标准库的 Context 接口，还封装了 request 和 response 的请求。你实现好了 Context 之后，就会发现它跟百宝箱一样，在处理具体的业务逻辑的时候，如果需要获取参数、设置返回值等，都可以通过 Context 获取。</p>
@@ -15098,8 +15098,6 @@ a请求失败，但是b，c请求是成功的呀。</p>2021-09-18</li><br/><li><
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

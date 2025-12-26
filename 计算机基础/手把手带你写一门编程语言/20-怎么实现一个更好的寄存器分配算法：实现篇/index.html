@@ -6443,17 +6443,17 @@
 <h2 id="cfg">基于CFG的变量活跃性分析</h2>
 <p>在前面几节课，我们讲到if语句和for循环语句的时候，说到它们的执行流程可以用一个CFG来表示。我借用了之前我在<a href="https://time.geekbang.org/column/intro/100034101">《编译原理之美》</a>课程中用过的一个例子，来和你说明一下如何基于CFG来做数据流分析。</p>
 <p>我们先来看第一个图，这是一个带有if分支的CFG。这个CFG里，每个基本块都编了号。
-<img alt="" src="https://static001.geekbang.org/resource/image/86/f7/86bdebdbfbabe87e5f9f5a8e500132f7.jpg?wh=1080x1202" />
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/86/f7/86bdebdbfbabe87e5f9f5a8e500132f7.jpg?wh=1080x1202" />
 在进行变量活跃性分析的时候，根据我们上一节课提到过的由下到上的顺序，我们需要倒着从第5个基本块进行分析。你会看到，第5个基本块需要活跃变量x，这就形成了对基本块4的需求。所以，我们知道了，基本块4一开始的活跃变量集合不是空集，而是{x}。
-<img alt="" src="https://static001.geekbang.org/resource/image/93/e6/93895b76a9da8314b01db5d6306f2ae6.jpg?wh=1080x1202" />
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/93/e6/93895b76a9da8314b01db5d6306f2ae6.jpg?wh=1080x1202" />
 再进一步，基本块4又形成了对2和3的需求，要求它们提供{a,b,c,d}共4个活跃变量。</p>
 <p>依次类推，基本块2和3又形成了对基本块1的需求，要求基本块1提供{a,b,c}共3个活跃变量。</p>
 <p>到这就完事了。这看上去也不复杂呀，就是沿着CFG中的边，逆向遍历一遍图就行了呗！</p>
 <p>慢着，我们刚刚举的例子只是一个比较简单的情况。在这个例子中，图里没有形成环，是个有向无环图，是图的数据结构中几乎最简单的一种，算法处理比较容易。但是我们实际的程序，会形成更复杂的图。比如，for循环语句就会形成带有环的图，使得里面的基本块形成循环依赖，这会导致算法复杂度的提升。</p>
 <p>我们接着来看看下面的例子，这个例子中我们增加了从基本块4到1的控制流，从而构成了环路。我们还是沿着刚才的计算顺序，分别计算基本块5-&gt;4-&gt;3-&gt;2-&gt;1，这会形成下面的活跃变量集合。
-<img alt="" src="https://static001.geekbang.org/resource/image/06/af/068cf59b926a582dfe82e59feb2b01af.jpg?wh=1080x1202" />
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/06/af/068cf59b926a582dfe82e59feb2b01af.jpg?wh=1080x1202" />
 但是，这并没有计算完毕。你看，由于存在着从4到1的环路，所以1的输出，会形成对4的活跃变量的需求。所以，我们这里又要重新计算一遍基本块4的活跃变量，进而导致我们需要对基本块3、2和1都再次计算一遍，引起它们的活跃变量集合的变化。
-<img alt="" src="https://static001.geekbang.org/resource/image/58/16/580523c02799ab7a7fde4b99dec53d16.jpg?wh=1080x1202" />
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/58/16/580523c02799ab7a7fde4b99dec53d16.jpg?wh=1080x1202" />
 这样的循环可能会重复多次，直到每个基本块的活跃变量集合不再有变化为止。</p>
 <p>上面这些就是我们对基于CFG的变量活跃性分析的算法思路的分析。你会看到，它比针对单个基本块的分析确实复杂了不少，接下来就让我们实现一下吧。</p>
 <p><strong>首先，我们要对数据结构做一个调整。</strong>在这部分，我们需要记录下每个基本块初始的活跃变量集合。这个集合可能不再是一个空集，因为后序基本块可能要求前序基本块必须提供某些活跃变量。</p>
@@ -6481,7 +6481,7 @@
 </code></pre></div>
 <p>在这个CFG类中，有两个Map很有用。一个Map记录了所有进入某个基本块的边，另一个Map则记录了从该基本块到其他基本块的边。通过这两个Map，我们可以很容易地沿着这些边进行正向或逆向的遍历。
 在这里，我们通过了一个专门的buildCFG方法来构建CFG。如果你用node play example_if.ts -v --dumpAsm命令，可以打印出为每个函数构建的CFG出来。 我附了一张截图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c2/8e/c2018e37471b82650e68c97158c55b8e.png?wh=410x766" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c2/8e/c2018e37471b82650e68c97158c55b8e.png?wh=410x766" /></p>
 <p><strong>第三，我们实现要实现基于CFG的活跃变量分析算法。</strong>这个算法的思路，是逆向遍历整个CFG，而且只要某个基本块的分析结果会影响到前序的基本块，那我们就需要持续不停地进行迭代分析，直到每个基本块的活跃变量集合都不再变化为止。</p>
 <p>我放了一块比较关键的代码，具体实现你可以参考代码库中的<a href="https://gitee.com/richard-gong/craft-a-language/blob/master/20/asm_x86-64.ts#L1809">analyzeFunction</a>方法。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>//持续遍历图，直到没有BasicBlock的活跃变量需要被更新
@@ -6524,7 +6524,7 @@
 <p>答案是函数调用之后的活跃变量集合。因为在例子中，x1作为参数使用过以后，后面就不再用它了，所以就没有必要保护它的值了。</p>
 <p><strong>第三个重要的技术点，就是栈桢的维护。</strong>采用新的寄存器分配算法以后，我们栈桢的内容会有所不同。这个时候了，我们就没有必要再在内存里逐个保存参数和本地变量了，而是只为溢出的变量提供空间就可以了。</p>
 <p>我们以这张图为例分析一下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ba/98/ba63dd73b4f96a7062b82bb7e639d098.png?wh=632x576" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ba/98/ba63dd73b4f96a7062b82bb7e639d098.png?wh=632x576" /></p>
 <p>这里栈帧维护的重点，是要能够准确计算出每个被溢出的变量的地址相对于rbp的偏移量。</p>
 <p>而这里就有一个不确定的因素了，就是在溢出变量的存储空间上部，是为Callee保护的寄存器而留出的空间。但是我们到底需要保存几个Callee保护的寄存器，这要在寄存器分配算法执行完毕以后才能知道。</p>
 <p>所以你会看到，所有被Spill的变量的准确内存地址，是需要在算法的最后调整一次的。你可以看一下lowerFunction中的这段代码：</p>
@@ -6544,9 +6544,9 @@
 <p>你可以运行make example_fibo命令，再来构建一次斐波那契数列的例子，然后用./example_fibo命令来执行它。并且，你还可以用make fibo命令来编译一遍fibo.c，也就是C语言版本的斐波那契数列程序。</p>
 <p>在这节课的Makefile文件中，我给fibo命令添加了-O2编译选项，也就是生成的代码是优化过的，也会使用寄存器。</p>
 <p>我再一次把计算结果贴上来，你可以看看下面的表格。不过这里你要注意一下，在表格里，我把当前实现的这个TypeScript的版本叫做PlayScript，称呼起来更加方便一些。这是我比较喜欢的一个名称，我在<a href="https://time.geekbang.org/column/intro/100034101">《编译原理之美》</a>课程中就用过这个名称。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/da/d6/da91bf11f0148772057f8ca0895af3d6.jpg?wh=1920x1080" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/da/d6/da91bf11f0148772057f8ca0895af3d6.jpg?wh=1920x1080" /></p>
 <p>而且，我仍然做了一张曲线图，让你能够更直观地看到各个版本之间的差别。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c9/34/c950d8f99b497ea5e58c29d8129f4c34.png?wh=1466x854" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c9/34/c950d8f99b497ea5e58c29d8129f4c34.png?wh=1466x854" /></p>
 <p>从这些数据和图表中，你能得到什么结论呢？你可以停一两分钟，自己先想一下。</p>
 <p>首先，采用了线性扫描算法以后，我们程序的性能果然有提升（图中的蓝线），超过了采用简单寄存器算法的版本，也超过未优化的C语言版本。</p>
 <p>不过，你有没有觉得有点不对劲？哪里不对劲呢？<strong>看上去，这性能的提升也没有特别大呀，还不到1倍</strong>。在我内心中，其实期待着更大的性能提升。毕竟我们说过，内存读写的速度可比寄存器的速度慢上百倍呢。</p>
@@ -6695,8 +6695,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

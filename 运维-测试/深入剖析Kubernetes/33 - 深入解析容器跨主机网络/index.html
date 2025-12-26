@@ -6765,11 +6765,11 @@
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>$ dockerd --bip=$FLANNEL_SUBNET ...
 </code></pre></div>
 <p>以上，就是基于Flannel UDP模式的跨主通信的基本原理了。我把它总结成了一幅原理图，如下所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/83/6c/8332564c0547bf46d1fbba2a1e0e166c.jpg?wh=1857%2A878" title="图1 基于Flannel UDP模式的跨主通信的基本原理" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/83/6c/8332564c0547bf46d1fbba2a1e0e166c.jpg?wh=1857%2A878" title="图1 基于Flannel UDP模式的跨主通信的基本原理" /></p>
 <p>可以看到，Flannel UDP模式提供的其实是一个三层的Overlay网络，即：它首先对发出端的IP包进行UDP封装，然后在接收端进行解封装拿到原始的IP包，进而把这个IP包转发给目标容器。这就好比，Flannel在不同宿主机上的两个容器之间打通了一条“隧道”，使得这两个容器可以直接使用IP地址进行通信，而无需关心容器和宿主机的分布情况。</p>
 <p>我前面曾经提到，上述UDP模式有严重的性能问题，所以已经被废弃了。通过我上面的讲述，你有没有发现性能问题出现在了哪里呢？</p>
 <p>实际上，相比于两台宿主机之间的直接通信，基于Flannel UDP模式的容器通信多了一个额外的步骤，即flanneld的处理过程。而这个过程，由于使用到了flannel0这个TUN设备，仅在发出IP包的过程中，就需要经过三次用户态与内核态之间的数据拷贝，如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/84/8d/84caa6dc3f9dcdf8b88b56bd2e22138d.png?wh=890%2A593" title="图2 TUN设备示意图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/84/8d/84caa6dc3f9dcdf8b88b56bd2e22138d.png?wh=890%2A593" title="图2 TUN设备示意图" /></p>
 <p>我们可以看到：</p>
 <p>第一次，用户态的容器进程发出的IP包经过docker0网桥进入内核态；</p>
 <p>第二次，IP包根据路由表进入TUN（flannel0）设备，从而回到用户态的flanneld进程；</p>
@@ -6781,7 +6781,7 @@
 <p>而为了能够在二层网络上打通“隧道”，VXLAN会在宿主机上设置一个特殊的网络设备作为“隧道”的两端。这个设备就叫作VTEP，即：VXLAN Tunnel End Point（虚拟隧道端点）。</p>
 <p>而VTEP设备的作用，其实跟前面的flanneld进程非常相似。只不过，它进行封装和解封装的对象，是二层数据帧（Ethernet frame）；而且这个工作的执行流程，全部是在内核里完成的（因为VXLAN本身就是Linux内核中的一个模块）。</p>
 <p>上述基于VTEP设备进行“隧道”通信的流程，我也为你总结成了一幅图，如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/03/f5/03185fab251a833fef7ed6665d5049f5.jpg?wh=1767%2A933" title="图3 基于Flannel VXLAN模式的跨主通信的基本原理" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/03/f5/03185fab251a833fef7ed6665d5049f5.jpg?wh=1767%2A933" title="图3 基于Flannel VXLAN模式的跨主通信的基本原理" /></p>
 <p>可以看到，图中每台宿主机上名叫flannel.1的设备，就是VXLAN所需的VTEP设备，它既有IP地址，也有MAC地址。</p>
 <p>现在，我们的container-1的IP地址是10.1.15.2，要访问的container-2的IP地址是10.1.16.3。</p>
 <p>那么，与前面UDP模式的流程类似，当container-1发出请求之后，这个目的地址是10.1.16.3的IP包，会先出现在docker0网桥，然后被路由到本机flannel.1设备进行处理。也就是说，来到了“隧道”的入口。为了方便叙述，我接下来会把这个IP包称为“原始IP包”。</p>
@@ -6811,7 +6811,7 @@
 <p>可以看到，最新版本的Flannel并不依赖L3 MISS事件和ARP学习，而会在每台节点启动时把它的VTEP设备对应的ARP记录，直接下放到其他每台宿主机上。</p>
 </blockquote>
 <p>有了这个“目的VTEP设备”的MAC地址，<strong>Linux内核就可以开始二层封包工作了</strong>。这个二层帧的格式，如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f2/55/f208fba66d2b58405864882342b23255.jpg?wh=799%2A179" title="图4 Flannel VXLAN模式的内部帧" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f2/55/f208fba66d2b58405864882342b23255.jpg?wh=799%2A179" title="图4 Flannel VXLAN模式的内部帧" /></p>
 <p>可以看到，Linux内核会把“目的VTEP设备”的MAC地址，填写在图中的Inner Ethernet Header字段，得到一个二层数据帧。</p>
 <p>需要注意的是，上述封包过程只是加一个二层头，不会改变“原始IP包”的内容。所以图中的Inner IP Header字段，依然是container-2的IP地址，即10.1.16.3。</p>
 <p>但是，上面提到的这些VTEP设备的MAC地址，对于宿主机网络来说并没有什么实际意义。所以上面封装出来的这个数据帧，并不能在我们的宿主机二层网络里传输。为了方便叙述，我们把它称为“内部数据帧”（Inner Ethernet Frame）。</p>
@@ -6834,7 +6834,7 @@
 <p>所以<strong>接下来的流程，就是一个正常的、宿主机网络上的封包工作。</strong></p>
 <p>我们知道，UDP包是一个四层数据包，所以Linux内核会在它前面加上一个IP头，即原理图中的Outer IP Header，组成一个IP包。并且，在这个IP头里，会填上前面通过FDB查询出来的目的主机的IP地址，即Node 2的IP地址10.168.0.3。</p>
 <p>然后，Linux内核再在这个IP包前面加上二层数据帧头，即原理图中的Outer Ethernet Header，并把Node 2的MAC地址填进去。这个MAC地址本身，是Node 1的ARP表要学习的内容，无需Flannel维护。这时候，我们封装出来的“外部数据帧”的格式，如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8c/85/8cede8f74a57617494027ba137383f85.jpg?wh=1864%2A192" title="图5 Flannel VXLAN模式的外部帧" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8c/85/8cede8f74a57617494027ba137383f85.jpg?wh=1864%2A192" title="图5 Flannel VXLAN模式的外部帧" /></p>
 <p>这样，封包工作就宣告完成了。</p>
 <p>接下来，Node 1上的flannel.1设备就可以把这个数据帧从Node 1的eth0网卡发出去。显然，这个帧会经过宿主机网络来到Node 2的eth0网卡。</p>
 <p>这时候，Node 2的内核网络栈会发现这个数据帧里有VXLAN Header，并且VNI=1。所以Linux内核会对它进行拆包，拿到里面的内部数据帧，然后根据VNI的值，把它交给Node 2上的flannel.1设备。</p>
@@ -6977,8 +6977,6 @@ kube-proxy用的模式是ipvs</p>2018-11-08</li><br/><li><span>陆培尔</span> 
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

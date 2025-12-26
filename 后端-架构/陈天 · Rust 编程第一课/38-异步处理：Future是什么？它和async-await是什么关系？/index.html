@@ -15160,7 +15160,7 @@
 <p>通过前几讲的学习，我们对并发处理，尤其是常用的并发原语，有了一个比较清晰的认识。并发原语是并发任务之间同步的手段，今天我们要学习的 Future 以及在更高层次上处理 Future 的 async/await，是<strong>产生和运行并发任务</strong>的手段。</p>
 <p>不过产生和运行并发任务的手段有很多，async/await 只是其中之一。在一个分布式系统中，并发任务可以运行在系统的某个节点上；在某个节点上，并发任务又可以运行在多个进程中；而在某个进程中，并发任务可以运行在多个线程中；在某个（些）线程上，并发任务可以运行在多个 Promise / Future / Goroutine / Erlang process 这样的协程上。</p>
 <p>它们的粒度从大到小如图所示：
-<img alt="" src="https://static001.geekbang.org/resource/image/75/66/7575380e2255ae078569bb7e185da666.jpg?wh=2139x979" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/75/66/7575380e2255ae078569bb7e185da666.jpg?wh=2139x979" /></p>
 <p>在之前的课程里，我们大量应用了线程这种并发工具，在 kv server 的构建过程中，也通过 async/await 用到了 Future 这样的无栈协程。</p>
 <p>其实 Rust 的 Future 跟 JavaScript 的 Promise 非常类似。</p>
 <p>如果你熟悉 JavaScript，应该熟悉 Promise 的概念，<a href="https://time.geekbang.org/column/article/410038">02</a>也简单讲过，它代表了<strong>在未来的某个时刻才能得到的结果的值</strong>，Promise 一般存在三个状态；</p>
@@ -15211,7 +15211,7 @@
 </code></pre></div>
 <p>这段代码读取 Cargo.toml 和 Cargo.lock 将其转换成 yaml，再分别写入到 /tmp 下。</p>
 <p>虽然说这段代码的逻辑并没有问题，但性能有很大的问题。在读 Cargo.toml 时，整个主线程被阻塞，直到 Cargo.toml 读完，才能继续读下一个待处理的文件。整个主线程，只有在运行 toml2yaml 的时间片内，才真正在执行计算任务，之前的读取文件以及之后的写入文件，CPU 都在闲置。
-<img alt="" src="https://static001.geekbang.org/resource/image/c1/3e/c11148d0647e5f3217a77e06d233923e.jpg?wh=2217x1560" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c1/3e/c11148d0647e5f3217a77e06d233923e.jpg?wh=2217x1560" /></p>
 <p>当然，你会辩解，在读文件的过程中，我们不得不等待，因为 toml2yaml 函数的执行有赖于读取文件的结果。嗯没错，但是，这里还有很大的 CPU 浪费：我们读完第一个文件才开始读第二个文件，有没有可能两个文件同时读取呢？这样总共等待的时间是 max(time_for_file1, time_for_file2)，而非 time_for_file1 + time_for_file2 。</p>
 <p>这并不难，我们可以把文件读取和写入的操作放入单独的线程中执行，比如（<a href="https://play.rust-lang.org/?version=stable&amp;mode=debug&amp;edition=2021&amp;gist=89c5a55179f966a364268c584db8a477">代码</a>）：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">use</span><span class="w"> </span><span class="n">anyhow</span><span class="p">::{</span><span class="n">anyhow</span><span class="p">,</span><span class="w"> </span><span class="nb">Result</span><span class="p">};</span>
@@ -15335,7 +15335,7 @@
 <h2 id="_1">深入了解</h2>
 <p>好，了解了 Future 在软件开发中的必要性，来深入研究一下 Future/async/await。</p>
 <p>在前面代码撰写过程中，不知道你有没有发现，异步函数（async fn）的返回值是一个奇怪的 impl Future&lt;Output&gt; 的结构：
-<img alt="" src="https://static001.geekbang.org/resource/image/15/6e/159d35852d585f9b00b4d78ac9b7a26e.png?wh=1920x354" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/15/6e/159d35852d585f9b00b4d78ac9b7a26e.png?wh=1920x354" /></p>
 <p>我们知道，一般会用 impl 关键字为数据结构实现 trait，也就是说接在 impl 关键字后面的东西是一个 trait，所以，显然 Future 是一个 trait，并且还有一个关联类型 Output。</p>
 <p>来看 <a href="https://doc.rust-lang.org/std/future/trait.Future.html">Future</a> 的定义：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">pub</span><span class="w"> </span><span class="k">trait</span><span class="w"> </span><span class="n">Future</span><span class="w"> </span><span class="p">{</span>
@@ -15405,7 +15405,7 @@
 <p>tokio 的调度器（executor）会运行在多个线程上，运行线程自己的 ready queue 上的任务（Future），如果没有，就去别的线程的调度器上“偷”一些过来运行。当某个任务无法再继续取得进展，此时 Future 运行的结果是 Poll::Pending，那么调度器会挂起任务，并设置好合适的唤醒条件（Waker），等待被 reactor 唤醒。</p>
 <p>而 reactor 会利用操作系统提供的异步 I/O，比如 epoll / kqueue / IOCP，来监听操作系统提供的 IO 事件，当遇到满足条件的事件时，就会调用 Waker.wake() 唤醒被挂起的 Future。这个 Future 会回到 ready queue 等待执行。</p>
 <p>整个流程如下：
-<img alt="" src="https://static001.geekbang.org/resource/image/69/30/69faf0cc944c1a19e8eba7f5ee878330.jpg?wh=2564x1341" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/69/30/69faf0cc944c1a19e8eba7f5ee878330.jpg?wh=2564x1341" /></p>
 <p>我们以一个具体的代码示例来进一步理解这个过程（<a href="https://play.rust-lang.org/?version=stable&amp;mode=debug&amp;edition=2021&amp;gist=c75ff383ac2696eb420ad4f10b9269b2">代码</a>）：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">use</span><span class="w"> </span><span class="n">anyhow</span><span class="p">::</span><span class="nb">Result</span><span class="p">;</span>
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">use</span><span class="w"> </span><span class="n">futures</span><span class="p">::{</span><span class="n">SinkExt</span><span class="p">,</span><span class="w"> </span><span class="n">StreamExt</span><span class="p">};</span>
@@ -15800,8 +15800,6 @@ let listener = TcpListener::bind(addr).await?;</p>2022-07-13</li><br/><li><span>
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -6643,14 +6643,14 @@
 <p>你所用的计算机，其实同一个时间可以运行很多个程序。比如，我现在一边在浏览器里写这篇文章，后台同样运行着一个Python脚本程序。而这两个程序，是完全相互独立的。它们两个的指令完全并行运行，而不会产生依赖问题带来的“冒险”。</p>
 <p>然而这个时候，你可能就会觉得奇怪了，这么做似乎不需要什么新技术呀。现在我们用的CPU都是多核的，本来就可以用多个不同的CPU核心，去运行不同的任务。即使当时的Pentium 4是单核的，我们的计算机本来也能同时运行多个进程，或者多个线程。这个超线程技术有什么特别的用处呢？</p>
 <p>无论是上面说的多个CPU核心运行不同的程序，还是在单个CPU核心里面切换运行不同线程的任务，在同一时间点上，一个物理的CPU核心只会运行一个线程的指令，所以其实我们并没有真正地做到指令的并行运行。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/96/c8/96aa1220ff27776f55091c55c2eddbc8.jpeg?wh=2665%2A736" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/96/c8/96aa1220ff27776f55091c55c2eddbc8.jpeg?wh=2665%2A736" /></p>
 <p>超线程可不是这样。超线程的CPU，其实是把一个物理层面CPU核心，“伪装”成两个逻辑层面的CPU核心。这个CPU，会在硬件层面增加很多电路，使得我们可以在一个CPU核心内部，维护两个不同线程的指令的状态信息。</p>
 <p>比如，在一个物理CPU核心内部，会有双份的PC寄存器、指令寄存器乃至条件码寄存器。这样，这个CPU核心就可以维护两条并行的指令的状态。在外面看起来，似乎有两个逻辑层面的CPU在同时运行。所以，超线程技术一般也被叫作<strong>同时多线程</strong>（Simultaneous Multi-Threading，简称SMT）技术<strong>。</strong></p>
 <p>不过，在CPU的其他功能组件上，Intel可不会提供双份。无论是指令译码器还是ALU，一个CPU核心仍然只有一份。因为超线程并不是真的去同时运行两个指令，那就真的变成物理多核了。超线程的目的，是在一个线程A的指令，在流水线里停顿的时候，让另外一个线程去执行指令。因为这个时候，CPU的译码器和ALU就空出来了，那么另外一个线程B，就可以拿来干自己需要的事情。这个线程B可没有对于线程A里面指令的关联和依赖。</p>
 <p>这样，CPU通过很小的代价，就能实现“同时”运行多个线程的效果。通常我们只要在CPU核心的添加10%左右的逻辑功能，增加可以忽略不计的晶体管数量，就能做到这一点。</p>
 <p>不过，你也看到了，我们并没有增加真的功能单元。所以超线程只在特定的应用场景下效果比较好。一般是在那些各个线程“等待”时间比较长的应用场景下。比如，我们需要应对很多请求的数据库应用，就很适合使用超线程。各个指令都要等待访问内存数据，但是并不需要做太多计算。</p>
 <p>于是，我们就可以利用好超线程。我们的CPU计算并没有跑满，但是往往当前的指令要停顿在流水线上，等待内存里面的数据返回。这个时候，让CPU里的各个功能单元，去处理另外一个数据库连接的查询请求就是一个很好的应用案例。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/75/e5/759b55d8acdc6f69d0b711f4f62ad4e5.png?wh=409%2A412" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/75/e5/759b55d8acdc6f69d0b711f4f62ad4e5.png?wh=409%2A412" /></p>
 <p>我的移动工作站的CPU信息</p>
 <p>我这里放了一张我的电脑里运行CPU-Z的截图。你可以看到，在右下角里，我的CPU的Cores，被标明了是4，而Threads，则是8。这说明我手头的这个CPU，只有4个物理的CPU核心，也就是所谓的4核CPU。但是在逻辑层面，它“装作”有8个CPU核心，可以利用超线程技术，来同时运行8条指令。如果你用的是Windows，可以去下载安装一个<a href="https://www.cpuid.com/softwares/cpu-z.html">CPU-Z</a>来看看你手头的CPU里面对应的参数。</p>
 <h2 id="simd">SIMD：如何加速矩阵乘法？</h2>
@@ -6672,7 +6672,7 @@
 <p>而前面使用循环来一步一步计算的算法呢，一般被称为<strong>SISD</strong>，也就是<strong>单指令单数据</strong>（Single Instruction Single Data）的处理方式。如果你手头的是一个多核CPU呢，那么它同时处理多个指令的方式可以叫作<strong>MIMD</strong>，也就是<strong>多指令多数据</strong>（Multiple Instruction Multiple Dataa）。</p>
 <p>为什么SIMD指令能快那么多呢？这是因为，SIMD在获取数据和执行指令的时候，都做到了并行。一方面，在从内存里面读取数据的时候，SIMD是一次性读取多个数据。</p>
 <p>就以我们上面的程序为例，数组里面的每一项都是一个integer，也就是需要 4 Bytes的内存空间。Intel在引入SSE指令集的时候，在CPU里面添上了8个 128 Bits的寄存器。128 Bits也就是 16 Bytes ，也就是说，一个寄存器一次性可以加载 4 个整数。比起循环分别读取4次对应的数据，时间就省下来了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/48/a6/48ddcd5ac345091c1be5963d5ef7d7a6.jpeg?wh=2977%2A2086" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/48/a6/48ddcd5ac345091c1be5963d5ef7d7a6.jpeg?wh=2977%2A2086" /></p>
 <p>在数据读取到了之后，在指令的执行层面，SIMD也是可以并行进行的。4个整数各自加1，互相之前完全没有依赖，也就没有冒险问题需要处理。只要CPU里有足够多的功能单元，能够同时进行这些计算，这个加法就是4路同时并行的，自然也省下了时间。</p>
 <p>所以，对于那些在计算层面存在大量“数据并行”（Data Parallelism）的计算中，使用SIMD是一个很划算的办法。在这个大量的“数据并行”，其实通常就是实践当中的向量运算或者矩阵运算。在实际的程序开发过程中，过去通常是在进行图片、视频、音频的处理。最近几年则通常是在进行各种机器学习算法的计算。</p>
 <p>而基于SIMD的向量计算指令，也正是在Intel发布Pentium处理器的时候，被引入的指令集。当时的指令集叫作<strong>MMX</strong>，也就是Matrix Math eXtensions的缩写，中文名字就是<strong>矩阵数学扩展</strong>。而Pentium处理器，也是CPU第一次有能力进行多媒体处理。这也正是拜SIMD和MMX所赐。</p>
@@ -6815,8 +6815,6 @@ day27 笔记：https:&#47;&#47;www.cnblogs.com&#47;luoahong&#47;p&#47;11442013.h
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

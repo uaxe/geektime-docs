@@ -14689,11 +14689,11 @@
 <p>在主从集群中，主库上有一个名为“<code>__sentinel__:hello</code>”的频道，不同哨兵就是通过它来相互发现，实现互相通信的。</p>
 <p>我来举个例子，具体说明一下。在下图中，哨兵1把自己的IP（172.16.19.3）和端口（26579）发布到“<code>__sentinel__:hello</code>”频道上，哨兵2和3订阅了该频道。那么此时，哨兵2和3就可以从这个频道直接获取哨兵1的IP地址和端口号。</p>
 <p>然后，哨兵2、3可以和哨兵1建立网络连接。通过这个方式，哨兵2和3也可以建立网络连接，这样一来，哨兵集群就形成了。它们相互间可以通过网络连接进行通信，比如说对主库有没有下线这件事儿进行判断和协商。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ca/b1/ca42698128aa4c8a374efbc575ea22b1.jpg?wh=2822%2A1535" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ca/b1/ca42698128aa4c8a374efbc575ea22b1.jpg?wh=2822%2A1535" /></p>
 <p>哨兵除了彼此之间建立起连接形成集群外，还需要和从库建立连接。这是因为，在哨兵的监控任务中，它需要对主从库都进行心跳判断，而且在主从库切换完成后，它还需要通知从库，让它们和新主库进行同步。</p>
 <p>那么，<strong>哨兵是如何知道从库的IP地址和端口的呢？</strong></p>
 <p>这是由哨兵向主库发送INFO命令来完成的。就像下图所示，哨兵2给主库发送INFO命令，主库接受到这个命令后，就会把从库列表返回给哨兵。接着，哨兵就可以根据从库列表中的连接信息，和每个从库建立连接，并在这个连接上持续地对从库进行监控。哨兵1和3可以通过相同的方法和从库建立连接。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/88/e0/88fdc68eb94c44efbdf7357260091de0.jpg?wh=2499%2A1404" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/88/e0/88fdc68eb94c44efbdf7357260091de0.jpg?wh=2499%2A1404" /></p>
 <p>你看，通过pub/sub机制，哨兵之间可以组成集群，同时，哨兵又通过INFO命令，获得了从库连接信息，也能和从库建立连接，并进行监控了。</p>
 <p>但是，哨兵不能只和主、从库连接。因为，主从库切换后，客户端也需要知道新主库的连接信息，才能向新主库发送请求操作。所以，哨兵还需要完成把新主库的信息告诉客户端这个任务。</p>
 <p>而且，在实际使用哨兵时，我们有时会遇到这样的问题：如何在客户端通过监控了解哨兵进行主从切换的过程呢？比如说，主从切换进行到哪一步了？这其实就是要求，客户端能够获取到哨兵集群在监控、选主、切换这个过程中发生的各种事件。</p>
@@ -14701,7 +14701,7 @@
 <h2 id="pubsub_1">基于pub/sub机制的客户端事件通知</h2>
 <p>从本质上说，哨兵就是一个运行在特定模式下的Redis实例，只不过它并不服务请求操作，只是完成监控、选主和通知的任务。所以，每个哨兵实例也提供pub/sub机制，客户端可以从哨兵订阅消息。哨兵提供的消息订阅频道有很多，不同频道包含了主从库切换过程中的不同关键事件。</p>
 <p>频道有这么多，一下子全部学习容易丢失重点。为了减轻你的学习压力，我把重要的频道汇总在了一起，涉及几个关键事件，包括主库下线判断、新主库选定、从库重新配置。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4e/25/4e9665694a9565abbce1a63cf111f725.jpg?wh=2856%2A1738" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4e/25/4e9665694a9565abbce1a63cf111f725.jpg?wh=2856%2A1738" /></p>
 <p>知道了这些频道之后，你就可以<strong>让客户端从哨兵这里订阅消息</strong>了。具体的操作步骤是，客户端读取哨兵的配置文件后，可以获得哨兵的地址和端口，和哨兵建立网络连接。然后，我们可以在客户端执行订阅命令，来获取不同的事件消息。</p>
 <p>举个例子，你可以执行如下命令，来订阅“所有实例进入客观下线状态的事件”：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>SUBSCRIBE +odown
@@ -14718,12 +14718,12 @@
 <p>确定由哪个哨兵执行主从切换的过程，和主库“客观下线”的判断过程类似，也是一个“投票仲裁”的过程。在具体了解这个过程前，我们再来看下，判断“客观下线”的仲裁过程。</p>
 <p>哨兵集群要判定主库“客观下线”，需要有一定数量的实例都认为该主库已经“主观下线”了。我在上节课向你介绍了判断“客观下线”的原则，接下来，我介绍下具体的判断过程。</p>
 <p>任何一个实例只要自身判断主库“主观下线”后，就会给其他实例发送is-master-down-by-addr命令。接着，其他实例会根据自己和主库的连接情况，做出Y或N的响应，Y相当于赞成票，N相当于反对票。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e0/84/e0832d432c14c98066a94e0ef86af384.jpg?wh=2322%2A1260" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e0/84/e0832d432c14c98066a94e0ef86af384.jpg?wh=2322%2A1260" /></p>
 <p>一个哨兵获得了仲裁所需的赞成票数后，就可以标记主库为“客观下线”。这个所需的赞成票数是通过哨兵配置文件中的quorum配置项设定的。例如，现在有5个哨兵，quorum配置的是3，那么，一个哨兵需要3张赞成票，就可以标记主库为“客观下线”了。这3张赞成票包括哨兵自己的一张赞成票和另外两个哨兵的赞成票。</p>
 <p>此时，这个哨兵就可以再给其他哨兵发送命令，表明希望由自己来执行主从切换，并让所有其他哨兵进行投票。这个投票过程称为“Leader选举”。因为最终执行主从切换的哨兵称为Leader，投票过程就是确定Leader。</p>
 <p>在投票过程中，任何一个想成为Leader的哨兵，要满足两个条件：第一，拿到半数以上的赞成票；第二，拿到的票数同时还需要大于等于哨兵配置文件中的quorum值。以3个哨兵为例，假设此时的quorum设置为2，那么，任何一个想成为Leader的哨兵只要拿到2张赞成票，就可以了。</p>
 <p>这么说你可能还不太好理解，我再画一张图片，展示一下3个哨兵、quorum为2的选举过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5f/d9/5f6ceeb9337e158cc759e23c0f375fd9.jpg?wh=2843%2A1934" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5f/d9/5f6ceeb9337e158cc759e23c0f375fd9.jpg?wh=2843%2A1934" /></p>
 <p>在T1时刻，S1判断主库为“客观下线”，它想成为Leader，就先给自己投一张赞成票，然后分别向S2和S3发送命令，表示要成为Leader。</p>
 <p>在T2时刻，S3判断主库为“客观下线”，它也想成为Leader，所以也先给自己投一张赞成票，再分别向S1和S2发送命令，表示要成为Leader。</p>
 <p>在T3时刻，S1收到了S3的Leader投票请求。因为S1已经给自己投了一票Y，所以它不能再给其他哨兵投赞成票了，所以S1回复N表示不同意。同时，S2收到了T2时S3发送的Leader投票请求。因为S2之前没有投过票，它会给第一个向它发送投票请求的哨兵回复Y，给后续再发送投票请求的哨兵回复N，所以，在T3时，S2回复S3，同意S3成为Leader。</p>
@@ -14948,8 +14948,6 @@ majority：授权进行主从切换的最少的哨兵数量
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

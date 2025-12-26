@@ -5916,7 +5916,7 @@
 </code></pre></div>
 <p>从valgrind的检查结果里我们可以清楚地看到，申请的内存只被使用了一次（memset）就再没被使用，但是在使用完后却没有把这段内存空间给释放掉，这就是典型的内存泄漏。那这个内存泄漏是有危害的吗？</p>
 <p>这就要从进程地址空间的分配和销毁来说起，下面是一个简单的示意图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e0/64/e0e227529ba7f2fcab1ab445c4634764.jpg?wh=3300%2A1950" title="进程地址空间申请和释放示意图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e0/64/e0e227529ba7f2fcab1ab445c4634764.jpg?wh=3300%2A1950" title="进程地址空间申请和释放示意图" /></p>
 <p>从上图可以看出，进程在退出的时候，会把它建立的映射都给解除掉。换句话说，进程退出时，会把它申请的内存都给释放掉，这个内存泄漏就是没危害的。不过话说回来，虽然这样没有什么危害，但是我们最好还是要在程序里加上free §，这才是符合编程规范的。我们修改一下这个程序，加上free§，再次编译后通过valgrind来检查，就会发现不存在任何内存泄漏了：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>$ valgrind --leak-check=full  ./a.out
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>==20123== HEAP SUMMARY:
@@ -5974,10 +5974,10 @@
 <p>系统内存不足时会唤醒OOM killer来选择一个进程给杀掉，在我们这个例子中它杀掉了这个正在内存泄漏的程序，该进程被杀掉后，整个系统也就变得安全了。但是你要注意，<strong>OOM killer选择进程是有策略的，它未必一定会杀掉正在内存泄漏的进程，很有可能是一个无辜的进程被杀掉。</strong>而且，OOM本身也会带来一些副作用。</p>
 <p>我来说一个发生在生产环境中的实际案例，这个案例我也曾经<a href="https://lore.kernel.org/linux-mm/1586597774-6831-1-git-send-email-laoar.shao@gmail.com/">反馈给Linux内核社区来做改进</a>，接下来我们详细说一下它。</p>
 <p>这个案例跟OOM日志有关，OOM日志可以理解为是一个单生产者多消费者的模型，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b3/a7/b39503a3fb39e731d2d4c51687db70a7.jpg?wh=2758%2A1591" title="OOM info" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b3/a7/b39503a3fb39e731d2d4c51687db70a7.jpg?wh=2758%2A1591" title="OOM info" /></p>
 <p>这个单生产者多消费者模型，其实是由OOM killer打印日志（OOM info）时所使用的printk（类似于userspace的printf）机制来决定的。printk会检查这些日志需要输出给哪些消费者，比如写入到内核缓冲区（kernel buffer），然后通过dmesg命令来查看；我们通常也都会配置rsyslog，然后rsyslogd会将内核缓冲区的内容给转储到日志文件（/var/log/messages）中；服务器也可能会连着一些控制台（console ），比如串口，这些日志也会输出到这些console。</p>
 <p>问题就出在console这里，如果console的速率很慢，输出太多日志会非常消耗时间，而当时我们配置了“console=ttyS1,19200”，即波特率为19200的串口，这是个很低速率的串口。一个完整的OOM info需要约10s才能打印完，这在系统内存紧张时就会成为一个瓶颈点，为什么会是瓶颈点呢？答案如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2c/e7/2c4e5452584e9a1525921dffbdfda4e7.jpg?wh=4153%2A2088" title="OOM为什么会成为瓶颈点" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2c/e7/2c4e5452584e9a1525921dffbdfda4e7.jpg?wh=4153%2A2088" title="OOM为什么会成为瓶颈点" /></p>
 <p>进程A在申请内存失败后会触发OOM，在发生OOM的时候会打印很多很多日志（这些日志是为了方便分析为什么OOM会发生），然后会选择一个合适的进程来杀掉，从而释放出来空闲的内存，这些空闲的内存就可以满足后续内存申请了。</p>
 <p>如果这个OOM的过程耗时很长（即打印到slow console所需的时间太长，如上图红色部分所示），其他进程（进程B）也在此时申请内存，也会申请失败，于是进程B同样也会触发OOM来尝试释放内存，而OOM这里又有一个全局锁（oom_lock）来进行保护，进程B尝试获取（trylock）这个锁的时候会失败，就只能再次重试。</p>
 <p>如果此时系统中有很多进程都在申请内存，那么这些申请内存的进程都会被阻塞在这里，这就形成了一个恶性循环，甚至会引发系统长时间无响应（假死）。</p>
@@ -6127,8 +6127,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

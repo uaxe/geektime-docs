@@ -14146,7 +14146,7 @@
 <p>如果你不从事中间件开发工作，那估计网络编程对你来说会非常陌生，为了让你对它有一个直观的认知，我给你举一个例子。</p>
 <p>假如我们在使用Dubbo构建微服务应用，Dubbo客户端在向服务提供者发起远程调用的过程中，需要告诉服务提供者服务名、方法名和参数。但这些参数是怎么在网络中传递的呢？服务提供者又怎么识别出客户端的意图呢？</p>
 <p>你可以先看看我画的这张图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/4e/f0/4ec5c84yy26af476210e1e653c01aff0.jpg?wh=1920x553" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4e/f0/4ec5c84yy26af476210e1e653c01aff0.jpg?wh=1920x553" /></p>
 <p>客户端在发送内容之前需要先将待发送的内容序列化为二进制流。例如，上图发送了两个包，第一个包的二进制流是0110，第二个包的二进制流是00110011。这时，服务端读取数据的情形可能有两种。</p>
 <ol>
 <li><strong>经过多次读取</strong>：在上面这张图中，服务端调用了3次read方法才把数据全部读取出来，分别读取到的包是011、000、110011。</li>
@@ -14156,11 +14156,11 @@
 <p>那服务端是如何正确识别出0110就是第一个请求包，00110011是第二个请求包的呢？它为什么不会将011当成第一个请求包，000当成第二个请求包，110011当成第三个包，或者直接将011000110011当成一个请求包呢？其实这种现象叫做<strong>粘包。</strong></p>
 <p>常用的解决方案是客户端与服务端共同制定一个通信规范（也称通信协议），用它来定义请求包/响应包的具体格式。这样，客户端发送请求之前，需要先将内容按照通信规范序列化成二进制流，这个过程称之为编码；同样，服务端会按照通信规范将收到的二进制流进行反序列化，这个过程称之为解码。</p>
 <p>从这里你也可以看出，网络编程中通常涉及编码、往网络中写数据（Write）、从网络中读取数据（Read）、解码、业务逻辑处理、发送响应结果和接受响应结果等步骤，你可以看下下面这张图，加深理解：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/48/4f/487acd1670a4b7578e1bf50cfaa0334f.jpg?wh=1920x652" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/48/4f/487acd1670a4b7578e1bf50cfaa0334f.jpg?wh=1920x652" /></p>
 <p>那如何制订通信协议呢？</p>
 <p>通信协议的制订方法有很多，有的是采用特殊符号来标记一个请求的结束，但如果请求体中也包含这个分隔符就会使协议破坏，还有一种方法是使用固定长度来表述一个请求包，定义一个请求包固定包含多少字节，如果请求体内存不足，就使用填充符合进行填充，但这种方式会造成空间的浪费。</p>
 <p>业界最为经典的协议设计方法是<strong>协议头+Body的设计理念</strong>，如图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f7/a8/f7df1794aac442388868b51d24948da8.jpg?wh=1804x551" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f7/a8/f7df1794aac442388868b51d24948da8.jpg?wh=1804x551" /></p>
 <p>这里有几个关键点，你需要注意一下：</p>
 <ul>
 <li><strong>协议头的长度是固定的</strong>，通常为识别出一个业务的最小长度；</li>
@@ -14168,14 +14168,14 @@
 <li>消息体中存储业务数据。</li>
 </ul>
 <p>为了更直观地给你展示，我直接以一个简单的 RPC 通信场景为例，实现类似Dubbo服务远程服务调用，通信协议设计如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/eb/6a/eb61c11e8675a604585f56b7f020436a.jpg?wh=1920x703" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/eb/6a/eb61c11e8675a604585f56b7f020436a.jpg?wh=1920x703" /></p>
 <p>这里我们演示的是基于Header+Body的设计模式，接受端从网络中读取到字节后解码的流程。接受端将读取到的数据存储在一个接收缓冲区，在Netty中称为累积缓冲区。</p>
 <p>首先我们要判断累积缓存区中是否包含一个完整的Head，例如上述示例中，一个包的Header 的长度为 6 个字节，那首先判断累积缓存中可读字节数是否大于等于 6，<strong>如果不足 6 个字节，跳过本次处理，等待更多数据到达累积缓存区。</strong></p>
 <p>如果累积缓存区中包含一个完整的Header，就解析头部，并且提取长度字段中存储的数值，即包长度，然后判断累积缓存区中可读字节数是否大于或等于整个包的长度。<strong>如果累积缓存区不包含一个完整的数据包，则跳过本次处理，等待更多数据到达累积缓存区。</strong>如果累积缓存区包含一个完整的包，则按照通信协议的格式按顺序读取相关的内容。</p>
 <p>通过上面这种方式，我们就可以完美解决粘包问题了。</p>
 <p>我们前面也说了，网络编程中包含编码、解码、网络读取、业务逻辑等多个步骤，所以如何使用多线程提升并发度，合理处理多线程之间的高效协作就显得尤为重要，接下来我们来看一下Netty的线程模型是怎么做的。</p>
 <p>Netty的线程模型采取的是业界的主流线程模型，也就是主从多Reactor模型：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b1/yy/b117c06b91c299ca835d7613d351a2yy.jpg?wh=1920x1090" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b1/yy/b117c06b91c299ca835d7613d351a2yy.jpg?wh=1920x1090" /></p>
 <p>它的设计重点主要包括下面这几个方面。</p>
 <ul>
 <li><strong>Netty Boss Group线程组</strong></li>
@@ -14290,10 +14290,10 @@
 </code></pre></div>
 <p>这里还涉及另一问题，那就是Netty的channelRead、channelReadComplete等事件是怎么传播的呢？我建议你查看我的另一篇文章<a href="https://mp.weixin.qq.com/s/5dlUN0bzW3aKfcg1PSR5Ow">《Netty4 事件处理传播机制》</a>。</p>
 <p>Netty网络读流程就讲到这里了，我们用一张流程图结束网络读取部分的讲解：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/96/87/963f0b7a9b44b16c2d36e0c859110f87.jpg?wh=1920x921" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/96/87/963f0b7a9b44b16c2d36e0c859110f87.jpg?wh=1920x921" /></p>
 <p>接下来，我们一起看看Netty的网络写入流程。</p>
 <p>基于Netty网络模型，通常会使用一个业务线程池来执行业务操作，业务执行完成后，需要通过网络将响应结果提交给对应的IO线程，再通过IO线程将数据返回给客户端，其过程大致如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/4d/f8/4d23a22e05fe908b9e31cdecde8bfbf8.jpg?wh=1920x761" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4d/f8/4d23a22e05fe908b9e31cdecde8bfbf8.jpg?wh=1920x761" /></p>
 <p>那在代码实现层面，业务线程与IO线程是怎么协作的呢？我们带着这个问题，继续深入研究Netty的网络写入流程。</p>
 <p>在Netty中，一眼就能看到写事件的处理入口，也就是NioEventLoop（IO线程）的processSelectedKey方法，代码片段如下所示：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>// Process OP_WRITE first as we may be able to write some queued buffers and so free memory.
@@ -14474,16 +14474,16 @@
 <a id="__codelineno-13-19" name="__codelineno-13-19" href="#__codelineno-13-19"></a>}
 </code></pre></div>
 <p>为了方便你深入阅读Netty相关源码，我还给你整理了Netty写入的流程图：</p>
-<h2 id="_2"><img alt="图片" src="https://static001.geekbang.org/resource/image/a2/57/a24e94e0078c9cdf1ace4e0541300b57.jpg?wh=1920x1780" /></h2>
+<h2 id="_2"><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a2/57/a24e94e0078c9cdf1ace4e0541300b57.jpg?wh=1920x1780" /></h2>
 <h2 id="netty_1">Netty编程实战</h2>
 <p>好了，关于Netty网络读写的理解就介绍到这里了，但是只有理论是不行的，在这节课的最后，我们来看一个Netty的实战案例。</p>
 <p>Netty通常会用在中间件开发、即时通信（IM）、游戏服务器、高性能网关服务器等领域，阿里巴巴的高性能消息中间件RocketMQ就是用Netty进行网络层开发的。</p>
 <p>为了方便你学习，我将RocketMQ网络层代码单独抽取成了一个网络编程框架，并上传到了<a href="https://github.com/dingwpmz/netty-learning/tree/main/netty-framework">GitHub</a>，你可以拷贝下来跟我一起操作。</p>
 <p>在深入RocketMQ网络层具体实践之前，我们先来看一下RocketMQ的网络交互流程：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c3/b3/c340d40bd519295b10bf6f678d338db3.jpg?wh=1449x634" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c3/b3/c340d40bd519295b10bf6f678d338db3.jpg?wh=1449x634" /></p>
 <p><strong>基于Netty进行网络编程，我们通常需要编写客户端代码、服务端代码和通信协议。</strong></p>
 <p>我们先来看Netty客户端编程的通用示例：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7c/d6/7cf85b0fb4cbc0d918d831e454488fd6.png?wh=1026x536" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7c/d6/7cf85b0fb4cbc0d918d831e454488fd6.png?wh=1026x536" /></p>
 <p>这里我们需要注意五个关键点。</p>
 <ol>
 <li>需要创建Handler执行线程池，让IO线程只负责网络读写，而且创建线程池一定要使用线程工厂，同时要记得为线程命名。</li>
@@ -14493,17 +14493,17 @@
 <li>将编码、解码、业务逻辑处理相关的事件处理器加入到事件执行链条。</li>
 </ol>
 <p>再来看一下客户端如何创建连接，其代码片段如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a5/ce/a5c5894e50c6a7e338d30ca6f93749ce.png?wh=1920x765" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a5/ce/a5c5894e50c6a7e338d30ca6f93749ce.png?wh=1920x765" /></p>
 <p>客户端通过调用Bootstrap的connect方法尝试与服务端建立连接，该方法会立即返回一个Future而无须等待连接建立，所以该方法调用结束后并不一定成功创建了连接。但是连接只有在创建成功之后才能被用来发送和读取数据，所以这里我们需要再调用Future对象的awaitUninterruptibly方法等待连接成功建立。</p>
 <p>客户端与服务端建立连接后，就可以通过连接向服务端发送请求了：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0b/4a/0be5fc1365b53ec04434b392b549yy4a.png?wh=1920x1283" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0b/4a/0be5fc1365b53ec04434b392b549yy4a.png?wh=1920x1283" /></p>
 <p>这里主要有四个实现要点。</p>
 <ol>
 <li>为每一个请求创建一个唯一的请求序号。也就是为每一个请求创建一个响应结果Future，并建立RequestId到响应结果的映射Map，这样在收到服务端响应结果时，就可以准确地知道具体是哪一个请求的结果了。这是多线程共同使用单一连接发送请求的核心要点。为了更进一步理解，你可以再看一下这张示意图：</li>
 </ol>
 <!--THE END-->
 
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/74/52/74f03de29817d3cda8ce983dbb953552.jpg?wh=1920x571" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/74/52/74f03de29817d3cda8ce983dbb953552.jpg?wh=1920x571" /></p>
 <ol>
 <li>通过调用Channel的writeAndFlush方法，<strong>将数据写入到网络中。也就是说，不需要在发送数据之前先注册写事件。</strong>然后基于Future模式添加事件监听器，在收到返回结构后，ResponseFuture中的状态会被更新。</li>
 <li>同步发送的实现模板，通过调用ResponseFuture获取等待结果，如果使用异步发送模式，就在第三步执行用户定义的回调函数。</li>
@@ -14511,7 +14511,7 @@
 </ol>
 <p>介绍完客户端编程范例后，接下来我们看一下如何使用Netty编写服务端程序。</p>
 <p>首先，创建相关线程组，代码片段如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/db/ab/db5c63a641afab60fdb56185225546ab.png?wh=1233x737" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/db/ab/db5c63a641afab60fdb56185225546ab.png?wh=1233x737" /></p>
 <p>这里分别创建了3个线程组。</p>
 <ul>
 <li>eventLoopGroupBoss线程组，默认使用1个线程，对应Netty线程模型中的主Reactor。</li>
@@ -14519,13 +14519,13 @@
 <li>defaultEventExecutorGroup线程组，在Netty中，可以为编解码等事件处理器单独指定一个线程池，从而使IO线程只负责数据的读取与写入。</li>
 </ul>
 <p>下一步，使用Netty提供的ServerBootstrap对象创建Netty服务端，示例代码如下所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a0/43/a01ca20a4ff9bb8ea901d64225ef8043.png?wh=1253x509" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a0/43/a01ca20a4ff9bb8ea901d64225ef8043.png?wh=1253x509" /></p>
 <p>上面的代码基本都是模版代码，少数不同点就是需要自己实现编码器、解码器和业务处理Handler。其中，编码器、解码器其实就是实现通信协议，而ServerHandler就是服务端业务处理器。</p>
 <p>再下一步，服务端在指定接口建立监听，等待客户端连接：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6a/f7/6a9a5763e671c9512ea80dbbcab77df7.png?wh=944x193" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6a/f7/6a9a5763e671c9512ea80dbbcab77df7.png?wh=944x193" /></p>
 <p>ServerBootstrap的bind方法是一个非阻塞方法，调用sync()方法会变成阻塞方法，它需要等待服务端启动完成。</p>
 <p>最后一步就是编写服务端业务处理Handler了：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/73/2c/73a4383e93717b0813c62e490624b12c.png?wh=966x465" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/73/2c/73a4383e93717b0813c62e490624b12c.png?wh=966x465" /></p>
 <p>服务端处理器需要接收客户端请求，所以通常需要实现channelRead事件。通常业务Handler是在解码器之后执行，所以业务Handler中channelRead方法接收到的参数已经是通信协议中定义的具体模型，也就是请求对象了。后面就是根据该请求对象中的内容，执行对应的业务逻辑了。业务Handler会在defaultEventExecutorGroup线程组中执行，为了提高解码的性能，避免业务逻辑与IO操作相互影响，通常会将业务执行派发到业务线程池。</p>
 <h2 id="_3">总结</h2>
 <p>好了，这节课就讲到这里。</p>
@@ -14672,8 +14672,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

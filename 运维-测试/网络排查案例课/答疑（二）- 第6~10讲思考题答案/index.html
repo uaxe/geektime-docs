@@ -6546,7 +6546,7 @@
 <p>这节课，我给你介绍了利用防火墙的TTL跟原先的正常报文的TTL不一致的特点，从而识别出防火墙的方法。那么，假设有一天，防火墙公司把这个特性也完善了，我们再也不能仅凭TTL的突变而发现防火墙了，你觉得还有什么办法可以识别出防火墙吗？</p>
 <h3 id="_2">答案</h3>
 <p>这是一个开放式的问题，其实并没有标准答案。不过，通过对这个问题的思考，我们可以对网络的理解更进一步。我们先参考下面这张图，复习一下用TTL判断防火墙的原理：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f6/56/f6a1206ea604d7f3dd88981e39366256.jpg?wh=1694x562" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f6/56/f6a1206ea604d7f3dd88981e39366256.jpg?wh=1694x562" /></p>
 <blockquote>
 <p>补充：上图是一个例子，假设防火墙是路径上的第5跳，那么防火墙自己发出的报文的TTL就比真正的发送端的TTL多了5。</p>
 </blockquote>
@@ -6554,11 +6554,11 @@
 <p>那么，还有哪些元信息也是在这个构造好的报文里呢？其实这些信息也可以帮我们辅助判断防火墙。</p>
 <p>另外在IP层，除了TTL，还有一个字段也值得我们注意，它就是<strong>IP ID</strong>。这个字段占用了2个字节，所以它的最大值是2^16-1，也就是65535。IP ID一般是IP报文的发起端设置的，每次发包递增1，然后在0到65535之间循环使用。</p>
 <p>它最主要的用途，是<strong>接收端会根据这个ID来组装（assemble）同一组IP分片（fragments），</strong>而中间设备（交换机、路由器）不会改动IP ID。并且在防火墙构造RST报文的时候，IP包的TTL和ID值也是防火墙自己设置的，也就有可能被我们用来发现防火墙。所以，如果SYN+ACK和RST的IP ID不连续，我们就可以判断出防火墙，也就是下图这样：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/51/52/51df7643ff2127011ce9e6fd124e9652.jpg?wh=1846x884" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/51/52/51df7643ff2127011ce9e6fd124e9652.jpg?wh=1846x884" /></p>
 <p>不过，我在探究这个可能性的时候，又遇到了新的问题。要知道，Linux系统发送SYN+ACK的时候，IP ID一定是0，但是我既在Wireshark里看到了这个现象，也在内核代码里证实了这一点。而这就给我们利用IP ID带来了障碍：<strong>因为即使RST真的是对端发出的，两个报文的IP ID也会不同。</strong></p>
 <p>只有当我们收到至少三个报文，也就是除了SYN+ACK和RST之外，我们还需要在中间收到一些报文，才可以对比RST跟中间报文的IP ID的差别，然后进行判断。</p>
 <p>所以，利用IP ID的方法，对于TCP握手后就发生RST的情况并不适用，但对于交互过程中发生RST的情况应该是适用的。你有机会也可以在遇到RST时，来抓包验证一下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/16/d5/168e95c43c17fc318d72df93205231d5.jpg?wh=1821x943" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/16/d5/168e95c43c17fc318d72df93205231d5.jpg?wh=1821x943" /></p>
 <h2 id="07">07讲的答疑</h2>
 <h3 id="_3">思考题</h3>
 <ol>
@@ -6576,11 +6576,11 @@
 <p>这类过滤器的使用场景一般是这样的：我们知道应用层的某一个信息，比如HTTP报文里面的某个uuid，然后再通过这个信息，去找到对应的报文。</p>
 <p>而在这里，又可以细分为两种不同的场景。</p>
 <p><strong>第一种，某一个TCP连接在通信两端的报文的对应。</strong>比如，客户端发出的HTTP报文里含有某个uuid，那么我们需要在服务端的抓包文件里，把这个TCP流过滤出来，就可以用上面说的那些过滤器。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/61/e6/6180fd2be0492305d612eb6e2f2fbce6.jpg?wh=2000x954" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/61/e6/6180fd2be0492305d612eb6e2f2fbce6.jpg?wh=2000x954" /></p>
 <p><strong>第二种，LB前后方两个不同TCP连接的报文的对应。</strong>比如，LB会转发请求给后端多台服务器中的某一个，而这个选择一般是动态的，这就给我们的排查工作带来了不小的障碍。</p>
 <p>那么这里可以参考的方法就是：在“客户端&lt;-&gt;LB”这一侧的连接中，找到HTTP报文的某个uuid，然后在“LB&lt;-&gt;多个后端IP”这一侧的抓包中，搜索这个uuid，就能得到同样是这个请求的相关报文了。</p>
 <p>我们可以看看下面这个示意图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/28/6d/282b9b474a7b96998c657bfdbebae46d.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/28/6d/282b9b474a7b96998c657bfdbebae46d.jpg?wh=2000x1125" /></p>
 <p>也就是说，TCP流1和TCP流1<code>'</code>，还有TCP流2和TCP流2<code>'</code>，分别是同一个TCP流在连接两侧的不同体现。而<strong>由于流1和流2确实是完全不同的连接，无法用任何TCP报文头部的信息来进行匹配，所以只能用应用层的信息来找到对应关系</strong>。</p>
 <p>第二个问题也是一个开放式的问题。我看到不少同学都分享了他们的经验，这也增加了我自己的见识，真是一件多赢的事。比如，<strong>@江山如画</strong>同学对这个问题的回复是这样的：</p>
 <blockquote>
@@ -6631,7 +6631,7 @@
 <p>第一个问题呢，其实是一个简单的<strong>协议规范的问题</strong>。这个知识点，你很容易就可以在<a href="https://www.ietf.org/archive/id/draft-ietf-tcpm-rfc793bis-25.html#section-3.10.7.4-2.1.2.1.9.7.2.1">RFC793</a>里找到。TCP的序列号和确认号的长度都是4个字节，4个字节也就是32位，所以最大值是2^32-1，也就是4G。我也建议你记住这些小的知识点，因为它是在工作中高频使用的知识点，你能记住的话就不用去搜索了，可以提升工作的效率。</p>
 <p>第二个问题就比较复杂了，而且因为当时的现场没有了，所以也没有标准答案。但是这个思考的过程对我们掌握这一讲的知识是很有帮助的，而且，我们其实还是可以大致推导出当时的情景。</p>
 <p>我直接借用<a href="https://time.geekbang.org/column/article/485689">第10讲</a>里面的一张示意图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5d/e1/5daef13e8f38a14a86c45yyd28513ee1.jpg?wh=2000x872" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5d/e1/5daef13e8f38a14a86c45yyd28513ee1.jpg?wh=2000x872" /></p>
 <p>我也来简单描述一下这个过程。</p>
 <ul>
 <li>在t1这个时间点，B通知A：“我的接收窗口是1000字节”。</li>
@@ -6640,7 +6640,7 @@
 <li>在t4这个时间点，A收到B确认300个字节的确认包，于是<strong>判断出在途字节数是700字节，所以A能发的最多只有300字节。</strong></li>
 </ul>
 <p>我们再来看一下接收端的报文处理流程。如果我们把缓冲区（包括Ring Buffer和Recieve Buffer）比作水池，那么报文进入缓冲区，就相当于有水龙头往里注水；应用程序到缓冲区取走数据，又相当于有水龙头放出水。这两个水龙头的速度的不同，就造成了缓冲区的动态调整。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a4/f5/a483db4d1ffe854e660d4c4611cde0f5.jpg?wh=2000x778" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a4/f5/a483db4d1ffe854e660d4c4611cde0f5.jpg?wh=2000x778" /></p>
 <p>那么，发生数据“滞留”，其实就相当于水池中一直囤着水，也就是“放水速度不够”，应用程序没有把数据都及时读取走导致的。</p>
 <p>显然，比较理想的情况是放水的速度大于等于注水的速度，这是传输速度最快的方式。</p>
 <p>但是，我们也要认识到，操作系统设立缓冲区的一大原因，就是考虑到“注水”和“放水”的速度本来就是经常不相等的，所以用缓冲区这个“空间”，来抵消速度不同导致的“时间”上的矛盾。简单来说就是“<strong>用空间换时间</strong>”。而且，不仅是网络接收和发送的缓冲区如此，大部分缓冲区也都是“用空间换时间”原则的体现。</p>
@@ -6762,8 +6762,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

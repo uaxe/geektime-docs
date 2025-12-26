@@ -14794,15 +14794,15 @@
 <p>目前，很多微服务框架中的服务通信是基于RPC通信实现的，在没有进行组件扩展的前提下，SpringCloud是基于Feign组件实现的RPC通信（基于Http+Json序列化实现），Dubbo是基于SPI扩展了很多RPC通信框架，包括RMI、Dubbo、Hessian等RPC通信框架（默认是Dubbo+Hessian序列化）。不同的业务场景下，RPC通信的选择和优化标准也不同。</p>
 <p>例如，开头我提到的我们部门在选择微服务框架时，选择了Dubbo。当时的选择标准就是RPC通信可以支持抢购类的高并发，在这个业务场景中，请求的特点是瞬时高峰、请求量大和传入、传出参数数据包较小。而Dubbo中的Dubbo协议就很好地支持了这个请求。</p>
 <p><strong>以下是基于Dubbo:2.6.4版本进行的简单的性能测试。</strong>分别测试Dubbo+Protobuf序列化以及Http+Json序列化的通信性能（这里主要模拟单一TCP长连接+Protobuf序列化和短连接的Http+Json序列化的性能对比）。为了验证在数据量不同的情况下二者的性能表现，我分别准备了小对象和大对象的性能压测，通过这样的方式我们也可以间接地了解下二者在RPC通信方面的水平。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/dc/54/dc950f3a5ff15253e101fac90c192f54.jpg?wh=1438%2A321" /></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/20/b1/20814a2a87057fdc03af699454f703b1.jpg?wh=1429%2A312" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dc/54/dc950f3a5ff15253e101fac90c192f54.jpg?wh=1438%2A321" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/20/b1/20814a2a87057fdc03af699454f703b1.jpg?wh=1429%2A312" /></p>
 <p>这个测试是我之前的积累，基于测试环境比较复杂，这里我就直接给出结果了，如果你感兴趣的话，可以留言和我讨论。</p>
 <p>通过以上测试结果可以发现：<strong>无论从响应时间还是吞吐量上来看，单一TCP长连接+Protobuf序列化实现的RPC通信框架都有着非常明显的优势。</strong></p>
 <p>在高并发场景下，我们选择后端服务框架或者中间件部门自行设计服务框架时，RPC通信是重点优化的对象。</p>
 <p>其实，目前成熟的RPC通信框架非常多，如果你们公司没有自己的中间件团队，也可以基于开源的RPC通信框架做扩展。在正式进行优化之前，我们不妨简单回顾下RPC。</p>
 <h2 id="rpc_1">什么是RPC通信</h2>
 <p>一提到RPC，你是否还想到MVC、SOA这些概念呢？如果你没有经历过这些架构的演变，这些概念就很容易混淆。<strong>你可以通过下面这张图来了解下这些架构的演变史。</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e4/a5/e43a8f81d76927948a73a9977643daa5.jpg?wh=2560%2A576" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e4/a5/e43a8f81d76927948a73a9977643daa5.jpg?wh=2560%2A576" /></p>
 <p>无论是微服务、SOA、还是RPC架构，它们都是分布式服务架构，都需要实现服务之间的互相通信，我们通常把这种通信统称为RPC通信。</p>
 <p>RPC（Remote Process Call），即远程服务调用，是通过网络请求远程计算机程序服务的通信技术。RPC框架封装好了底层网络通信、序列化等技术，我们只需要在项目中引入各个服务的接口包，就可以实现在代码中调用RPC服务同调用本地方法一样。正因为这种方便、透明的远程调用，RPC被广泛应用于当下企业级以及互联网项目中，是实现分布式系统的核心。</p>
 <p>RMI（Remote Method Invocation）是JDK中最先实现了RPC通信的框架之一，RMI的实现对建立分布式Java应用程序至关重要，是Java体系非常重要的底层技术，很多开源的RPC通信框架也是基于RMI实现原理设计出来的，包括Dubbo框架中也接入了RMI框架。接下来我们就一起了解下RMI的实现原理，看看它存在哪些性能瓶颈有待优化。</p>
@@ -14811,7 +14811,7 @@
 <h3 id="rmi">RMI的实现原理</h3>
 <p>RMI远程代理对象是RMI中最核心的组件，除了对象本身所在的虚拟机，其它虚拟机也可以调用此对象的方法。而且这些虚拟机可以不在同一个主机上，通过远程代理对象，远程应用可以用网络协议与服务进行通信。</p>
 <p>我们可以通过一张图来详细地了解下整个RMI的通信过程：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/11/4f/1113e44dd62591ce68961e017c11ed4f.jpg?wh=2070%2A1106" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/11/4f/1113e44dd62591ce68961e017c11ed4f.jpg?wh=2070%2A1106" /></p>
 <h3 id="rmi_1">RMI在高并发场景下的性能瓶颈</h3>
 <ul>
 <li>Java默认序列化</li>
@@ -14830,7 +14830,7 @@
 <p>RPC通信包括了建立通信、实现报文、传输协议以及传输数据编解码等操作，接下来我们就从每一层的优化出发，逐步实现整体的性能优化。</p>
 <h3 id="1">1.选择合适的通信协议</h3>
 <p>要实现不同机器间的网络通信，我们先要了解计算机系统网络通信的基本原理。网络通信是两台设备之间实现数据流交换的过程，是基于网络传输协议和传输数据的编解码来实现的。其中网络传输协议有TCP、UDP协议，这两个协议都是基于Socket编程接口之上，为某类应用场景而扩展出的传输协议。通过以下两张图，我们可以大概了解到基于TCP和UDP协议实现的Socket网络通信是怎样的一个流程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2c/0b/2c7c373963196a30e9d4fdc524a92d0b.jpg?wh=1924%2A1394" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2c/0b/2c7c373963196a30e9d4fdc524a92d0b.jpg?wh=1924%2A1394" /></p>
 <p>基于TCP协议实现的Socket通信是有连接的，而传输数据是要通过三次握手来实现数据传输的可靠性，且传输数据是没有边界的，采用的是字节流模式。</p>
 <p>基于UDP协议实现的Socket通信，客户端不需要建立连接，只需要创建一个套接字发送数据报给服务端，这样就不能保证数据报一定会达到服务端，所以在传输数据方面，基于UDP协议实现的Socket通信具有不可靠性。UDP发送的数据采用的是数据报模式，每个UDP的数据报都有一个长度，该长度将与数据一起发送到服务端。</p>
 <p>通过对比，我们可以得出优化方法：为了保证数据传输的可靠性，通常情况下我们会采用TCP协议。如果在局域网且对数据传输的可靠性没有要求的情况下，我们也可以考虑使用UDP协议，毕竟这种协议的效率要比TCP协议高。</p>
@@ -14852,8 +14852,8 @@
 <p><strong>SO_KEEPALIVE：</strong>当设置该选项以后，连接会检查长时间没有发送数据的客户端的连接状态，检测到客户端断开连接后，服务端将回收该连接。我们可以将该时间设置得短一些，来提高回收连接的效率。</p>
 <h3 id="4">4.量身定做报文格式</h3>
 <p>接下来就是实现报文，我们需要设计一套报文，用于描述具体的校验、操作、传输数据等内容。为了提高传输的效率，我们可以根据自己的业务和架构来考虑设计，尽量实现报体小、满足功能、易解析等特性。我们可以参考下面的数据格式：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6d/c1/6dc21193a6ffbf94a7dd8e5a0d2302c1.jpg?wh=1512%2A204" />
-<img alt="" src="https://static001.geekbang.org/resource/image/f3/ae/f3bb46ed6ece4a8a9bcc3d9e9df84cae.jpg?wh=1191%2A718" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6d/c1/6dc21193a6ffbf94a7dd8e5a0d2302c1.jpg?wh=1512%2A204" />
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f3/ae/f3bb46ed6ece4a8a9bcc3d9e9df84cae.jpg?wh=1191%2A718" /></p>
 <h3 id="5">5.编码、解码</h3>
 <p>在09讲中，我们分析过序列化编码和解码的过程，对于实现一个好的网络通信协议来说，兼容优秀的序列化框架是非常重要的。如果只是单纯的数据对象传输，我们可以选择性能相对较好的Protobuf序列化，有利于提高网络通信的性能。</p>
 <h3 id="6linuxtcp">6.调整Linux的TCP参数设置选项</h3>
@@ -14863,13 +14863,13 @@
 </ul>
 <!--THE END-->
 
-<p><img alt="" src="https://static001.geekbang.org/resource/image/32/de/32381d3314bd982544f69e4d3faba1de.jpg?wh=1218%2A800" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/32/de/32381d3314bd982544f69e4d3faba1de.jpg?wh=1218%2A800" /></p>
 <ul>
 <li>四次握手</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/df/91/df9f4e3f3598a7e160c899f552a59391.jpg?wh=964%2A666" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/df/91/df9f4e3f3598a7e160c899f552a59391.jpg?wh=964%2A666" /></p>
 <p>我们可以通过sysctl -a | grep net.xxx命令运行查看Linux系统默认的的TCP参数设置，如果需要修改某项配置，可以通过编辑 vim/etc/sysctl.conf，加入需要修改的配置项， 并通过sysctl -p命令运行生效修改后的配置项设置。通常我们会通过修改以下几个配置项来提高网络吞吐量和降低延时。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9e/bc/9eb01fe017b267367b11170a864bd0bc.jpg?wh=1503%2A1340" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9e/bc/9eb01fe017b267367b11170a864bd0bc.jpg?wh=1503%2A1340" /></p>
 <p>以上就是我们从不同层次对RPC优化的详解，除了最后的Linux系统中TCP的配置项设置调优，其它的调优更多是从代码编程优化的角度出发，最终实现了一套RPC通信框架的优化路径。</p>
 <p>弄懂了这些，你就可以根据自己的业务场景去做技术选型了，还能很好地解决过程中出现的一些性能问题。</p>
 <h2 id="_1">总结</h2>
@@ -15004,8 +15004,6 @@ TCP连接的建立详细过程？TCP的连接断开过程？
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

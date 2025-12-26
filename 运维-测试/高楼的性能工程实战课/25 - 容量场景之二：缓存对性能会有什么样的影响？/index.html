@@ -6287,31 +6287,31 @@
 <h2 id="_1">第四阶段分析</h2>
 <h3 id="_2">场景压力数据</h3>
 <p>这是我在进行持续加压过程中，得到的场景数据：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a0/ea/a0408ff35e086996e13f4218ca4c26ea.png?wh=1828%2A833" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a0/ea/a0408ff35e086996e13f4218ca4c26ea.png?wh=1828%2A833" /></p>
 <p>看上面的曲线图就能知道，这是在压力持续的过程中，出现了TPS掉下来的问题，这是不能接受的。</p>
 <h3 id="_3">拆分响应时间</h3>
 <p>针对上述问题，我们先来看一下现在的时间消耗。这是已经运行了一段时间的响应时间图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/18/c6/1858074580cc743b6259726e03de2ac6.png?wh=914%2A294" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/18/c6/1858074580cc743b6259726e03de2ac6.png?wh=914%2A294" /></p>
 <p>我们可以根据整体的平均响应时间，一个个分析这些接口的时间消耗在了哪里。其实，从这张图就能看出，所有的业务时间相比上一节课的响应时间图都增加了。由于所有业务的响应时间都增加了，说明不是某个业务本身的问题，所以，我们任意分析一个接口就可以。</p>
 <p>这里我用生成确认订单这个接口做时间拆分。在之前部署系统的时候，我们把SkyWalking采样率设置得非常低，只有5%左右，目的为了不让APM影响性能和网络。</p>
 <p>下面这些数据是按分钟平均的。</p>
 <ul>
 <li>Gateway：
-<img alt="" src="https://static001.geekbang.org/resource/image/57/58/5764d379eb0cd29cc19f506047430758.png?wh=334%2A178" /></li>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/57/58/5764d379eb0cd29cc19f506047430758.png?wh=334%2A178" /></li>
 <li>Order：
-<img alt="" src="https://static001.geekbang.org/resource/image/ac/f8/ac07769yyaa61dbcf4cddd92c5dff0f8.png?wh=321%2A185" /></li>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ac/f8/ac07769yyaa61dbcf4cddd92c5dff0f8.png?wh=321%2A185" /></li>
 <li>Cart：
-<img alt="" src="https://static001.geekbang.org/resource/image/55/3d/556ab449aa47a27fda1f52bb1195a73d.png?wh=315%2A179" /></li>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/55/3d/556ab449aa47a27fda1f52bb1195a73d.png?wh=315%2A179" /></li>
 <li>Member：
-<img alt="" src="https://static001.geekbang.org/resource/image/8d/e5/8d43f0322dae23b3bd6c20665a88b1e5.png?wh=328%2A176" /></li>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8d/e5/8d43f0322dae23b3bd6c20665a88b1e5.png?wh=328%2A176" /></li>
 <li>Auth：
-<img alt="" src="https://static001.geekbang.org/resource/image/67/1f/6735e1e63f7fca798bd17160c11ab51f.png?wh=327%2A188" /></li>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/67/1f/6735e1e63f7fca798bd17160c11ab51f.png?wh=327%2A188" /></li>
 </ul>
 <p>从数据上来看，似乎每个服务都和整体响应时间慢有关。悲催的场景总是这样。</p>
 <p>不过，别慌张，我们仍然按照全局到定向的分析思路来走就可以了。我们先看全局监控数据。</p>
 <h3 id="_4">全局监控分析</h3>
 <p>从全局监控的第一个界面来看，worker-4上的CPU资源使用比较高，其次是worker-6：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/97/05/97a61841d5791f036592d36f997d8e05.png?wh=1829%2A461" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/97/05/97a61841d5791f036592d36f997d8e05.png?wh=1829%2A461" /></p>
 <p>我们一个一个来收拾。</p>
 <p>我们先进入到worker-4中，执行top/vmstat命令，截取到一些重要的数据，下面这些是worker-4这个节点更为详细的全局监控数据：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>-- vmstat的数据
@@ -6349,13 +6349,13 @@
 <p>从vmstat的in列可以看出，系统的中断数比较高；从vmstat中的cs（context switch）来看，CS也达到了3万左右。同时，sy cpu（syscall消耗的CPU）也占到了25%左右。这就说明我们需要着重关注syscall（系统调用）层面。</p>
 <h3 id="_5">定向监控分析</h3>
 <p>我们先查看中断数据，下面这张图就是全部的中断数据截图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0b/1b/0bfyy6b43928554d94eaf83dd44yyd1b.png?wh=1287%2A926" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0b/1b/0bfyy6b43928554d94eaf83dd44yyd1b.png?wh=1287%2A926" /></p>
 <p>虽然从这张图里，我们可以看到整体的中断数据，也可以从白底黑字的数据上看到数据的变化，但是我们还没有结论。</p>
 <p>我们再看软中断的数据：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a5/ac/a5e8055b5b893c376bb9379a7de69cac.png?wh=1636%2A470" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a5/ac/a5e8055b5b893c376bb9379a7de69cac.png?wh=1636%2A470" /></p>
 <p>从白底黑字的数据可以看到，NET_RX的变化较大（TIMER是系统的时钟，我们不用做分析），而这个服务器worker-4上同时放了Gateway和Redis，并且这两个服务都是用网络的大户，显然这是我们要分析的地方。</p>
 <p>由于网络的中断比较高，我们进入到Pod中，查看一下网络队列：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/dc/96/dce7bf1af8e13b3273e79bc054f48f96.png?wh=1181%2A670" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dc/96/dce7bf1af8e13b3273e79bc054f48f96.png?wh=1181%2A670" /></p>
 <p>你看，这里面有recv_Q。我们知道，recv_Q是网络数据的接收队列，它持续有值说明了接收队列中确实有阻塞。</p>
 <p>请你注意，这个结论不是我只刷一次netstat得到的，而是刷了很多次。因为每次都有这样的队列出现，所以，我才会判断网络接收队列recv_Q中确实有未处理完的数据。如果它只是偶尔出现一次，那问题倒是不大。</p>
 <p>现在，我们继续分析这个问题，待会再给出解决方案。</p>
@@ -6432,12 +6432,12 @@
 <p>为什么这么说呢？</p>
 <p>因为在业务上来看，除了打开首页和查询商品不用它之外，其他的脚本似乎都需要用它。所以，它慢了不是影响一个业务，而是影响一堆业务。</p>
 <p>然而，正当我们分析到这里，还没来得及做优化的时候，又......出现了新问题。我在接着压的过程中，发现了这样的现象：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/50/09/50ce836643202d334b172c1b806eb109.png?wh=1831%2A833" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/50/09/50ce836643202d334b172c1b806eb109.png?wh=1831%2A833" /></p>
 <p>你瞧瞧，TPS不稳定就算了，后面居然还全报错了，这也太不合适了吧！</p>
 <p>于是，我开始对报错日志一通查，最后发现了Redis的容器都飘红了，下面是Redis在架构中的状态截图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/55/29/55acca876156a22d6cfb2f4ea6aae129.png?wh=478%2A192" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/55/29/55acca876156a22d6cfb2f4ea6aae129.png?wh=478%2A192" /></p>
 <p>这明显是Redis没了呀！这时候我们再去看应用的状态：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5b/a1/5b3777e79f5880c7c34f31fa5f3b73a1.png?wh=1844%2A770" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5b/a1/5b3777e79f5880c7c34f31fa5f3b73a1.png?wh=1844%2A770" /></p>
 <p>满目疮痍呀！</p>
 <p>接着，我们登录到Redis服务所在的worker节点，查看日志：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>[ 7490.807349] redis-server invoked oom-killer: gfp_mask=0xd0, order=0, oom_score_adj=807
@@ -6521,16 +6521,16 @@
 <li>不管上面两步有用没用，对Redis来说，我们都应该考虑限制内存的大小和AOF文件的大小。</li>
 </ol>
 <p>我们看一下把Redis从worker-4移到worker-7上之后的TPS如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/82/b0/8280f7c008b93b51b1a8cfd18e0041b0.png?wh=1832%2A587" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/82/b0/8280f7c008b93b51b1a8cfd18e0041b0.png?wh=1832%2A587" /></p>
 <p>TPS还是在下降，并且没有一开始的那么高了，之前都能达到1000TPS。这个看似非常正确的优化动作却导致了TPS下降的现象，显然不是我们期望的。</p>
 <p>现在还不知道问题在哪里，不过，我们一直想达到的目标是降队列。所以，我们先确认下网络队列有没有降下来，再来考虑TPS怎么提升。</p>
 <p>你看worker-4上的队列，没有recv_Q的值了：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ee/29/eedebbd0338a8de3a68a9bffe3f99029.png?wh=1304%2A576" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ee/29/eedebbd0338a8de3a68a9bffe3f99029.png?wh=1304%2A576" /></p>
 <p>现在我们就得来处理下AOF了，因为我们虽然移开了Redis，但是TPS并没有上升。所以，我们还得看看AOF的影响。</p>
 <p>关掉AOF之后，TPS如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/00/ab/009dc49121215309fd600454ae07d5ab.png?wh=1831%2A581" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/00/ab/009dc49121215309fd600454ae07d5ab.png?wh=1831%2A581" /></p>
 <p>总体资源如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/31/e0/31afcba048861d02981f5947c88819e0.png?wh=1827%2A456" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/31/e0/31afcba048861d02981f5947c88819e0.png?wh=1827%2A456" /></p>
 <p>看到了没，效果还是有的吧？我们可是得到了1000以上的稳定的TPS曲线。</p>
 <p>在这个容量场景中，我们完成了四个阶段的分析之后，优化效果还不错。不过，每个性能测试都应该有<strong>结论</strong>。所以，我们还需要做一个动作，就是接着增加压力，看一下系统的最大容量能达到多少。</p>
 <p>于是，我们进入第五个阶段的分析。</p>
@@ -6538,11 +6538,11 @@
 <p>请你注意<strong>，容量场景最重要的变化只有一个，就是增加线程</strong>。而跟着线程一起变化的就是参数化的数据量。在这样的增加线程的场景中，我们还要关注的就是资源的均衡使用。因此，在第四阶段的优化之后，我们先来看一下这个场景的结果是个什么样子。</p>
 <h3 id="_7">场景运行数据</h3>
 <p>场景压力数据如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/db/5d/dbcd3ae8b6df86ac8bf2c9a919270a5d.png?wh=1830%2A582" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/db/5d/dbcd3ae8b6df86ac8bf2c9a919270a5d.png?wh=1830%2A582" /></p>
 <p>从效果上来看，不错哦，TPS已经达到1700了。</p>
 <h3 id="_8">全局监控分析</h3>
 <p>全局监控的数据如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ey/c4/eyy599b05a63e03383107a67d56d5ec4.png?wh=1834%2A459" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ey/c4/eyy599b05a63e03383107a67d56d5ec4.png?wh=1834%2A459" /></p>
 <p>从上面两张图中可以看到，在我们这样的压力之下，TPS最大能达到1700左右，系统整体资源使用率也不算少了。</p>
 <p><strong>经过了基准场景和容量场景之后，我们现在就可以下结论了：系统资源在这个最大容量的场景中已经达到了比较高的使用率。</strong></p>
 <p>你有没有听过性能行业中一直流传的一句话：性能优化是无止境的。所以，<strong>我们一定要选择好性能项目结束的关键点。</strong></p>
@@ -6699,8 +6699,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

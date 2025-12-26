@@ -14114,8 +14114,8 @@
 <p>等一下，那这种编码算法是不是就有缺陷了？难道只能针对数值数据来进行编码？</p>
 <p>其实我们可以稍微变通一下，比如HBase里面使用的Delta Encoding系列算法，PREFIX、DIFF、FAST_DIFF等，也能够支持对字符串数据的编码。</p>
 <p>用PREFIX（由PrefixKeyDeltaEncoder实现）举个例子。如下图所示，图的上半部分表示一个存储了4行数据的表，这个表的行键由两部分组成。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/4e/24/4e2c931093429ae514308ccdaeb2c324.png?wh=1836x788" /></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3d/ff/3d3yy188d0fb21dbfd020675e04764ff.png?wh=2380x236" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4e/24/4e2c931093429ae514308ccdaeb2c324.png?wh=1836x788" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3d/ff/3d3yy188d0fb21dbfd020675e04764ff.png?wh=2380x236" /></p>
 <p>第一部分是将用户ID反转后补齐20位获得的，即行键中的红色部分。这个处理是为了避免热点区间，因为用户ID一般是连续的整数，而新用户一般比较活跃，产生的数据较多，所以反转后能够避免连续的新用户全部分到同一个分区或者服务器。</p>
 <p>第二部分是一个用Long.MAX_VALUE减去当前时间戳，得到的值再补齐20位，即行键中的紫色部分。保证得到一个定长的行键，就能方便我们从行键中提取数据，而且最新的数据会排在前面。</p>
 <p>再看图的下半部分，是开启编码后存储的数据示例。可以看到，表格里多存储了一列前缀长度，但是行键的位数大大减少了。具体怎么做到的呢？</p>
@@ -14129,8 +14129,8 @@
 <h3 id="dictionary-encoding">字典编码（Dictionary Encoding）</h3>
 <p>第3个是字典编码，这种编码需要构建一个字典表，将数据值映射为字典索引进行存储，减少数据的存储空间，提高压缩比。</p>
 <p>比如我们先构建一个城市的字典表，将城市映射成为一个数字，之后在表数据存储时，针对城市的列，我们只需要存储城市的数字编码即可。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e3/92/e399e5df45da052eaa3f1eba14846c92.png?wh=2468x1390" /></p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b9/6e/b987f493595a937f98yy1e6422062d6e.png?wh=2468x1172" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e3/92/e399e5df45da052eaa3f1eba14846c92.png?wh=2468x1390" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b9/6e/b987f493595a937f98yy1e6422062d6e.png?wh=2468x1172" /></p>
 <p>使用字典编码一方面可以节省存储空间，另一方面，如果需要根据城市去过滤查询，使用数字过滤的性能也比字符串要高。</p>
 <p>字典编码适合低基数的列，也就是列的distinct取值较少的场景。当然，在分布式数据库中，还要考虑字典的全局性与唯一性，以免出现不同节点字典不一致导致数据不一致的情况。StarRocks就是通过全局字典来解决这个问题的。也就是用一个统一的全局字典来统一所有节点的用来编码的字典表。</p>
 <p>总结一下，各种编码方式只要是在合适的场景下使用，就都能节省一定的存储空间，有时候还能提升查询过滤的性能。而且，由于编码后占用空间减小，所以缓存到内存的数据量也变得更多了，同样能够提升性能，但带来的问题就是占用更多的CPU资源。</p>
@@ -14143,7 +14143,7 @@
 <p>常用的压缩算法包括Snappy、LZ4、Zstandard、GZip等，不同的压缩算法会在压缩/解压缩速度与压缩比例之间做一个平衡。而且很多压缩算法还能够支持多层压缩，也就是压缩一次后，再进行压缩，这样可以进一步提升压缩比例，但是压缩/解压缩时间会相应增加。</p>
 <p>这些压缩算法，通常能够压缩50%-70%以上的空间，极大地提升了数据的读取与写入速度。而且分布式数据库通常还会对数据进行多副本的备份，压缩后的数据再进行副本的同步，传输数据量也大大减少了，传输备份效率也会提升。</p>
 <p>这里我整理了一下我们要介绍的几个数据库所支持的压缩算法，以及这些算法的一些压缩指标。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d9/0a/d94d0cecyybb4a355b1f01461b7da90a.png?wh=3712x2040" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d9/0a/d94d0cecyybb4a355b1f01461b7da90a.png?wh=3712x2040" /></p>
 <p>下面是这3个分布式数据库建表时启用编码与压缩的方法。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>#HBase 启用压缩
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>CREATE &#39;ls3_compress_table&#39;,
@@ -14347,8 +14347,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

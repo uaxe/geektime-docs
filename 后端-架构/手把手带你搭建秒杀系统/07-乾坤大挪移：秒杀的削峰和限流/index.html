@@ -13789,7 +13789,7 @@
 <p>削峰填谷概念一开始出现在电力行业，是调整用电负荷的一种措施，在互联网分布式高可用架构的演进过程中，也经常会采用类似的削峰填谷手段来构建稳定的系统。</p>
 <p>削峰的方法有很多，可以通过业务手段来削峰，比如秒杀流程中设置验证码或者问答题环节；也可以通过技术手段削峰，比如采用消息队列异步化用户请求，或者采用限流漏斗对流量进行层层过滤。削峰又分为无损和有损削峰。本质上，<strong>限流是一种有损技术削峰；而引入验证码、问答题以及异步化消息队列可以归为无损削峰。</strong></p>
 <p>我们先来看一下电商平台线上真实场景下的秒杀流量图，因为数据保密的需要，这里我隐去了具体的流量数字。但是，你可以看到这个图有个非常明显的特点，就是毛刺特别大，流量几秒内爬升到峰值，然后马上掉下来。不管是口罩、茅台，还是春运的火车票，都符合这样的流量特点。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/35/64/35dc492a82da8e4bbc0188918dcc7964.png?wh=2464x1740" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/35/64/35dc492a82da8e4bbc0188918dcc7964.png?wh=2464x1740" /></p>
 <p>我们现在需要做的就是通过削峰和限流，把这超大的瞬时流量平稳地承接下来，落到秒杀系统里。这就犹如武侠小说里，众人从高塔纵身跳下，张无忌运用乾坤大挪移，把对众人伤害极大的垂直自由落体运动改变为水平运动，使之安然脱险。</p>
 <h2 id="_1">流量削峰</h2>
 <p>前面的章节中，我介绍过秒杀的业务特点是库存少，最终能够抢到商品的人数取决于库存数量，而参与秒杀的人越多，并发数就越高，随之无效请求也就越多。但从业务方的角度来说，肯定是希望有更多的人参与进来，点击“立即秒杀”按钮体验秒杀的乐趣。</p>
@@ -13801,7 +13801,7 @@
 <p>在秒杀交易流程中，引入验证码和问答题，有两个目的：一是快速拦截掉部分刷子流量，防止机器作弊，起到防刷的作用；二是平滑秒杀的毛刺请求，延缓并发，对流量进行削峰。</p>
 <p>让用户在秒杀前输入验证码或者做问答题，不同用户的手速有快有慢，这就起到了让1s的瞬时流量平均到30s甚至1分钟的平滑流量中，这样就不需要堆积过多的机器应对1s的瞬时流量了。</p>
 <p>以下是流程图，我来解释一下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a7/6d/a7e4c6a0af9c9c22db57d24e8910676d.jpg?wh=2036x1130" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a7/6d/a7e4c6a0af9c9c22db57d24e8910676d.jpg?wh=2036x1130" /></p>
 <p>设计验证码流程，一般是在用户进入详情页时，先判别秒杀活动是否已经开始，如果已经开始，同时秒杀活动也配置了需要校验验证码标识，那么就需要从秒杀系统获取图片验证码，并进行渲染；用户手工输入验证码后，提交给秒杀系统进行验证码校验，如果通过就跳转至秒杀结算页。</p>
 <p>上图增加的红线部分就是引入了验证码的秒杀流程。当然，我这里介绍的，是把验证码功能作为秒杀系统的一个模块了，而大公司一般都会有单独的验证码服务，我们不用自己造轮子，只要进行系统对接就行了。</p>
 <p>下面我简单介绍一下验证码的实现，通过上图得知，验证码服务需提供两个基本的功能：生成验证码和校验验证码。</p>
@@ -13893,20 +13893,20 @@
 <p>当服务A依赖服务B时，正常情况下服务A会直接通过RPC调用服务B的接口，当服务A调用的流量可控，且服务B的TP99和QPS能满足调用时，这是最简单直接的调用方式，没什么问题，目前大部分的微服务间调用也都是这样做的。</p>
 <p>但是，试想一下，如果服务A的流量非常高（假设10万QPS），远远大于服务B所能支持的能力（假设1万QPS），那么服务B的CPU很快就会升高，TP99也随之变高，最终服务B被服务A的流量冲垮。</p>
 <p>这个时候，消息队列就派上用场了，我们把一步调用的直接紧耦合方式，通过消息队列改造成两步异步调用，让超过服务B范围的流量，暂存在消息队列里，由B根据自己的服务能力来决定处理快慢，这就是通过消息队列进行调用解耦的常见手段。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b8/6c/b8f142e7926cd954935497917711ae6c.jpg?wh=1530x807" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b8/6c/b8f142e7926cd954935497917711ae6c.jpg?wh=1530x807" /></p>
 <p>常见的开源消息队列有Kafka、RocketMQ和RabbitMQ等，大厂的基础中间件部门一般也会根据自己公司的业务特点，自研适合自己的MQ系统。对一般的场景来说，我推荐你用RocketMQ，应该能解决你大部分的问题。</p>
 <p>以上是通过MQ进行调用解耦的基本思路，现在我们回到秒杀的场景，看看应该怎么设计呢？请看下图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/94/df/944yy258d21de2f70b2acc1f0e217edf.jpg?wh=2230x1026" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/94/df/944yy258d21de2f70b2acc1f0e217edf.jpg?wh=2230x1026" /></p>
 <p>以上红色和蓝色的部分，就是通过消息队列解耦后，详情页系统和秒杀系统各自处理的部分。因为解耦了，所以在第6步下单之后，其实是不知道秒杀结果的，因此在第11步，需要前端定期去查询秒杀结果反馈给用户。而在秒杀系统拉取消息队列进行处理的时候，也有个小技巧，那就是当前面的请求已经把库存消耗光之后，在缓存里设置占位符，让后续的请求快速失败，从而最快地进行响应。</p>
 <h2 id="_4">限流</h2>
 <p>削峰的方式，前面介绍了验证码/问答题以及消息队列，这些方式使流量峰值变得更加平滑，但也在一定程度上降低了抢购体验，容易引发用户咨询和投诉。那有没有更好的解决方式呢？接下来我们学习下限流，看看如何通过限流实现削峰。</p>
 <p>限流是系统自我保护的最直接手段，再厉害的系统，总有所能承载的能力上限，一旦流量突破这个上限，就会引起实例宕机，进而发生系统雪崩，带来灾难性后果。</p>
 <p>在<a href="https://time.geekbang.org/column/article/420777">第一讲</a>的时候，我有和你提到过流量漏斗的概念，对于秒杀流程来说，从用户开始参与秒杀，到秒杀成功支付完成，实际上经历了很多的系统链路调用，中间有非常庞杂的系统在支撑，比如有商详、风控、登录、限购、购物车以及订单等很多交易系统。</p>
 <p>那么对于秒杀的瞬时流量，如果不加筛选，不做限制，直接把流量传递给下游各个系统，对整个交易系统都是非常大的挑战，也是很大的资源浪费，所以主流的做法是从上游开始，对流量进行逐级限流，分层过滤，优质的有效的流量最终才能参与下单。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e8/cd/e8e9d01c9e384c8eb7ee6bc908901dcd.jpg?wh=4247x2227" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e8/cd/e8e9d01c9e384c8eb7ee6bc908901dcd.jpg?wh=4247x2227" /></p>
 <p>这是系统的<strong>流量漏斗示意图</strong>，通过风控和防刷筛选刷子流量，通过限购和预约校验过滤无效流量，通过限流丢弃多余流量，最终秒杀系统给到下游的流量就是非常优质且少量的了。</p>
 <p>限流常用的算法有令牌桶和漏桶，有关这两个算法的专业介绍，你可以参考：<a href="https://hansliu.com/posts/2020/11/what-is-token-bucket-and-leaky-bucket-algorithms.html">https://hansliu.com/posts/2020/11/what-is-token-bucket-and-leaky-bucket-algorithms.html</a></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fb/69/fb564594bb1bb523dde77b678822c269.jpg?wh=2028x844" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fb/69/fb564594bb1bb523dde77b678822c269.jpg?wh=2028x844" /></p>
 <p>下面我们针对demo-nginx和demo-web两个应用，介绍一下具体的限流方法。</p>
 <h3 id="demo-nginx"><strong>demo-nginx网关限流</strong></h3>
 <p>先开始<strong>准备工作</strong>，俗话说，工欲善其事必先利其器，在开发之前，我们先把Nginx的日志给配置起来，方便我们后续开发的调试与验证。</p>
@@ -13919,9 +13919,9 @@
 </code></pre></div>
 <p>如果想自定义输出日志格式，需要使用log_format来实现，下面我们就来配置一下这两种日志。</p>
 <p>首先我们在nginx.conf中定义一个名为access的日志格式，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/75/b3/75a292b5508576f439fa7888c2c3e9b3.png?wh=1920x750" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/75/b3/75a292b5508576f439fa7888c2c3e9b3.png?wh=1920x750" /></p>
 <p>然后在domain.com中配置error_log和access_log，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/12/39/12f71dfa20538527c923591ff6595639.jpg?wh=1920x509" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/12/39/12f71dfa20538527c923591ff6595639.jpg?wh=1920x509" /></p>
 <p>这里我使用了内置变量以及自定义变量$user_id（通过set_by_lua_block定义并赋值）。现在我们已经把日志配置好了，接下来就开始今天的重头戏吧，就从Nginx限流开始讲起。</p>
 <p>这里的Nginx限流，主要是依赖Nginx自带的限流功能，针对请求的来源IP或者自定义的一个关键参数来做限流，比如用户ID。其配置限流规则的语法为：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">limit_req_zone</span><span class="w"> </span><span class="o">&lt;</span><span class="err">变量名</span><span class="o">&gt;</span><span class="w"> </span><span class="k">zone</span><span class="o">=&lt;</span><span class="err">限流规则名称</span><span class="o">&gt;</span><span class="p">:</span><span class="o">&lt;</span><span class="err">内存大小</span><span class="o">&gt;</span><span class="w"> </span><span class="n">rate</span><span class="o">=&lt;</span><span class="err">速率阈值</span><span class="o">&gt;</span><span class="n">r</span><span class="o">/</span><span class="n">s</span><span class="p">;</span>
@@ -13952,7 +13952,7 @@
 <p>以上是Nginx网关层的限流，接下来我们进入应用层的限流。应用层的限流手段也是比较多的，这里我们重点介绍通过线程池和API限流的方法。</p>
 <p><strong>线程池限流</strong></p>
 <p>Java原生的线程池原理相信你非常清楚，我们可以通过自定义线程池，配置最大连接数，以请求处理队列长度以及拒绝策略等参数来达到限流的目的。当处理队列满，而且最大线程都在处理时，多余的请求就会被拒绝策略丢弃，也就是被限流了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7f/56/7f30154bdbc6d9f085dc92bde0216856.jpg?wh=1385x786" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7f/56/7f30154bdbc6d9f085dc92bde0216856.jpg?wh=1385x786" /></p>
 <p><strong>API限流</strong></p>
 <p>上面介绍的线程池限流可以看做是一种并发数限流，对于并发数限流来说，实际上服务提供的QPS能力是和后端处理的响应时长有关系的，在并发数恒定的情况下，TP99越低，QPS就越高。</p>
 <p>然而大部分情况是，我们希望根据QPS多少来进行限流，这时就不能用线程池策略了。不过，我们可以用Google提供的RateLimiter开源包，自己手写一个基于令牌桶的限流注解和实现，在业务API代码里使用。当然了，大厂中都会有通用的限流机制，你直接用就行了。</p>
@@ -14133,8 +14133,6 @@ http:&#47;&#47;nginx.org&#47;en&#47;docs&#47;http&#47;ngx_http_limit_req_module.
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

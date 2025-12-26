@@ -14557,7 +14557,7 @@
 <p>如果以znode持久性来划分，<strong>znode可分为持久性znode和临时znode</strong>。持久性znode不会因为ZooKeeper集群重启而消失，而临时znode则与创建该znode的ZooKeeper会话绑定，一旦会话结束，该节点会被自动删除。</p>
 <p>ZooKeeper赋予客户端监控znode变更的能力，即所谓的Watch通知功能。一旦znode节点被创建、删除，子节点数量发生变化，抑或是znode所存的数据本身变更，ZooKeeper会通过节点变更监听器(ChangeHandler)的方式显式通知客户端。</p>
 <p>依托于这些功能，ZooKeeper常被用来实现<strong>集群成员管理、分布式锁、领导者选举</strong>等功能。Kafka控制器大量使用Watch功能实现对集群的协调管理。我们一起来看一张图片，它展示的是Kafka在ZooKeeper中创建的znode分布。你不用了解每个znode的作用，但你可以大致体会下Kafka对ZooKeeper的依赖。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4a/fb/4a2ec3372ff5e4639e5e9c780ec7fcfb.jpg?wh=2250%2A2896" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4a/fb/4a2ec3372ff5e4639e5e9c780ec7fcfb.jpg?wh=2250%2A2896" /></p>
 <p>掌握了ZooKeeper的这些基本知识，现在我们就可以开启对Kafka控制器的讨论了。</p>
 <h2 id="_1">控制器是如何被选出来的？</h2>
 <p>你一定很想知道，控制器是如何被选出来的呢？我们刚刚在前面说过，每台Broker都能充当控制器，那么，当集群启动后，Kafka怎么确认控制器位于哪台Broker呢？</p>
@@ -14578,7 +14578,7 @@
 <p>控制器的最后一大类工作，就是向其他Broker提供数据服务。控制器上保存了最全的集群元数据信息，其他所有Broker会定期接收控制器发来的元数据更新请求，从而更新其内存中的缓存数据。</p>
 <h2 id="_3">控制器保存了什么数据？</h2>
 <p>接下来，我们就详细看看，控制器中到底保存了哪些数据。我用一张图来说明一下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/21/d4/2174fb81fa7db42122915fee856790d4.jpg?wh=2250%2A3303" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/21/d4/2174fb81fa7db42122915fee856790d4.jpg?wh=2250%2A3303" /></p>
 <p>怎么样，图中展示的数据量是不是很多？几乎把我们能想到的所有Kafka集群的数据都囊括进来了。这里面比较重要的数据有：</p>
 <ul>
 <li>所有主题信息。包括具体的分区信息，比如领导者副本是谁，ISR集合中有哪些副本等。</li>
@@ -14590,13 +14590,13 @@
 <p>我们在前面强调过，在Kafka集群运行过程中，只能有一台Broker充当控制器的角色，那么这就存在<strong>单点失效</strong>（Single Point of Failure）的风险，Kafka是如何应对单点失效的呢？答案就是，为控制器提供故障转移功能，也就是说所谓的Failover。</p>
 <p><strong>故障转移指的是，当运行中的控制器突然宕机或意外终止时，Kafka能够快速地感知到，并立即启用备用控制器来代替之前失败的控制器</strong>。这个过程就被称为Failover，该过程是自动完成的，无需你手动干预。</p>
 <p>接下来，我们一起来看一张图，它简单地展示了控制器故障转移的过程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fb/7d/fb9c538a27253fe069ff7ea2f02fa17d.jpg?wh=3507%2A1989" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fb/7d/fb9c538a27253fe069ff7ea2f02fa17d.jpg?wh=3507%2A1989" /></p>
 <p>最开始时，Broker 0是控制器。当Broker 0宕机后，ZooKeeper通过Watch机制感知到并删除了/controller临时节点。之后，所有存活的Broker开始竞选新的控制器身份。Broker 3最终赢得了选举，成功地在ZooKeeper上重建了/controller节点。之后，Broker 3会从ZooKeeper中读取集群元数据信息，并初始化到自己的缓存中。至此，控制器的Failover完成，可以行使正常的工作职责了。</p>
 <h2 id="_4">控制器内部设计原理</h2>
 <p>在Kafka 0.11版本之前，控制器的设计是相当繁琐的，代码更是有些混乱，这就导致社区中很多控制器方面的Bug都无法修复。控制器是多线程的设计，会在内部创建很多个线程。比如，控制器需要为每个Broker都创建一个对应的Socket连接，然后再创建一个专属的线程，用于向这些Broker发送特定请求。如果集群中的Broker数量很多，那么控制器端需要创建的线程就会很多。另外，控制器连接ZooKeeper的会话，也会创建单独的线程来处理Watch机制的通知回调。除了以上这些线程，控制器还会为主题删除创建额外的I/O线程。</p>
 <p>比起多线程的设计，更糟糕的是，这些线程还会访问共享的控制器缓存数据。我们都知道，多线程访问共享可变数据是维持线程安全最大的难题。为了保护数据安全性，控制器不得不在代码中大量使用<strong>ReentrantLock同步机制</strong>，这就进一步拖慢了整个控制器的处理速度。</p>
 <p>鉴于这些原因，社区于0.11版本重构了控制器的底层设计，最大的改进就是，<strong>把多线程的方案改成了单线程加事件队列的方案</strong>。我直接使用社区的一张图来说明。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/90/a3/90be543d426a6a450f360ab40e2734a3.jpg?wh=4160%2A2155" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/90/a3/90be543d426a6a450f360ab40e2734a3.jpg?wh=4160%2A2155" /></p>
 <p>从这张图中，我们可以看到，社区引入了一个<strong>事件处理线程</strong>，统一处理各种控制器事件，然后控制器将原来执行的操作全部建模成一个个独立的事件，发送到专属的事件队列中，供此线程消费。这就是所谓的单线程+队列的实现方式。</p>
 <p>值得注意的是，这里的单线程不代表之前提到的所有线程都被“干掉”了，控制器只是把缓存状态变更方面的工作委托给了这个线程而已。</p>
 <p>这个方案的最大好处在于，控制器缓存中保存的状态只被一个线程处理，因此不再需要重量级的线程同步机制来维护线程安全，Kafka不用再担心多线程并发访问的问题，非常利于社区定位和诊断控制器的各种问题。事实上，自0.11版本重构控制器代码后，社区关于控制器方面的Bug明显少多了，这也说明了这种方案是有效的。</p>
@@ -14606,7 +14606,7 @@
 <p>这在2.2版本之前是做不到的。不过自2.2开始，Kafka正式支持这种不同优先级请求的处理。简单来说，Kafka将控制器发送的请求与普通数据类请求分开，实现了控制器请求单独处理的逻辑。鉴于这个改进还是很新的功能，具体的效果我们就拭目以待吧。</p>
 <h2 id="_5">小结</h2>
 <p>好了，有关Kafka控制器的内容，我已经讲完了。最后，我再跟你分享一个小窍门。当你觉得控制器组件出现问题时，比如主题无法删除了，或者重分区hang住了，你不用重启Kafka Broker或控制器。有一个简单快速的方式是，去ZooKeeper中手动删除/controller节点。<strong>具体命令是rmr /controller</strong>。这样做的好处是，既可以引发控制器的重选举，又可以避免重启Broker导致的消息处理中断。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a7/07/a77479402c0fddbf7541d26d72a97707.jpg?wh=2069%2A2580" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a7/07/a77479402c0fddbf7541d26d72a97707.jpg?wh=2069%2A2580" /></p>
 <h2 id="_6">开放讨论</h2>
 <p>目前，控制器依然是重度依赖于ZooKeeper的。未来如果要减少对ZooKeeper的依赖，你觉得可能的方向是什么？</p>
 <p>欢迎写下你的思考和答案，我们一起讨论。如果你觉得有所收获，也欢迎把文章分享给你的朋友。</p>
@@ -14740,8 +14740,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

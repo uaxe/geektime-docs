@@ -6362,12 +6362,12 @@
 <h2 id="_1">分析的第二阶段</h2>
 <h3 id="swaptps">Swap的原理和对TPS的影响</h3>
 <p>前面有一个扣，是说swap多的问题。要理解swap为什么是黄的，得先知道什么是swap。我先画个简易的示意图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1f/e5/1fd061cbf986f9cea3509bd4699ddbe5.jpg?wh=285%2A111" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1f/e5/1fd061cbf986f9cea3509bd4699ddbe5.jpg?wh=285%2A111" /></p>
 <p>这里先解释一下，对于一个Linux系统来说，如果配置并开启了swap分区，那么默认的swappiness参数是60。</p>
 <p>swappiness是在内存reclaim的时候生效的，而reclaim方式同时有两个动作：1. 将file相关内存进行回收；2. 将anon内存交换到swap分区。</p>
 <p>所以swapiness值越大，swap分区就用得越多。</p>
 <p>对我们现在分析的这个系统来说，来看一下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e2/7f/e29ec84d980fb9e667e41010b209427f.png?wh=735%2A268" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e2/7f/e29ec84d980fb9e667e41010b209427f.png?wh=735%2A268" /></p>
 <p>我们看到这里配置了一个内存为8G左右，已经使用了7G多了，swappiness配置为30%。</p>
 <p>通过free看到现在只有145M的物理内存剩余，可用内存也只有254M了。
 所以上面图中的swap飘黄也是很合理的喽！</p>
@@ -6377,7 +6377,7 @@
 <p>说得如此硬气，那在生产中怎么办呢？开还是关？有人觉得关了心里有安稳，有人觉得开着心里会安稳。而一个系统、一个容器、一个节点，如果容量控制的非常好的情况下，我建议关掉。开着它，也只是心里上的安慰，不会有TPS处理能力上的提升。</p>
 <h3 id="_2">瓶颈分析定位</h3>
 <p>既然知道了上面的大概原理。对一个运行Tomcat应用的服务器来说，那肯定是要先检查一下JVM设置为多大。先执行ps命令，看一下Java进程吧。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8d/ba/8d6525787d1234c738f629389b5da5ba.png?wh=1359%2A180" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8d/ba/8d6525787d1234c738f629389b5da5ba.png?wh=1359%2A180" /></p>
 <p>关键参数如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>JAVA_OPTS=&quot;$JAVA_OPTS -server -Xms2048M -Xmx8192m -XX:PermSize=256M -XX:MaxNewSize=2790m -XX:MaxPermSize=512m -XX:SurvivorRatio=8&quot;
 </code></pre></div>
@@ -6386,14 +6386,14 @@
 <p>虽说有多个地方配置不合理，但是我们也得要知道一下应该配置多少是合理的吧。</p>
 <p>看参数的时候，JMX也配置上了，那就用工具来看吧。</p>
 <p>首先来看一下系统资源。先看一下系统资源在压力下的表现：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ef/66/ef8154abc5d60e04752a5d9ea29d4966.png?wh=686%2A503" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ef/66/ef8154abc5d60e04752a5d9ea29d4966.png?wh=686%2A503" /></p>
 <ol>
 <li>队列已经出现，CS 2万多，in 2万多，说多不多。我们可以先放着。</li>
 <li>I/O没什么压力，swap也一直有值，我们要解决的就是它。</li>
 <li>us：sy接近2：1，这个是不良信号，记在心里，后面再说。</li>
 </ol>
 <p>其次再看下JVM的情况：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d8/f1/d84de678e28c64b46b1b69b8b30b77f1.png?wh=1652%2A900" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d8/f1/d84de678e28c64b46b1b69b8b30b77f1.png?wh=1652%2A900" /></p>
 <p>CPU使用在应用上的时间达到60%，GC上没耗什么时间，并且从堆的回收能力上来看，比较正常，只是只用到了3G左右，这里有必要给8G吗？</p>
 <p>线程活动的达到347，看起来还是在增加的，这里也可能是个问题点，只是现在我们不用关心，它还没跳出来。</p>
 <p>从这个JVM状态上来看，它完全用不到8G。在这种状态下，还有另一个Tomat，并且另一个Tomcat中也没有配置-Xmx -Xms参数，当没有配置时，默认-Xmx是物理内存的1/4。再加上thread用的，所以swap飘黄也是吻合的。</p>
@@ -6405,25 +6405,25 @@
 <p>各部分配置为多大，都没有定数，要通过测试看需要多少。</p>
 <p>而我们现在最重要的是先把性能调整上去，再考虑这些细节内容。这样修改JVM就是为了把物理内存使用率低下来，先不修改swapiness的比例是为了看下结果，如果用不到swap就不再调了，如果还是用了swap，再来调它。</p>
 <p>当我们把JVM修改了之后，再执行起来场景。看到内容如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/40/44/40116bf5ff367647f3f41143fd47fd44.png?wh=1494%2A895" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/40/44/40116bf5ff367647f3f41143fd47fd44.png?wh=1494%2A895" /></p>
 <p>CPU使用率相对前面没有什么变化，但是堆4G只用到了1.5G，可见这个堆连4G都用不到。当然我们还是要分析下其他的内容。</p>
 <p>还记得我们要解决的是什么问题吧？swap飘黄了！</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d8/1f/d8ec1c105537e046a98440790462f91f.png?wh=1306%2A866" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d8/1f/d8ec1c105537e046a98440790462f91f.png?wh=1306%2A866" /></p>
 <p>从这张图可以看到Swapping不报警了！CPU占用70%左右。说明现在available的内存是充足的。</p>
 <p>这时我们再看一下系统资源，首先是应用服务器系统资源。</p>
 <p>应用服务器系统资源vmstat如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/10/67/1002a324619b0fe3ba5d6a0d7af53e67.png?wh=682%2A572" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/10/67/1002a324619b0fe3ba5d6a0d7af53e67.png?wh=682%2A572" /></p>
 <p>应用服务器系统资源top：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/61/41/61b13011e46b803fef61dde5030e4541.png?wh=601%2A112" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/61/41/61b13011e46b803fef61dde5030e4541.png?wh=601%2A112" /></p>
 <p>应用服务器系统资源iftop:</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/41/de/4109d34df75fed3d71cdc842d516d9de.png?wh=387%2A63" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/41/de/4109d34df75fed3d71cdc842d516d9de.png?wh=387%2A63" /></p>
 <p>上图中可以看到，对比之前的资源，swap基本上没有了，CPU使用率多起来了。但是队列依旧长，sy CPU消耗还是有点多了。</p>
 <p>应用服务器的si已经到了13.1%了，这个值要关注下，暂时还不能说是问题，但是接着增加下去，肯定会是问题。</p>
 <p>网络已经超过70Mbps了，峰值上到87Mbps，这是一个好事，它说明现在处理的业务量确定多了。</p>
 <p>接下来是数据库服务器系统资源：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/85/27/851e322ad9561715a30fc1ce79052027.png?wh=702%2A486" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/85/27/851e322ad9561715a30fc1ce79052027.png?wh=702%2A486" /></p>
 <p>你可以看到数据库CPU都用到这么高了？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f3/2b/f36982dff7c811cbe9d5ca8d9cf0862b.png?wh=912%2A124" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f3/2b/f36982dff7c811cbe9d5ca8d9cf0862b.png?wh=912%2A124" /></p>
 <p>TPS能到259.2了，较之前的221.5没有提升多少。但是我们解决了swap的问题，还是有了一点点的提升。</p>
 <p>那下一个瓶颈在哪里呢？通过上面的数据库资源来看，数据库早就已经被用到了100%的CPU，队列也嗖嗖地涨到了好几十，高的都超过100了。</p>
 <p>可见我们在处理应用服务器的时候，数据库这边已经早就吃不消了。那下面，我们就先把应用服务器的优化部分放一下，再去分析下一个短板：数据库。</p>
@@ -6439,21 +6439,21 @@
 <h2 id="_5">分析的第三阶段</h2>
 <h3 id="_6">瓶颈分析定位</h3>
 <p>先来看看数据库的系统资源。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/dc/c4/dc2569aa95f7eab54930c479ee8b04c4.png?wh=661%2A147" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dc/c4/dc2569aa95f7eab54930c479ee8b04c4.png?wh=661%2A147" /></p>
 <p>我在很多场合都在强调一个词：证据链。所以基本上分析也会是从OS层面开始。</p>
 <p>但是证据链这个词说起来容易理解，实际上要想真的有链起来的能力，必须具有基础知识，像分析数据库就更明显。因为当我们不了解系统架构时，想说明一个事情就非常困难。</p>
 <p>像上面的这个top，显然us CPU使用率非常地高，idle几乎没有了，只有一个si占了5.7%，这个si并不算高，我们在上一阶段看到的应用服务器的si都已经达到了13%了。</p>
 <p>我们说si的高或者低，倒不是关键，关键的是它有没有成为我们的瓶颈点。在这个系统中，us cpu才是我们要关注的重点，因为它实在是太高了。</p>
 <p>对于一个数据库来说，要干的事情就是执行SQL。当分析多了数据库之后，基本上也形成了套路。不管怎么样，还是先看一下基本的监控信息，以下截取一些Spotlight on MySQL的有用的图，如果你没有这个工具，用其他的监控工具也是一样的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bd/09/bd2d900a6d737649dcccf53c81584409.png?wh=587%2A825" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bd/09/bd2d900a6d737649dcccf53c81584409.png?wh=587%2A825" /></p>
 <p>从上面的图可以看到，CPU使用率99%，Query Cache 是OFF的。记下这个位置！</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c2/1d/c2c538d0c263c6e87d77b3b78402151d.png?wh=1449%2A913" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c2/1d/c2c538d0c263c6e87d77b3b78402151d.png?wh=1449%2A913" /></p>
 <p>从上图看到，负载队列非常长，但Disk I/O没多少，说明队列和I/O无关，只是CPU的队列，非常好！</p>
 <p>Network也不算大，进出每秒5000多个包，我们再来看一下网络用到多少了？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3e/c7/3eb362a32b7bcaabce509dbd790286c7.png?wh=390%2A62" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3e/c7/3eb362a32b7bcaabce509dbd790286c7.png?wh=390%2A62" /></p>
 <p>峰值也才70Mbps左右，即使是100Mbps带宽，现在仍然认为有余量（注意！我这里说有余量是因为我同时也检查了网络队列，并没有阻塞，并不是只看了这个值就武断地做了判断）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cf/63/cf347ab9406ffcb3a281f1ef4a646263.png?wh=1328%2A403" /></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/23/ec/23e8f83c88e76c1c44badabaea44deec.png?wh=1390%2A830" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cf/63/cf347ab9406ffcb3a281f1ef4a646263.png?wh=1328%2A403" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/23/ec/23e8f83c88e76c1c44badabaea44deec.png?wh=1390%2A830" /></p>
 <p>通过上面的图可以看到，每秒执行2500-3000的SQL，Sorts per second达到800-1000，Sort rows per second达到8000-10000。</p>
 <p>session用得倒是也不多，但Miss Rates在压力过程中Query Cache都是在100%，并且从最上面的summary中可以看到Query Cache也是OFF的。</p>
 <p>为什么没有在看到Query Cache是OFF的时候就敲黑板呢，这是因为在一些应用中，如果不是查询多的话，这个值OFF也不能说有问题，但是在这个应用中几乎所有的语句都是select，那这个Query Cache再不打开就说不过去了呀。这里先记录下这个问题，待会我们的优化动作就是打开Query Cache。</p>
@@ -6501,7 +6501,7 @@
 <p>嗯，这看着顺眼多了。前两个SQL占了所有执行时间的96.8%！第一个SQL平均执行时间350ms，方差16%。而第二个语句更夸张，平均执行时间16s，方差44%。这得收拾！</p>
 <p>但是要不要优化这样的SQL，我们就需要根据SQL的分析和业务的分析来判断了。这里我先把执行计划列出来看看。</p>
 <p>SQL1的执行计划：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/77/69/7746e95a65b8ca2537672ccd5a474c69.png?wh=1272%2A80" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/77/69/7746e95a65b8ca2537672ccd5a474c69.png?wh=1272%2A80" /></p>
 <ol>
 <li>没有分区。</li>
 <li>不包含子查询或者union操作。</li>
@@ -6512,7 +6512,7 @@
 <li>在第二个表中，Extra有一个值，Range checked for each record (index map: 0x1) 。</li>
 </ol>
 <p>SQL2的执行计划：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ec/c4/ecbcccf81290dc50cb6192782500cfc4.png?wh=1357%2A79" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ec/c4/ecbcccf81290dc50cb6192782500cfc4.png?wh=1357%2A79" /></p>
 <ol>
 <li>没有分区。</li>
 <li>不包含子查询或者union操作。</li>
@@ -6539,14 +6539,14 @@
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>query_cache_size  1048576
 </code></pre></div>
 <p>再执行起来场景，看系统资源：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a5/b7/a5fb75d8b6af58760d2eb7f9976df4b7.png?wh=633%2A145" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a5/b7/a5fb75d8b6af58760d2eb7f9976df4b7.png?wh=633%2A145" /></p>
 <p>效果还不错哦，us CPU降到了50%以下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/81/e9/81652d6852324114300d4b36355f31e9.png?wh=383%2A56" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/81/e9/81652d6852324114300d4b36355f31e9.png?wh=383%2A56" /></p>
 <p>网络峰值时能达到90Mbps了，又快把带宽占完了。</p>
 <p>查看网络队列：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/29/8c/297e4d951b9b1aa3e439137aab87598c.png?wh=202%2A514" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/29/8c/297e4d951b9b1aa3e439137aab87598c.png?wh=202%2A514" /></p>
 <p>再检查下队列，这时看到已经有接收队列了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4a/09/4a813c91a6a79d3ff359666c581f3c09.png?wh=1133%2A386" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4a/09/4a813c91a6a79d3ff359666c581f3c09.png?wh=1133%2A386" /></p>
 <p>从TPS上来看，现在能到300多一点，同时网络接收发送加在一起8M左右。</p>
 <h3 id="_8">后续性能工作建议</h3>
 <p>接下来数据库的优化方向就是优化SQL。</p>
@@ -6683,8 +6683,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

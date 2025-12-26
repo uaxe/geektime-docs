@@ -7239,7 +7239,7 @@
 <p>如果用协同过滤算法来处理这百万级别的数据量，显然处理不过来。因为协同过滤的本质是计算两两内容之间的关系矩阵，如果内容越多，矩阵就会越大。我们在计算协同过滤时会把整个矩阵放入内存当中，当矩阵变得越来越大时，会导致OOM（Out Of Memory）现象，说白了就是内存会爆掉，导致最后无法产生想要的结果。即使有一个无限大内存的机器，对于这种上百万的矩阵计算时间也会非常长，也不是我们想要的。</p>
 <p>而YouTubeDNN利用了Embedding向量加上对负样本的特殊采样处理，巧妙地解决了这一问题。</p>
 <p>接下来我们详细看下具体的解决思路，首先是YouTubeDNN召回部分的模型结构。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/97/9b/9751eec0bda2b69eee17d8c58b4b399b.png?wh=1569x1247" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/97/9b/9751eec0bda2b69eee17d8c58b4b399b.png?wh=1569x1247" /></p>
 <p>这个结构我们自底向上来看，整个模型由最下面的模型输入层开始，经过了三层ReLU神经网络之后得到用户的特征向量。然后经过Softmax层进行预测，得到每个视频的观看概率，从而得到了视频的召回层排序。接着，我们来详细地说一下这几层所做的事情。</p>
 <h3 id="_1"><strong>输入层</strong></h3>
 <p>在YouTubeDNN的召回部分中，输入层里面一共取了以下4种特征。</p>
@@ -7251,19 +7251,19 @@
 </ol>
 <p>在处理观看的视频序列和搜索词时需要格外注意，每一个人所观看的内容的数量、长度一定不同、所搜索的关键词也一定不同，所产生出来的Embedding也会千差万别。<strong>这时我们就需要用多值特征和平均池化进行处理。</strong></p>
 <p>每个人的序列长度不同会导致产生出来的特征长度不同。我们在进行训练时就需要将多值特征中的每一个视频ID经过Embedding Lookup操作后，得到其对应的Embedding向量，然后再经过一层平均池化处理，最后得到这个多值特征所对应的Embedding特征，也就是下面这个部分。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d6/12/d643f20af83f322dafa90b37bd463d12.png?wh=488x692" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d6/12/d643f20af83f322dafa90b37bd463d12.png?wh=488x692" /></p>
 <p>无论是对于观看的视频还是搜索的关键词，都是采用这样的方式，通过平均池化，得到了最后的Embedding，然后将观看视频的历史、搜索的Tokens，以及用户的地理信息Embedding和用户的其他信息Embedding拼接起来形成一个长度很大的Embedding，这个Embedding就是我们最后要输入给模型的Embedding。</p>
 <h3 id="_2"><strong>三层神经网络</strong></h3>
 <p>当通过输入层得到了需要输入到模型的Embedding向量后，接下来要做的就是把它们送到模型里进行训练。</p>
 <p>YouTubeDNN的召回层中所使用到的模型结构其实非常简单，就是用了三层ReLU结构，最后再接入了一层Softmax进行预测，我们来看下这三层ReLU结构。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/00/03/0047877d954a9333f10ae08f287ea203.png?wh=941x255" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/00/03/0047877d954a9333f10ae08f287ea203.png?wh=941x255" /></p>
 <p>实际上在YouTubeDNN中，这三层ReLU的作用就是接收输入层特征的CONCAT，然后使用常见的塔形设计，对自底向上的每一层神经元数目作减半处理，直到得到的输出维度与Softmax所要求的输入维度相同（也就是256维）。所以在这三层ReLU中，我们经历的维度变化就是1024ReLU、512ReLU、256ReLU。</p>
 <p>这里简单说一下ReLU函数。ReLU是一个激活函数，在卷积神经网络中使用该函数是为了去除卷积结果中的负值，保留正值不变。ReLU激活函数只在输入大于0时才激活一个节点，此时输出等于输入；当输入小于0时，输出为零。</p>
 <p>在深度学习网络（DNN）中，由于训练的数据量和神经网络的参数较大，就会产生过拟合的现象。ReLU会使一部分神经元的输出为0，这样就造成了网络的稀疏性，并且减少了参数的相互依存关系，缓解了过拟合问题的发生。</p>
 <p>在这里之所以使用DNN，是因为在DNN中连续性变量和类别型变量都很容易输入到模型中，并且用户的信息（以及一些可以简单进行二值化的特征和数值特征）都可以很容易地训练DNN。最后数值型经过归一化之后，再输入到下一层模型中。</p>
 <h3 id="softmax">Softmax层</h3>
 <p>在经过三层ReLU之后，召回层使用Softmax作为输出层，我们来看一下Softmax这一层的结构。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/66/a2/66bf9d14d691485260dfa0ce0a3e78a2.png?wh=1166x359" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/66/a2/66bf9d14d691485260dfa0ce0a3e78a2.png?wh=1166x359" /></p>
 <p>我们知道，传入Softmax层的参数是用户的Embedding向量，而这里的用户的Embedding并不是在输入层里面的用户信息，也就是说，在Softmax这一层所传入的用户的Embedding并不是提前计算好的，而是根据输入的特征信息实时计算得到，这里面的用户信息实际上就是最后一层ReLU的输出。</p>
 <p>在Softmax这一层中需要注意的是，最终的输出并不是点击率的预估，而是预测用户最终会点击哪个视频。首先看右侧的Softmax部分，这一部分实际上是把上一步ReLU输出的向量u接到了Softmax层，得到其概率分布。</p>
 <p>YouTubeDNN把每一个视频当做一个类别，这里的Softmax可以理解为每一个视频进行了一个概率上的打分。从论文的角度来说，就是将用户的向量u和视频的向量v进行内积（这个内积实际上就是求其相似度然后再进行Softmax），这样就可以得到用户观看每个视频的概率，也就是上面这张图中所展示的class probabilities。</p>
@@ -7287,7 +7287,7 @@
 <h3 id="_5"><strong>上下文的选择</strong></h3>
 <p>在上下文和标签的选择中，主要利用了序列的方法。用户每次进入YouTube一直到退出都有一定的序列，而这个序列大部分情况下会选择范围比较广的视频进行浏览，然后再慢慢地专注到一个比较小的范围内。按照冷启动的EE问题来讲，就是从探索到了开采。</p>
 <p>这种浏览行为实际上就是一种不对称的浏览行为。因此，作者的做法就是从观看序列中随机抽取一个视频作为Label，这样就忽略了这种不对称性所产生的影响。大概的示意图如下。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/20/44/20d14ba28e76224a806539d44d965444.png?wh=1409x453" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/20/44/20d14ba28e76224a806539d44d965444.png?wh=1409x453" /></p>
 <p>实际上这张图是作者的一个对比实验。左边这种是许多算法都会用到的方式，就是利用全局观看的信息作为输入，这种方法忽略了观看序列的不对称性。而在YouTubeDNN中选用的是右边的方法，就是把历史信息当做输入，用历史来预测未来。这样做的好处在于，模型的测试集往往也是用户最近一次的观看行为，后面的实验可以把用户最后一次的点击放到测试集中，防止信息穿越的问题，这种方式实际上在线上的AB Test中表现更佳。</p>
 <h2 id="_6"><strong>总结</strong></h2>
 <p>到这里，今天的课程就讲完了，我们来对今天的课程做一个简单的总结，学完本节课你应该知道以下四个要点。</p>
@@ -7419,8 +7419,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

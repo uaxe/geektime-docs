@@ -14398,9 +14398,9 @@
 <p>作为公司消息中间件的负责人，在故障发生时没有其他其他补救手段确实比较无奈。事后，我对顺序消费模型进行了反思与改善。接下来，我想和你介绍我是如何优化RocketMQ的顺序消费性能的。</p>
 <h2 id="rocketmq">RocketMQ顺序消费实现原理</h2>
 <p>我们先来了解一下 RocketMQ 顺序消费的实现原理。RocketMQ支持局部顺序消息消费，可以保证同一个消费队列上的消息顺序消费。例如，消息发送者向主题为ORDER_TOPIC的4个队列共发送12条消息， RocketMQ 可以保证1、4、8这三条按顺序消费，但无法保证消息4和消息2的先后顺序。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c4/04/c483d9fcfd0948938395e89c83cf4704.jpg?wh=1690x641" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c4/04/c483d9fcfd0948938395e89c83cf4704.jpg?wh=1690x641" /></p>
 <p>那RocketMQ是怎么做到分区顺序消费的呢？我们可以看一下它的工作机制：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/51/61/51ef84yy8790bd41aef99787fd2b1961.jpg?wh=1920x1328" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/51/61/51ef84yy8790bd41aef99787fd2b1961.jpg?wh=1920x1328" /></p>
 <p>顺序消费实现的核心要点可以细分为三个阶段。</p>
 <p><strong>第一阶段：消费队列负载。</strong></p>
 <p>RebalanceService线程启动后，会以20s的频率计算每一个消费组的队列负载、当前消费者的消费队列集合（用newAssignQueueSet表），然后与上一次分配结果（用oldAssignQueueSet表示）进行对比。这时候会出现两种情况。</p>
@@ -14450,7 +14450,7 @@
 <h3 id="_1">破局思路：关联顺序性</h3>
 <p>我们不妨来看一个金融行业的真实业务场景：<strong>银行账户余额变更短信通知</strong>。</p>
 <p>当用户的账户余额发生变更时，金融机构需要发送一条短信，告知用户余额变更情况。为了实现余额变更和发送短信的解耦，架构设计时通常会引入消息中间件，它的基本实现思路你可以参考这张图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ce/dc/cea0d3f79617c677e8dec11d03c322dc.jpg?wh=1920x494" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ce/dc/cea0d3f79617c677e8dec11d03c322dc.jpg?wh=1920x494" /></p>
 <p>基于RocketMQ的顺序消费机制，我们可以实现基于队列的顺序消费，在消息发送时只需要确保同一个账号的多条消息（多次余额变更通知）发送到同一个队列，消费端使用顺序消费，就可以保证同一个账号的多次余额变更短信不会顺序错乱。</p>
 <p>q0队列中依次发送了账号ID为1、3、5、3、9的5条消息，这些消息将严格按照顺序执行。但是，我们为账号1和账号3发送余额变更短信，时间顺序必须和实际的时间顺序保持一致吗？</p>
 <p>答案是显而易见的，没有这个必要。</p>
@@ -14459,7 +14459,7 @@
 <p>显然，RocketMQ顺序消费模型并没有做到关联顺序性。针对这个问题，我们可以看到一条清晰的优化路线：<strong>并发执行同一个队列中不同账号的消息，串行执行同一个队列中相同账号的消息</strong>。</p>
 <h3 id="rocketmq_3">RocketMQ顺序模型优化</h3>
 <p>基于关联顺序性的整体指导思路，我设计出了一种<strong>顺序消费改进模型</strong>：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9a/82/9ae8ed21d5c0023c013ce98cd1fe8682.jpg?wh=1920x932" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9a/82/9ae8ed21d5c0023c013ce98cd1fe8682.jpg?wh=1920x932" /></p>
 <p>详细说明一下。</p>
 <ol>
 <li>消息拉取线程（PullMeessageService）从Broker端拉取一批消息。</li>
@@ -14467,7 +14467,7 @@
 <li>消息进入到某一个消费线程中，排队单线程执行消费，遵循严格的消费顺序。</li>
 </ol>
 <p>为了让你更加直观地体会两种设计的优劣，我们来看一下两种模式针对一批消息的消费行为对比：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/38/63/384003e610539cf1f7cc0e7334d0c463.jpg?wh=1920x1135" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/38/63/384003e610539cf1f7cc0e7334d0c463.jpg?wh=1920x1135" /></p>
 <p>在这里，方案一是RocketMQ内置的顺序消费模型。实际执行过程中，线程三、线程四也会处理消息，但内部线程在处理消息之前必须获取队列锁，所以说同一时刻一个队列只会有一个线程真正存在消费动作。</p>
 <p>方案二是优化后的顺序消费模型，它和方案一相比最大的优势是并发度更高。</p>
 <p>方案一的并发度取决于消费者分配的队列数，单个消费者的消费并发度并不会随着线程数的增加而升高，而方案二的并发度与消息队列数无关，消费者线程池的线程数量越高，并发度也就越高。</p>
@@ -14476,7 +14476,7 @@
 <p>所以我们就尝试落地这个方案。接下来我们基于RocketMQ4.6版本的DefaultLitePullConsumer类，引入新的线程模型，实现新的Push模式。</p>
 <p>为了方便你阅读代码，我们先详细看看各个类的职责（类图）与运转主流程（时序图）。</p>
 <h3 id="_3">类图设计</h3>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c4/94/c469fabd860ff2eff3c3a117e764e394.jpg?wh=1920x783" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c4/94/c469fabd860ff2eff3c3a117e764e394.jpg?wh=1920x783" /></p>
 <ol>
 <li>DefaultMQLitePushConsumer
 基于DefaultMQLitePullCOnsumer实现的Push模式，它的内部对线程模型进行了优化，对标DefaultMQPushConsumer。</li>
@@ -14499,7 +14499,7 @@
 </ol>
 <h3 id="_4">时序图</h3>
 <p>类图只能简单介绍各个类的职责，接下来，我们用时序图勾画出核心的设计要点：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/47/01/4754a410033f5452aaa7947353122c01.jpg?wh=1920x1099" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/47/01/4754a410033f5452aaa7947353122c01.jpg?wh=1920x1099" /></p>
 <p>这里，我主要解读一下与顺序消费优化模型相关的核心流程：</p>
 <ol>
 <li>调用DefaultMQLitePushConsumer的start方法后，会依次启动Pull线程（消息拉取线程）、消费组线程池、消息处理队列与消费处理任务。这里的重点是，一个AbstractConsumerTask代表一个消费线程，一个AbstractConsumerTask关联一个任务队列，消息在按照Key路由后会放入指定的任务队列，从而被指定线程处理。</li>
@@ -14512,7 +14512,7 @@
 <p>类图与时序图已经强调了顺序消费模型的几个关键点，接下来我们结合代码看看具体的实现技巧。</p>
 <h4 id="_6">创建消费线程池</h4>
 <p>创建消费线程池部分是我们这个方案的点睛之笔，它对应的是第三小节顺序消费改进模型图中用虚线勾画出的线程池。为了方便你回顾，我把这个图粘贴在下面。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9a/82/9ae8ed21d5c0023c013ce98cd1fe8682.jpg?wh=1920x932" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9a/82/9ae8ed21d5c0023c013ce98cd1fe8682.jpg?wh=1920x932" /></p>
 <p>代码实现如下所示：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1">// 启动消费组线程池</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kd">private</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">startConsumerThreads</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
@@ -14550,7 +14550,7 @@
 <li>第13行：创建consumerThreadCont个AbstractConsumerTask任务，每一个task关联一个LinkedBlockingQueue任务队列，然后将AbstractConsumerTask提交到线程池中执行。</li>
 </ul>
 <p>以5个消费线程池为例，从运行视角来看，它对应的效果如下：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b6/96/b6ce902df7139dba23cfec955125f096.jpg?wh=1920x1049" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b6/96/b6ce902df7139dba23cfec955125f096.jpg?wh=1920x1049" /></p>
 <h4 id="_7">消费线程内部执行流程</h4>
 <p>将任务提交到提交到线程池后，异步运行任务，具体代码由AbstractConsumerTask的run方法来实现，其run方法定义如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kd">public</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">run</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
@@ -14801,8 +14801,6 @@ consumerLimitController.resume();
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

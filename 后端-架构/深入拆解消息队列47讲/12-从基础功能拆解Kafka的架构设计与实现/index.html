@@ -14830,7 +14830,7 @@
 <p>接下来我们就从底层原理的角度来看一下，它们都有哪些异同点。</p>
 <h2 id="kafka">Kafka 系统架构</h2>
 <p>首先来看一下Kafka的架构图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/39/5a/39d54678ca944b19d2470521dfbec15a.jpg?wh=10666x5048" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/39/5a/39d54678ca944b19d2470521dfbec15a.jpg?wh=10666x5048" /></p>
 <p>如上图所示，Kafka 由 Producer、Broker、ZooKeeper、Consumer 四个模块组成。其中，ZooKeeper 用来存储元数据信息，集群中所有元数据都持久化存储在ZooKeeper 当中。</p>
 <p>Kafka有Topic和分区的概念，分区就相当于RocketMQ的MessageQueue。一个Topic可以包含一个或多个分区。消费方面通过Group来组织消费者和分区的关系。</p>
 <p>到这你是不是发现了？<strong>Kafka架构和RocketMQ非常像。</strong>从社区信息来看，RocketMQ最初的设计应该参考过Kafka，所以它们的架构和概念非常像，只是在具体实现方式上不太一样。比如概念上分区和MessageQueue的作用是一样的，元数据存储ZooKeeper和NameServer 的作用也是一样的。</p>
@@ -14847,14 +14847,14 @@
 <h3 id="_3">元数据存储</h3>
 <p>上面我们说过，Kafka的元数据是存储在ZooKeeper里面的。元数据信息包括Topic、分区、Broker节点、配置等信息。ZooKeeper 会持久化存储全量元数据信息，Broker 本身不存储任何集群相关的元数据信息。在Broker启动的时候，需要连接ZooKeeper读取全量元数据信息。</p>
 <p>ZooKeeper是一个单独的开源项目，它自带了集群组网、数据一致性、持久化存储、监听机制等等完整的能力。它的底层是基于Zab协议组件集群，有Leader节点和Slave节点的概念，数据写入全部在Leader节点完成，Slave负责数据的读取工作。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5e/78/5ed6a93804949915ebf406e7d76a7e78.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5e/78/5ed6a93804949915ebf406e7d76a7e78.jpg?wh=10666x6000" /></p>
 <p>从ZooKeeper的角度来看，<strong>Kafka只是它的一个使用者</strong>，Kafka用ZooKeeper的标准使用方式向ZooKeeper集群上写入、删除、更新数据，以完成Kafka的元数据管理、集群构建等工作。所以每台Broker启动时，都会在ZooKeeper注册、监听一些节点信息，从而感知集群的变化。</p>
 <p>另外，Kakfa 集群中的一些如消费进度信息、事务信息，分层存储元数据，以及3.0后的Raft架构相关的元数据信息，都是基于内置Topic来完成存储的。把数据存储在内置Topic中，算是一个比较巧妙的思路了，也是一个值得借鉴的技巧。Kafka 中存储不同功能的元数据信息的Topic列表如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/62/46/6260ced9bbb35d3c9fc9185314df2d46.jpg?wh=10666x3829" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/62/46/6260ced9bbb35d3c9fc9185314df2d46.jpg?wh=10666x3829" /></p>
 <h3 id="_4">消息数据</h3>
 <p>在消息数据存储方面，Kafka的数据是以分区为维度单独存储的。即写入数据到Topic后，根据生产分区分配关系，会将数据分发到 Topic 中不同的分区。此时底层不同分区的数据是存储在不同的“文件”中的，即一个分区一个数据存储“文件”。这里提到的“文件”也是一个虚指，在系统底层的表现是一个目录，里面的文件会分段存储。</p>
 <p>如下图所示，当Broker收到数据后，是直接将数据写入到不同的分区文件中的。所以在消费的时候，消费者也是直接从每个分区读取数据。这个存储模型和RocketMQ、RabbitMQ都不像，这里的选择考虑和优劣势可以回顾<a href="https://time.geekbang.org/column/article/671725">第05讲</a>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ff/82/ffd5d608f6ffc0a2f506d098ba7f7782.jpg?wh=10666x3689" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ff/82/ffd5d608f6ffc0a2f506d098ba7f7782.jpg?wh=10666x3689" /></p>
 <p>在底层数据存储中，Kafka的存储结构是以Topic和分区维度来组织的。一个分区一个目录，目录名称是TopicName + 分区号，结构如下图所示：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>/data/kafka/data#ll
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>drwxr-xr-x 2 root root 4096 2月  15 2020 __consumer_offsets-0
@@ -14881,14 +14881,14 @@
 <h2 id="_5">生产者和消费者</h2>
 <p>Kafka 客户端在连接 Broker 之前需要经过客户端寻址，找到目标Broker的信息。在早期，Kafka 客户端是通过链接 ZooKeeper 完成寻址操作的，但是因为ZooKeeper的性能不够，如果大量的客户端都访问ZooKeeper，那么就会导致ZooKeeper超载，从而导致集群异常。</p>
 <p>所以在新版本的Kafka中，客户端是通过直连Broker完成寻址操作的，不会跟ZooKeeper交互。即Broker跟ZooKeeper交互，在本地缓存全量的元数据信息，然后客户端通过连接Broker拿到元数据信息，从而避免对ZooKeeper造成太大负载。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/49/49/49ca389c31ccd15cb11e3yyb31b3d449.jpg?wh=10666x4859" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/49/49/49ca389c31ccd15cb11e3yyb31b3d449.jpg?wh=10666x4859" /></p>
 <p>我们知道 RocketMQ 一直是通过 NameServer 完成寻址操作的，这就是我们说的虽然RocketMQ和Kafka架构很像，但是实际的实现相差很大。</p>
 <h3 id="_6">生产者</h3>
 <p>生产者完成寻址后，在发送的时候可以将数据发送到Topic或者直接发送到分区。发送到Topic时会经过生产分区分配的流程，即根据一定的策略将数据发送到不同的分区。</p>
 <p><strong>Kafka提供了轮询和KeyHash两种策略。</strong></p>
 <p>轮询策略是指按消息维度轮询，将数据平均分配到多个分区。Key Hash是指根据消息的Key生成一个Hash值，然后和分区数量进行取余操作，得到的结果可以确定要将数据发送到哪个分区。生产消息分配的过程是在客户端完成的。</p>
 <p>Kafka 协议提供了批量（Batch）发送的语义。所以生产端会在本地先缓存数据，根据不同的分区聚合数据后，再根据一定的策略批量将数据写入到Broker。因为这个Batch机制的存在，客户端和服务端的吞吐性能会提高很多。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/92/2b/92ce44f04a794c072c74de7dc2e48a2b.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/92/2b/92ce44f04a794c072c74de7dc2e48a2b.jpg?wh=10666x6000" /></p>
 <p>这里多讲一点，客户端批量往服务端写有两种形式：<strong>一种是协议和内核就提供了Batch语义，一种是在业务层将一批数据聚合成一次数据发送。</strong>这两种虽然都是批量发送，但是它们的区别在于：</p>
 <ol>
 <li>第一种批量消息中的每条消息都会有一个Offset，每条消息在Broker看来就是一条消息。第二种批量消息是这批消息就是一条消息，只有一个Offset。</li>
@@ -14903,7 +14903,7 @@
 <p>Kafka内核是不支持HTTP协议的，如果需要支持，则需要在Broker前面挂一层代理。如Confluent开源的 <a href="https://github.com/confluentinc/kafka-rest">Kafka Rest</a>。</p>
 <p>管控的大部分操作是通过Kafka Protocol暴露的，基于四层的TCP进行通信。还有部分可以通过直连ZooKeeper完成管控操作。</p>
 <p>在早期很多管控操作都是通过操作ZooKeeper完成的。后来为了避免对ZooKeeper造成压力，所有的管控操作都会通过 Broker 再封装一次，即客户端SDK 通过Kafka Protocol调用Broker，Broker再去和ZooKeeper 交互。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/87/69/87e542e15283f885e1ebb58dca636369.jpg?wh=10666x4478" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/87/69/87e542e15283f885e1ebb58dca636369.jpg?wh=10666x4478" /></p>
 <p>Kafka 命令行提供了管控、生产、消费、压测等功能，其底层就是通过客户端SDK和Broker进行交互的。我们在代码里面也可以通过客户端SDK完成相应的操作，<strong>不用必须通过命令行</strong>。</p>
 <p>因为历史的演进，在一些命令行里面，还残留着直连ZooKeeper的操作。而我们也可以通过直接操作ZooKeeper中的数据完成一些操作，比如更改配置、创建Topic等等。</p>
 <h2 id="_8">总结</h2>
@@ -15043,8 +15043,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

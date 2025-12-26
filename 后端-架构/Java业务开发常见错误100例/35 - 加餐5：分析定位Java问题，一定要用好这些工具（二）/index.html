@@ -14532,15 +14532,15 @@
 </ol>
 <p>比如，我手头有一个OOM后得到的转储文件java_pid29569.hprof，现在要使用MAT的直方图、支配树、线程栈、OQL等功能来分析此次OOM的原因。</p>
 <p>首先，用MAT打开后先进入的是概览信息界面，可以看到整个堆是437.6MB：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/63/61/63ecdaf5ff7ac431f0d05661855b2e61.png?wh=2384%2A1500" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/63/61/63ecdaf5ff7ac431f0d05661855b2e61.png?wh=2384%2A1500" /></p>
 <p>那么，这437.6MB都是什么对象呢？</p>
 <p>如图所示，工具栏的第二个按钮可以打开直方图，直方图按照类型进行分组，列出了每个类有多少个实例，以及占用的内存。可以看到，char[]字节数组占用内存最多，对象数量也很多，结合第二位的String类型对象数量也很多，大概可以猜出（String使用char[]作为实际数据存储）程序可能是被字符串占满了内存，导致OOM。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0b/b9/0b3ca076b31a2d571a47c64d622b0db9.png?wh=1610%2A1440" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0b/b9/0b3ca076b31a2d571a47c64d622b0db9.png?wh=1610%2A1440" /></p>
 <p>我们继续分析下，到底是不是这样呢。</p>
 <p>在char[]上点击右键，选择List objects-&gt;with incoming references，就可以列出所有的char[]实例，以及每个char[]的整个引用关系链：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f1/a3/f162fb9c6505dc9a8f1ea9900437ada3.png?wh=1600%2A186" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f1/a3/f162fb9c6505dc9a8f1ea9900437ada3.png?wh=1600%2A186" /></p>
 <p>随机展开一个char[]，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/dd/ac/dd4cb44ad54edee3a51f56a646c5f2ac.png?wh=3079%2A858" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dd/ac/dd4cb44ad54edee3a51f56a646c5f2ac.png?wh=3079%2A858" /></p>
 <p>接下来，我们按照红色框中的引用链来查看，尝试找到这些大char[]的来源：</p>
 <ul>
 <li>在①处看到，这些char[]几乎都是10000个字符、占用20000字节左右（char是UTF-16，每一个字符占用2字节）；</li>
@@ -14551,16 +14551,16 @@
 <p>Retained Heap（深堆）代表对象本身和对象关联的对象占用的内存，Shallow Heap（浅堆）代表对象本身占用的内存。比如，我们的FooService中的data这个ArrayList对象本身只有16字节，但是其所有关联的对象占用了431MB内存。这些就可以说明，肯定有哪里在不断向这个List中添加String数据，导致了OOM。</p>
 <p>左侧的蓝色框可以查看每一个实例的内部属性，图中显示FooService有一个data属性，类型是ArrayList。</p>
 <p>如果我们希望看到字符串完整内容的话，可以右键选择Copy-&gt;Value，把值复制到剪贴板或保存到文件中：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cc/8f/cc1d53eb9570582da415c1aec5cc228f.png?wh=1844%2A688" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cc/8f/cc1d53eb9570582da415c1aec5cc228f.png?wh=1844%2A688" /></p>
 <p>这里，我们复制出的是10000个字符a（下图红色部分可以看到）。对于真实案例，查看大字符串、大数据的实际内容对于识别数据来源，有很大意义：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7b/a0/7b3198574113fecdd2a7de8cde8994a0.png?wh=2466%2A1594" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7b/a0/7b3198574113fecdd2a7de8cde8994a0.png?wh=2466%2A1594" /></p>
 <p>看到这些，我们已经基本可以还原出真实的代码是怎样的了。</p>
 <p>其实，我们之前使用直方图定位FooService，已经走了些弯路。你可以点击工具栏中第三个按钮（下图左上角的红框所示）进入支配树界面（有关支配树的具体概念参考<a href="https://help.eclipse.org/2020-03/index.jsp?topic=%2Forg.eclipse.mat.ui.help%2Fconcepts%2Fdominatortree.html&amp;resultof%3D%2522%2564%256f%256d%2569%256e%2561%2574%256f%2572%2522%2520%2522%2564%256f%256d%2569%256e%2522%2520%2522%2574%2572%2565%2565%2522%2520">这里</a>）。这个界面会按照对象保留的Retained Heap倒序直接列出占用内存最大的对象。</p>
 <p>可以看到，第一位就是FooService，整个路径是FooSerice-&gt;ArrayList-&gt;Object[]-&gt;String-&gt;char[]（蓝色框部分），一共有21523个字符串（绿色方框部分）：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7a/57/7adafa4178a4c72f8621b7eb49ee2757.png?wh=3226%2A1362" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7a/57/7adafa4178a4c72f8621b7eb49ee2757.png?wh=3226%2A1362" /></p>
 <p>这样，我们就从内存角度定位到FooService是根源了。那么，OOM的时候，FooService是在执行什么逻辑呢？</p>
 <p>为解决这个问题，我们可以点击工具栏的第五个按钮（下图红色框所示）。打开线程视图，首先看到的就是一个名为main的线程（Name列），展开后果然发现了FooService：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3a/ce/3a2c3d159e1599d906cc428d812cccce.png?wh=3140%2A1382" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3a/ce/3a2c3d159e1599d906cc428d812cccce.png?wh=3140%2A1382" /></p>
 <p>先执行的方法先入栈，所以线程栈最上面是线程当前执行的方法，逐一往下看能看到整个调用路径。因为我们希望了解FooService.oom()方法，看看是谁在调用它，它的内部又调用了谁，所以选择以FooService.oom()方法（蓝色框）为起点来分析这个调用栈。</p>
 <p>往下看整个绿色框部分，oom()方法被OOMApplication的run方法调用，而这个run方法又被SpringAppliction.callRunner方法调用。看到参数中的CommandLineRunner你应该能想到，OOMApplication其实是实现了CommandLineRunner接口，所以是SpringBoot应用程序启动后执行的。</p>
 <p>以FooService为起点往上看，从紫色框中的Collectors和IntPipeline，你大概也可以猜出，这些字符串是由Stream操作产生的。再往上看，可以发现在StringBuilder的append操作的时候，出现了OutOfMemoryError异常（黑色框部分），说明这这个线程抛出了OOM异常。</p>
@@ -14570,18 +14570,18 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>SELECT * FROM org.geekbang.time.commonmistakes.troubleshootingtools.oom.FooService
 </code></pre></div>
 <p>可以看到只有一个实例，然后我们通过List objects功能搜索引用FooService的对象：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/19/43/1973846815bd9d78f85bef05b499e843.png?wh=3206%2A1284" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/19/43/1973846815bd9d78f85bef05b499e843.png?wh=3206%2A1284" /></p>
 <p>得到以下结果：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/07/a8/07e1216a6cc93bd146535b5809649ea8.png?wh=2074%2A704" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/07/a8/07e1216a6cc93bd146535b5809649ea8.png?wh=2074%2A704" /></p>
 <p>可以看到，一共两处引用：</p>
 <ul>
 <li>第一处是，OOMApplication使用了FooService，这个我们已经知道了。</li>
 <li>第二处是一个ConcurrentHashMap。可以看到，这个HashMap是DefaultListableBeanFactory的singletonObjects字段，可以证实FooService是Spring容器管理的单例的Bean。</li>
 </ul>
 <p>你甚至可以在这个HashMap上点击右键，选择Java Collections-&gt;Hash Entries功能，来查看其内容：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ce/5f/ce4020b8f63db060a94fd039314b2d5f.png?wh=3126%2A1112" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ce/5f/ce4020b8f63db060a94fd039314b2d5f.png?wh=3126%2A1112" /></p>
 <p>这样就列出了所有的Bean，可以在Value上的Regex进一步过滤。输入FooService后可以看到，类型为FooService的Bean只有一个，其名字是fooService：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/02/1a/023141fb717704cde9a57c5be6118d1a.png?wh=2678%2A206" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/02/1a/023141fb717704cde9a57c5be6118d1a.png?wh=2678%2A206" /></p>
 <p>到现在为止，我们虽然没看程序代码，但是已经大概知道程序出现OOM的原因和大概的调用栈了。我们再贴出程序来对比一下，果然和我们看到得一模一样：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>@SpringBootApplication
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>public class OOMApplication implements CommandLineRunner {
@@ -14643,28 +14643,28 @@
 <a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a>time      2020-01-30 15:48:33
 </code></pre></div>
 <p>输出help命令，可以看到所有支持的命令列表。今天，我们会用到dashboard、thread、jad、watch、ognl命令，来定位这个HighCPUApplication进程。你可以通过<a href="https://alibaba.github.io/arthas/commands.html">官方文档</a>，查看这些命令的完整介绍：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/47/73/47b2abc1c3a8c0670a60c6ed74761873.png?wh=2156%2A1496" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/47/73/47b2abc1c3a8c0670a60c6ed74761873.png?wh=2156%2A1496" /></p>
 <p>dashboard命令用于整体展示进程所有线程、内存、GC等情况，其输出如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ce/4c/ce59c22389ba95104531e46edd9afa4c.png?wh=2772%2A1840" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ce/4c/ce59c22389ba95104531e46edd9afa4c.png?wh=2772%2A1840" /></p>
 <p>可以看到，CPU高并不是GC引起的，占用CPU较多的线程有8个，其中7个是ForkJoinPool.commonPool。学习过<a href="https://time.geekbang.org/column/article/212374">加餐1</a>的话，你应该就知道了，ForkJoinPool.commonPool是并行流默认使用的线程池。所以，此次CPU高的问题，应该出现在某段并行流的代码上。</p>
 <p>接下来，要查看最繁忙的线程在执行的线程栈，可以使用thread -n命令。这里，我们查看下最忙的8个线程：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>thread -n 8
 </code></pre></div>
 <p>输出如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/96/00/96cca0708e211ea7f7de413d40c72c00.png?wh=2964%2A1916" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/96/00/96cca0708e211ea7f7de413d40c72c00.png?wh=2964%2A1916" /></p>
 <p>可以看到，由于这些线程都在处理MD5的操作，所以占用了大量CPU资源。我们希望分析出代码中哪些逻辑可能会执行这个操作，所以需要从方法栈上找出我们自己写的类，并重点关注。</p>
 <p>由于主线程也参与了ForkJoinPool的任务处理，因此我们可以通过主线程的栈看到需要重点关注org.geekbang.time.commonmistakes.troubleshootingtools.highcpu.HighCPUApplication类的doTask方法。</p>
 <p>接下来，使用jad命令直接对HighCPUApplication类反编译：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>jad org.geekbang.time.commonmistakes.troubleshootingtools.highcpu.HighCPUApplication
 </code></pre></div>
 <p>可以看到，调用路径是main-&gt;task()-&gt;doTask()，当doTask方法接收到的int参数等于某个常量的时候，会进行1万次的MD5操作，这就是耗费CPU的来源。那么，这个魔法值到底是多少呢？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/45/e5/4594c58363316d8ff69178d7a341d5e5.png?wh=2964%2A1916" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/45/e5/4594c58363316d8ff69178d7a341d5e5.png?wh=2964%2A1916" /></p>
 <p>你可能想到了，通过jad命令继续查看User类即可。这里因为是Demo，所以我没有给出很复杂的逻辑。在业务逻辑很复杂的代码中，判断逻辑不可能这么直白，我们可能还需要分析出doTask的“慢”会慢在什么入参上。</p>
 <p>这时，我们可以使用watch命令来观察方法入参。如下命令，表示需要监控耗时超过100毫秒的doTask方法的入参，并且输出入参，展开2层入参参数：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>watch org.geekbang.time.commonmistakes.troubleshootingtools.highcpu.HighCPUApplication doTask &#39;{params}&#39; &#39;#cost&gt;100&#39; -x 2
 </code></pre></div>
 <p>可以看到，所有耗时较久的doTask方法的入参都是0，意味着User.ADMN_ID常量应该是0。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/04/3a/04e7a4e54c09052ab937f184ab31e03a.png?wh=2262%2A1066" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/04/3a/04e7a4e54c09052ab937f184ab31e03a.png?wh=2262%2A1066" /></p>
 <p>最后，我们使用ognl命令来运行一个表达式，直接查询User类的ADMIN_ID静态字段来验证是不是这样，得到的结果果然是0：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>[arthas@31126]$ ognl &#39;@org.geekbang.time.commonmistakes.troubleshootingtools.highcpu.User@ADMIN_ID&#39;
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>@Integer[0]
@@ -14807,8 +14807,6 @@ Arthas 真的强大，看评论去就懂了，所以感谢老师提供一个简�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

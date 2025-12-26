@@ -13661,7 +13661,7 @@
 <p>所以，今天我就想带着你一起去探索Mutex的实现及演进之路，希望你能和我一样体验到这种技术追求的美妙。我们从Mutex的一个简单实现开始，看看它是怎样逐步提升性能和公平性的。在这个过程中，我们可以学习如何逐步设计一个完善的同步原语，并能对复杂度、性能、结构设计的权衡考量有新的认识。经过这样一个学习，我们不仅能通透掌握Mutex，更好地使用这个工具，同时，对我们自己设计并发数据接口也非常有帮助。</p>
 <p>那具体怎么来讲呢？我把Mutex的架构演进分成了四个阶段，下面给你画了一张图来说明。</p>
 <p>“<strong>初版</strong>”的Mutex使用一个flag来表示锁是否被持有，实现比较简单；后来照顾到新来的goroutine，所以会让新的goroutine也尽可能地先获取到锁，这是第二个阶段，我把它叫作“<strong>给新人机会</strong>”；那么，接下来就是第三阶段“<strong>多给些机会</strong>”，照顾新来的和被唤醒的goroutine；但是这样会带来饥饿问题，所以目前又加入了饥饿的解决方案，也就是第四阶段“<strong>解决饥饿</strong>”。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c2/35/c28531b47ff7f220d5bc3c9650180835.jpg?wh=4000%2A2250" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c2/35/c28531b47ff7f220d5bc3c9650180835.jpg?wh=4000%2A2250" /></p>
 <p>有了这四个阶段，我们学习的路径就清晰了，那接下来我会从代码层面带你领略Go开发者这些大牛们是如何逐步解决这些问题的。</p>
 <h1 id="_1">初版的互斥锁</h1>
 <p>我们先来看怎么实现一个最简单的互斥锁。在开始之前，你可以先想一想，如果是你，你会怎么设计呢？</p>
@@ -13713,7 +13713,7 @@
 <li><strong>字段key：</strong>是一个flag，用来标识这个排外锁是否被某个goroutine所持有，如果key大于等于1，说明这个排外锁已经被持有；</li>
 <li><strong>字段sema：</strong>是个信号量变量，用来控制等待goroutine的阻塞休眠和唤醒。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/82/25/825e23e1af96e78f3773e0b45de38e25.jpg?wh=3032%2A2199" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/82/25/825e23e1af96e78f3773e0b45de38e25.jpg?wh=3032%2A2199" /></p>
 <p>调用Lock请求锁的时候，通过xadd方法进行CAS操作（第24行），xadd方法通过循环执行CAS操作直到成功，保证对key加1的操作成功完成。如果比较幸运，锁没有被别的goroutine持有，那么，Lock方法成功地将key设置为1，这个goroutine就持有了这个锁；如果锁已经被别的goroutine持有了，那么，当前的goroutine会把key加1，而且还会调用semacquire方法（第27行），使用信号量将自己休眠，等锁释放的时候，信号量会将它唤醒。</p>
 <p>持有锁的goroutine调用Unlock释放锁时，它会将key减1（第31行）。如果当前没有其它等待这个锁的goroutine，这个方法就返回了。但是，如果还有等待此锁的其它goroutine，那么，它会调用semrelease方法（第34行），利用信号量唤醒等待锁的其它goroutine中的一个。</p>
 <p>所以，到这里，我们就知道了，初版的Mutex利用CAS原子操作，对key这个标志量进行设置。key不仅仅标识了锁是否被goroutine所持有，还记录了当前持有和等待获取锁的goroutine的数量。</p>
@@ -13779,7 +13779,7 @@
 <a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>)
 </code></pre></div>
 <p>虽然Mutex结构体还是包含两个字段，但是第一个字段已经改成了state，它的含义也不一样了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4c/15/4c4a3dd2310059821f41af7b84925615.jpg?wh=2978%2A1756" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4c/15/4c4a3dd2310059821f41af7b84925615.jpg?wh=2978%2A1756" /></p>
 <p>state是一个复合型的字段，一个字段包含多个意义，这样可以通过尽可能少的内存来实现互斥锁。这个字段的第一位（最小的一位）来表示这个锁是否被持有，第二位代表是否有唤醒的goroutine，剩余的位数代表的是等待此锁的goroutine数。所以，state这一个字段被分成了三部分，代表三个数据。</p>
 <p>请求锁的方法Lock也变得复杂了。复杂之处不仅仅在于对字段state的操作难以理解，而且代码逻辑也变得相当复杂。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>func (m *Mutex) Lock() {
@@ -13817,7 +13817,7 @@
 <p>代码中的第10行将当前的flag设置为加锁状态，如果能成功地通过CAS把这个新值赋予state（第19行和第20行），就代表抢夺锁的操作成功了。</p>
 <p>不过，需要注意的是，如果成功地设置了state的值，但是之前的state是有锁的状态，那么，state只是清除mutexWoken标志或者增加一个waiter而已。</p>
 <p>请求锁的goroutine有两类，一类是新来请求锁的goroutine，另一类是被唤醒的等待请求锁的goroutine。锁的状态也有两种：加锁和未加锁。我用一张表格，来说明一下goroutine不同来源不同状态下的处理逻辑。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/de/ac/de281d2a9e022b2e026bb6126f28c9ac.jpg?wh=1690x620" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/de/ac/de281d2a9e022b2e026bb6126f28c9ac.jpg?wh=1690x620" /></p>
 <p>刚刚说的都是获取锁，接下来，我们再来看看释放锁。释放锁的Unlock方法也有些复杂，我们来看一下。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>func (m *Mutex) Unlock() {
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>// Fast path: drop lock bit.
@@ -13900,7 +13900,7 @@
 <p>之后，2018年，Go开发者将fast path和slow path拆成独立的方法，以便内联，提高性能。2019年也有一个Mutex的优化，虽然没有对Mutex做修改，但是，对于Mutex唤醒后持有锁的那个waiter，调度器可以有更高的优先级去执行，这已经是很细致的性能优化了。</p>
 <p>为了避免代码过多，这里只列出当前的Mutex实现。想要理解当前的Mutex，我们需要好好泡一杯茶，仔细地品一品了。</p>
 <p>当然，现在的Mutex代码已经复杂得接近不可读的状态了，而且代码也非常长，删减后占了几乎三页纸。但是，作为第一个要详细介绍的同步原语，我还是希望能更清楚地剖析Mutex的实现，向你展示它的演化和为了一个貌似很小的feature不得不将代码变得非常复杂的原因。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e0/76/e0c23794c8a1d355a7a183400c036276.jpg?wh=3096%2A1644" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e0/76/e0c23794c8a1d355a7a183400c036276.jpg?wh=3096%2A1644" /></p>
 <p>当然，你也可以暂时略过这一段，以后慢慢品，<strong>只需要记住，Mutex绝不容忍一个goroutine被落下，永远没有机会获取锁。不抛弃不放弃是它的宗旨，而且它也尽可能地让等待较长的goroutine更有机会获取到锁</strong>。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>type Mutex struct {
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>state int32
@@ -14218,8 +14218,6 @@ ync.Mutex,那么在每个goroutine中的sema数值不都是一样的，如果其
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

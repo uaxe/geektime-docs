@@ -6635,7 +6635,7 @@
 <h2 id="_1">缓慢的锁</h2>
 <p>Disruptor作为一个高性能的生产者-消费者队列系统，一个核心的设计就是通过RingBuffer实现一个无锁队列。</p>
 <p>上一讲里我们讲过，Java里面的基础库里，就有像LinkedBlockingQueue这样的队列库。但是，这个队列库比起Disruptor里用的RingBuffer要慢上很多。慢的第一个原因我们说过，因为链表的数据在内存里面的布局对于高速缓存并不友好，而RingBuffer所使用的数组则不然。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9c/69/9ce732cb22c49a8a26e870dddde66b69.jpeg?wh=2566%2A2059" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9c/69/9ce732cb22c49a8a26e870dddde66b69.jpeg?wh=2566%2A2059" /></p>
 <p>LinkedBlockingQueue慢，有另外一个重要的因素，那就是它对于锁的依赖。在生产者-消费者模式里，我们可能有多个消费者，同样也可能有多个生产者。多个生产者都要往队列的尾指针里面添加新的任务，就会产生多个线程的竞争。于是，在做这个事情的时候，生产者就需要拿到对于队列尾部的锁。同样地，在多个消费者去消费队列头的时候，也就产生竞争。同样消费者也要拿到锁。</p>
 <p>那只有一个生产者，或者一个消费者，我们是不是就没有这个锁竞争的问题了呢？很遗憾，答案还是否定的。一般来说，在生产者-消费者模式下，消费者要比生产者快。不然的话，队列会产生积压，队列里面的任务会越堆越多。</p>
 <p>一方面，你会发现越来越多的任务没有能够及时完成；另一方面，我们的内存也会放不下。虽然生产者-消费者模型下，我们都有一个队列来作为缓冲区，但是大部分情况下，这个缓冲区里面是空的。也就是说，即使只有一个生产者和一个消费者者，这个生产者指向的队列尾和消费者指向的队列头是同一个节点。于是，这两个生产者和消费者之间一样会产生锁竞争。</p>
@@ -6696,7 +6696,7 @@
 <h2 id="ringbuffer">无锁的RingBuffer</h2>
 <p>加锁很慢，所以Disruptor的解决方案就是“无锁”。这个“无锁”指的是没有操作系统层面的锁。实际上，Disruptor还是利用了一个CPU硬件支持的指令，称之为CAS（Compare And Swap，比较和交换）。在Intel CPU里面，这个对应的指令就是 cmpxchg。那么下面，我们就一起从Disruptor的源码，到具体的硬件指令来看看这是怎么一回事儿。</p>
 <p>Disruptor的RingBuffer是这么设计的，它和直接在链表的头和尾加锁不同。Disruptor的RingBuffer创建了一个Sequence对象，用来指向当前的RingBuffer的头和尾。这个头和尾的标识呢，不是通过一个指针来实现的，而是通过一个<strong>序号</strong>。这也是为什么对应源码里面的类名叫Sequence。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b6/ec/b64487a7b6b45393fdfa7e2d63e176ec.jpeg?wh=2566%2A3601" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b6/ec/b64487a7b6b45393fdfa7e2d63e176ec.jpeg?wh=2566%2A3601" /></p>
 <p>在这个RingBuffer当中，进行生产者和消费者之间的资源协调，采用的是对比序号的方式。当生产者想要往队列里加入新数据的时候，它会把当前的生产者的Sequence的序号，加上需要加入的新数据的数量，然后和实际的消费者所在的位置进行对比，看看队列里是不是有足够的空间加入这些数据，而不会覆盖掉消费者还没有处理完的数据。</p>
 <p>在Sequence的代码里面，就是通过compareAndSet这个方法，并且最终调用到了UNSAFE.compareAndSwapLong，也就是直接使用了CAS指令。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>public boolean compareAndSet(final long expectedValue, final long newValue)
@@ -6957,8 +6957,6 @@ return *addr;
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

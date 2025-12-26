@@ -14501,7 +14501,7 @@
   <h1>18   反应式编程框架设计：如何使程序调用不阻塞等待，立即响应？</h1>
 
 <p>我们在专栏<a href="https://time.geekbang.org/column/article/166581">第1篇</a>就讨论了为什么在高并发的情况下，程序会崩溃。主要原因是，在高并发的情况下，有大量用户请求需要程序计算处理，而目前的处理方式是，为每个用户请求分配一个线程，当程序内部因为访问数据库等原因造成线程阻塞时，线程无法释放去处理其他请求，这样就会造成请求堆积，不断消耗资源，最终导致程序崩溃。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/02/c3/02d5af37b36b083b4eea6e44e54988c3.png?wh=1366%2A360" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/02/c3/02d5af37b36b083b4eea6e44e54988c3.png?wh=1366%2A360" /></p>
 <p>这是传统的Web应用程序运行期的线程特性。对于一个高并发的应用系统来说，总是同时有很多个用户请求到达系统的Web容器。Web容器为每个请求分配一个线程进行处理，线程在处理过程中，如果遇到访问数据库或者远程服务等操作，就会进入阻塞状态，这个时候，如果数据库或者远程服务响应延迟，就会出现程序内的线程无法释放的情况，而外部的请求不断进来，导致计算机资源被快速消耗，最终程序崩溃。</p>
 <p>那么有没有不阻塞线程的编程方法呢？</p>
 <h2 id="_1">反应式编程</h2>
@@ -14516,7 +14516,7 @@
 <p>下面我们就看看Flower如何实现异步无阻塞的调用，以及Flower这个框架设计使用了什么样的设计原则与模式。</p>
 <h2 id="flower">反应式编程框架Flower的基本原理</h2>
 <p>一个使用Flower框架开发的典型Web应用的线程特性如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d3/cc/d32ecc606278266b20a956f3767635cc.png?wh=1352%2A344" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d3/cc/d32ecc606278266b20a956f3767635cc.png?wh=1352%2A344" /></p>
 <p>当并发用户到达应用服务器的时候，Web容器线程不需要执行应用程序代码，它只是将用户的HTTP请求变为请求对象，将请求对象异步交给Flower框架的Service去处理，自身立刻就返回。因为容器线程不做太多的工作，所以只需极少的容器线程就可以满足高并发的用户请求，用户的请求不会被阻塞，不会因为容器线程不够而无法处理。相比传统的阻塞式编程，Web容器线程要完成全部的请求处理操作，直到返回响应结果才能释放线程；<strong>使用Flower框架只需要极少的容器线程就可以处理较多的并发用户请求，而且容器线程不会阻塞。</strong></p>
 <p>用户请求交给基于Flower框架开发的业务Service对象以后，Service之间依然是使用异步消息通讯的方式进行调用，不会直接进行阻塞式的调用。一个Service完成业务逻辑处理计算以后，会返回一个处理结果，这个结果以消息的方式异步发送给它的下一个Service。</p>
 <p>传统编程模型的Service之间如果进行调用，如我们在专栏第一篇讨论的那样，被调用的Service在返回之前，调用的Service方法只能阻塞等待。而Flower的Service之间使用了AKKA Actor进行消息通信，调用者的Service发送调用消息后，不需要等待被调用者返回结果，就可以处理自己的下一个消息了。事实上，这些Service可以复用同一个线程去处理自己的消息，也就是说，<strong>只需要有限的几个线程就可以完成大量的Service处理和消息传输，这些线程不会阻塞等待。</strong></p>
@@ -14524,7 +14524,7 @@
 <p>也就是说，使用Flower开发的系统，在一个典型的Web应用中，几乎没有任何地方会被阻塞，所有的线程都可以被不断地复用，<strong>有限的线程就可以完成大量的并发用户请求，从而大大地提高了系统的吞吐能力和响应时间</strong>，同时，由于线程不会被阻塞，<strong>应用就不会因为并发量太大或者数据库处理缓慢而宕机，从而提高了系统的可用性。</strong></p>
 <p>Flower框架实现异步无阻塞，一方面是利用了Web容器的异步特性，主要是Servlet3.0以后提供的AsyncContext，快速释放容器线程；另一方面是利用了异步的数据库驱动以及异步的网络通信，主要是HttpAsyncClient等异步通信组件。而Flower框架内，核心的应用代码之间的异步无阻塞调用，则是利用了Akka 的Actor模型实现。</p>
 <p>Akka Actor的异步消息驱动实现如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/10/25/1045f11aa3ffafb552619872161b6725.jpg?wh=755%2A228" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/10/25/1045f11aa3ffafb552619872161b6725.jpg?wh=755%2A228" /></p>
 <p>一个Actor向另一个Actor进行通讯的时候，当前Actor就是一个消息的发送者sender，当它想要向另一个Actor进行通讯的时候，就需要获得另一个Actor的ActorRef，也就是一个引用，通过引用进行消息通信。而ActorRef收到消息以后，会将这个消息放入到目标Actor的Mailbox里面去，然后就立即返回了。</p>
 <p>也就是说一个Actor向另一个Actor发送消息的时候，不需要另一个Actor去真正地处理这个消息，只需要将消息发送到目标Actor的Mailbox里面就可以了。自己不会被阻塞，可以继续执行自己的操作，而目标Actor检查自己的Mailbox中是否有消息，如果有消息，Actor则会在从Mailbox里面去获取消息，对消息进行异步的处理，而所有的Actor会共享线程，这些线程不会有任何的阻塞。</p>
 <h2 id="flower_1">反应式编程框架Flower的设计方法</h2>
@@ -14543,23 +14543,23 @@
 </code></pre></div>
 <p>表示ServiceA的返回值将作为消息发送给ServiceB，成为ServiceB的输入值，这样两个Service就可以合作完成一些更复杂的业务逻辑。</p>
 <p>Flower还支持可视化的Service流程编排，像下面这张图一样编辑流程定义文件，就可以开发一个异步业务处理流程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/22/85/221c5366834d24bbad8a9e0ab1441785.png?wh=603%2A343" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/22/85/221c5366834d24bbad8a9e0ab1441785.png?wh=603%2A343" /></p>
 <p>那么这个Flower框架是如何实现的呢？</p>
 <p>Flower框架的设计也是基于前面专栏讨论过的<a href="https://time.geekbang.org/column/article/179282">依赖倒置原则</a>。所有应用开发者实现的Service类都需要包装在Actor里面进行异步调用，但是Actor不会依赖开发者实现的Service类，开发者也不会依赖Actor类，他们共同依赖一个Service接口，这个接口是框架提供的，如上面例子所示。</p>
 <p>Actor与Service的依赖倒置关系如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/55/97/557b2bb561c44c2309aa96a06f7c9797.png?wh=894%2A430" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/55/97/557b2bb561c44c2309aa96a06f7c9797.png?wh=894%2A430" /></p>
 <p>每个Actor都依赖一个Service接口，而具体的Service实现类，比如MyService，则实现这个Service接口。在运行期实例化Actor的时候，这个接口被注入具体的Service实现类，比如MyService。在Flower中，调用MyService对象，其实就是给包装MyService对象的Actor发消息，Actor收到消息，执行自己的onReceive方法，在这个方法里，Actor调用MyService的process方法，并将onReceive收到的Message对象当做process的输入参数传入。</p>
 <p>process处理完成后，返回一个Object对象。Actor会根据编排好的流程，获取MyService在流程中的下一个Service对应的Actor，即nextServiceActor，将process返回的Object对象当做消息发送给这个nextServiceActor。这样，Service之间就根据编排好的流程，异步、无阻塞地调用执行起来了。</p>
 <h2 id="flower_2">反应式编程框架Flower的落地效果</h2>
 <p>Flower框架在部分项目中落地应用，应用效果较为显著，一方面，Flower可以显著提高系统的性能。这是某个C#开发的系统使用Flower重构后的TPS性能比较，使用Flower开发的系统TPS差不多是原来C#系统的两倍。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d8/00/d8e8f1a444e69356f8dc45d517428c00.png?wh=834%2A536" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d8/00/d8e8f1a444e69356f8dc45d517428c00.png?wh=834%2A536" /></p>
 <p>另一方面，Flower对系统可用性也有较大提升，目前常见互联网应用架构如下图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bd/a9/bdcb25e0ca9a3ba7686a28f4287dada9.png?wh=818%2A308" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bd/a9/bdcb25e0ca9a3ba7686a28f4287dada9.png?wh=818%2A308" /></p>
 <p>用户请求通过网关服务器调用微服务完成处理，那么当有某个微服务连接的数据库查询执行较慢时，如图中服务1，那么按照传统的线程阻塞模型，就会导致服务1的线程都被阻塞在这个慢查询的数据库操作上。同样的，网关线程也会阻塞在调用这个延迟比较厉害的服务1上。</p>
 <p>最终的效果就是，网关所有的线程都被阻塞，即使是不调用服务1的用户请求也无法处理，最后整个系统失去响应，应用宕机。使用阻塞式编程，实际的压测效果如下，当服务1响应延迟，出错率大幅飙升的时候，通过网关调用正常的服务2的出错率也非常高。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/77/f7/777cc6b37a94f2a7f93c107187c68af7.png?wh=2248%2A198" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/77/f7/777cc6b37a94f2a7f93c107187c68af7.png?wh=2248%2A198" /></p>
 <p>使用Flower开发的网关，实际压测效果如下，同样服务1响应延迟，出错率极高的情况下，通过Flower网关调用服务2完全不受影响。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/97/8b/97923d96fb3b59159ed70c5457412d8b.png?wh=2248%2A182" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/97/8b/97923d96fb3b59159ed70c5457412d8b.png?wh=2248%2A182" /></p>
 <h2 id="_2">小结</h2>
 <p>事实上，Flower不仅是一个反应式Web编程框架，还是反应式的微服务框架。也就是说，Flower的Service可以远程部署到一个Service容器里面，就像我们现在常用的微服务架构一样。Flower会提供一个独立的Flower容器，用于启动一些Service，这些Service在启动了以后，会向注册中心进行注册，而且应用程序可以将这些分布式的Service进行流程编排，得到一个分布式非阻塞的微服务系统。整体架构和主流的微服务架构很像，主要的区别就是Flower的服务是异步的，通过流程编排的方式进行服务调用，而不是通过接口依赖的方式进行调用。</p>
 <p>你可以点击<a href="https://github.com/zhihuili/flower">这里</a>进入Flower框架的源代码地址，欢迎你参与Flower开发，也欢迎将Flower应用到你的系统开发中。你对Flower有什么疑问，也欢迎与我交流。</p>
@@ -14697,8 +14697,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -14369,7 +14369,7 @@
 <p>这些GC和JVM活动信息很重要，根据启动JVM时提供的JVM选项，各种类型的相关信息，都将记录到GC的日志文件中。</p>
 <p>尽管某些GC引起的STW暂停众所周知（比如JVM导致的Full GC），但是我们在生产中发现，其他因素，比如<strong>操作系统本身，也会导致一些相当大的STW暂停</strong>。</p>
 <p>比如我举个例子。文中的图片就显示了一个STW暂停和GC日志，这个暂停时间超过了11秒；我就经常在生产环境中看到这样的STW暂停。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/98/21/9811fd17d7055b2f25308a36f729b921.png?wh=1573%2A449" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/98/21/9811fd17d7055b2f25308a36f729b921.png?wh=1573%2A449" /></p>
 <p>你注意一下图片中有较大的字体的那行，里面显示了User、Sys和Real的计时，分别对应着用户、系统和实际的计时。比如“Real=11.45”就表示实际的STW暂停是11.45秒钟。</p>
 <p>在这个GC日志中，这种暂停11秒钟的STW非常讨厌，因为这样大的暂停是不能容忍的。而且这个问题很难理解，完全不能用GC期间的应用程序活动和垃圾回收活动来解释。</p>
 <p>从日志中我们也看到，这个JVM的堆并不大，只有4GB，垃圾收集基本不会超过1秒钟。正如图中显示的那样，用户和系统时间都可以忽略不计，User和Sys的暂停时间分别是0.18秒钟和0.01秒钟，但是实际上JVM暂停了11.45秒钟！</p>
@@ -14386,10 +14386,10 @@
 </ol>
 <p>下面让我们一起来看看结果。</p>
 <p>场景A是基准场景，Java程序在没有后台IO负载的情况下运行。我们在实验室环境中执行了许多次运行，得到的结果基本是一致的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9e/c9/9e14b3630deefda85d0b1b4128d15fc9.png?wh=2500%2A1242" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9e/c9/9e14b3630deefda85d0b1b4128d15fc9.png?wh=2500%2A1242" /></p>
 <p>图片中显示的是一个持续5分钟的运行，就是沿着5分钟的时间线，显示了所有JVM STW暂停的时间序列数据。我们观察到，所有暂停都非常小，并且STW暂停都不会超过0.25秒。 STW的总暂停时间约为32.8秒。</p>
 <p>场景B是有后台IO负载情况下运行相同的Java程序。在实际的生产过程中，IO负载可能来自很多地方，比如操作系统、同一机器上的其他应用程序，或者来自同一Java应用程序的各种IO活动。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d3/35/d3a781387eb9ebc20513146a63a4ad35.png?wh=2500%2A1225" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d3/35/d3a781387eb9ebc20513146a63a4ad35.png?wh=2500%2A1225" /></p>
 <p>在图片中，我们同样沿着5分钟的时间线，显示了所有JVM STW暂停的时间序列数据。我们发现，当后台IO运行时，相同的Java程序，在短短5分钟的运行中，看到1个STW暂停超过3.6秒，3个暂停超过0.5秒！结果是，STW的总暂停时间为36.8秒，比基准场景多了12％。</p>
 <p>而STW总暂停时间多，也就意味着应用程序的实际工作吞吐量比较低，因为JVM多花了时间在STW暂停上面。</p>
 <h2 id="_3">响应延迟的根本原因在哪里？</h2>
@@ -14398,12 +14398,12 @@
 <p>操作系统的“回写”机制是什么呢？就是文件系统定期地把一些被改变了的磁盘文件，从内存页面写回存储系统。</p>
 <p>具体来说，当缓冲的write()需要写入文件时，它首先需要写入OS缓存中的内存页面。这些内存页是有可能被“回写”的OS缓存机制锁定的；而且当后台IO流量很重时，该机制可能导致这些内存页面被锁定相当长的时间。</p>
 <p>为了彻底查清原因，我们使用Linux下的Strace工具，来剖析函数调用和STW暂停的时间相关性。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5a/4e/5a307738734b433b0d82723c016e9d4e.png?wh=1500%2A1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5a/4e/5a307738734b433b0d82723c016e9d4e.png?wh=1500%2A1125" /></p>
 <p>这个图表示的是<strong>JVM STW暂停</strong>，和strace工具报告的<strong>JVM进行write()系统调用的延迟</strong>。图片集中显示了一个1.59秒的JVM STW暂停的快照。</p>
 <p>我们仔细检查了两个时间序列数据，发现尽管JVM的GC日志记录使用缓冲写入，但是GC暂停和write()延迟之间有极大的相关性。</p>
 <p>这些时间序列的相关性表明，由于某些原因，GC日志记录的缓冲写入仍然被阻塞了。</p>
 <p>那这个原因是什么呢？我们就要通过仔细阅读分析JVM GC的日志和Strace的输出日志（如下图所示）来寻找。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/53/f6/53fd4368c2fc468b368f938ca3aaf2f6.png?wh=1500%2A623" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/53/f6/53fd4368c2fc468b368f938ca3aaf2f6.png?wh=1500%2A623" /></p>
 <p>让我沿着时间轴线来具体解释一下图片中的数据。</p>
 <p>在时间35.04秒时，也就是第 2 行日志，一个新的JVM新生代GC启动，并用了0.12秒才完成。新生代GC在35.17秒时结束，并且JVM尝试发出write()系统调用（第4行），将新生代GC统计的信息输出到GC日志文件。write()调用被阻塞1.47秒，所以最后在时间36.64（第5行）结束，总共耗时1.47秒。当write()调用在36.64返回给JVM时，JVM记录此STW暂停为1.59秒（即0.12 + 1.47）（第3行）。</p>
 <p>这些数据表明，GC日志记录过程，恰好位于JVM的STW暂停路径上，而日志记录所花费的时间也是STW暂停的一部分。如果日志记录，也就是write()调用被阻塞，那么就会导致STW暂停。换句话说，实际的STW暂停时间由两部分组成：</p>
@@ -14412,7 +14412,7 @@
 <li>GC日志记录时间，例如，write()执行时被OS阻塞的时间。</li>
 </ol>
 <p>我用下图来清楚地表示它们之间的关系。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6f/16/6fb8cb8e982ec471bb371fb42d2c9416.png?wh=2000%2A939" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6f/16/6fb8cb8e982ec471bb371fb42d2c9416.png?wh=2000%2A939" /></p>
 <p>左边是JVM的活动，右边是操作系统的活动。时间T1时垃圾回收开始，T2时GC结束，并开始调用write()写日志。这之间的延迟，就是GC的延迟。T3时write()调用开始，T4时write()调用返回。这之间的延迟，就是OS导致的阻塞延迟。所以，总的STW暂停就是这两部分延迟的和，也就是T4-T1。</p>
 <p>那么接下来的一个很难理解的问题是：为什么非阻塞IO，还会被阻塞？！</p>
 <p>在深入研究各种资源（包括操作系统内核源代码）后，我们意识到，非阻塞IO写入还是可能会停留，并被阻塞在内核代码执行过程中。具体原因有好几个，其中包括：<strong>页面写入稳定</strong>（Stable Page Writing）和<strong>文件系统日志提交</strong>（Journal Logging）。下面分别说明。</p>
@@ -14441,11 +14441,11 @@
 <p>在我们提出的三种方案中，第一种方案，也就是改进JVM，是暂时难以实现的，因为它需要修改JVM的实现机制。第二种方案呢，是不言自明。如果没有背景IO或者有较少背景IO，那么自然背景IO的影响就变小了；或者减少GC日志输出的频率，就不会有那么多次STW暂停了。</p>
 <p>因此，我们这里直接来验证第三种方案：将GC日志记录与其他IO分开。</p>
 <p>我们的方法，是将GC日志文件放在SSD文件系统上来验证这种方案。我们运行与前面实验场景中相同的Java应用程序和后台IO负载。下图中显示了一个5分钟运行时段的所有STW暂停和相应的时间戳。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8e/35/8e79fbff8312b961d1d9a65ab3d07335.png?wh=2500%2A1123" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8e/35/8e79fbff8312b961d1d9a65ab3d07335.png?wh=2500%2A1123" /></p>
 <p>对于STW暂停的信息，我们注意到所有的JVM的暂停都非常小，所有暂停都在0.25秒以下。可以说，延迟暂停方面的性能，得到了很大的提高，这表明，如果这样分开GC日志文件，即使有很大的后台IO负载，也不会导致JVM程序发生较大的STW暂停；这样的结果也就验证了这一方案的有效性。</p>
 <h2 id="_6">总结</h2>
 <p>今天我们探讨了一个跨层的性能分析和优化案例。由于计算机几个层面的技术互相影响，实际生产环境中，会出现非常大的响应时间延时，严重影响公司业务。这些层面包括应用程序、JVM机制、操作系统和存储系统。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ee/7a/eee73e11928fdfbe864008124aa2957a.png?wh=3000%2A2519" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ee/7a/eee73e11928fdfbe864008124aa2957a.png?wh=3000%2A2519" /></p>
 <p>我们通过合理的性能测试和性能分析，包括搭建合适的测试环境进行问题重现、详细的根因分析，最终提出了几种解决方案。简单来说，就是JVM在GC时会输出日志文件，写入磁盘时会因为背景IO而被阻塞。把日志文件和背景IO分开放在不同磁盘，从而让它们互相不影响的话，就能大幅度降低STW延迟。</p>
 <p>从这个案例我们也可以再次了解，从事性能优化工作需要通晓几乎所有层面的知识。而且不光要知识面广，还要能深入下去，才能进行彻底的根因分析。</p>
 <p>唐代诗人刘禹锡有一首诗说：“莫道谗言如浪深，莫言迁客似沙沉。千淘万漉虽辛苦，吹尽狂沙始到金。”对待这样复杂的性能问题，我们也需要不怕困难，不惧浪深沙沉。因为只有经过千淘万漉的辛苦，才能淘到真金，发现问题的本质并彻底解决它。</p>
@@ -14573,8 +14573,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

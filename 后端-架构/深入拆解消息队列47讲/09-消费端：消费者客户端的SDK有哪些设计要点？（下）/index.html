@@ -14731,9 +14731,9 @@
 <p>在没有消费分组直接消费Topic的场景下，如果希望不重复消费Topic中的数据，那么就<strong>需要有一个标识来标识当前的消费情况，比如记录进度。</strong>这个唯一标识就是消费分组。</p>
 <p>在一个集群中可以有很多消费分组，消费分组间通过名称来区分。消费分组自身的数据是集群元数据的一部分，会存储在Broker的元数据存储服务中。消费分组主要有管理消费者和分区的对应关系、保存消费者的消费进度、实现消息可重复被消费三类功能。</p>
 <p>消费分组和Topic是强相关的，它需要包含Topic才有意义，一个空的消费分组是没有意义的。如下图所示，消费分组内有很多个消费者，一个消费分组也可以订阅和消费多个Topic，一个Topic也可以被多个消费分组订阅和消费。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/77/52/77e59yy3fc26de63c6f6dea701a75252.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/77/52/77e59yy3fc26de63c6f6dea701a75252.jpg?wh=10666x6000" /></p>
 <p>因为 Topic 不存储真实数据，分区才存储消息数据，所以就需要解决消费者和分区的分配关系，即<strong>哪个分区被哪个消费者消费，这个分配的过程就叫做消费重平衡（Rebalance）</strong>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/73/73/73768bb217c4da2b44301d8f21475f73.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/73/73/73768bb217c4da2b44301d8f21475f73.jpg?wh=10666x6000" /></p>
 <p>从流程上来看，当新建一个消费分组的时候，就需要开始分配消费者和分区的消费关系了。分配完成后，就可以正常消费。如果消费者和分区出现变动，比如消费者挂掉、新增消费者、订阅的Topic的分区数发生变化等等，就会重新开始分配消费关系，否则就会存在某些分区不能被订阅和消费的情况。</p>
 <h3 id="_2">协调者</h3>
 <p>从实现上来看，如果要对消费者和分区进行分配，肯定需要有一个模块拥有消费分组、所有的消费者、分区信息三部分信息，这个模块我们一般命名为<strong>协调者。</strong>协调者主要的工作就是执行消费重平衡，并记录消费分组的消费进度。</p>
@@ -14743,7 +14743,7 @@
 <li>在消费者完成，即负责分配的消费者获取所有消费者和分区的信息，然后该消费者完成分区分配操作，最后再把分配关系同步给其他消费者。</li>
 </ol>
 <p>从技术上来看，这两种形式的优劣区别并不大，取决于代码的实现。<strong>一般在创建消费分组和消费者/ Topic分区发生变化的时候，会触发协调者执行消费重平衡。</strong></p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0d/04/0d8af534dba3e33e9cc31926f607b904.jpg?wh=10666x6000" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0d/04/0d8af534dba3e33e9cc31926f607b904.jpg?wh=10666x6000" /></p>
 <p>从实现的角度来看，协调者一般是Broker内核的一个模块，就是一段代码或者一个类，专门用来完成上述的工作。当有多台Broker时，协调者的实现有多种方式，比如Kafka 集群每台Broker都有协调者存在。通过消费分组的名称计算出来一个hash值和__consumer_offset的分区数，取余计算得出一个分区号。最后这个分区号对应的Leader所在的Broker节点就是协调者所在的节点。客户端就和计算出来的这台Broker节点进行交互，来执行消费重平衡的相关操作。</p>
 <p>当有了协调者后，就需要来确认哪个分区给哪个消费者了，此时就需要一个分配策略来执行，这就是消费分区分配策略。</p>
 <h3 id="_3">消费分区分配策略</h3>
@@ -14782,9 +14782,9 @@
 <p>那么当数据被消费成功后，就必须进行消费确认操作了，告诉服务端已经成功消费了这个数据。消费确认就是我们在消息队列中常说的ACK。</p>
 <p>一般情况下，消息确认分为确认后删除数据和确认后保存消费进度数据两种形式。</p>
 <p><strong>确认后删除数据</strong>是指集群的每条消息只能被消费一次，只要数据被消费成功，就会回调服务端的ACK接口，服务端就会执行数据删除操作。在实际开发的过程中，一般都会支持单条ACK和批量ACK两种操作。这种方式不利于回溯消费，所以用得比较少。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/12/c2/12b587f119d537efb3a7115979941dc2.jpg?wh=10666x2987" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/12/c2/12b587f119d537efb3a7115979941dc2.jpg?wh=10666x2987" /></p>
 <p><strong>消费成功保存消费进度</strong>是指当消费数据成功后，调用服务端的消费进度接口来保存消费进度。这种方式一般都是配合消费分组一起用的，服务端从消费分组维度来保存进度数据。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ff/da/ff28fc25ee6ef5d99596c701b8c5f7da.jpg?wh=10666x2866" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ff/da/ff28fc25ee6ef5d99596c701b8c5f7da.jpg?wh=10666x2866" /></p>
 <p>为了保证消息的回溯消费和多次消费，消息队列大多数用的是第二种方案。<strong>数据的删除交由数据过期策略去执行。</strong></p>
 <p>保存消费进度一般分为服务端保存和客户端自定义保存两种实现机制。</p>
 <p><strong>服务端保存</strong>是指当消费端消费完成后，客户端需要调用一个接口提交信息，这个接口是由服务端提供的“提交消费进度”接口，然后服务端会持久保存进度。当客户端断开重新消费时，可以从服务端读取这个进度进行消费。服务端一般会通过内置的Topic或者文件来持久保存该数据。这种方式的优点就是客户端会封装好这些逻辑，使用简单，无需管理进度相关的信息，缺点就是不够灵活。服务端保存一般是默认的方案。</p>
@@ -14794,7 +14794,7 @@
 <li><strong>手动提交</strong>是指业务根据自己的处理情况，手动提交进度信息，以避免业务处理异常导致的数据丢失。</li>
 </ul>
 <p>它们两者的优缺点如下表所示：
-<img alt="" src="https://static001.geekbang.org/resource/image/14/da/144495cf3102ce8f56cbf729771a6eda.jpg?wh=10666x3267" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/14/da/144495cf3102ce8f56cbf729771a6eda.jpg?wh=10666x3267" /></p>
 <p>一般情况下，我建议你使用手动提交方式，可以避免数据丢失。</p>
 <p><strong>客户端自定义保存</strong>是指当消费完成后，客户端自己管理保存消费进度。此时就不需要向服务端接口提交进度信息了，自定义保存进度信息即可，比如保存在客户端的缓存、文件、自定义的服务中，当需要修改和回滚的时候就比较方便。这种方案的优点就是灵活，缺点就是会带来额外的工作量。</p>
 <p>业界主流来看，这两种方案用得都比较多，不过默认情况下都是使用第一种方案，业务需要的话就选择第二种方案。</p>
@@ -14971,8 +14971,6 @@ https:&#47;&#47;rocketmq.apache.org&#47;zh&#47;docs&#47;featureBehavior&#47;08co
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

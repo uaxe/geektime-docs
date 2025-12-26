@@ -7161,7 +7161,7 @@
 <p>对于上述的3种分类标准，它们之间是相互正交的，我们在Spark SQL学习模块介绍过它们各自的适用场景与优劣势（记不清的可以回顾第<a href="https://time.geekbang.org/column/article/427470">17</a>、<a href="https://time.geekbang.org/column/article/428259">18</a>讲）。</p>
 <p>而在流计算的场景下，按照数据来源的不同，数据关联又可以分为“流批关联”与“双流关联”。所谓“流批关联”（Stream-Static Join），它指的是，参与关联的一张表，来自离线批数据，而另一张表的来源，是实时的数据流。换句话说，动态的实时数据流可以与静态的离线数据关联在一起，为我们提供多角度的数据洞察。</p>
 <p>而“双流关联”（Stream-Stream Join），顾名思义，它的含义是，参与关联的两张表，都来自于不同的数据流，属于动态数据与动态数据之间的关联计算，如下图所示。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/99/ac/991af276cf633d587ea627251ae7bdac.jpg?wh=1920x918" title="流批关联与双流关联示意图" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/99/ac/991af276cf633d587ea627251ae7bdac.jpg?wh=1920x918" title="流批关联与双流关联示意图" /></p>
 <p>显然，相对于关联形式、实现方式和分发模式，数据来源的分类标准与前三者也是相互正交的。我们知道，基于前3种分类标准，数据关联已经被划分得足够细致。再加上一种正交的分类标准，数据关联的划分，只会变得更为精细。</p>
 <p>更让人头疼的是，在Structured Streaming流计算框架下，“流批关联”与“双流关联”，对于不同的关联形式，有着不同的支持与限制。而这，也是我们需要特别关注流处理中数据关联的原因之一。</p>
 <p>接下来，我们就分别对“流批关联”和“双流关联”进行展开，说一说它们支持的功能与特性，以及可能存在的限制。本着由简入难的原则，我们先来介绍“流批关联”，然后再去说“双流关联”。</p>
@@ -7184,12 +7184,12 @@
 <p>该选项指定了Structured Streaming需要监听的文件系统目录，一旦有新的数据内容进入该目录，Structured Streaming便以流的形式，把新数据加载进来。</p>
 <p>需要说明的是，上面的代码并不完整，目的是让你先对文件形式的Source建立初步认识。随着后续讲解的推进，待会我们会给出完整版代码，并详细讲解其中的每一步。</p>
 <p>要用文件的形式模拟数据流的生成，我们只需将包含用户互动行为的文件，依次拷贝到Structured Streaming的监听目录即可，在我们的例子中，也就是interactions目录。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/eb/3b/ebb4bc05741f0923f83cb010c360b43b.jpg?wh=1920x662" title="流批关联示意图" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/eb/3b/ebb4bc05741f0923f83cb010c360b43b.jpg?wh=1920x662" title="流批关联示意图" /></p>
 <p>如上图的步骤1所示，我们事先把用户反馈文件，保存到临时的staging目录中，然后依次把文件拷贝到interactions目录，即可模拟数据流的生成。而用户属性信息本身就是离线数据，因此，我们把相关数据文件保存到userProfile目录即可，如图中步骤3所示。</p>
 <p>对于上面的流批关联计算过程，在给出代码实现之前，咱们不妨先来了解一下数据，从而更好地理解后续的代码内容。离线的用户属性比较简单，仅包含id、name、age与gender四个字段，文件内容如下所示。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/83/8b/832c4da115abd99c93e509af90fc1b8b.jpg?wh=1920x927" title="userProfile.csv" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/83/8b/832c4da115abd99c93e509af90fc1b8b.jpg?wh=1920x927" title="userProfile.csv" /></p>
 <p>线上的用户反馈相对复杂一些，分别包含userId、videoId、event、eventTime等字段。前两个字段分别代表用户ID与短视频ID，而event是互动类型，包括Like（点赞）、Comment（评论）、Forward（转发）三个取值，eventTime则代表产生互动的时间戳，如下所示。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6a/0b/6af42cc99a5a4yy4f2d78b971ab1180b.jpg?wh=1920x804" title="interactions0.csv" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6a/0b/6af42cc99a5a4yy4f2d78b971ab1180b.jpg?wh=1920x804" title="interactions0.csv" /></p>
 <p>除了上面的interactions0.csv以外，为了模拟数据流的生成，我还为你准备了interactions1.csv、interactions2.csv两个文件，它们的Schema与interactions0.csv完全一致，内容也大同小异。对于这3个文件，我们暂时把它们缓存在staging目录下。</p>
 <p>好啦，数据准备好之后，接下来，我们就可以从批数据与流数据中创建DataFrame，并实现两者的关联，达到构建用户特征向量的目的。首先，我们先来加载数据。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">import</span><span class="w"> </span><span class="nn">org</span><span class="p">.</span><span class="nn">apache</span><span class="p">.</span><span class="nn">spark</span><span class="p">.</span><span class="nn">sql</span><span class="p">.</span><span class="nc">DataFrame</span>
@@ -7223,7 +7223,7 @@
 <a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a><span class="p">.</span><span class="n">load</span>
 </code></pre></div>
 <p>为了方便你把代码与计算流程对应上，这里我再一次把流批关联示意图贴在了下面。上述代码，对应的是下图中的步骤2与步骤3，也就是流数据与批数据的加载。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/eb/3b/ebb4bc05741f0923f83cb010c360b43b.jpg?wh=1920x662" title="流批关联示意图" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/eb/3b/ebb4bc05741f0923f83cb010c360b43b.jpg?wh=1920x662" title="流批关联示意图" /></p>
 <p>从代码中，我们不难发现，readStream API与read API的用法，几乎如出一辙，不仅如此，二者的返回类型都是DataFrame。因此，流批关联在用法上，与普通的DataFrame之间的关联，看上去并没有什么不同，如下所示。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1">// 互动数据分组、聚合，对应流程图中的步骤4</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">streamingDF</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">streamingDF</span>
@@ -7258,13 +7258,13 @@
 <p>上面这段代码，想必你并不陌生，咱们在之前的几讲中，都是指定Console为输出Sink，这里的操作没什么不同。</p>
 <p>好啦，到此为止，流批关联实例的完整代码就是这些了。接下来，让我们把代码敲入本地环境的spark-shell，然后依次把staging文件夹中的interactions*.csv拷贝到interactions目录之下，来模拟数据流的生成，从而触发流批关联的计算。代码与数据的全部内容，你可以通过这里的<a href="https://github.com/wulei-bj-cn/learn-spark/tree/main/chapter33">GitHub地址</a>进行下载。</p>
 <p>这里，我贴出部分计算结果供你参考。下面的截图，是我们把interactions0.csv文件拷贝到interactions目录之后得到的结果，你可以在你的环境下去做验证，同时继续把剩下的两个文件拷贝到监听目录，来进一步观察流批关联的执行效果。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/47/cb/47fc7fb6a8fa32e64a7131b3489a66cb.png?wh=1576x296" title="部分计算结果截屏" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/47/cb/47fc7fb6a8fa32e64a7131b3489a66cb.png?wh=1576x296" title="部分计算结果截屏" /></p>
 <h2 id="_3">双流关联</h2>
 <p>了解了流批关联之后，我们再来说说“双流关联”。显然，与流批关联相比，双流关联最主要的区别是数据来源的不同。除此之外，在双流关联中，<strong>事件时间的处理尤其关键</strong>。为什么这么说呢？</p>
 <p>学过上一讲之后，我们知道，在源源不断的数据流当中，总会有Late Data产生。Late Data需要解决的主要问题，就是其是否参与当前批次的计算。</p>
 <p>毫无疑问，数据关联是一种最为常见的计算。因此，在双流关联中，我们应该利用Watermark机制，明确指定两条数据流各自的Late Data“容忍度”，从而避免Structured Streaming为了维护状态数据而过度消耗系统资源。Watermark的用法很简单，你可以通过回顾<a href="https://time.geekbang.org/column/article/450916">上一讲</a>来进行复习。</p>
 <p>说到这里，你可能会问：“什么是状态数据？而维护状态数据，又为什么会过度消耗系统资源呢？”一图胜千言，咱们不妨通过下面的示意图，来说明状态数据的维护，会带来哪些潜在的问题和隐患。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/83/1f/8361f27df68785173346a30488b9af1f.jpg?wh=1920x1063" title="状态数据维护示意图" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/83/1f/8361f27df68785173346a30488b9af1f.jpg?wh=1920x1063" title="状态数据维护示意图" /></p>
 <p>假设咱们有两个数据流，一个是短视频发布的数据流，其中记录着短视频相关的元信息，如ID、Name等等。另一个数据流是互动流，也就是用户对于短视频的互动行为。其实在刚刚的流批关联例子中，我们用到数据流也是互动流，这个你应该不会陌生。</p>
 <p>现在，我们想统计短视频在发布一段时间（比如1个小时、6个小时、12个小时，等等）之后，每个短视频的热度。所谓热度，其实就是转评赞等互动行为的统计计数。</p>
 <p>要做到这一点，咱们可以先根据短视频ID把两个数据流关联起来，然后再做统计计数。上图演示的是，两条数据流在Micro-batch模式下的关联过程。为了直击要点，咱们把注意力放在ID=1的短视频上。</p>
@@ -7434,8 +7434,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

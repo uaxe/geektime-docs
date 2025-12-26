@@ -5392,7 +5392,7 @@
 
 <p>你好，我是李兵。</p>
 <p>在第一节我们介绍过V8执行JavaScript代码，需要经过<strong>编译</strong>和<strong>执行</strong>两个阶段，其中<strong>编译过程</strong>是指V8将JavaScript代码转换为字节码或者二进制机器代码的阶段，而执行阶段则是指解释器解释执行字节码，或者是CPU直接执行二进制机器代码的阶段。总的流程你可以参考下图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fe/db/fe3d39715d28a833883df6702930a0db.jpg?wh=2284%2A1006" title="代码执行" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fe/db/fe3d39715d28a833883df6702930a0db.jpg?wh=2284%2A1006" title="代码执行" /></p>
 <p>在编译JavaScript代码的过程中，V8并不会一次性将所有的JavaScript解析为中间代码，这主要是基于以下两点：</p>
 <ul>
 <li>首先，如果一次解析和编译所有的JavaScript代码，过多的代码会增加编译时间，这会严重影响到首次执行JavaScript代码的速度，让用户感觉到卡顿。因为有时候一个页面的JavaScript代码都有10多兆，如果要将所有的代码一次性解析编译完成，那么会大大增加用户的等待时间；</li>
@@ -5411,10 +5411,10 @@
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>foo(1, 5)
 </code></pre></div>
 <p>当把这段代码交给V8处理时，V8会至上而下解析这段代码，在解析过程中首先会遇到foo函数，由于这只是一个函数声明语句，V8在这个阶段只需要将该函数转换为函数对象，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/35/4a/35ce3f6469a7024ca14d81b6c804044a.jpg?wh=2284%2A1073" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/35/4a/35ce3f6469a7024ca14d81b6c804044a.jpg?wh=2284%2A1073" /></p>
 <p>注意，这里只是将该函数声明转换为函数对象，但是并没有解析和编译函数内部的代码，所以也不会为foo函数的内部代码生成抽象语法树。</p>
 <p>然后继续往下解析，由于后续的代码都是顶层代码，所以V8会为它们生成抽象语法树，最终生成的结果如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e5/62/e52476efb6ef924e74f470ead4970262.jpg?wh=2284%2A1285" title="生成顶层代码的抽象语法树" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e5/62/e52476efb6ef924e74f470ead4970262.jpg?wh=2284%2A1285" title="生成顶层代码的抽象语法树" /></p>
 <p>代码解析完成之后，V8便会按照顺序自上而下执行代码，首先会先执行“a=1”和“c=4”这两个赋值表达式，接下来执行foo函数的调用，过程是从foo函数对象中取出函数代码，然后和编译顶层代码一样，V8会先编译foo函数的代码，编译时同样需要先将其编译为抽象语法树和字节码，然后再解释执行。</p>
 <p>好了，上面就是惰性解析的一个大致过程，看上去是不是很简单，不过在V8实现惰性解析的过程中，需要支持JavaScript中的闭包特性，这会使得V8的解析过程变得异常复杂。</p>
 <p>为什么闭包会让V8解析代码的过程变得复杂呢？要解答这个问题，我们先来拆解闭包的特性，然后再来分析为什么闭包影响到了V8的解析流程。</p>
@@ -5485,7 +5485,7 @@
 <li>如果采用了惰性解析，那么当执行到foo函数时，V8只会解析foo函数，并不会解析内部的inner函数，那么这时候V8就不知道inner函数中是否引用了foo函数的变量d。</li>
 </ul>
 <p>这么讲可能有点抽象，下面我们就来看一下上面这段代码的执行流程，我们上节分析过了，JavaScript是一门基于堆和栈的语言，当执行foo函数的时候，堆栈的变化如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/de/10/deaa69d414571516a1debd9712860110.jpg?wh=2284%2A1285" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/de/10/deaa69d414571516a1debd9712860110.jpg?wh=2284%2A1285" /></p>
 <p>从上图可以看出来，在执行全局代码时，V8会将全局执行上下文压入到调用栈中，然后进入执行foo函数的调用过程，这时候V8会为foo函数创建执行上下文，执行上下文中包括了变量d，然后将foo函数的执行上下文压入栈中，foo函数执行结束之后，foo函数执行上下文从栈中弹出，这时候foo执行上下文中的变量d也随之被销毁。</p>
 <p>但是这时候，由于inner函数被保存到全局变量中了，所以inner函数依然存在，最关键的地方在于inner函数使用了foo函数中的变量d，按照正常执行流程，变量d在foo函数执行结束之后就被销毁了。</p>
 <p>所以正常的处理方式应该是foo函数的执行上下文虽然被销毁了，但是inner函数引用的foo函数中的变量却不能被销毁，那么V8就需要为这种情况做特殊处理，需要保证即便foo函数执行结束，但是foo函数中的d变量依然保持在内存中，不能随着foo函数的执行上下文被销毁掉。</p>
@@ -5681,8 +5681,6 @@ return a + 1;
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

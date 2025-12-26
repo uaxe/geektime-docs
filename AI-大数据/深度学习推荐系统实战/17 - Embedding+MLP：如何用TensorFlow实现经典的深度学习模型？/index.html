@@ -7417,17 +7417,17 @@
 <h2 id="embeddingmlp">Embedding+MLP模型的结构</h2>
 <p>图1 展示的就是微软在2016年提出的深度学习模型Deep Crossing，微软把它用于广告推荐这个业务场景上。它是一个经典的Embedding+MLP模型结构，我们可以看到，Deep Crossing从下到上可以分为5层，分别是Feature层、Embedding层、Stacking层、MLP层和Scoring层。</p>
 <p>接下来，我就从下到上来给你讲讲每一层的功能是什么，以及它们的技术细节分别是什么样的。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/50/71/5076071d3c69d3a9fff848a9e631f371.jpeg?wh=1920%2A1080" title="图1 经典的Embedding+MLP模型结构（图片来自 Deep Crossing - Web-Scale Modeling without Manually Crafted Combinatorial Features）" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/50/71/5076071d3c69d3a9fff848a9e631f371.jpeg?wh=1920%2A1080" title="图1 经典的Embedding+MLP模型结构（图片来自 Deep Crossing - Web-Scale Modeling without Manually Crafted Combinatorial Features）" /></p>
 <p>我们先来看Feature层。Feature层也叫做输入特征层，它处于Deep Crossing的最底部，作为整个模型的输入。仔细看图1的话，你一定会发现不同特征在细节上的一些区别。比如Feature#1向上连接到了Embedding层，而Feature#2就直接连接到了更上方的Stacking层。这是怎么回事呢？</p>
 <p>原因就在于Feature#1代表的是类别型特征经过One-hot编码后生成的特征向量，而Feature#2代表的是数值型特征。我们知道，One-hot特征太稀疏了，不适合直接输入到后续的神经网络中进行训练，所以我们需要通过连接到Embedding层的方式，把这个稀疏的One-hot向量转换成比较稠密的Embedding向量。</p>
 <p>接着，我们来看Embedding层。Embedding层就是为了把稀疏的One-hot向量转换成稠密的Embedding向量而设置的，我们需要注意的是，Embedding层并不是全部连接起来的，而是每一个特征对应一个Embedding层，不同Embedding层之间互不干涉。</p>
 <p>那Embedding层的内部结构到底是什么样子的呢？我想先问问你，你还记得Word2vec的原理吗？Embeding层的结构就是Word2vec模型中从输入神经元到隐层神经元的部分（如图2红框内的部分）。参照下面的示意图，我们可以看到，这部分就是一个从输入层到隐层之间的全连接网络。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8a/29/8a26d9a531ae8bef89f3730388f59a29.jpeg?wh=1920%2A1080" title="图2 Word2vec模型中Embedding层的部分" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8a/29/8a26d9a531ae8bef89f3730388f59a29.jpeg?wh=1920%2A1080" title="图2 Word2vec模型中Embedding层的部分" /></p>
 <p>一般来说，Embedding向量的维度应远小于原始的稀疏特征向量，按照经验，几十到上百维就能够满足需求，这样它才能够实现从稀疏特征向量到稠密特征向量的转换。</p>
 <p>接着我们来看Stacking层。Stacking层中文名是堆叠层，我们也经常叫它连接（Concatenate）层。它的作用比较简单，就是把不同的Embedding特征和数值型特征拼接在一起，形成新的包含全部特征的特征向量。</p>
 <p>再往上看，MLP层就是我们开头提到的多层神经网络层，在图1中指的是Multiple Residual Units层，中文叫多层残差网络。微软在实现Deep Crossing时针对特定的问题选择了残差神经元，但事实上，神经元的选择有非常多种，比如我们之前在深度学习基础知识中介绍的，以Sigmoid函数为激活函数的神经元，以及使用tanh、ReLU等其他激活函数的神经元。我们具体选择哪种是一个调参的问题，一般来说，ReLU最经常使用在隐层神经元上，Sigmoid则多使用在输出神经元，实践中也可以选择性地尝试其他神经元，根据效果作出最后的决定。</p>
 <p>不过，不管选择哪种神经元，MLP层的特点是全连接，就是不同层的神经元两两之间都有连接。就像图3中的两层神经网络一样，它们两两连接，只是连接的权重会在梯度反向传播的学习过程中发生改变。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7a/99/7a2b22c106c454af3db2edaed555e299.jpeg?wh=1920%2A1080" title="图3 全连接神经网络" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7a/99/7a2b22c106c454af3db2edaed555e299.jpeg?wh=1920%2A1080" title="图3 全连接神经网络" /></p>
 <p>MLP层的作用是让特征向量不同维度之间做充分的交叉，让模型能够抓取到更多的非线性特征和组合特征的信息，这就使深度学习模型在表达能力上较传统机器学习模型大为增强。</p>
 <p>最后是Scoring层，它也被称为输出层。虽然深度学习模型的结构可以非常复杂，但最终我们要预测的目标就是一个分类的概率。如果是点击率预估，就是一个二分类问题，那我们就可以采用逻辑回归作为输出层神经元，而如果是类似图像分类这样的多分类问题，我们往往在输出层采用softmax这样的多分类模型。</p>
 <p>到这里，我们就讲完了Embedding+MLP的五层结构。它的结构重点用一句话总结就是，<strong>对于类别特征，先利用Embedding层进行特征稠密化，再利用Stacking层连接其他特征，输入MLP的多层结构，最后用Scoring层预估结果。</strong></p>
@@ -7437,7 +7437,7 @@
 <p>首先，我们来看看特征选择和模型设计。</p>
 <h3 id="_1">特征选择和模型设计</h3>
 <p>在上一节的实践准备课程中，我们已经为模型训练准备好了可用的训练样本和特征。秉着“类别型特征Embedding化，数值型特征直接输入MLP”的原则，我们选择movieId、userId、movieGenre、userGenre作为Embedding化的特征，选择物品和用户的统计型特征作为直接输入MLP的数值型特征，具体的特征选择你可以看看下面的表格：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/af/94/af3fabdcb119c9e06ddc0f7225bbc094.jpg?wh=1809%2A1156" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/af/94/af3fabdcb119c9e06ddc0f7225bbc094.jpg?wh=1809%2A1156" /></p>
 <p>选择好特征后，就是MLP部分的模型设计了。我们选择了一个三层的MLP结构，其中前两层是128维的全连接层。我们这里采用好评/差评标签作为样本标签，因此要解决的是一个类CTR预估的二分类问题，对于二分类问题，我们最后一层采用单个sigmoid神经元作为输出层就可以了。</p>
 <p>当然了，我知道你肯定对这一步的细节实现有很多问题，比如为什么要选三层的MLP结构，为什么要选sigmoid作为激活函数等等。其实，我们对模型层数和每个层内维度的选择是一个超参数调优的问题，这里的选择不能保证最优，我们需要在实战中根据模型的效果进行超参数的搜索，找到最适合的模型参数。</p>
 <h3 id="embeddingmlptensorflow">Embedding+MLP模型的TensorFlow实现</h3>
@@ -7575,7 +7575,7 @@
 <p>Embedding+MLP主要是由Embedding部分和MLP部分这两部分组成，使用Embedding层是为了将类别型特征转换成Embedding向量，MLP部分是通过多层神经网络拟合优化目标。具体来说，以微软的Deep Crossing为例，模型一共分为5层，从下到上分别是Feature层、Embedding层、Stacking层、MLP层和Scoring层。</p>
 <p>在TensorFlow实践部分，我们利用上节课处理好的特征和训练数据，实现了Sparrow Recsys项目中的第一个深度学习模型。在实践过程中，我们要重点掌握类别型特征的处理方法，模型的定义方式和训练方式，以及最后的模型评估方法。</p>
 <p>我也把这些重点知识总结在了一张表格里，你可以利用它来认真回顾。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4e/67/4e34e77589d386c8924542794dyy1867.jpg?wh=1870%2A1273" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4e/67/4e34e77589d386c8924542794dyy1867.jpg?wh=1870%2A1273" /></p>
 <p>今天，我们一起完成了Embedding MLP模型的实现。在之后的课程中，我们会进一步实现其他深度学习模型，通过模型的评估进行效果上的对比。另外，我们也会利用训练出的深度学习模型完成Sparrow Recsys的猜你喜欢功能，期待与你一起不断完善我们的项目。</p>
 <h2 id="_3">课后思考</h2>
 <p>在我们实现的Embedding+MLP模型中，也有用户Embedding层和物品Embedding层。你觉得从这两个Embedding层中，抽取出来的用户和物品Embedding，能直接用来计算用户和物品之间的相似度吗？为什么？</p>
@@ -7709,8 +7709,6 @@ Consider rewriting this model with the Functional API.</p>2021-01-19</li><br/><l
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

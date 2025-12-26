@@ -14487,7 +14487,7 @@
 <p><strong>分布式缓存</strong>就是指在分布式环境或系统下，把一些热门数据存储到离用户近、离应用近的位置，并尽量存储到更快的设备，以减少远程数据传输的延迟，让用户和应用可以很快访问到想要的数据。这，是不是可以形象地理解为“身手钥钱”随身带呢？</p>
 <p>其实，<strong>我们通常说的分布式数据缓存，属于计算机应用中的缓存的一种</strong>。而计算机应用中的缓存，一般指内存，即内存存储了用户经常访问的数据，用户或应用不再需要到磁盘中去获取相应的数据，大幅提高访问速度。</p>
 <p>如下图所示，数据A是应用经常访问的数据，而数据B很少被应用访问，因此当应用访问数据A时，不需要到磁盘，而直接访问内存即可得到对应的值，速度较快；相反，访问数据B时，由于内存中没有缓存数据B，所以应用需要到磁盘中获取对应的值，速度较慢。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/67/bf/67315610b5f0cb2b14588885a05335bf.png?wh=527%2A220" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/67/bf/67315610b5f0cb2b14588885a05335bf.png?wh=527%2A220" /></p>
 <p>那么今天，我要与你分享的分布式数据存储相关的缓存技术，就是以内存做为磁盘的缓存。</p>
 <h2 id="_2">分布式缓存原理</h2>
 <p>接下来，我以主流的分布式缓存系统Redis和Memcached为例，与你讲述分布式缓存技术，以加深你的理解吧。</p>
@@ -14499,7 +14499,7 @@
 <p>Redis是一个基于内存的key-value数据库，为了方便支持多应用的缓存，比如缓存文本类型、数据库的查询结果（字段与字段对应的值）等等，支持的数据结构不仅有简单的k／v类型，还可以支持List、Set、Hash等复杂类型的存储。</p>
 <p>以Hash这种复杂类型的存储为例，Redis将Hash视作一个整体当作数据库的value（可以是一个对象，比如结构体对象）进行存储。如果把Hash结构的整体看作对象的话，Hash结构里的key-value相当于该对象的属性名和属性值。</p>
 <p>比如，插入Hash数据类型的命令：HMSET test field1 “Hello” field2 “World”中，如下图所示，test为key值， field1 “Hello” field2 “World” 为value值，如果把整个Hash结构看做对象的话，则field1、field2类似于对象中的属性名，“Hello”“World”类似于对象中的属性值。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9f/1a/9f025bfd4d3731d378d01c4c19ede21a.png?wh=912%2A640" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9f/1a/9f025bfd4d3731d378d01c4c19ede21a.png?wh=912%2A640" /></p>
 <p><strong>第二，Redis支持持久化。</strong></p>
 <p>持久化是指，将数据从内存这种易失性存储设备中写入磁盘，从而让数据永久保存。Redis中存储的数据虽然是基于内存的，但它也提供了持久化的机制，主要有两种方式：RDB和AOF。</p>
 <p><strong>RDB</strong>（Redis DataBase），也称快照方式，简单来说就是Redis会定时将内存中的数据备份到磁盘中，形成一个快照，比如每天保存一下过去一周的数据。这样当节点出现故障时，可以根据快照恢复到不同版本的数据。这种方式有一个明显的缺点，是会造成数据丢失，即当节点出现故障时，新数据可能还未备份到磁盘中。</p>
@@ -14527,12 +14527,12 @@
 <li>RDB生成后会发送给备服务器，备服务器通过RDB文件进行数据更新；</li>
 <li>更新完成后，主服务器再将新记录的写操作发送给备服务器，备服务器执行完这些新记录的写操作，便与主服务器的数据保持一致了。</li>
 </ol>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4c/fa/4cc71fd16815139a2af93b9721a586fa.png?wh=632%2A436" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4c/fa/4cc71fd16815139a2af93b9721a586fa.png?wh=632%2A436" /></p>
 <p>简单地说，<strong>部分重同步</strong>就是，当网络恢复后，主数据库将主备数据库断开连接之后的一系列写操作发送给备服务器，备数据库执行这些写操作，从而保证数据保持一致。</p>
 <p>在这种方式的实现中，主备数据库会共同维护一个复制偏移量，这样主数据库就知道应该将哪些写操作发给备数据库，备数据库同步时也知道应该从哪里继续执行操作。</p>
 <p>如图所示，主数据库的复制偏移量为5000时，向备数据库发送了100个字节的数据，发送结束后复制偏移量为5100。</p>
 <p>此时主备数据库连接断开，备数据库没有接收到这100个字节的数据，等到备数据库重新与主数据库连接上之后，会给主数据库发送PSYNC命令，并带上自己的复制偏移量5000，主数据库接收到信息后，根据接收到的复制偏移量，将5000之后的数据发给备数据库，从而完成数据的部分重同步。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3d/93/3da4db478862a8643d278333fdff5e93.png?wh=1344%2A850" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3d/93/3da4db478862a8643d278333fdff5e93.png?wh=1344%2A850" /></p>
 <p>以上，就是分布式缓存系统Redis中涉及的关键技术，包括支持的数据结构、数据持久化方法和数据同步方法，相信通过上面的介绍，你对分布式缓存技术已经有了一定的了解。</p>
 <p>接下来，我再带你学习另一个缓存数据库Memcached。</p>
 <h3 id="memcached">Memcached分布式缓存原理</h3>
@@ -14541,14 +14541,14 @@
 <p>首先，我要先带你了解一下Memcached的集群结构。</p>
 <p>Redis的集群结构是每个节点负责一部分哈希槽，且每个节点可以设计主备。与Redis不同，Memcached集群采用一致性哈希的思路，使用的是Ketama算法。该算法的主要思想就是，<strong>带虚拟节点的一致性哈希算法</strong>。</p>
 <p>在实际应用中，每个物理节点对应100~200个虚拟节点，才能到达一个较好的存储均衡。这里为了方便理解，我对Memcached的集群结构做了简化，如下图所示，物理节点1对应两个虚拟节点1-1、1-2，物理节点2对应三个虚拟节点2-1、2-2和2-3。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/af/68/af2a8805451df9b15d18a8672bd98c68.png?wh=420%2A388" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/af/68/af2a8805451df9b15d18a8672bd98c68.png?wh=420%2A388" /></p>
 <p>采用带虚拟节点的一致性哈希方法，有一个优点是，当添加或移除节点时，不会出现大规模的数据迁移。你可以再回顾下<a href="https://time.geekbang.org/column/article/168940">第25篇文章</a>中的相关内容。</p>
 <p>对于数据结构的支持，Memcached仅支持简单的k／v数据类型，如果想要存储复杂的数据类型，比如List、Set和Hash等，需要客户端自己处理，将其转化为字符串然后进行存储。这样就导致了一个缺点，操作不灵活。比如，Memcached存储的数组中有一个元素需要修改，则需要将整个数组的数据取出来，修改后再整体写入到数据库中 。</p>
 <p>而对于持久化，Memcached是不支持的。这意味着断电时，Memcached中存储的数据将会全部丢失。因为内存是一种易失性存储设备，断电后将不会存储数据。</p>
 <p>在Memcached中，服务器和服务器之间没有任何通信，即自身不支持主备。如果想要实现高可用，需要通过第三方实现。比如，Repcached实现了Memcached的复制功能，支持一主一备，从而使Memcached满足高可用。</p>
 <h3 id="_3">对比分析</h3>
 <p>上面，我以Redis和Memcached这两个主流的分布式缓存系统为例，带你学习了分布式缓存技术。接下来，我以一个表格对它们进行分析对比，以便于你理解和查阅。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4b/91/4b3069a37873b26db686a439a1921691.jpg?wh=3340%2A1670" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4b/91/4b3069a37873b26db686a439a1921691.jpg?wh=3340%2A1670" /></p>
 <h2 id="_4">知识扩展：除了分布式存储中的缓存，还有计算机体系结构和网络中的缓存，它们又分别是什么呢？</h2>
 <p><strong>计算机体系结构中的缓存</strong>，通常是指专用的缓存设备。由于内存和CPU访问速度相差很大，为了提高CPU的性能，计算机内部在CPU与内存之间设置了相应的缓存。</p>
 <p>现在大多数机器分为三级缓存：L1高级缓存、L2高级缓存和L3高级缓存。就访问速度来讲，L1高级缓存 &gt; L2高级缓存 &gt; L3高级缓存&gt;内存。其中，L1高级缓存的访问速度，几乎和CPU中寄存器的访问速度一样快。</p>
@@ -14560,7 +14560,7 @@
 <p>首先，我以水缸的例子带你直观了解了什么是缓存，并引出了什么是分布式数据缓存。分布式数据缓存是以内存作为磁盘的缓存，存储一些用户经常需要用的数据，以提高访问速度。</p>
 <p>其次，我以主流的Redis和Memcached为例，与你介绍了分布式缓存技术中的关键技术，包括支持的数据存储结构（比如k/v、Set、List等）、持久化技术（包括快照方式等）和数据同步技术（具体技术原理，可参见<a href="https://time.geekbang.org/column/article/168963">第26篇文章</a>）。</p>
 <p>最后，我再通过一张思维导图来归纳一下今天的核心知识点吧。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1e/45/1e625c22f729a87ea551f6bbc343f045.png?wh=1116%2A926" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1e/45/1e625c22f729a87ea551f6bbc343f045.png?wh=1116%2A926" /></p>
 <p>相信通过本讲的学习，你已不再觉得分布式缓存有多么神秘了，不管是使用Redis还是看Redis等系统的源码，一定会更容易理解和上手。加油，行动起来吧！</p>
 <h2 id="_6">思考题</h2>
 <p>本讲我主要介绍了Redis和Memcached分布式数据缓存系统，你还知道哪些主流的分布式数据缓存系统呢？它们的缓存核心技术是什么呢？</p>
@@ -14715,8 +14715,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

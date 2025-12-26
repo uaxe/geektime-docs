@@ -14897,18 +14897,18 @@
 <p>我们先来看第一种情况。一个事务的EXEC命令还没有执行时，事务的命令操作是暂存在命令队列中的。此时，如果有其它的并发操作，我们就需要看事务是否使用了WATCH机制。</p>
 <p>WATCH机制的作用是，在事务执行前，监控一个或多个键的值变化情况，当事务调用EXEC命令执行时，WATCH机制会先检查监控的键是否被其它客户端修改了。如果修改了，就放弃事务执行，避免事务的隔离性被破坏。然后，客户端可以再次执行事务，此时，如果没有并发修改事务数据的操作了，事务就能正常执行，隔离性也得到了保证。</p>
 <p>WATCH机制的具体实现是由WATCH命令实现的，我给你举个例子，你可以看下下面的图，进一步理解下WATCH命令的使用。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/4f/73/4f8589410f77df16311dd29131676373.jpg?wh=3000%2A1921" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4f/73/4f8589410f77df16311dd29131676373.jpg?wh=3000%2A1921" /></p>
 <p>我来给你具体解释下图中的内容。</p>
 <p>在t1时，客户端X向实例发送了WATCH命令。实例收到WATCH命令后，开始监测a:stock的值的变化情况。</p>
 <p>紧接着，在t2时，客户端X把MULTI命令和DECR命令发送给实例，实例把DECR命令暂存入命令队列。</p>
 <p>在t3时，客户端Y也给实例发送了一个DECR命令，要修改a:stock的值，实例收到命令后就直接执行了。</p>
 <p>等到t4时，实例收到客户端X发送的EXEC命令，但是，实例的WATCH机制发现a:stock已经被修改了，就会放弃事务执行。这样一来，事务的隔离性就可以得到保证了。</p>
 <p>当然，如果没有使用WATCH机制，在EXEC命令前执行的并发操作是会对数据进行读写的。而且，在执行EXEC命令的时候，事务要操作的数据已经改变了，在这种情况下，Redis并没有做到让事务对其它操作隔离，隔离性也就没有得到保障。下面这张图显示了没有WATCH机制时的情况，你可以看下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8c/57/8ca37debfff91282b9c62a25fd7e9a57.jpg?wh=3000%2A1562" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8c/57/8ca37debfff91282b9c62a25fd7e9a57.jpg?wh=3000%2A1562" /></p>
 <p>在t2时刻，客户端X发送的EXEC命令还没有执行，但是客户端Y的DECR命令就执行了，此时，a:stock的值会被修改，这就无法保证X发起的事务的隔离性了。</p>
 <p>刚刚说的是并发操作在EXEC命令前执行的情况，下面我再来说一说第二种情况：<strong>并发操作在EXEC命令之后被服务器端接收并执行</strong>。</p>
 <p>因为Redis是用单线程执行命令，而且，EXEC命令执行后，Redis会保证先把命令队列中的所有命令执行完。所以，在这种情况下，并发操作不会破坏事务的隔离性，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/11/ae/11a1eff930920a0b423a6e46c23f44ae.jpg?wh=2958%2A1799" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/11/ae/11a1eff930920a0b423a6e46c23f44ae.jpg?wh=2958%2A1799" /></p>
 <p>最后，我们来分析一下Redis事务的持久性属性保证情况。</p>
 <h3 id="_4">持久性</h3>
 <p>因为Redis是内存数据库，所以，数据是否持久化保存完全取决于Redis的持久化配置模式。</p>
@@ -14917,7 +14917,7 @@
 <p>所以，不管Redis采用什么持久化模式，事务的持久性属性是得不到保证的。</p>
 <h2 id="_5">小结</h2>
 <p>在这节课上，我们学习了Redis中的事务实现。Redis通过MULTI、EXEC、DISCARD和WATCH四个命令来支持事务机制，这4个命令的作用，我总结在下面的表中，你可以再看下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/95/50/9571308df0620214d7ccb2f2cc73a250.jpg?wh=2505%2A734" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/95/50/9571308df0620214d7ccb2f2cc73a250.jpg?wh=2505%2A734" /></p>
 <p>事务的ACID属性是我们使用事务进行正确操作的基本要求。通过这节课的分析，我们了解到了，Redis的事务机制可以保证一致性和隔离性，但是无法保证持久性。不过，因为Redis本身是内存数据库，持久性并不是一个必须的属性，我们更加关注的还是原子性、一致性和隔离性这三个属性。</p>
 <p>原子性的情况比较复杂，只有当事务中使用的命令语法有误时，原子性得不到保证，在其它情况下，事务都可以原子性执行。</p>
 <p>所以，我给你一个小建议：<strong>严格按照Redis的命令规范进行程序开发，并且通过code review确保命令的正确性</strong>。这样一来，Redis的事务机制就能被应用在实践中，保证多操作的正确执行。</p>
@@ -15100,8 +15100,6 @@ pipeline.sync();
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

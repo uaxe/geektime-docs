@@ -14164,9 +14164,9 @@
 <p>在当选后，领导者会递增自己的任期编号，并基于任期编号值的大小，来和跟随者协商，最终建立领导关系。<strong>具体说的话，就是跟随者会选择任期编号值最大的节点，作为自己的领导者，而被大多数节点认同的领导者，将成为真正的领导者。</strong></p>
 <p>我举个例子，具体帮你理解一下。</p>
 <p>假设一个ZooKeeper集群，由节点A、B、C组成。其中，领导者A已经宕机，C是新选出来的领导者，B是新的跟随者（为了方便演示，假设B、C已提交提案的事务标识符最大值分别是&lt;1, 10&gt;和&lt;1, 11&gt;，其中1是任期编号，10、11是事务标识符中的计数器值，A宕机前的任期编号也是1）。那么B、C如何协商建立领导关系呢？</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/9a/34/9a31fd8f5d888abfb014b07408c4be34.jpg?wh=1142%2A596" title="图1" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9a/34/9a31fd8f5d888abfb014b07408c4be34.jpg?wh=1142%2A596" title="图1" /></p>
 <p>首先，B、C会把自己的ZAB状态设置为成员发现（DISCOVERY），这就表明，选举（ELECTION）阶段结束了，进入了下一个阶段：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5c/8c/5c933b8033238c2f58ea19c39bf12f8c.jpg?wh=1142%2A564" title="图2" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5c/8c/5c933b8033238c2f58ea19c39bf12f8c.jpg?wh=1142%2A564" title="图2" /></p>
 <p>在这里，我想补充一下，ZAB定义了4种状态，来标识节点的运行状态。</p>
 <ul>
 <li>ELECTION（选举状态）：表明节点在进行领导者选举；</li>
@@ -14176,33 +14176,33 @@
 </ul>
 <p>关于这4种状态，你知道它们是做什么的就可以了。我就强调一点，<strong>只有当集群大多数节点处于广播状态的时候，集群才能提交提案。</strong></p>
 <p>接下来，B会主动联系C，发送给它包含自己接收过的领导者任期编号最大值（也就是前领导者A的任期编号，1）的FOLLOWINFO消息。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f5/56/f5209e12171cffbe1ed4a9b4835eca56.jpg?wh=1142%2A556" title="图3" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f5/56/f5209e12171cffbe1ed4a9b4835eca56.jpg?wh=1142%2A556" title="图3" /></p>
 <p>当C接收来自B的信息时，它会将包含自己事务标识符最大值的LEADINFO消息发给跟随者。</p>
 <p>你要注意，领导者进入到成员发现阶段后，会对任期编号加1，创建新的任期编号，然后基于新任期编号，创建新的事务标识符（也就是&lt;2, 0&gt;）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f5/15/f54d28ba395fa1fd8bfa1f95e2574815.jpg?wh=1142%2A565" title="图4" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f5/15/f54d28ba395fa1fd8bfa1f95e2574815.jpg?wh=1142%2A565" title="图4" /></p>
 <p>当接收到领导者的响应后，跟随者会判断领导者的任期编号是否最新，如果不是，就发起新的选举；如果是，跟随者返回ACKEPOCH消息给领导者。在这里，C的任期编号（也就是2）大于B接受过的其他领导任期编号（也就是旧领导者A的任期编号，1），所以B返回确认响应给C，并设置ZAB状态为数据同步。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ef/79/ef46c226ad137738100c9764dff96879.jpg?wh=1142%2A543" title="图5" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ef/79/ef46c226ad137738100c9764dff96879.jpg?wh=1142%2A543" title="图5" /></p>
 <p>最后，当领导者接收到来自大多数节点的ACKEPOCH消息时，就设置ZAB状态为数据同步。在这里，C接收到了B的消息，再加上C自己，就是大多数了，所以，在接收到来自B的消息后，C设置ZAB状态为数据同步。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0f/41/0f7569a56088a5df3383b64313d55541.jpg?wh=1142%2A544" title="图6" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0f/41/0f7569a56088a5df3383b64313d55541.jpg?wh=1142%2A544" title="图6" /></p>
 <p><strong>现在，ZAB在成员发现阶段确立了领导者的领导关系，之后领导者就可以行使领导职能了。</strong>而这时它首先要解决的就是数据冲突，实现各节点数据的一致性，那么它是怎么做的呢？</p>
 <h3 id="_2">如何处理冲突数据？</h3>
 <p>当进入到数据同步状态后，领导者会根据跟随者的事务标识符最大值，判断以哪种方式处理不一致数据（有DIFF、TRUNC、SNAP这3种方式，后面我会具体说一说）。</p>
 <p>因为C已提交提案的事务标识符最大值（也就是&lt;1, 11&gt;）大于B已提交提案的事务标识符最大值（也就是&lt;1, 10&gt;），所以C会用DIFF的方式修复数据副本的不一致，并返回差异数据（也就是事务标识符为&lt;1, 11&gt;的提案）和NEWLEADER消息给B。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/aa/7a/aa434b6ef27b7e702857d796ae53257a.jpg?wh=1142%2A534" title="图7" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/aa/7a/aa434b6ef27b7e702857d796ae53257a.jpg?wh=1142%2A534" title="图7" /></p>
 <p><strong>在这里，我想强调一点：B已提交提案的最大值，也是它最新提案的最大值。</strong>因为在ZooKeeper实现中，节点退出跟随者状态时（也就是在进入选举前），所有未提交的提案都会被提交。这是ZooKeeper的设计，你知道有这么个事就可以了。</p>
 <p>然后，B修复不一致数据，返回NEWLEADER消息的确认响应给领导者。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/87/06/87308ab8b9ba6eabc9217d0eeba03d06.jpg?wh=1142%2A509" title="图8" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/87/06/87308ab8b9ba6eabc9217d0eeba03d06.jpg?wh=1142%2A509" title="图8" /></p>
 <p>接着，当领导者接收到来自大多数节点的NEWLEADER消息的确认响应，将设置ZAB状态为广播。在这里，C接收到B的确认响应，加上C自己，就是大多数确认了。所以，在接收到来自B的确认响应后，C设置自己的ZAB状态为广播，并发送UPTODATE消息给所有跟随者，通知它们数据同步已经完成了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a5/26/a53e5ea1bbc85f2d80e766bd85382d26.jpg?wh=1142%2A537" title="图9" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a5/26/a53e5ea1bbc85f2d80e766bd85382d26.jpg?wh=1142%2A537" title="图9" /></p>
 <p>最后当B接收到UPTODATE消息时，它就知道数据同步完成了，就设置ZAB状态为广播。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/42/65/42d2162cb833a3b50fd44ba00556ed65.jpg?wh=1142%2A535" title="图10" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/42/65/42d2162cb833a3b50fd44ba00556ed65.jpg?wh=1142%2A535" title="图10" /></p>
 <p>这个时候，集群就可以正常处理写请求了。</p>
 <p>现在，我已经讲完了故障恢复的原理，那接下来，我们就来看一看ZooKeeper到底是怎么实现的吧。</p>
 <h2 id="zookeeper">ZooKeeper如何恢复故障？</h2>
 <h3 id="_3">成员发现</h3>
 <p>成员发现是通过跟随者和领导者交互来完成的，<strong>目标是确保大多数节点对领导者的领导关系没有异议，也就是确立领导者的领导地位。</strong></p>
 <p>大概的实现流程，就像下面这样：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/90/c6/900afb50caffdee9d0fa46cc121893c6.jpg?wh=1142%2A865" title="图11" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/90/c6/900afb50caffdee9d0fa46cc121893c6.jpg?wh=1142%2A865" title="图11" /></p>
 <p>为帮你更好地理解这个流程，我们来走一遍核心代码的流程，加深下印象。</p>
 <p>第一步，领导者选举结束，节点进入跟随者状态或者领导者状态后，它们会分别设置ZAB状态为成员发现。具体来说就是：</p>
 <ul>
@@ -14249,7 +14249,7 @@
 <p>当跟随者和领导者设置ZAB状态为数据同步，它们也就是进入了数据同步阶段，那在ZooKeeper中数据同步是如何实现的呢？</p>
 <h3 id="_4">数据同步</h3>
 <p>数据同步也是通过跟随者和领导者交互来完成的，目标是确保跟随者节点上的数据与领导者节点上数据是一致的。大概的实现流程，如图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6e/44/6ea74f1a56a9fd0f39b82b25d2814c44.jpg?wh=1142%2A866" title="图12" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6e/44/6ea74f1a56a9fd0f39b82b25d2814c44.jpg?wh=1142%2A866" title="图12" /></p>
 <p>为了方便你理解，咱们一起走一遍核心代码的流程，加深下印象。</p>
 <p>第一，在LearnerHandler.run()函数中，领导者调用syncFollower()函数，根据跟随者的事务标识符值最大值，判断用哪种方式处理不一致数据，把已经提交提案和未提交提案都同步给跟随者：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>peerLastZxid = ss.getLastZxid();
@@ -14446,8 +14446,6 @@ zk这个commit 的特性（退出跟随者时commit），会不会影响顺序�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

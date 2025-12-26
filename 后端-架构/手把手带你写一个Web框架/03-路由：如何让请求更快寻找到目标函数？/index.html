@@ -14603,7 +14603,7 @@
 <p>每一个请求逻辑，都有一个控制器ControllerHandler与之对应。那么一个请求，如何查找到指定的控制器呢？这就是今天要研究的内容：路由，我将带你理解路由，并且实现一个高效、易用的路由模块。</p>
 <h2 id="_1">路由设计思路</h2>
 <p>相信你对路由是干啥的已经有大致了解，具体来说就是让 Web 服务器根据规则，理解 HTTP 请求中的信息，匹配查找出对应的控制器，再将请求传递给控制器执行业务逻辑，<strong>简单来说就是制定匹配规则</strong>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/11/7b/11dee96201a6f32358d8cceced0f137b.jpg?wh=1920x1080" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/11/7b/11dee96201a6f32358d8cceced0f137b.jpg?wh=1920x1080" /></p>
 <p>但是就是这么简单的功能，<strong>路由的设计感不同，可用性有天壤之别</strong>。为什么这么说呢，我们带着这个问题，先来梳理一下制定路由规则需要的信息。</p>
 <p>路由可以使用HTTP请求体中的哪些信息，得回顾我们第一节课讲 HTTP 的内容。</p>
 <p>一个 HTTP 请求包含请求头和请求体。请求体内一般存放的是请求的业务数据，是基于具体控制业务需要的，所以，我们不会用来做路由。</p>
@@ -14617,7 +14617,7 @@
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>Referer:<span class="w"> </span>https://developer.mozilla.org/testpage.html
 </code></pre></div>
 <p>每一行的信息和含义都是非常大的课题，也与今天要讲的内容无关，我们这里要关注的是 HTTP 请求的第一行，叫做 Request Line，由三个部分组成：<strong>Method、Request-URI 和 HTTP-Version</strong>（<a href="https://datatracker.ietf.org/doc/html/rfc2616">RFC2616</a>）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7b/d7/7bd9061513922ff9e748f4ed90422dd7.jpg?wh=1920x1080" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7b/d7/7bd9061513922ff9e748f4ed90422dd7.jpg?wh=1920x1080" /></p>
 <p>Method 是HTTP的方法，标识对服务端资源的操作属性。它包含多个方法，每个方法都代表不同的操作属性。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Method<span class="w">         </span>=<span class="w"> </span>&quot;OPTIONS&quot;<span class="w">                </span>;<span class="w"> </span>Section<span class="w"> </span>9.2
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>|<span class="w"> </span>&quot;GET&quot;<span class="w">                    </span>;<span class="w"> </span>Section<span class="w"> </span>9.3
@@ -14631,7 +14631,7 @@
 <a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>extension-method<span class="w"> </span>=<span class="w"> </span>token
 </code></pre></div>
 <p>Request-URI是请求路径，也就是浏览器请求地址中域名外的剩余部分。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a8/ac/a8ca2560e0096b2e364f569079496eac.jpg?wh=1920x1080" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a8/ac/a8ca2560e0096b2e364f569079496eac.jpg?wh=1920x1080" /></p>
 <p>HTTP-Version 是 HTTP 的协议版本，目前常见的有1.0、1.1、2.0。</p>
 <p>Web Service 在路由中使用的就是Method和Request-URI这两个部分。了解制定路由规则时，请求体中可以使用的元素之后，我们再回答刚才的问题，什么是路由的设计感。</p>
 <p>这里说的设计感指的是：<strong>框架设计者希望使用者如何用路由模块</strong>。</p>
@@ -14661,7 +14661,7 @@
 </ul>
 <p>这个需求是针对需求2改进的，因为 URL 中某个字段或者某些字段并不是固定的，是按照一定规则（比如是数字）变化的。那么，我们希望路由也能够支持这个规则，将这个动态变化的路由URL匹配出来。所以我们需要，使用自己定义的路由来补充，只支持静态匹配的DefaultServerMux默认路由。</p>
 <p>现在四个最基本的需求我们已经整理出来了，接下来通过一个例子来解释下，比如我们需要能够支持一个日志网站的这些功能：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/dc/62/dc6e322c49be2334954d85b9883d0862.jpg?wh=1920x1080" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/dc/62/dc6e322c49be2334954d85b9883d0862.jpg?wh=1920x1080" /></p>
 <p>接下来就是今天的重头戏了，要匹配这样的路由列表，路由规则定义代码怎么写呢？我把最终的使用代码贴在这里，你可以先看看，然后我们一步步实现，分析清楚每行代码背后的方法如何定义、为什么要这么定义。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1">// 注册路由规则</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kd">func</span><span class="w"> </span><span class="nx">registerRouter</span><span class="p">(</span><span class="nx">core</span><span class="w"> </span><span class="o">*</span><span class="nx">framework</span><span class="p">.</span><span class="nx">Core</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
@@ -14683,7 +14683,7 @@
 <p>（这段代码会在最后补充到上节课中创建的业务目录中的路由文件router.go。）</p>
 <h2 id="http">实现HTTP方法和静态路由匹配</h2>
 <p>我们首先看第一个需求和第二个需求。由于有两个待匹配的规则，Request-URI 和 Method，所以自然联想到可以使用两级哈希表来创建映射。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/13/dc/13377ea20d08bcf39b3f1b735eca83dc.jpg?wh=1920x1232" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/13/dc/13377ea20d08bcf39b3f1b735eca83dc.jpg?wh=1920x1232" />
 第一级hash是请求Method，第二级hash是Request-URI。</p>
 <p>这个路由map我们会存放在第一讲定义的Core结构里（如下），并且在初始化 Core 结构的时候，初始化第一层map。所以还是拉出<a href="https://github.com/gohade/coredemo/blob/geekbang/03/framework/core.go">geekbang/03分支</a>，来更新框架文件夹中的core.go 文件：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1">// 框架核心结构</span>
@@ -14810,9 +14810,9 @@
 </code></pre></div>
 <p>看下这个Group方法，它的参数是一个前缀字符串，返回值应该是包含Get、Post、Put、Delete 方法的一个结构，我们给这个结构命名Group，在其中实现各种方法。</p>
 <p>在这里我们暂停一下，看看有没有优化点。</p>
-<p>这么设计直接返回 Group 结构，确实可以实现功能，但试想一下，随着框架发展，如果我们发现Group结构的具体实现并不符合我们的要求了，需要引入实现另一个Group2结构，该怎么办？直接修改Group结构的具体实现么？<img alt="" src="https://static001.geekbang.org/resource/image/b4/ef/b40828bd1dbc2651dc649ac5ecd29fef.jpg?wh=1920x1080" /></p>
+<p>这么设计直接返回 Group 结构，确实可以实现功能，但试想一下，随着框架发展，如果我们发现Group结构的具体实现并不符合我们的要求了，需要引入实现另一个Group2结构，该怎么办？直接修改Group结构的具体实现么？<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b4/ef/b40828bd1dbc2651dc649ac5ecd29fef.jpg?wh=1920x1080" /></p>
 <p><strong>其实更好的办法是使用接口来替代结构定义</strong>。在框架设计之初，我们要保证框架使用者，在最少的改动中，就能流畅迁移到Group2，这个时候，如果返回接口 IGroup，而不是直接返回 Group 结构，就不需要修改core.Group的定义了，只需要修改core.Group的具体实现，返回Group2就可以。
-<img alt="" src="https://static001.geekbang.org/resource/image/2a/9b/2a969d91845f3fe1f8afd0144273509b.jpg?wh=1920x1080" />
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2a/9b/2a969d91845f3fe1f8afd0144273509b.jpg?wh=1920x1080" />
 尽量使用接口来解耦合，是一种比较好的设计思路。</p>
 <p>怎么实现呢，这里我们定义 IGroup 接口来作为Group方法的返回值。在框架文件夹下创建<a href="https://github.com/gohade/coredemo/blob/geekbang/03/framework/group.go">group.go文件</a>来存放分组相关的信息：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1">// IGroup 代表前缀分组</span>
@@ -14851,7 +14851,7 @@
 <a id="__codelineno-10-25" name="__codelineno-10-25" href="#__codelineno-10-25"></a><span class="k">return</span><span class="w"> </span><span class="nx">NewGroup</span><span class="p">(</span><span class="nx">c</span><span class="p">,</span><span class="w"> </span><span class="nx">prefix</span><span class="p">)</span>
 <a id="__codelineno-10-26" name="__codelineno-10-26" href="#__codelineno-10-26"></a><span class="p">}</span>
 </code></pre></div>
-<p>这个 Group 结构包含自身的前缀地址和Core结构的指针。它的 Get、Put、Post、Delete 方法就是把这个Group结构的前缀地址和目标地址组合起来，作为Core的Request-URI地址。<img alt="" src="https://static001.geekbang.org/resource/image/b5/f8/b5f6f18b380db972600032dcc97dfff8.jpg?wh=1920x1080" /></p>
+<p>这个 Group 结构包含自身的前缀地址和Core结构的指针。它的 Get、Put、Post、Delete 方法就是把这个Group结构的前缀地址和目标地址组合起来，作为Core的Request-URI地址。<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b5/f8/b5f6f18b380db972600032dcc97dfff8.jpg?wh=1920x1080" /></p>
 <p>讲到这里，有的同学可能不以为然，觉得这不就是个人代码风格的问题吗。其实并不是，希望你能够意识到，这个选择并不仅仅是代码风格，而是关于框架设计、关于代码扩展性。</p>
 <p>接口是一种协议，它忽略具体的实现，定义的是两个逻辑结构的交互，因为两个函数之间定义的是一种约定，不依赖具体的实现。</p>
 <p>你可以这么判断：<strong>如果你觉得这个模块是完整的，而且后续希望有扩展的可能性，那么就应该尽量使用接口来替代实现</strong>。在代码中，多大程度使用接口进行逻辑结构的交互，是评价框架代码可扩展性的一个很好的标准。这种思维会贯穿在我们整个框架的设计中，后续我会时不时再提起的。</p>
@@ -14884,7 +14884,7 @@
 <a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="mi">4</span><span class="w"> </span><span class="o">/</span><span class="nx">subject</span><span class="o">/</span><span class="nx">name</span><span class="o">/</span><span class="nx">age</span>
 <a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="mi">5</span><span class="w"> </span><span class="o">/</span><span class="nx">subject</span><span class="o">/</span><span class="p">:</span><span class="nx">id</span><span class="o">/</span><span class="nx">name</span>
 </code></pre></div>
-<p>画成图更清晰一些：<img alt="" src="https://static001.geekbang.org/resource/image/68/98/6837822864392bbb5e7345518448b098.jpg?wh=1920x1080" /></p>
+<p>画成图更清晰一些：<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/68/98/6837822864392bbb5e7345518448b098.jpg?wh=1920x1080" /></p>
 <p>这个trie树是按照路由地址的每个段(segment)来切分的，每个segment在trie树中都能找到对应节点，每个节点保存一个segment。树中，每个叶子节点都代表一个URI，对于中间节点来说，有的中间节点代表一个URI（比如上图中的 /subject/name），而有的中间节点并不是一个URI（因为没有路由规则对应这个URI）。</p>
 <p>现在分析清楚了，我们开始动手实现trie树。还是照旧先明确下可以分为几步：</p>
 <ol>
@@ -15166,14 +15166,14 @@
 <a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="p">}</span>
 </code></pre></div>
 <p>来看服务启动情况：访问地址/user/login 匹配路由UserLoginContorller。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/df/52/df2cf7aaf2be03c6da8bb8e72a10fd52.png?wh=684x191" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/df/52/df2cf7aaf2be03c6da8bb8e72a10fd52.png?wh=684x191" /></p>
 <p>访问地址/subject/list/all 匹配路由SubjectListController。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b5/0a/b5f4248d9ee478eed83b121c886c640a.png?wh=663x267" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b5/0a/b5f4248d9ee478eed83b121c886c640a.png?wh=663x267" /></p>
 <p>访问地址 /subject/100 匹配动态路由 SubjectGetController。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a6/f0/a6f095eb721b20dbeeb6952aa24df7f0.png?wh=655x227" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a6/f0/a6f095eb721b20dbeeb6952aa24df7f0.png?wh=655x227" /></p>
 <p>路由规则符合要求！</p>
 <p>今天的文件及代码结构如下，新建的文件夹多一点你可以对照着GitHub再看看，代码地址在<a href="https://github.com/gohade/coredemo/tree/geekbang/03">geekbang/03</a>分支上：
-<img alt="" src="https://static001.geekbang.org/resource/image/c2/3c/c2518fc8d20034aacb93b5e509375b3c.png?wh=726x942" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c2/3c/c2518fc8d20034aacb93b5e509375b3c.png?wh=726x942" /></p>
 <h2 id="_6">小结</h2>
 <p>在这一讲，我们一步步实现了满足四个需求的路由：HTTP方法匹配、批量通用前缀、静态路由匹配和动态路由匹配。</p>
 <p>我们使用IGroup结构和在Core中定义key为方法的路由，实现了HTTP方法匹配、批量通用前缀这两个需求，并且用哈希来实现静态路由匹配，之后我们使用trie树算法替代哈希算法，实现了动态路由匹配的需求。</p>
@@ -15373,8 +15373,6 @@ return NewGroup(c, prefix)
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

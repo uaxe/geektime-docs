@@ -6383,7 +6383,7 @@
 <p>在本模块中，我将把几个常用的监控部分给梳理一下。前面我们提到过，在性能监控图谱中，有操作系统、应用服务器、中间件、队列、缓存、数据库、网络、前端、负载均衡、Web服务器、存储、代码等很多需要监控的点。</p>
 <p>显然这些监控点不能在一个专栏中全部覆盖并一一细化，我只能找最常用的几个，做些逻辑思路的说明，同时也把具体的实现描述出来。如果你遇到了其他的组件，也需要一一实现这些监控。</p>
 <p>在本篇中，主要想说明白下图的这个监控逻辑。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e0/39/e0aa269a7f528f393b859cc8ed69ac39.jpg?wh=1894%2A1022" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e0/39/e0aa269a7f528f393b859cc8ed69ac39.jpg?wh=1894%2A1022" /></p>
 <p>这应该是现在最流行的一套监控逻辑了吧。</p>
 <p>我今天把常见的使用Grafana、Prometheus、InfluxDB、Exporters的数据展示方式说一下，如果你刚进入性能测试领域，也能有一个感性的认识。</p>
 <p>有测试工具，有监控工具，才能做后续的性能分析和瓶颈定位，所以有必要把这些工具的逻辑跟你摆一摆。</p>
@@ -6391,11 +6391,11 @@
 <p>我先说明一下JMeter和node_exporter到Grafana的数据展示逻辑。至于其他的Exporter，我就不再解释这个逻辑了，只说监控分析的部分。</p>
 <h2 id="jmeterinfluxdbgrafana">JMeter+InfluxDB+Grafana的数据展示逻辑</h2>
 <p>一般情况下，我们用JMeter做压力测试时，都是使用JMeter的控制台来查看结果。如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/60/75/60469fd6df4eff032fe0ce161963f675.png?wh=1189%2A397" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/60/75/60469fd6df4eff032fe0ce161963f675.png?wh=1189%2A397" /></p>
 <p>或者装个插件来看结果：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bd/32/bdcaa07b1ce26ffe504a7fde931b1d32.png?wh=1202%2A512" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bd/32/bdcaa07b1ce26ffe504a7fde931b1d32.png?wh=1202%2A512" /></p>
 <p>或者用JMeter来生成HTML：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/98/f2/98d050b5df8554a7109e3e532e0781f2.png?wh=1001%2A555" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/98/f2/98d050b5df8554a7109e3e532e0781f2.png?wh=1001%2A555" /></p>
 <p>这样看都没有问题，我们在前面也强调过，对于压力工具来说，我们最多只关心三条曲线的数据：TPS（T由测试目标定义）、响应时间、错误率。这里的错误率还只是辅助排查问题的曲线，没有问题时，只看TPS和响应时间即可。</p>
 <p>不过采取以上三种方式有几个方面的问题。</p>
 <ol>
@@ -6408,13 +6408,13 @@
 <p>用JMeter的Backend Listener帮我们实时发送数据到InfluxDB或Graphite可以解决这样的问题。Graphite Backend Listener的支持是在JMeter 2.13版本，InfluxdDB Backend Listener的支持是在JMeter 3.3的版本，它们都是用异步的方式把数据发送出来，以便查看。</p>
 <p>其实有这个JMeter发送给InfluxDB的数据之后，我们不需要看上面的那些HTML数据，也可以直观地看到系统性能的性能趋势。并且这样保存下来的数据，在测试结束后想再次查看也比较方便比对。</p>
 <p>JMeter+InfluxDB+Grafana的结构如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/60/d6/60e7006b3baf95393080b302ccab9fd6.jpg?wh=1814%2A842" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/60/d6/60e7006b3baf95393080b302ccab9fd6.jpg?wh=1814%2A842" /></p>
 <p>在这个结构中，JMeter发送压力到服务器的同时，统计下TPS、响应时间、线程数、错误率等信息。默认每30秒在控制台输出一次结果（在jmeter.properties中有一个参数#summariser.interval=30可以控制）。配置了Backend Listener之后，将统计出的结果异步发送到InfluxDB中。最后在Grafana中配置InfluxDB数据源和JMeter显示模板。</p>
 <p>然后就可以实时查看JMeter的测试结果了，这里看到的数据和控制台的数据是一样。</p>
 <p>但如果这么简单就说完了，这篇文章也就没价值了。下面我们来说一下，数据的传输和展示逻辑。</p>
 <h3 id="jmeterbackend-listener">JMeter中Backend Listener的配置</h3>
 <p>下面我们就InfluxDB的Backend Listener做个说明。它的配置比较简单，在脚本中加上即可。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b1/38/b1da92bbdf07f81f80c17a863a1ae238.png?wh=1358%2A345" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b1/38/b1da92bbdf07f81f80c17a863a1ae238.png?wh=1358%2A345" /></p>
 <p>我们先配置好influxdb Url、application等信息，application这个配置可以看成是场景名。</p>
 <p>那么JMeter如何将数据发给InfluxDB呢？请看源码中的关键代码，如下所示：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>private void addMetrics(String transaction, SamplerMetric metric) {
@@ -6537,12 +6537,12 @@
 <p>在Grafana中显示的时候，就是从这个表中取出的数据，根据时序做的曲线。</p>
 <h3 id="grafana">Grafana中的配置</h3>
 <p>有了JMeter发送到InfluxDB中的数据，下面就来配置一下Grafana中的展示。首先，要配置一个InfluxDB数据源。如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/88/c8/880584ed313336eac49fe7fe6f82a3c8.png?wh=875%2A926" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/88/c8/880584ed313336eac49fe7fe6f82a3c8.png?wh=875%2A926" /></p>
 <p>在这里配置好URL、Database、User、Password之后，直接点击保存即可。</p>
 <p>然后添加一个JMeter dashboard，我们常用的dashboard是Grafana官方ID为5496的模板。导入进来后，选择好对应的数据源。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f7/82/f7291868468ec639efda5b24b2555182.png?wh=880%2A438" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f7/82/f7291868468ec639efda5b24b2555182.png?wh=880%2A438" /></p>
 <p>然后就看到界面了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/97/f3/97095aac53edf2d164e25de3db3221f3.png?wh=1845%2A777" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/97/f3/97095aac53edf2d164e25de3db3221f3.png?wh=1845%2A777" /></p>
 <p>这时还没有数据，我们稍后做个示例，看下JMeter中的数据怎么和这个界面的数据对应起来。</p>
 <p>我们先看下图中两个重要的数据查询语句吧。</p>
 <p>TPS曲线：</p>
@@ -6555,23 +6555,23 @@
 </code></pre></div>
 <p>这里是用95 pct内的响应时间画出来的曲线。</p>
 <p>整体展示出来的效果如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ff/3d/ffac987c827b103fef240916f7cb233d.png?wh=1843%2A777" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ff/3d/ffac987c827b103fef240916f7cb233d.png?wh=1843%2A777" /></p>
 <h3 id="_1">数据比对</h3>
 <p>首先，我们在JMeter中配置一个简单的场景。10个线程，每个线程迭代10次，以及两个HTTP请求。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/55/dc/5546c4449baf0e59d477095a93d717dc.png?wh=719%2A282" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/55/dc/5546c4449baf0e59d477095a93d717dc.png?wh=719%2A282" /></p>
 <p>也就是说，这时会产生10x10x2=200次请求。我们用JMeter跑起来看一下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/92/b9/92d1144a5e8d9ebb7fec246777431bb9.png?wh=1004%2A71" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/92/b9/92d1144a5e8d9ebb7fec246777431bb9.png?wh=1004%2A71" /></p>
 <p>看到了吧，这个请求数和我们预想的一样。下面我们看一下Grafana中展示出来的结果。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ff/55/ffb38e433239eeb4712887f7d9723155.png?wh=1848%2A833" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ff/55/ffb38e433239eeb4712887f7d9723155.png?wh=1848%2A833" /></p>
 <p>还有针对每个事务的统计情况。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3b/47/3b921720759c06ea39673ec5c84a8047.png?wh=1851%2A780" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3b/47/3b921720759c06ea39673ec5c84a8047.png?wh=1851%2A780" /></p>
 <p>至此，JMeter到Grafana的展示过程就完成了。以后我们就不用再保存JMeter的执行结果了，也不用等着JMeter输出HTML了。</p>
 <h2 id="node_exporterprometheusgrafana">node_exporter+Prometheus+Grafana的数据展示逻辑</h2>
 <p>对性能测试来说，在常用的Grafana+Prometheus+Exporter的逻辑中，第一步要看的就是操作系统资源了。所以在这一篇中，我们将以node_exporter为例来说明一下操作系统抽取数据的逻辑，以便知道监控数据的来源，至于数据的含义，我们将在后续的文章中继续描述。</p>
 <p>首先，我们还是要画一个图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/39/6b/39a970eea119124245e2318779ec7c6b.jpg?wh=744%2A1246" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/39/6b/39a970eea119124245e2318779ec7c6b.jpg?wh=744%2A1246" /></p>
 <p>现在node_exporter可以支持很多个操作系统了。官方列表如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/76/e9/76c6d768b427dd0e3003f9c78a57b3e9.png?wh=1154%2A751" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/76/e9/76c6d768b427dd0e3003f9c78a57b3e9.png?wh=1154%2A751" /></p>
 <p>当然不是说只支持这些，你也可以扩展自己的Exporter。</p>
 <h3 id="node_exporter">配置node_exporter</h3>
 <p>node_exporter目录如下：</p>
@@ -6622,9 +6622,9 @@
 <p>这样就行了吗？当然不是。根据上面的流程图，我们还需要配置Grafana。</p>
 <h3 id="grafana_1">配置Grafana</h3>
 <p>首先配置一个数据源，非常简单。如下所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7f/04/7fdde673c4aabe7d2b0293384237dc04.png?wh=492%2A680" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7f/04/7fdde673c4aabe7d2b0293384237dc04.png?wh=492%2A680" /></p>
 <p>再配置一个node_exporter的模板，比如我这里选择了官方模板（ID：11074），展示如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/33/00/33c880ff5ba645285f6e6dfbd32aed00.png?wh=1861%2A992" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/33/00/33c880ff5ba645285f6e6dfbd32aed00.png?wh=1861%2A992" /></p>
 <h3 id="_2">数据逻辑说明</h3>
 <p>说明完上面的过程之后，对我们做性能测试和分析的人来说，最重要的，就是要知道数据的来源和含义了。</p>
 <p>拿上面图中的CPU使用率来说吧（因为CPU使用率是非常重要的一个计数器，所以我们今天先拿它来开刀）。</p>
@@ -6636,9 +6636,9 @@
 </code></pre></div>
 <p>这些都是从Prometheus中取出来的数据，查询语句读了Prometheus中<code>node_cpu_seconds_total</code>的不同的模块数据。</p>
 <p>下面我们来看一下，<code>node_exporter</code>暴露出来的计数器。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a6/b0/a6a96e9ead348d8d206c8f10e1890db0.png?wh=682%2A412" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a6/b0/a6a96e9ead348d8d206c8f10e1890db0.png?wh=682%2A412" /></p>
 <p>这些值和top一样，都来自于<code>/proc/</code>目录。下面这张图是top数据，我们可以比对一下。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/2d/50/2d62f76de8535a92caa3c0e140cba250.png?wh=673%2A393" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2d/50/2d62f76de8535a92caa3c0e140cba250.png?wh=673%2A393" /></p>
 <p>到此，我们就了解到了操作系统中监控数据的取值逻辑了，也就是从操作系统本身的计数器中取出值来，然后传给Prometheus，再由Grafana中的query语句查出相应的数据，最后由Grafana展示在界面上。</p>
 <h2 id="_3">总结</h2>
 <p>为什么要解释数据的逻辑呢？</p>
@@ -6818,8 +6818,6 @@ JMeter实际上是将数据推送到Influxdb中，Influxdb本身对外提供了H
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

@@ -6309,10 +6309,10 @@
 <p>对性能优化比较有经验的人（或者说见过世面比较多的人）都会知道，当一个系统调到非常精致的程度时，基本上会卡在两个环节上，对计算密集型的应用来说，会卡在CPU上；对I/O密集型的应用来说，瓶颈会卡在I/O上。</p>
 <p>我们对I/O的判断逻辑关系是什么呢？</p>
 <p>我们先画一个I/O基本的逻辑过程。我们很多人嘴上说I/O，其实脑子里想的都是Disk I/O，但实际上一个数据要想写到磁盘当中，没那么容易，步骤并不简单。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0b/0c/0b8dd1fa8ddda518e666546205d9170c.jpg?wh=1632%2A1729" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0b/0c/0b8dd1fa8ddda518e666546205d9170c.jpg?wh=1632%2A1729" /></p>
 <p>这个简化的图是思虑再三的结果。</p>
 <p>I/O有很多原理细节，那我们如何能快速地做出相应的判断呢？首先要祭出的一个工具就是<code>iostat</code>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b8/31/b8de645585fa5804e26929c88c579031.png?wh=720%2A405" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b8/31/b8de645585fa5804e26929c88c579031.png?wh=720%2A405" /></p>
 <p>在这张图中，我们取出一条数据来做详细看下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Device:   rrqm/s   wrqm/s     r/s     w/s    rkB/s    wkB/s  avgrq-sz
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>vda        0.00     0.67   18.33  114.33   540.00 54073.33   823.32
@@ -6355,35 +6355,35 @@
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>[12766211.190964] Killed process 32188 (java) total-vm:5861784kB, anon-rss:1416044kB, file-rss:0kB, shmem-rss:0kB
 </code></pre></div>
 <p>这种情况只要出现，TPS肯定会掉下来，如果你有负载均衡的话，压力工具中的事务还是可能有成功的。但如果你只有一个应用节点，或者所有应用节点都被<code>OOM Killer</code>给干掉了，那TPS就会是这样的结果。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/38/83/38825aee9c3d56819c3e242382bbb483.png?wh=826%2A208" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/38/83/38825aee9c3d56819c3e242382bbb483.png?wh=826%2A208" /></p>
 <p>对内存监控，可以看到这样的趋势：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7b/3a/7b2cf887b969f5684b266ee82869663a.png?wh=1412%2A281" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7b/3a/7b2cf887b969f5684b266ee82869663a.png?wh=1412%2A281" /></p>
 <p>内存慢慢被耗光，但是杀掉应用进程之后，<code>free</code>内存立即就有了。你看上面这个图，就是一个机器上有两个节点，先被杀了一个，另一个接着泄露，又把内存耗光了，于是又被杀掉，最后内存全都空闲了。</p>
 <p>在我的性能工作生涯中，这样的例子还挺常见。当然对这种情况的分析定位，只看物理内存已经没有意义了，更重要的是看应用的内存是如何被消耗光的。</p>
 <p>对于内存的分析，你还可以用<code>nmon</code>和<code>cat/proc/meminfo</code>看到更多信息。如果你的应用是需要大页处理的，特别是大数据类的应用，需要关注下<code>HugePages</code>相关的计数器。</p>
 <p>内存我们就说到这里，总之，要关注<code>available</code>内存的值。</p>
 <h2 id="network">NetWork</h2>
 <p>这里我们就来到了网络分析的部分了，在说握手之前，我们先看网络的分析决策链。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ed/2c/ed8a7d9ca55cc58d25db9f07bc57b42c.jpg?wh=1116%2A1094" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ed/2c/ed8a7d9ca55cc58d25db9f07bc57b42c.jpg?wh=1116%2A1094" /></p>
 <p>请看上图中，在判断了瓶颈在网络上之后，如果知道某个进程的网络流量大，首先肯定是要考虑减少流量，当然要在保证业务正常运行，TPS也不降低的情况下。</p>
 <h3 id="recv_qsend_q">Recv_Q和Send_Q</h3>
 <p>当然我们还要干一件事，就是可能你并不知道是在哪个具体的环节上出了问题，那就要学会判断了。网络<code>I/O</code>栈也并不简单，看下图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/58/0f/5837c5a68264aaf8b5a870281cf8060f.png?wh=1592%2A895" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/58/0f/5837c5a68264aaf8b5a870281cf8060f.png?wh=1592%2A895" /></p>
 <p>数据发送过程是这样的。</p>
 <p>应用把数据给到<code>tcp_wmem</code>就结束它的工作了，由内核接过来之后，经过传输层，再经过队列、环形缓冲区，最后通过网卡发出去。</p>
 <p>数据接收过程则是这样的。</p>
 <p>网卡把数据接过来，经过队列、环形缓冲区，再经过传输层，最后通过<code>tcp_rmem</code>给到应用。</p>
 <p>你似乎懂了对不对？那么在这个过程中，我们有什么需要关注的呢？</p>
 <p>首先肯定是看队列，通过<code>netstat</code>或其他命令可以看到<code>Recv_Q</code>和<code>Send_Q</code>，这两项至少可以告诉你瓶颈会在哪一端。如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6f/13/6f2fbd3c7299a64a8a28ace03bf84613.jpg?wh=2063%2A681" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6f/13/6f2fbd3c7299a64a8a28ace03bf84613.jpg?wh=2063%2A681" /></p>
 <p>我画个表清晰地判断一下瓶颈点。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/be/d1/bef88cefe67796c856f29dc89f4510d1.png?wh=1068%2A383" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/be/d1/bef88cefe67796c856f29dc89f4510d1.png?wh=1068%2A383" /></p>
 <p>其实这个过程中，我还没有把防火墙加进去，甚至我都没说<code>NAT</code>的逻辑，这些基础知识你需要自己先做足功课。</p>
 <p>在我们做性能分析的过程中，基本上，基于上面这个表格就够通过接收和发送判断瓶颈点发生在谁身上了。</p>
 <p>但是，要是这些队列都没有值，是不是网络就算好了呢？还不是。</p>
 <h3 id="_1">三次握手和四次挥手</h3>
 <p>我们先看握手图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a6/45/a68fb795457f127bb0c24a065bf11945.jpg?wh=1307%2A620" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a6/45/a68fb795457f127bb0c24a065bf11945.jpg?wh=1307%2A620" /></p>
 <p>我发现一点，很多人以为三次握手是非常容易理解的，但是没几个人能判断出和它相关的问题。</p>
 <p>握手的过程，我就不说了，主要看这里面的两个队列：半连接队列和全连接队列。</p>
 <p>在B只接到第一个<code>syn</code>包的时候，把这个连接放到半连接队列中，当接到<code>ack</code>的时候才放到全连接队列中。这两个队列如果有问题，都到不了发送接收数据的时候，你就看到报错了。</p>
@@ -6408,7 +6408,7 @@
 </ol>
 <p>我们再来看下四次挥手。我遇到性能测试过程中的挥手问题，有很多都是做性能分析的人在不了解的情况下就去做各种优化动作而产生的。</p>
 <p>先看一下TCP挥手图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/69/88/69a6fc7664ae937d13d241a255989988.jpg?wh=1307%2A890" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/69/88/69a6fc7664ae937d13d241a255989988.jpg?wh=1307%2A890" /></p>
 <p>在挥手的逻辑中，和性能相关的问题真的非常少。</p>
 <p>但有一个点是经常会问到的，那就是<code>TIME_WAIT</code>。不知道为什么，很多人看到<code>TIME_WAIT</code>就紧张，就想去处理掉，于是搜索一圈，哦，要改<code>recycle/reuse</code>的TCP参数，要改<code>fin_time_out</code>值。</p>
 <p>至于为什么要处理<code>TIME_WAIT</code>，却没几个人能回答得上来。</p>
@@ -6420,7 +6420,7 @@
 <h2 id="system">System</h2>
 <p>确切地说，在性能测试分析的领域里，System似乎实在是没有什么可写的地方。</p>
 <p>我们最常见的System的计数器是<code>in(interrupts:中断)</code>和<code>cs(context switch：上下文切换)</code>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c4/06/c4b16ca370a2ffa1482915cf3ad57206.png?wh=946%2A395" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c4/06/c4b16ca370a2ffa1482915cf3ad57206.png?wh=946%2A395" /></p>
 <p>因为这是我能找得到的最疯狂的System计数器了。</p>
 <p>中断的逻辑在前面跟你说过了。</p>
 <p><code>cs</code>也比较容易理解，就是CPU不得不转到另一件事情上，听这一句你就会知道，中断时肯定会有<code>cs</code>。但是不止中断会引起cs，还有多任务处理也会导致<code>cs</code>。</p>
@@ -6428,9 +6428,9 @@
 <p>在我们的这个图中，显然是由于<code>in</code>引起的<code>cs</code>，CPU队列那么高也是由<code>in</code>导致的。像这样的问题，你可以去看我们在上篇文章中提到的<code>si CPU</code>高的那个分析链了。</p>
 <h2 id="swap">Swap</h2>
 <p>Swap的逻辑是什么呢？它是在磁盘上创建的一个空间，当物理内存不够的时候，可以保存物理内存里的数据。如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/18/6b/1805402973701416c23c16003af5c06b.jpg?wh=2412%2A820" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/18/6b/1805402973701416c23c16003af5c06b.jpg?wh=2412%2A820" /></p>
 <p>先看和它相关的几个参数。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e2/7f/e29ec84d980fb9e667e41010b209427f.png?wh=735%2A268" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e2/7f/e29ec84d980fb9e667e41010b209427f.png?wh=735%2A268" /></p>
 <p>在操作系统中，vm.swappiness是用来定义使用swap的倾向性。官方说明如下：</p>
 <blockquote>
 <p>swappiness
@@ -6598,8 +6598,6 @@ swappiness 的范围是 0-100，数值越大，越积极使用 Swap，也就是�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

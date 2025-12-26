@@ -6077,10 +6077,10 @@
 <h2 id="_1">单消息队列的队头阻塞问题</h2>
 <p>我们知道，渲染主线程会按照先进先出的顺序执行消息队列中的任务，具体地讲，当产生了新的任务，渲染进程会将其添加到消息队列尾部，在执行任务过程中，渲染进程会顺序地从消息队列头部取出任务并依次执行。</p>
 <p>在最初，采用这种方式没有太大的问题，因为页面中的任务还不算太多，渲染主线程也不是太繁忙。不过浏览器是向前不停进化的，其进化路线体现在架构的调整、功能的增加以及更加精细的优化策略等方面，这些变化让渲染进程所需要处理的任务变多了，对应的渲染进程的主线程也变得越拥挤。下图所展示的仅仅是部分运行在主线程上的任务，你可以参考下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/fa/f4/fa9f5853a5dcad650aaaf39072820ef4.png?wh=1546%2A460" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fa/f4/fa9f5853a5dcad650aaaf39072820ef4.png?wh=1546%2A460" /></p>
 <p>任务和消息队列</p>
 <p>你可以试想一下，在基于这种单消息队列的架构下，如果用户发出一个点击事件或者缩放页面的事件，而在此时，该任务前面可能还有很多不太重要的任务在排队等待着被执行，诸如V8的垃圾回收、DOM定时器等任务，如果执行这些任务需要花费的时间过久的话，那么就会让用户产生卡顿的感觉。你可以参看下图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/cc/ff/cc7c32fa82207cece9c78015e4b841ff.jpg?wh=2583%2A651" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cc/ff/cc7c32fa82207cece9c78015e4b841ff.jpg?wh=2583%2A651" /></p>
 <p>队头阻塞问题</p>
 <p>因此，<strong>在单消息队列架构下，存在着低优先级任务会阻塞高优先级任务的情况</strong>，比如在一些性能不高的手机上，有时候滚动页面需要等待一秒以上。这像极了我们在介绍HTTP协议时所谈论的队头阻塞问题，那么我们也把这个问题称为消息队列的队头阻塞问题吧。</p>
 <h2 id="chromium">Chromium是如何解决队头阻塞问题的？</h2>
@@ -6093,11 +6093,11 @@
 <li>通过CSS、JavaScript等操作触发的动画特效等任务。</li>
 </ul>
 <p>这些任务被触发后，用户想立即得到页面的反馈，所以我们需要让这些任务能够优先与其他的任务执行。要实现这种效果，我们可以增加一个高优级的消息队列，将高优先级的任务都添加到这个队列里面，然后优先执行该消息队列中的任务。最终效果如下图所示:</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/03/c1/039fdf4c399d20a75d7dea9448cc8fc1.jpg?wh=2671%2A1077" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/03/c1/039fdf4c399d20a75d7dea9448cc8fc1.jpg?wh=2671%2A1077" /></p>
 <p>引入高优先级的消息队列</p>
 <p>观察上图，我们使用了一个优先级高的消息队列和一个优先级低消息队列，渲染进程会将它认为是紧急的任务添加到高优先级队列中，不紧急的任务就添加到低优先级的队列中。然后我们再在渲染进程中引入一个<strong>任务调度器</strong>，负责从多个消息队列中选出合适的任务，通常实现的逻辑，先按照顺序从高优先级队列中取出任务，如果高优先级的队列为空，那么再按照顺序从低优级队列中取出任务。</p>
 <p>我们还可以更进一步，将任务划分为多个不同的优先级，来实现更加细粒度的任务调度，比如可以划分为高优先级，普通优先级和低优先级，最终效果如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d7/78/d7c71113c6c13047fb79e7d120173b78.jpg?wh=3814%2A1805" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d7/78/d7c71113c6c13047fb79e7d120173b78.jpg?wh=3814%2A1805" /></p>
 <p>增加多个不同优先级的消息队列</p>
 <p>观察上图，我们实现了三个不同优先级的消息队列，然后可以使用任务调度器来统一调度这三个不同消息队列中的任务。</p>
 <p>好了，现在我们引入了多个消息队列，结合任务调度器我们就可以灵活地调度任务了，这样我们就可以让高优先级的任务提前执行，采用这种方式似乎解决了消息队列的队头阻塞问题。</p>
@@ -6111,7 +6111,7 @@
 <li>还可以创建一个空闲消息队列，用来存放V8的垃圾自动垃圾回收这一类实时性不高的事件。</li>
 </ul>
 <p>最终实现效果如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/56/ce/56ec510f7f7d4738e9db83dbd51f3fce.png?wh=1118%2A578" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/56/ce/56ec510f7f7d4738e9db83dbd51f3fce.png?wh=1118%2A578" /></p>
 <p>根据消息类型实现不同优先级的消息队列</p>
 <p>通过迭代，这种策略已经相当实用了，但是它依然存在着问题，那就是这几种消息队列的优先级都是固定的，任务调度器会按照这种固定好的静态的优先级来分别调度任务。那么静态优先级会带来什么问题呢？</p>
 <p>我们在《<a href="https://time.geekbang.org/column/article/143889">25 | 页面性能：如何系统地优化页面？</a>》这节分析过页面的生存周期，页面大致的生存周期大体分为两个阶段，加载阶段和交互阶段。</p>
@@ -6119,7 +6119,7 @@
 <h2 id="3">3. 第三次迭代：动态调度策略</h2>
 <p>可以看出，我们所采用的优化策略像个跷跷板，虽然优化了高优先级任务，却拖慢低优先级任务，之所以会这样，是因为我们采取了静态的任务调度策略，对于各种不同的场景，这种静态策略就显得过于死板。</p>
 <p>所以我们还得根据实际场景来继续平衡这个跷跷板，也就是说在不同的场景下，根据实际情况，动态调整消息队列的优先级。一图胜过千言，我们先看下图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/3c/f5/3cc95247daae7f90f0dced017d349af5.png?wh=1746%2A776" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3c/f5/3cc95247daae7f90f0dced017d349af5.png?wh=1746%2A776" /></p>
 <p>动态调度策略</p>
 <p>这张图展示了Chromium在不同的场景下，是如何调整消息队列优先级的。通过这种动态调度策略，就可以满足不同场景的核心诉求了，同时这也是Chromium当前所采用的任务调度策略。</p>
 <p>上图列出了三个不同的场景，分别是加载过程，合成过程以及正常状态。下面我们就结合这三种场景，来分析下Chromium为何做这种调整。</p>
@@ -6129,7 +6129,7 @@
 <p>在显卡中有一块叫着<strong>前缓冲区</strong>的地方，这里存放着显示器要显示的图像，显示器会按照一定的频率来读取这块前缓冲区，并将前缓冲区中的图像显示在显示器上，不同的显示器读取的频率是不同的，通常情况下是60HZ，也就是说显示器会每间隔1/60秒就读取一次前缓冲区。</p>
 <p>如果浏览器要更新显示的图片，那么浏览器会将新生成的图片提交到显卡的<strong>后缓冲区</strong>中，提交完成之后，GPU会将<strong>后缓冲区和前缓冲区互换位置</strong>，也就是前缓冲区变成了后缓冲区，后缓冲区变成了前缓冲区，这就保证了显示器下次能读取到GPU中最新的图片。</p>
 <p>这时候我们会发现，显示器从前缓冲区读取图片，和浏览器生成新的图像到后缓冲区的过程是不同步的，如下图所示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1c/38/1c3a9d8a0f56b73331041ea603ad3738.png?wh=1478%2A710" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1c/38/1c3a9d8a0f56b73331041ea603ad3738.png?wh=1478%2A710" /></p>
 <p>VSync时钟周期和渲染引擎生成图片不同步问题</p>
 <p>这种显示器读取图片和浏览器生成图片不同步，容易造成众多问题。</p>
 <ul>
@@ -6141,7 +6141,7 @@
 <p>为了解决这些问题，就需要将显示器的时钟同步周期和浏览器生成页面的周期绑定起来，Chromium也是这样实现，那么下面我们就来看看Chromium具体是怎么实现的？</p>
 <p><strong>当显示器将一帧画面绘制完成后，并在准备读取下一帧之前，显示器会发出一个垂直同步信号（vertical synchronization）给GPU，简称 VSync。</strong>这时候浏览器就会充分利用好VSync信号。</p>
 <p>具体地讲，当GPU接收到VSync信号后，会将VSync信号同步给浏览器进程，浏览器进程再将其同步到对应的渲染进程，渲染进程接收到VSync信号之后，就可以准备绘制新的一帧了，具体流程你可以参考下图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/06/08/06206ed4846e9531351a0cb7d1db6208.png?wh=1618%2A776" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/06/08/06206ed4846e9531351a0cb7d1db6208.png?wh=1618%2A776" /></p>
 <p>绑定VSync时钟同步周期和浏览器生成页面周期</p>
 <p>上面其实是非常粗略的介绍，实际实现过程也是非常复杂的，如果感兴趣，你可以参考<a href="https://docs.google.com/document/d/16822du6DLKDZ1vQVNWI3gDVYoSqCSezgEmWZ0arvkP8/edit">这篇文章</a>。</p>
 <p>好了，我们花了很大篇幅介绍了VSync和页面中的一帧是怎么显示出来，有了这些知识，我们就可以回到主线了，来分析下渲染进程是如何优化交互阶段页面的任务调度策略的？</p>
@@ -6328,8 +6328,6 @@ https:&#47;&#47;developpaper.com&#47;in-depth-analysis-of-event-loop-and-browser
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

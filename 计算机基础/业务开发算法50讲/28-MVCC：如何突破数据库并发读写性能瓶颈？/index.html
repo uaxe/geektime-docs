@@ -6423,7 +6423,7 @@
 <h2 id="_2">隔离性</h2>
 <p>数据库通常是并发访问的，也就是说我们很可能会同时执行多个事务，而一个事务又会包含多个读写操作，当两个事务同时进行，并对数据库中同一条数据进行了读写，会发生什么呢？如果有冲突了要怎么办呢？</p>
 <p>在很多业务场景中，我们都碰到过这种情况，也非常常见。看学生数据表的例子，我们会反复修正学生最近考试的成绩。假设id=1的学生，成绩一开始是50，现在有两个事务A、B，分别执行语句：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3b/32/3b85a3b4b1cfaeaa0539ef28426a6b32.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3b/32/3b85a3b4b1cfaeaa0539ef28426a6b32.jpg?wh=1920x1145" /></p>
 <p>我们先花一分钟思考一下，在熟悉的数据库中，事务A在T2和T4两次查询的结果是多少呢？</p>
 <p>其实在不同的事务隔离等级下，我们会有不同的结果。比如有一种可能性是，T2事务A查询的结果是50，T4查询的结果是100，这样的查询结果在很多业务场景下是会产生问题的，我们一般称为脏读问题，也就是在事务开始时，读到了尚未提交的其他并发事务对数据的修改值。</p>
 <p><strong>为什么我们称为脏值，主要因为这个值是可能会回滚的</strong>，比如如果B事务失败了，100这个值并没有真的被写入成功，会被撤销掉，但是我们竟然在A事务里看到了，这种情况我们称为脏，很好理解。</p>
@@ -6435,7 +6435,7 @@
 <p>因为存在这三种问题，脏读、不可重复读、幻读，业务很可能会产生错误，所以我们就需要<strong>根据不同的业务场景，提供不同的事务隔离等级，你可以理解成某个事务对其他事务修改数据结果的可见性情况</strong>。</p>
 <h2 id="_3">事务隔离等级</h2>
 <p>SQL标准定义了四种不同的事务隔离等级的，相信你也一定有所听闻，按照隔离级别由弱到强，分为：读未提交、读已提交、可重复读和串行化。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a5/9b/a545f22645aeb43316b9f60af1f8e69b.jpg?wh=1920x956" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a5/9b/a545f22645aeb43316b9f60af1f8e69b.jpg?wh=1920x956" /></p>
 <p>许多数据库是允许我们设置事务隔离级别的。比如在采用InnoDB为引擎的MySQL中，默认采用的就是可重复读的事务隔离级别。</p>
 <p>在这个隔离级别下，可以从表格里看出来，不会出现脏读和不可重复读的情况，幻读可能发生。不过在InnoDB中，幻读这个情况有点特殊，不一定会发生，我们稍后讲MVCC机制的时候再聊。</p>
 <p>现在既然有不同的隔离等级，我们当然要想办法实现它们。</p>
@@ -6445,7 +6445,7 @@
 <p><strong>那最低等级的读未提交，也很好懂，它是性能最好的，策略就是不做任何处理。事务中所有的写都立刻作用到表中，并且对所有其他正在执行中的事务可见</strong>，自然会产生脏读问题。在前面学生成绩的例子里，T4时刻A事务读到id=1的学生的分数就已经被更新成了100，即使B事务的修改尚未提交。这种事务的隔离等级，在我们的实际开发中也是非常少见的。</p>
 <p>中间的两个等级，读已提交、可重复读，同时兼顾了性能和隔离性，也是许多主流数据库的首选之一，Oracle的默认隔离等级就是读已提交。</p>
 <p>对于读已提交而言，主要要避免的就是读到尚未提交的数据，也就是脏值。我们把例子修改一下看看在这个等级下会发生什么，A事务一共会进行3次读数据：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/20/a3/20e348f567bd0974671359996c333fa3.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/20/a3/20e348f567bd0974671359996c333fa3.jpg?wh=1920x1145" /></p>
 <p>在读提交的隔离等级下，T2还是读到50，这次在T4的时候我们不再会读到脏值100，但在T5事务B已经提交的时候，T6再去读同一个记录，会读到事务B提交之后更新的值100。这个时候，在同一个事务里，两次读到的数据就出现了不一致的情况，也就是仍然会出现不可重复读，但已经不会出现脏读的情况了。</p>
 <p>读提交如何实现呢？</p>
 <p>一种比较悲观的方式还是通过加锁，每次读数据的时候，对该行加共享锁，读完立刻释放，每次写数据的时候对该行加排他锁，直到事务提交才释放。</p>
@@ -6471,7 +6471,7 @@
 </ul>
 <p>undo log，也就是回滚日志，不知道你有没有一点耳熟，还记得我们之前提到的 redo log 吗？和 redo log 的预写（用来在宕机未持久化的时候恢复数据的机制）正好相反，undo log 记录了事务开始前的状态，用于事务失败时回滚。不过undo log和 redo log 可以说是一体两面了，都用于处理事务相关的问题。</p>
 <p>除了用于恢复事务，undo log 的另一大作用就是用于实现MVCC，<strong>我们的 roll_pointer 指向的其实就是undo log的记录</strong>。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/bc/f2/bcd56byy641d7274cb14f837d08e6ff2.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bc/f2/bcd56byy641d7274cb14f837d08e6ff2.jpg?wh=1920x1145" /></p>
 <p>你可以看到，由于 roll_pointer 的存在，整个数据库中的每行数据，背后都可能有不止一条数据，每个transaction的修改都会在表中留下痕迹，而它们<strong>通过 roll_pointer 形成了一个类似于单向链表的数据结构，我们称为版本链</strong>。所以每次新插入一条数据，除了插入数据本身和申请事务ID，我们也要记得把pointer指向此前数据的undo_log。</p>
 <p>MVCC 就是在这样的版本链上，通过事务ID和链上不同版本的对比，找到一个合适的可见版本的。快照读就是MVCC发挥作用的方式。</p>
 <ul>
@@ -6489,7 +6489,7 @@
 <p>现在在可重复读的隔离性下，MVCC是如何工作的呢？</p>
 <p>核心的可见性保证来自于读视图的建立，本质就是每个事务开始前，会记录下当前仍在活跃也就是开始但未提交的所有事务，保存在一个数组中，我们称为视图数组，然后会根据这个数组，基于一定的规则判断应该读取每个数据的哪个快照。</p>
 <p>来配合这张示意图看规则是什么：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c8/8f/c81ab709324eccb18a6751b5e86b2f8f.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c8/8f/c81ab709324eccb18a6751b5e86b2f8f.jpg?wh=1920x1145" /></p>
 <p>首先，我们会记录视图数组中最小的事务ID和最大的事务ID+1，分别称为低水位和高水位。</p>
 <p>这两个ID其实就可以从当前执行的事务的视角，将所有的事务分为三个部分，小于低水位的部分一定是当前事务开始前就提交了的部分，大于等于高水位的则一定是还未提交的事务，我们一定不可见。</p>
 <p>处于中间的部分就要分类讨论了：</p>
@@ -6500,7 +6500,7 @@
 <p>简单总结一下，如果我们记录低水位为low_id，高水位为high_id，活跃事务数组为trx_list。可见的trx_id就需要满足 trx_id &lt; low_id 或者 trx_id &lt; high_id 且 !trx_list.contains(trx_id) 的条件，也就是<strong>要么比低水位更早，要么比高水位的id小但是不能出现在活跃事物数组中</strong>。</p>
 <p>那读视图的规则其实就是根据可见性的约束，在查询数据的时候从版本链从最新往前遍历，直至找到第一个可见的版本返回。</p>
 <p>这么说可能还是比较抽象，我们还是用学生成绩的例子，分析一下事务A这次的执行情况，假设在A之前id=1的记录隐藏列中的事务ID为1，且已经提交。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/75/68/753e061781ec0f1aa726bf965a1a3b68.jpg?wh=1920x1145" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/75/68/753e061781ec0f1aa726bf965a1a3b68.jpg?wh=1920x1145" /></p>
 <p>在事务A启动的时候，由于晚于事务B、早于事务C，申请到的trx_id=3，而视图数组里活跃的事务只有trx_id=2的事务B，也就是长这样 <code>[trx_id=2]</code> 。</p>
 <p>看T4时，事务A的访问情况：</p>
 <ul>
@@ -6648,8 +6648,6 @@ MVCC依赖全局唯一而且递增的trx_id，只适用于单机版本，无法�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

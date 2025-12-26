@@ -7346,13 +7346,13 @@
 <p>如何设计这样一个分布式文件系统？其实思路很简单。</p>
 <p>我们先复习一下专栏上一期，我讲了RAID磁盘阵列存储，RAID将数据分片后在多块磁盘上并发进行读写访问，从而提高了存储容量、加快了访问速度，并通过数据的冗余校验提高了数据的可靠性，即使某块磁盘损坏也不会丢失数据。将RAID的设计理念扩大到整个分布式服务器集群，就产生了分布式文件系统，Hadoop分布式文件系统的核心原理就是如此。</p>
 <p>和RAID在多个磁盘上进行文件存储及并行读写的思路一样，HDFS是在一个大规模分布式服务器集群上，对数据分片后进行并行读写及冗余存储。因为HDFS可以部署在一个比较大的服务器集群上，集群中所有服务器的磁盘都可供HDFS使用，所以整个HDFS的存储空间可以达到PB级容量。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/65/d7/65efd126cbcf3930a706f64c6e6457d7.jpg?wh=1920%2A1142" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/65/d7/65efd126cbcf3930a706f64c6e6457d7.jpg?wh=1920%2A1142" /></p>
 <p>上图是HDFS的架构图，从图中你可以看到HDFS的关键组件有两个，一个是DataNode，一个是NameNode。</p>
 <p><strong>DataNode负责文件数据的存储和读写操作，HDFS将文件数据分割成若干数据块（Block），每个DataNode存储一部分数据块，这样文件就分布存储在整个HDFS服务器集群中</strong>。应用程序客户端（Client）可以并行对这些数据块进行访问，从而使得HDFS可以在服务器集群规模上实现数据并行访问，极大地提高了访问速度。</p>
 <p>在实践中，HDFS集群的DataNode服务器会有很多台，一般在几百台到几千台这样的规模，每台服务器配有数块磁盘，整个集群的存储容量大概在几PB到数百PB。</p>
 <p><strong>NameNode负责整个分布式文件系统的元数据（MetaData）管理，也就是文件路径名、数据块的ID以及存储位置等信息，相当于操作系统中文件分配表（FAT）的角色</strong>。HDFS为了保证数据的高可用，会将一个数据块复制为多份（缺省情况为3份），并将多份相同的数据块存储在不同的服务器上，甚至不同的机架上。这样当有磁盘损坏，或者某个DataNode服务器宕机，甚至某个交换机宕机，导致其存储的数据块不能访问的时候，客户端会查找其备份的数据块进行访问。</p>
 <p>下面这张图是数据块多份复制存储的示意，图中对于文件/users/sameerp/data/part-0，其复制备份数设置为2，存储的BlockID分别为1、3。Block1的两个备份存储在DataNode0和DataNode2两个服务器上，Block3的两个备份存储DataNode4和DataNode6两个服务器上，上述任何一台服务器宕机后，每个数据块都至少还有一个备份存在，不会影响对文件/users/sameerp/data/part-0的访问。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6f/ac/6f2faa48524251ad77e55e3565095bac.jpg?wh=720%2A404" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6f/ac/6f2faa48524251ad77e55e3565095bac.jpg?wh=720%2A404" /></p>
 <p>和RAID一样，数据分成若干数据块后存储到不同服务器上，可以实现数据大容量存储，并且不同分片的数据可以并行进行读/写操作，进而实现数据的高速访问。你可以看到，HDFS的大容量存储和高速访问相对比较容易实现，但是HDFS是如何保证存储的高可用性呢？</p>
 <p>我们尝试从不同层面来讨论一下HDFS的高可用设计。</p>
 <p>1.数据存储故障容错</p>
@@ -7364,7 +7364,7 @@
 <p>4.NameNode故障容错</p>
 <p>NameNode是整个HDFS的核心，记录着HDFS文件分配表信息，所有的文件路径和数据块存储信息都保存在NameNode，如果NameNode故障，整个HDFS系统集群都无法使用；如果NameNode上记录的数据丢失，整个集群所有DataNode存储的数据也就没用了。</p>
 <p>所以，NameNode高可用容错能力非常重要。NameNode采用主从热备的方式提供高可用服务，请看下图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7c/89/7cb2668644c32364beab0b69e60b3689.png?wh=722%2A470" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7c/89/7cb2668644c32364beab0b69e60b3689.png?wh=722%2A470" /></p>
 <p>集群部署两台NameNode服务器，一台作为主服务器提供服务，一台作为从服务器进行热备，两台服务器通过ZooKeeper选举，主要是通过争夺znode锁资源，决定谁是主服务器。而DataNode则会向两个NameNode同时发送心跳数据，但是只有主NameNode才能向DataNode返回控制信息。</p>
 <p>正常运行期间，主从NameNode之间通过一个共享存储系统shared edits来同步文件系统的元数据信息。当主NameNode服务器宕机，从NameNode会通过ZooKeeper升级成为主服务器，并保证HDFS集群的元数据信息，也就是文件分配表信息完整一致。</p>
 <p>对于一个软件系统而言，性能差一点，用户也许可以接受；使用体验差，也许也能忍受。但是如果可用性差，经常出故障导致不可用，那就比较麻烦了；如果出现重要数据丢失，那开发工程师绝对是摊上大事了。</p>
@@ -7511,8 +7511,6 @@ DataNode的备份在同步过程中假如出现了错误，NameNode在读取时�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

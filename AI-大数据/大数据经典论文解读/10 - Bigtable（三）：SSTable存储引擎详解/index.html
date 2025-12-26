@@ -7803,7 +7803,7 @@
 <h2 id="_1">如何提供高性能的随机数据写入？</h2>
 <p>在前面解读GFS的课程里，我们看到GFS这个文件系统本身，对随机读写是没有任何<a href="https://time.geekbang.org/column/article/422636">一致性保障</a>的。而在上一讲里，我们又了解到Bigtable是一个支持随机读写的KV数据库，而且它实际的数据存储是放在GFS上的。这两点，听起来似乎是自相矛盾的，<strong>为什么一个对随机读写没有一致性保障的文件系统，可以拿来作为主要用途是随机读写的数据库的存储系统呢？</strong></p>
 <p>而且，在2004年，Bigtable和GFS使用的硬盘还是传统的机械硬盘。如果你学习过<a href="https://time.geekbang.org/column/article/116104">《深入浅出计算机组成原理》</a>，你就会知道机械硬盘的随机读写性能是很差的。一块7200转/秒的机械硬盘，随机读写的IOPS只有75。即使你用上了后来的SSD硬盘，随机数据写入也需要面临SSD特有的写放大问题，不仅比顺序写慢，还会影响硬盘的寿命。可以说，无论是什么硬盘，都不喜欢随机写。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/d4/e6/d402f53c2fa9a0b8e9b09ef1af6c12e6.png?wh=1646x806" title="图片来自于《深入浅出计算机组成原理》的第46讲" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d4/e6/d402f53c2fa9a0b8e9b09ef1af6c12e6.png?wh=1646x806" title="图片来自于《深入浅出计算机组成原理》的第46讲" /></p>
 <blockquote>
 <p><a href="https://time.geekbang.org/column/article/117144">第46讲</a></p>
 </blockquote>
@@ -7812,7 +7812,7 @@
 <li>首先是将硬盘随机写，转化成了<strong>顺序写</strong>，也就是把Bigtable里面的提交日志（Commit Log）以及将内存表（MemTable）输出到磁盘的Minor Compaction机制。</li>
 <li>其次是利用“<a href="https://time.geekbang.org/column/article/107447">局部性原理</a>”，最近写入的数据，会保留在内存表里。最近被读取到的数据，会存放到缓存（Cache）里，而不存在的行键，也会以一个在内存里的<a href="https://en.wikipedia.org/wiki/Bloom_filter">布隆过滤器</a>（BloomFilter）进行快速过滤，尽一切可能减少真正需要随机访问硬盘的次数。</li>
 </ul>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/4c/cd/4c1b135234387c96bcfbd66f12ecd6cd.png?wh=1142x588" title="图片来自《深入浅出计算机组成原理》的第35讲[br]可以看到内存的随机读写的访问延时是机械硬盘的1/10000" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4c/cd/4c1b135234387c96bcfbd66f12ecd6cd.png?wh=1142x588" title="图片来自《深入浅出计算机组成原理》的第35讲[br]可以看到内存的随机读写的访问延时是机械硬盘的1/10000" /></p>
 <blockquote>
 <p><a href="https://time.geekbang.org/column/article/107422">第35讲</a></p>
 </blockquote>
@@ -7832,7 +7832,7 @@
 <p>第二个地方，是在我们<strong>读取数据</strong>的时候。在读取数据的时候，我们其实是读取MemTable加上多个SSTable文件合并在一起的一个视图。也就是说，我们从MemTable和所有的SSTable中，拿到了对应的行键的数据之后，会在内存中合并数据，并根据时间戳或者墓碑标记，来对数据进行“修改”和“删除”，并将数据返回给到客户端。</p>
 <p>相信到这里，你应该就明白了，为什么在整个Bigtable的数据写入过程中，是没有任何到GFS的随机写入的。GFS硬盘上的SSTable的整个文件，一旦写入完成，就是<strong>不可变</strong>（Immutable）的，所有的数据写入，包括删除，都是写入一个数据的新版本。而后台，会有一个程序会定期地进行类似于“垃圾回收”的操作，通过合并SSTable，清理掉过期版本和被标记为删除的数据。</p>
 <p>这也是为什么在Bigtable的数据模型里面，很自然地对于一个列下的值，根据时间戳可以有多个版本。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/04/01/04d5f97ed69f24ffe3e819107579d401.jpg?wh=1920x1290" title="在Bigtable论文中的读写流程示意图之外，我加上了Immutable MemTable，以及Minor Compaction的示意图" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/04/01/04d5f97ed69f24ffe3e819107579d401.jpg?wh=1920x1290" title="在Bigtable论文中的读写流程示意图之外，我加上了Immutable MemTable，以及Minor Compaction的示意图" /></p>
 <h2 id="_2">如何提供高性能的随机数据读取？</h2>
 <p>随机写入被转化成了顺序写，但是随机读我们还是避免不了的。而且按照前面的流程，你会发现，<strong>随机读的代价可不小</strong>。一次数据的随机查询，我们可能要多次访问GFS上的硬盘，读取多个SSTable。</p>
 <p>别着急，接下来我们就一起来看一看，Bigtable是怎么在尽可能减少随机读取的情况下，来访问数据的。</p>
@@ -7849,7 +7849,7 @@
 <li>第一部分，就是实际要存储的行键、列、值以及时间戳，这些数据会按照行键排序分成一个个固定大小的<strong>块</strong>（block）来进行存储。这部分数据，在SSTable中一般被称之为<strong>数据块</strong>（data block）<strong>。</strong></li>
 <li>第二部分，则是一系列的元数据和索引信息，这其中包括用来快速过滤当前SSTable中不存在的行键的布隆过滤器，以及整个数据块的一些统计指标，这些数据我们称之为<strong>元数据块</strong>（meta block）。另外还有针对数据块和元数据块的索引（index），这些索引内容，则分别是<strong>元数据索引块</strong>（metaindex block）和<strong>数据索引块</strong>（index block）。</li>
 </ul>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/13/6d/13398218e045bca5b16c441ca8732d6d.jpg?wh=1920x1290" title="SSTable的数据结构，可以参看GitHub上LevelDB的文档" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/13/6d/13398218e045bca5b16c441ca8732d6d.jpg?wh=1920x1290" title="SSTable的数据结构，可以参看GitHub上LevelDB的文档" /></p>
 <blockquote>
 <p><a href="https://github.com/google/leveldb/blob/master/doc/table_format.md">文档链接</a></p>
 </blockquote>
@@ -7864,11 +7864,11 @@
 <li>低层的缓存，是对查询所获取到的整个数据块进行缓存，我们称之为<strong>Block Cache</strong>。还以com.cnn.www这个行键为例，我们会把它所在的整个块数据都缓存在Tablet Server里。因为一个块里存储的数据都是排好序的，所以当下一次用户想要查询com.cnn.www1这样的行键的时候，就可以直接从Block Cache中获取到，而不需要再次访问GFS上的SSTable文件。</li>
 </ul>
 <p>需要注意的是，<strong>这两层缓存都是针对单个SSTable上的</strong>，而不是在单个Tablet上。而因为SSTable是一个不可变的数据，所以只要不出现Major Compaction，或者整个SSTable文件因为过期可以清理的情况，这些缓存都不会因为Tablet里写入新的数据而需要主动失效。新写入的数据更新都体现在MemTable中，不会影响到我们的SSTable。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/29/cd/29b209541bef8118820f42376e4644cd.jpg?wh=1920x1290" title="通过Bloom Filter, Scan Cache, Block Cache，尽可能避免需要访问GFS上的SSTable" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/29/cd/29b209541bef8118820f42376e4644cd.jpg?wh=1920x1290" title="通过Bloom Filter, Scan Cache, Block Cache，尽可能避免需要访问GFS上的SSTable" /></p>
 <p>这样，在有了后面两个优化步骤之后，我们就会发现<strong>访问硬盘的次数大大减少</strong>了。一方面，当读请求里的行键不存在的时候，我们有90%+乃至99%+的概率可以通过BloomFilter过滤掉。而当读请求的行键存在的时候，我们访问硬盘的次数也很少。而且对于一个Tablet下的多个SSTable文件来说，BloomFilter已经可以快速帮我们排除掉那些，不包含我们要查询的行键的SSTable的文件了。</p>
 <p>然后是Block Cache，因为元数据和索引也是一个Block，所以只要一个SSTable常常被访问，这些数据就会被缓存在Tablet Server的内存里，所以查询索引的过程，也往往在内存里面发生。</p>
 <p>而对于索引进行的实际数据查询，只要我们的查询有“<strong>时间局部性</strong>”，比如查询的通常是最近查询过的数据，或者有“<strong>空间局部性</strong>”，也就是连续查询的数据的行键是相邻的，我们就可以通过Scan Cache或者Block Cache给到答案，而不需要去访问GFS的文件系统。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a5/08/a5a5678cab2ae1cd6755369c576aef08.png?wh=1920x530" title="Bigtable论文中的图6，可以看到，需要访问到硬盘的随机读的性能是最差的" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a5/08/a5a5678cab2ae1cd6755369c576aef08.png?wh=1920x530" title="Bigtable论文中的图6，可以看到，需要访问到硬盘的随机读的性能是最差的" /></p>
 <p>只有完全没有规律的随机查询，才会使得我们的查询最终不得不大量进行随机的GFS文件访问，也就是变成随机的硬盘访问。而且更糟糕的是，我们还需要在网络上传输大量用不到的整个block的数据。在这种情况下，Bigtable的性能并不好。</p>
 <p>在论文第7部分的性能评估里，你也可以看到，对于Bigtable来说，数据存储在GFS上，而不是放在内存里的随机读的性能是最差的，在500个Tablet Server的环境下，单个节点数据读取的吞吐量，只有随机写入的1/8左右。</p>
 <p>不过，好在真实世界里，数据访问往往是满足局部性原理的，而且在Bigtable论文发表17年后的今天，我们大都用上了SSD硬盘，可以在很大程度上缓解这个问题。</p>
@@ -8020,8 +8020,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

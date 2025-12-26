@@ -14103,14 +14103,14 @@
 <p>其实，我在<a href="https://time.geekbang.org/column/article/229975">15讲</a>演示“如何实现操作顺序性”时，就已经介绍了ZooKeeper是如何处理读写请求的了。所以在这里我就不啰嗦了，只是在此基础上，再补充几点。</p>
 <p>首先，在ZooKeeper中，与领导者“失联”的节点，是不能处理读写请求的。比如，如果一个跟随者与领导者的连接发生了读超时，设置了自己的状态为LOOKING，那么此时它既不能转发写请求给领导者处理，也不能处理读请求，只有当它“找到”领导者后，才能处理读写请求。</p>
 <p>举个例子：当发生分区故障了，C与A（领导者）、B网络不通了，那么C将设置自己的状态为LOOKING，此时在C节点上既不能执行读操作，也不能执行写操作。
-<img alt="" src="https://static001.geekbang.org/resource/image/22/ad/22dfaa624590885c4b8406deb445afad.jpg?wh=1142%2A456" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/22/ad/22dfaa624590885c4b8406deb445afad.jpg?wh=1142%2A456" /></p>
 <p>其次，当大多数节点进入到广播阶段的时候，领导者才能提交提案，因为提案提交，需要来自大多数节点的确认。</p>
 <p>最后，写请求只能在领导者节点上处理，所以ZooKeeper集群写性能约等于单机。而读请求是可以在所有的节点上处理的，所以，读性能是能水平扩展的。也就是说，你可以通过分集群的方式来突破写性能的限制，并通过增加更多节点，来扩展集群的读性能。</p>
 <p>熟悉了ZooKeeper处理读写请求的过程和原理后，相信你应该好奇这些功能在ZooKeeper代码中是如何实现的呢？</p>
 <h2 id="zookeeper_1">ZooKeeper代码是如何实现读写操作的呢？</h2>
 <h3 id="_1">如何实现写操作？</h3>
 <p>我先来说一说写操作，在ZooKeeper代码中，处理写请求的核心流程就像下图一样（为了帮你更好的理解这部分内容，我来演示一下复杂的情况，也就是跟随者接收到写请求的情况）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/c7/8a/c77c241713b154673e15083fd063428a.jpg?wh=1142%2A948" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c7/8a/c77c241713b154673e15083fd063428a.jpg?wh=1142%2A948" /></p>
 <p>接下来，咱们一起走一遍核心代码的流程，加深一下印象。</p>
 <p>1.跟随者在FollowerRequestProcessor.processRequest()中接收到写请求。具体来说，写请求是系统在ZooKeeperServer.submitRequestNow()中发给跟随者的。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>firstProcessor.processRequest(si);
@@ -14131,7 +14131,7 @@
 <a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>}
 </code></pre></div>
 <p>需要你注意的是，跟随者节点和领导者节点的firstProcessor是不同的，这样当firstProcessor在ZooKeeperServer.submitRequestNow()中被调用时，就分别进入了跟随者和领导者的代码流程。另外，setupRequestProcessors()创建了2条处理链，就像下图的样子。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d5/e7/d5dfec8e64a2d3cb6f905421d5e918e7.jpg?wh=1142%2A593" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d5/e7/d5dfec8e64a2d3cb6f905421d5e918e7.jpg?wh=1142%2A593" /></p>
 <p>其中，处理链1是核心处理链，最终实现了提案提交和读请求对应的数据响应。处理链2实现了提案持久化存储，并返回确认响应给领导者。</p>
 <p>2.跟随者在FollowerRequestProcessor.run()中将写请求转发给领导者。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>// 调用learner.request()将请求发送给领导者
@@ -14170,7 +14170,7 @@
 <a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>}
 </code></pre></div>
 <p>需要你注意的是，与跟随者类似，setupRequestProcessors()给领导者也创建了2条处理链（其中处理链2是在创建proposalRequestProcessor时创建的）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f7/83/f780e2d141a766579ba20c3b3d0a2283.jpg?wh=1142%2A901" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f7/83/f780e2d141a766579ba20c3b3d0a2283.jpg?wh=1142%2A901" /></p>
 <p>其中，处理链1是核心处理链，最终实现了写请求处理（创建提案、广播提案、提交提案）和读请求对应的数据响应。处理链2实现了提案持久化存储，并返回确认响应给领导者自己。</p>
 <p>4.领导者在ProposalRequestProcessor.processRequest()中，调用propose()将提案广播给集群所有节点。</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>zks.getLeader().propose(request);
@@ -14204,7 +14204,7 @@
 <p>当然了，写入数据，最终还是为了后续的数据读取，那么在ZooKeeper中，是如何实现读操作的呢？</p>
 <h3 id="_2">如何实现读操作？</h3>
 <p>相比写操作，读操作的处理要简单很多，因为接收到读请求的节点，只需要查询本地数据，然后响应数据给客户端就可以了。读操作的核心代码流程，如图所示。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/f4/6d/f405d2a81f374e6e63b49c469506f26d.jpg?wh=1142%2A652" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f4/6d/f405d2a81f374e6e63b49c469506f26d.jpg?wh=1142%2A652" /></p>
 <p>咱们一起走一遍核心代码的流程，加深一下印象。</p>
 <p>1.跟随者在FollowerRequestProcessor.processRequest()中接收到读请求。</p>
 <p>2.跟随者在FinalRequestProcessor.processRequest()中查询本地数据，也就是dataTree中的数据。</p>
@@ -14390,8 +14390,6 @@ firstProcessor = new LeaderRequestProcessor(this, prepRequestProcessor);
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

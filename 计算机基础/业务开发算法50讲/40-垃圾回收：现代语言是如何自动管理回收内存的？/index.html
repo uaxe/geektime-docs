@@ -6416,7 +6416,7 @@
 <p>通常来说，如果对象被一个正在活跃的对象所引用，这个对象就仍在被使用中，而如果某个对象已经没有被任何活跃对象引用的话，我们就可以认为这个对象已经是一个垃圾，可以回收了。</p>
 <p>那可以想见，所有的对象之间如果以引用关系为边，一定会构成一个<strong>有向图</strong>。其中有一些节点入度为零，我们就称为GC根对象，常见的根对象包括活跃中的进程、线程或协程、方法区中的静态变量等等。</p>
 <p><strong>要标记某个对象是否可以仍在使用中，一种方式就是从每个根对象出发，按照引用关系遍历所有能达到的节点，这些节点就是仍在被使用中的对象</strong>；而剩下的节点就被我们称为不可达对象，也就是可以被回收的垃圾。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/cf/fd/cfba7f66a3b4b34711a311bbeed053fd.jpg?wh=1920x1204" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cf/fd/cfba7f66a3b4b34711a311bbeed053fd.jpg?wh=1920x1204" /></p>
 <p>这样我们就有了标记垃圾的办法。在程序运行过程中，我们就可以定期或者在需要的时候进行这样的搜索，标记出所有可以被回收的内存中间，然后进行回收。</p>
 <p>不过可以想见，在这个搜索的过程中，我们最好不要让新的引用关系产生或者消失，这样才能保证垃圾回收算法的正确性，这也是为什么我们的垃圾回收器通常需要一个停顿时间（stop the world time），而减少这个时间也是许多垃圾回收器的设计目标。不过，这也是一个很复杂的话题，我们今天就不展开讨论了，感兴趣的话你可以看<a href="https://www.overops.com/blog/improve-your-application-performance-with-garbage-collection-optimization/#:~:text=Continuous%20%E2%80%9CStop%20the%20World%E2%80%9D%20Events%20%E2%80%93&amp;text=If%20a%20GC%20event%20requires,are%20stopped%20to%20allow%20GC.">这篇文章</a>。</p>
 <p>根据这种思路，下面我们看两种主流、经典的垃圾回收算法：标记-清除算法、标记-整理算法。</p>
@@ -6424,13 +6424,13 @@
 <p>标记清除算法，顾名思义，整个算法分为标记和清除两个部分。</p>
 <p>标记的部分其实就是之前介绍的搜索算法。有了标记的结果，下一步就是将标记的对象全部释放。</p>
 <p>你可以把内存想象成一个连续的数组空间，每个对象在空间里占用了一定的槽位，我们会将内存空间分成三种不同的标记，分别是存活对象、可回收空间、未使用空间。这里画了一个示意图供你参考：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/80/e8/80c59a85dabe6a7250c47f6a91af07e8.jpg?wh=1920x1239" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/80/e8/80c59a85dabe6a7250c47f6a91af07e8.jpg?wh=1920x1239" /></p>
 <p>当垃圾回收触发的时候，我们扫描完整个内存空间获得了相应的标签之后，就会将所有可回收的区域直接标记为“未使用”的状态，这样申请内存的时候就可以直接使用了。</p>
 <p>从时间复杂度上来说，回收过程的代价最少就是遍历一遍所有可回收对象而已，在大部分内存都被活跃对象占用的场景下，效率是非常高的。</p>
 <p>但这个算法最大的问题是“内存碎片”的产生。因为我们不会对内存做任何整理的操作，而只是简单释放，这会导致随着程序的运行，我们能使用的、大的连续的内存空间越来越少，大量在存活对象之间的内存空间，可能由于过小而无法得以有效利用。</p>
 <h2 id="-compacting-collector">标记-整理算法（Compacting Collector）</h2>
 <p>为了解决内存空间碎片的问题，第二种标记-整理算法应运而生。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ca/b5/caa45b7daa011757286ayyb678de7bb5.jpg?wh=1920x1239" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ca/b5/caa45b7daa011757286ayyb678de7bb5.jpg?wh=1920x1239" /></p>
 <p>它和标记-清除算法的主要区别体现在第二步回收上，我们不再只是简单地把可回收的对象空间标记成“未使用”，而是会把所有仍然存活的对象往内存空间的一端移动，让内存空间可使用的部分都连续集中在内存空间的另一侧。</p>
 <p>这样我们就不再会产生众多的内存碎片，但同时也需要付出更大的移动对象的成本。</p>
 <p>了解了这两种算法的设计思路，它们在使用选择上也自然有所不同。在商业的Java虚拟机中，我们都采用了分代的垃圾回收实现，在老生代中通常采用标记-整理的方式进行垃圾回收，这是因为老生代中的对象生命周期往往比较长，GC触发的频率不高，我们就可以接受更长的停机时间来获得更有效的内存空间利用率。</p>
@@ -6551,8 +6551,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

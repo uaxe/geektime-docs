@@ -14599,16 +14599,16 @@
 <p>你好，我是刘超。</p>
 <p>今天这讲我们继续来聊聊锁优化。上一讲我重点介绍了在JVM层实现的Synchronized同步锁的优化方法，除此之外，在JDK1.5之后，Java还提供了Lock同步锁。那么它有什么优势呢？</p>
 <p>相对于需要JVM隐式获取和释放锁的Synchronized同步锁，Lock同步锁（以下简称Lock锁）需要的是显示获取和释放锁，这就为获取和释放锁提供了更多的灵活性。Lock锁的基本操作是通过乐观锁来实现的，但由于Lock锁也会在阻塞时被挂起，因此它依然属于悲观锁。我们可以通过一张图来简单对比下两个同步锁，了解下各自的特点：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8e/3d/8ec55dc637830f728e505c673fefde3d.jpg?wh=1238%2A660" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8e/3d/8ec55dc637830f728e505c673fefde3d.jpg?wh=1238%2A660" /></p>
 <p>从性能方面上来说，在并发量不高、竞争不激烈的情况下，Synchronized同步锁由于具有分级锁的优势，性能上与Lock锁差不多；但在高负载、高并发的情况下，Synchronized同步锁由于竞争激烈会升级到重量级锁，性能则没有Lock锁稳定。</p>
 <p>我们可以通过一组简单的性能测试，直观地对比下两种锁的性能，结果见下方，代码可以在<a href="https://github.com/nickliuchao/syncLockTest">Github</a>上下载查看。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5c/b4/5c71e1402407e8970f51f9253fb716b4.jpg?wh=2120%2A922" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5c/b4/5c71e1402407e8970f51f9253fb716b4.jpg?wh=2120%2A922" /></p>
 <p>通过以上数据，我们可以发现：Lock锁的性能相对来说更加稳定。那它与上一讲的Synchronized同步锁相比，实现原理又是怎样的呢？</p>
 <h2 id="lock">Lock锁的实现原理</h2>
 <p>Lock锁是基于Java实现的锁，Lock是一个接口类，常用的实现类有ReentrantLock、ReentrantReadWriteLock（RRW），它们都是依赖AbstractQueuedSynchronizer（AQS）类实现的。</p>
 <p>AQS类结构中包含一个基于链表实现的等待队列（CLH队列），用于存储所有阻塞的线程，AQS中还有一个state变量，该变量对ReentrantLock来说表示加锁状态。</p>
 <p>该队列的操作均通过CAS操作实现，我们可以通过一张图来看下整个获取锁的流程。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/22/33/222196b8c410ff4ffca7131faa19d833.jpg?wh=836%2A1240" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/22/33/222196b8c410ff4ffca7131faa19d833.jpg?wh=836%2A1240" /></p>
 <h2 id="lock_1">锁分离优化Lock同步锁</h2>
 <p>虽然Lock锁的性能稳定，但也并不是所有的场景下都默认使用ReentrantLock独占锁来实现线程同步。</p>
 <p>我们知道，对于同一份数据进行读写，如果一个线程在读数据，而另一个线程在写数据，那么读到的数据和最终的数据就会不一致；如果一个线程在写数据，而另一个线程也在写数据，那么线程前后看到的数据也会不一致。这个时候我们可以在读写方法中加入互斥锁，来保证任何时候只能有一个线程进行读或写操作。</p>
@@ -14619,10 +14619,10 @@
 <p>RRW也是基于AQS实现的，它的自定义同步器（继承AQS）需要在同步状态state上维护多个读线程和一个写线程的状态，该状态的设计成为实现读写锁的关键。RRW很好地使用了高低位，来实现一个整型控制两种状态的功能，读写锁将变量切分成了两个部分，高16位表示读，低16位表示写。</p>
 <p><strong>一个线程尝试获取写锁时，</strong>会先判断同步状态state是否为0。如果state等于0，说明暂时没有其它线程获取锁；如果state不等于0，则说明有其它线程获取了锁。</p>
 <p>此时再判断同步状态state的低16位（w）是否为0，如果w为0，则说明其它线程获取了读锁，此时进入CLH队列进行阻塞等待；如果w不为0，则说明其它线程获取了写锁，此时要判断获取了写锁的是不是当前线程，若不是就进入CLH队列进行阻塞等待；若是，就应该判断当前线程获取写锁是否超过了最大次数，若超过，抛异常，反之更新同步状态。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1b/d1/1bba37b281d83cdf0c51095f473001d1.jpg?wh=814%2A1388" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1b/d1/1bba37b281d83cdf0c51095f473001d1.jpg?wh=814%2A1388" /></p>
 <p><strong>一个线程尝试获取读锁时，</strong>同样会先判断同步状态state是否为0。如果state等于0，说明暂时没有其它线程获取锁，此时判断是否需要阻塞，如果需要阻塞，则进入CLH队列进行阻塞等待；如果不需要阻塞，则CAS更新同步状态为读状态。</p>
 <p>如果state不等于0，会判断同步状态低16位，如果存在写锁，则获取读锁失败，进入CLH阻塞队列；反之，判断当前线程是否应该被阻塞，如果不应该阻塞则尝试CAS同步状态，获取成功更新同步锁为读状态。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/52/46/52e77acc6999efbdf4113daaa5918d46.jpeg?wh=840%2A1378" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/52/46/52e77acc6999efbdf4113daaa5918d46.jpeg?wh=840%2A1378" /></p>
 <p>下面我们通过一个求平方的例子，来感受下RRW的实现，代码如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>public class TestRTTLock {
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
@@ -14710,7 +14710,7 @@
 <h2 id="_2">思考题</h2>
 <p>StampedLock同RRW一样，都适用于读大于写操作的场景，StampedLock青出于蓝结果却不好说，毕竟RRW还在被广泛应用，就说明它还有StampedLock无法替代的优势。你知道StampedLock没有被广泛应用的原因吗？或者说它还存在哪些缺陷导致没有被广泛应用。</p>
 <p>期待在留言区看到你的见解。也欢迎你点击“请朋友读”，把今天的内容分享给身边的朋友，邀请他一起学习。</p>
-<p><img alt="unpreview" src="https://static001.geekbang.org/resource/image/bb/67/bbe343640d6b708832c4133ec53ed967.jpg?wh=1110%2A659" /></p>
+<p><img alt="unpreview" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bb/67/bbe343640d6b708832c4133ec53ed967.jpg?wh=1110%2A659" /></p>
 <div><strong>精选留言（15）</strong></div>
 <ul>
 <li><span>Liam</span> 👍（69） 💬（3）<p>StampLock不支持重入，不支持条件变量，线程被中断时可能导致CPU暴涨</p>2019-06-18</li><br/><li><span>我知道了嗯</span> 👍（24） 💬（2）<p>可重入锁是什么？另外什么场景下会使用到？</p>2019-06-20</li><br/><li><span>-W.LI-</span> 👍（18） 💬（1）<p>老师好!读写锁那个流程图看不太明白，没有写线程的时候，判断不是当前线程在读就会进入CLF阻塞等待。
@@ -14840,8 +14840,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

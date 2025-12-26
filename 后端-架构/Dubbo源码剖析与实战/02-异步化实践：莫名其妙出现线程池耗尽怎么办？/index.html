@@ -14382,18 +14382,18 @@
 <p>之前我们一直沿着返回值这个方向思考，但已经选择了线程池的实现，如果能有一个存储媒介来存储异步化的结果，然后再想办法把存储媒介中的数据取出来返回回去，岂不是更好？</p>
 <p>于是现在的思路就变成了：<strong>在 queryOrderById 方法中开始异步化分支处理，紧接着在异步化分支中得到异步结果，然后把异步结果存储到某个地方，最后再看看谁可以取出这个异步结果并返回。</strong></p>
 <p>可是谁有这个能力可以感知到这个异步结果呢？我们仔细思考提供方接收请求的整个流程。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e0/ef/e02319717f4f8a6994fe2d7290d70aef.jpg?wh=1920x630" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e0/ef/e02319717f4f8a6994fe2d7290d70aef.jpg?wh=1920x630" /></p>
 <p>这里其实有两种方案，一种是看提供方的所有方法，在处理请求时有没有共同的必经之路，或者第二种也可以看在响应数据时有没有共同的API可以直接返回数据。我们就这两种思路仔细分析。</p>
 <h3 id="1">1. 处理请求时共同的必经之路</h3>
 <p>探索接收请求的整个流程，想找到必经之路，就相当于寻找一种可以拦截所有方法的流程机制，如果你能想到拦截，问题就好办了，在拦截处想办法拿到异步结果并返回就可以了，大致流程就像这样：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/92/33/9242b10eb91aafb57ff09a794b439e33.jpg?wh=1920x1131" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/92/33/9242b10eb91aafb57ff09a794b439e33.jpg?wh=1920x1131" /></p>
 <p>调用前后的形式有了明显变化，按照正常的调用思维，queryOrderById 的方法一定会被拦截到。但这里有个问题我们需要认真思考，能拦截到什么呢？</p>
 <p>因为 queryOrderById 走了异步分支，可能导致最终什么也没拦截到，所以我们要让拦截处想办法感知到 queryOrderById 内部实现是否走了异步处理，从代码层面上，<strong>就得引入一个变量，让拦截处一旦感知到业务接口</strong>（比如这里的queryOrderById）<strong>开启了异步化模式处理</strong>，就可以理所当然地直接从存储异步结果的地方，把结果取回并返回。</p>
 <p>这个思路看上去可行，我们接着看第二种思路，探索发送响应数据共同经历的API。</p>
 <h3 id="2-api">2. 响应数据时共同的API</h3>
 <p>既然数据要发送回去，就需要经过网络传输，那就一定与网络模块脱不了干系。Dubbo框架中的网络模块，默认是netty网络通信模块，所以只要想办法把数据通过netty发送回去，也是可以做到返回异步结果的。</p>
 <p>兴奋的你构思出了大致流程：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a5/c9/a5d281302b13c8f0a370004ffe1881c9.jpg?wh=1920x1036" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a5/c9/a5d281302b13c8f0a370004ffe1881c9.jpg?wh=1920x1036" /></p>
 <p>流程图变化不大，只是在异步化的地方，需要将异步化的结果直接发送返回给到调用方。其实有点像 BIO 程序，在ServerSocket#accept 方法返回值中得到 recvSocket 句柄，然后将该 recvSocket 句柄传入到异步化的逻辑中，待异步化逻辑处理完得到结果后，再调用 recvSocket 将结果写回去。</p>
 <p>但是想拿到Dubbo中接收请求连接的 recvSocket 句柄对象，可不是一件简单的事情。毕竟Dubbo框架的存在就是为了帮你封装了一系列网络通信细节，可我们想拿通信句柄，岂不是和Dubbo框架对着干么？</p>
 <p>其实所有框架都是一样的，<strong>如果没有驾驭底层源码的强悍能力，最好还是不要试图干预框架底层去实现一些业务逻辑的操作</strong>；即使有能力，也得站在上帝视角审视一下，<strong>你的改动是否符合框架的设计理念</strong>，不然很可能改得一团糟，花了大量时间，效果还不咋地。</p>
@@ -14404,7 +14404,7 @@
 <p>如果借助本地线程 ThreadLocal 来存储，又会遇到 queryOrderById 所在的线程与 cachedThreadPool 中的线程相互通信的问题。因为 ThreadLocal 存储的内容位于线程私有区域，从代码层面则体现在 java.lang.Thread#threadLocals 这个私有变量上，这也决定了，不同的线程，私有区域是无法相互访问的。</p>
 <p>所以这里<strong>采用上下文对象来存储，那异步化的结果也就毋庸置疑存储在上下文对象中</strong>。</p>
 <p>好，我们再来顺一遍流程，首先拦截识别异步，当拦截处发现有异步化模式的变量，从上下文对象中取出异步化结果并返回。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b4/63/b4f759e435e98814f1ed3e0d23c90963.jpg?wh=1920x956" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b4/63/b4f759e435e98814f1ed3e0d23c90963.jpg?wh=1920x956" /></p>
 <p>乍一看好像没什么问题，之前的问题1～4也都解决了。</p>
 <p>但注意一点，<strong>凡是异步问题，都需要考虑当前线程如何获取其他线程内数据</strong>，所以这里我们要思考：如果异步化处理有点耗时，拦截处从异步化结果中取不到结果该怎么办呢？不停轮询等待吗？还是要作何处理呢？</p>
 <p>这个问题抽象一下其实就是：A线程执行到某个环节，需要B线程的执行结果，但是B线程还未执行完，A线程是如何应对的？所以，本质回归到了多线程通信上。</p>
@@ -14459,10 +14459,10 @@
 <p>接下来就让我们来看看，Dubbo这个优秀框架，在源码层面是怎么实现异步的，和我们的思路异同点在哪里。</p>
 <h2 id="dubbo">Dubbo异步实现原理</h2>
 <p>首先，还是定义线程池对象，在Dubbo中 RpcContext.startAsync 方法意味着异步模式的开启：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c2/bb/c2455029d054a6d694019191827d97bb.jpg?wh=1920x1058" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c2/bb/c2455029d054a6d694019191827d97bb.jpg?wh=1920x1058" /></p>
 <p>我们追踪源码的调用流程，可以发现最终是通过 CAS 原子性的方式创建了一个 java.util.concurrent.CompletableFuture 对象，这个对象就存储在当前的上下文 org.apache.dubbo.rpc.RpcContextAttachment 对象中。</p>
 <p>然后，需要在异步线程中同步父线程的上下文信息：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1e/c9/1ea249f6cd8023b98d8963aff451c7c9.jpg?wh=1920x1719" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1e/c9/1ea249f6cd8023b98d8963aff451c7c9.jpg?wh=1920x1719" /></p>
 <p>可以看到，Dubbo 框架，也是用的 asyncContext.signalContextSwitch 同步不同线程间的信息，也就是信息的拷贝，只不过这个拷贝需要利用到异步模式开启之后的返回对象 asyncContext。</p>
 <p>因为 asyncContext 富含上下文信息，<strong>只需要把这个所谓的 asyncContext 对象传入到子线程中，然后将 asyncContext 中的上下文信息充分拷贝到子线程中</strong>，这样，子线程处理所需要的任何信息就不会因为开启了异步化处理而缺失。</p>
 <p>最后的第三步就是在异步线程中，将异步结果写入到异步线程的上下文信息中：</p>
@@ -14494,7 +14494,7 @@
 <p>异步的应用场景主要有3类：IO耗时、无业务牵连、无时序要求。</p>
 <h3 id="_6">思考题</h3>
 <p>你已经学会了如何进行异步化改造，也了解了异步改造的核心重要类 CompletableFuture， 在这个核心类中还有很多好用的异步调用方法，为了帮助你深入理解，我设计了一道有趣的多任务场景题：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/af/07/af2f2ca0a5117f56bdc5e9f744462707.jpg?wh=1920x1255" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/af/07/af2f2ca0a5117f56bdc5e9f744462707.jpg?wh=1920x1255" /></p>
 <ul>
 <li>任务一：执行任务 TASK-A1，然后并发执行任务 TASK-B1、TASK-C1，再异步执行 TASK-D1；</li>
 <li>任务二：执行任务 TASK-A2，然后并发执行任务 TASK-B2、TASK-C2，但是 TASK-B2、TASK-C2 中任意一个完成后，再异步执行 TASK-D2；</li>
@@ -14669,8 +14669,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

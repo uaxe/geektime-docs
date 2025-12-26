@@ -14888,27 +14888,27 @@
 <li>对于 UPDATE 来说，对应的 undo log 也应该是 UPDATE。比如说有一个数据的值原本是 3，要把它更新成5。那么对应的 undo log 就是把数据更新回 3。</li>
 </ul>
 <p>但是实际上 undo log 的实现机制要更复杂一点，我这里简化一下模型帮助你记忆。对于 INSERT 来说，对应的 undo log 记录了该行的主键。那么后续只需要根据 undo log 里面的主键去原本的聚簇索引里面删掉记录，就可以实现回滚效果。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/70/e3/70aa62a4cf4dc18778a6d0eba05dyye3.png?wh=1920x1037" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/70/e3/70aa62a4cf4dc18778a6d0eba05dyye3.png?wh=1920x1037" /></p>
 <p>对于 DELETE 来说，对应的 undo log 记录了该行的主键。因为在事务执行 DELETE 的时候，实际上并没有真的把记录删除，只是把原记录的删除标记位设置成了 true。所以这里 undo log 记录了主键之后，在回滚的时候就可以根据 undo log 找到原本的记录，然后再把删除标记位设置成 false。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/2b/d6/2b3a99a0f107b926c2cdd47699c62bd6.png?wh=1920x1037" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/2b/d6/2b3a99a0f107b926c2cdd47699c62bd6.png?wh=1920x1037" /></p>
 <p>对于 UPDATE 来说，要更加复杂一些。分为两种情况，如果没有更新主键，那么 undo log 里面就记录原记录的主键和被修改的列的原值。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/c5/91/c55e16e624ff158536111af9764ef591.png?wh=1920x1037" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c5/91/c55e16e624ff158536111af9764ef591.png?wh=1920x1037" /></p>
 <p>如果更新了主键，那么可以看作是删除了原本的行，然后插入了一个新行。因此 undo log 可以看作是一个 DELETE 原数据的 undo log 再加上插入一个新行的 undo log。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1f/18/1f8df91aab280230e4a1ea4512570018.png?wh=1920x1037" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1f/18/1f8df91aab280230e4a1ea4512570018.png?wh=1920x1037" /></p>
 <p>从上面你大概也能看出来，undo log 和 MVCC 中版本链的关系。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b6/68/b6c9ec706fyy62d235f2d5c590536368.png?wh=1920x1037" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b6/68/b6c9ec706fyy62d235f2d5c590536368.png?wh=1920x1037" /></p>
 <p>这部分知识有些难，如果你不是数据库岗位或者专家岗，了解这部分就可以了。接下来我们看一个和事务有关的另外一个日志 redo log。</p>
 <h3 id="redo-log">redo log</h3>
 <p>InnoDB 引擎在数据库发生更改的时候，把更改操作记录在 redo log 里，以便在数据库发生崩溃或出现其他问题的时候，能够通过 redo log 来重做。</p>
 <p>你可能会觉得奇怪，InnoDB 引擎不是直接修改了数据吗？为什么需要 redo log？答案是 InnoDB 引擎读写都不是直接操作磁盘的，而是读写内存里的 buffer pool，后面再把buffer pool里面修改过的数据刷新到磁盘里面。这是两个步骤，所以就可能会出现 buffer pool中的数据修改了，但是还没来得及刷新到磁盘数据库就崩溃了的情况。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e7/4d/e7e24d9bb6cce4d66c3d747f4919f54d.png?wh=1920x802" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e7/4d/e7e24d9bb6cce4d66c3d747f4919f54d.png?wh=1920x802" /></p>
 <p>为了解决这个问题，InnoDB 引擎就引入了 redo log。相当于InnoDB 先把 buffer pool 里面的数据更新了，再写一份 redo log。等到事务结束之后，就把buffer pool的数据刷新到磁盘里面。万一事务提交了，但是 buffer pool 的数据没写回去，就可以用 redo log 来恢复。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1d/b5/1d45b0f67230ba7957c450198b324db5.png?wh=1920x893" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1d/b5/1d45b0f67230ba7957c450198b324db5.png?wh=1920x893" /></p>
 <p>你可能会困惑，redo log 不需要写磁盘吗？如果 redo log 也要写磁盘，干嘛不直接修改数据呢？redo log 是需要写磁盘的，但是 redo log 是<strong>顺序写</strong>的，所以也是 WAL（write-ahead-log） 的一种。也就是说，不管你要修改什么数据，一会修改这条数据，一会修改另外一条数据，redo log 在磁盘上都是紧挨着的。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/22/be/22f603543b8e3dc0eb1a0d9a7a3cc0be.png?wh=1920x1037" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/22/be/22f603543b8e3dc0eb1a0d9a7a3cc0be.png?wh=1920x1037" /></p>
 <p>这是中间件设计里常用的技巧——顺序写取代随机写。<strong>顺序写的性能比随机写要好很多</strong>，即便是在 SSD 上，顺序写也能比随机写速度快上一个数量级。但是还要考虑一点：redo log 是直接一步到位写到磁盘的吗？</p>
 <p>并不是的，redo log 本身也是先写进 redo log buffer，后面再刷新到操作系统的 page cache，或者一步到位刷新到磁盘。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/51/21/513ac0409bcc8c0f9800365659a3f221.png?wh=1920x711" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/51/21/513ac0409bcc8c0f9800365659a3f221.png?wh=1920x711" /></p>
 <p>InnoDB 引擎本身提供了参数 innodb_flush_log_at_trx_commit 来控制写到磁盘的时机，里面有三个不同值。</p>
 <ul>
 <li>0：每秒刷新到磁盘，是从 redo log buffer 到磁盘。</li>
@@ -14933,35 +14933,35 @@
 </ol>
 <!--THE END-->
 
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/90/7d/90f4e190b125805c35301b2fed37207d.png?wh=1920x692" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/90/7d/90f4e190b125805c35301b2fed37207d.png?wh=1920x692" /></p>
 <ol>
 <li>写 undo log。</li>
 </ol>
 <!--THE END-->
 
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/17/0e/17bdcbef72866926af4d5eda4979380e.png?wh=1920x802" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/17/0e/17bdcbef72866926af4d5eda4979380e.png?wh=1920x802" /></p>
 <ol>
 <li>InnoDB 引擎在内存上更新值，实际上就是把 buffer pool 的值更新为目标值 5。</li>
 </ol>
 <!--THE END-->
 
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7f/0c/7f29be5e8642431fa32c753091543f0c.png?wh=1920x802" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7f/0c/7f29be5e8642431fa32c753091543f0c.png?wh=1920x802" /></p>
 <ol>
 <li>写 redo log。</li>
 </ol>
 <!--THE END-->
 
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/93/41/93e4cef542b1c6068cb41117ec290941.png?wh=1920x1073" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/93/41/93e4cef542b1c6068cb41117ec290941.png?wh=1920x1073" /></p>
 <ol>
 <li>提交事务，根据 innodb_flush_log_at_trx_commit 决定是否刷新 redo log。</li>
 </ol>
 <!--THE END-->
 
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/4e/50/4e20de0c7eb22d8394e3edf9555d4150.png?wh=1920x1073" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4e/50/4e20de0c7eb22d8394e3edf9555d4150.png?wh=1920x1073" /></p>
 <ol>
 <li>刷新 buffer pool 到磁盘。</li>
 </ol>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f0/cb/f0e5f266b4117f0e32cde46afae1e0cb.png?wh=1920x1066" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f0/cb/f0e5f266b4117f0e32cde46afae1e0cb.png?wh=1920x1066" /></p>
 <p>上面这个是最正常的流程。那么它还有两个比较重要的子流程。</p>
 <ol>
 <li>如果在 redo log 已经刷新到磁盘，然后数据库宕机了，buffer pool 丢失了修改，那么在 MySQL 重启之后就会回放这个 redo log，从而纠正数据库里的数据。</li>
@@ -14975,10 +14975,10 @@
 <li>第一阶段：redo log Prepare（准备）</li>
 <li>第二阶段：redo log Commit（提交）</li>
 </ul>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/30/63/30yy9f0yyfa99c0f8a5378e4b62af263.png?wh=1920x629" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/30/63/30yy9f0yyfa99c0f8a5378e4b62af263.png?wh=1920x629" /></p>
 <p>如果 redo log Prepare 执行完毕后，binlog 已经写成功了，那么即便 redo log 提交失败，MySQL 也会认为事务已经提交了。如果 binlog 没写成功，那么 MySQL 就认为提交失败了。比较简单的记忆方式就是看<strong>binlog 写成功了没有</strong>。binlog 本身有一些完整性校验的规则，所以在 MySQL 看来，写 binlog 要么成功，要么失败，不存在中间状态。</p>
 <p>我用正统的两阶段提交图来说明一下，在这个图里我把写入 binlog拆成了 Prepare 和 Commit 两个阶段。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/19/1a/1911847117dbf63e07923649b9f80e1a.png?wh=1920x1043" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/19/1a/1911847117dbf63e07923649b9f80e1a.png?wh=1920x1043" /></p>
 <p>从图里面，你就可以看出来，之所以以 binlog 为判断标准，是因为在两阶段提交里面，两个参与方 binlog 和 redo log中，binlog 已经提交成功了，那么 redo log 自然可以认为也提交成功了。但是我要强调，这只是为了方便你理解，实际上 binlog 没有显式的 Prepare 和 Commit 两个阶段。</p>
 <p>binlog 也有刷新磁盘的问题，不过你可以通过 <strong>sync_binlog</strong>参数来控制它。</p>
 <ul>
@@ -15035,10 +15035,10 @@
 <li>中间件发起了系统调用，写到了操作系统的 page cache 里面，就认为写入成功了。</li>
 <li>中间件强制发起刷盘，数据被持久化到了磁盘上，才认为写入成功了。</li>
 </ul>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8e/27/8ed3ca780ff900b1b18c9fa15c481227.png?wh=1920x789" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8e/27/8ed3ca780ff900b1b18c9fa15c481227.png?wh=1920x789" /></p>
 <p>除了一步到位直接写到磁盘，其他两种都要考虑一个问题，就是最终什么时候把数据刷到磁盘呢？思路也有两个，一个是定时，比如说每秒刷到磁盘。另一个是定量，这个就很灵活了，比如说在事务这里基本都是按照提交次数。而在消息队列里面，就可以按照消息条数。</p>
 <p>但是这里并没有考虑到另外一个问题，即在分布式环境下，写入一份数据，往往是指要写入主节点，也要写入从节点。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/8b/c8/8bbc229b85dbd11703a604c86e808dc8.png?wh=1920x983" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8b/c8/8bbc229b85dbd11703a604c86e808dc8.png?wh=1920x983" /></p>
 <p>所以在分布式环境下的写入语义更加含糊。</p>
 <ul>
 <li>主节点写入成功，就认为写入成功了。</li>
@@ -15077,7 +15077,7 @@
 </ul>
 <p>此外我还给出了两个你在面试中可以展示的亮点。一个是<strong>写入语义</strong>，我们要综合考虑单机写到哪里、分布式写不写从节点、写多少从节点的问题。另一个是<strong>调整刷盘时机</strong>，看重数据的就调小 sync_binlog，看重性能的就调大 sync_binlog 以及调整 innodb_flush_log_at_trx_commit。</p>
 <p>我在写入语义这个亮点给你演示了在面试中刷亮点的另外一种思路：<strong>充分地横向对比</strong>。简单来说就是我们计算机行业里面其实很多设计理念、解决方法都是充满了套路的。你要做的就是找出这个套路，然后在面试中说出来，并且举不同中间件作为例子佐证。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/99/6e/9912c7af6f82899e8610298f0f96ec6e.png?wh=2897x3133" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/99/6e/9912c7af6f82899e8610298f0f96ec6e.png?wh=2897x3133" /></p>
 <h2 id="_9">思考题</h2>
 <p>最后你来思考两个问题。</p>
 <ul>
@@ -15225,8 +15225,6 @@ Q2：在两阶段提交中，是需要用XID来关联redo log和bin log的吧。
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

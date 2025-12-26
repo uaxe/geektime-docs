@@ -5239,7 +5239,7 @@
 <p>值得注意的是，音频处理往往是一环套一环的链路式的处理结构，回声消除作为音频前处理链路的一环很可能会对整体的音频体验产生影响。所以这节课我会先带你从整体上，了解一下实时音频互动系统的链路是怎么搭建的。然后我们再从几个案例出发，看看我们是如何改进回声消除算法，以及和其它模块配合，来整体提升实时音频的质量的。</p>
 <h2 id="_1">实时音频处理链路</h2>
 <p>从贝尔实验室发明电话后，实时音频处理的技术不断发展，至今基于 VoIP（Voice over Internet Protocol，基于IP的语音传输）的实时音频互动已经慢慢成为人们日常音频在线交流的主流方法。图1展示的就是这样一个“现代版”的基于VoIP的实时音频处理链路。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ee/20/ee9809a1f5cf82fb1e8dc4fddf89cb20.jpg?wh=1280x372" title="图1 实时音频处理链路" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ee/20/ee9809a1f5cf82fb1e8dc4fddf89cb20.jpg?wh=1280x372" title="图1 实时音频处理链路" /></p>
 <p>实时音频可以分为上行链路和下行链路两个部分，其中<strong>上行链路</strong>中的音频处理步骤可以对应图1中的上半部分。我们可以看到，在采集模块（Recording）之后就是我们常说的<strong>“3A”处理，包括了AEC（回声消除）、ANS（降噪）、AGC（音频增益控制）这3个部分。</strong>之后在Voice Beautifier and Effects（美声音效）模块我们可能会对人声做一些美化或者加入一些音效，来提升音频的听感。最后把音频进行编码（Encode）传输，至此上行链路也就结束了。</p>
 <p><strong>下行链路</strong>主要的流程是先从网络中获取音频包进行解码（Decode）。由于网路传输过程中可能会出现网络抖动、丢包等现象，而下行链路中的NetEQ模块就是用来解决这些网络带来的问题。随后在播放端可能会需要一些个性化的空间音频渲染（Spartial Audio Rendering ），把音频转换成符合空间听感的多声道音频。最后通过播放模块（Playback）将音频通过播放设备播放出来。</p>
 <p>好的，了解了实时音频的处理步骤，我们再聚焦下AEC的位置。AEC的位置放在紧挨着采集模块的地方。上节课我们介绍过<strong>AEC需要对回声路径做估计，如果有别的模块放在AEC之前就会导致回声路径无法收敛到正确的位置</strong>。比如将AGC放在AEC之前，那么AGC模块导致的音量波动就可能导致回声信号忽大忽小，从而AEC中滤波器的系数就很难收敛了。但这样的顺序安排是否就没问题了呢？</p>
@@ -5251,7 +5251,7 @@
 <h3 id="1">案例1：混响</h3>
 <p>现在办公室的房间里有很多周围是玻璃墙的会议室，而在这些房间里回声泄漏的现象出现的概率很高。这是为什么呢？这里需要一点声学知识，即光滑且表面坚硬的墙壁，声波在其表面反射后能量衰减较小。也就是说声波可以在房间墙面多次反射，而能量依旧不会完全衰减。那这些<strong>不断反射的声音就形成了一个持续时间很长的混响</strong>，也就是所谓的“余音绕梁”。</p>
 <p>我们知道，在回声消除中自适应滤波器中滤波器的长度是固定的。如果混响持续的时间超过了滤波器的长度，那么回声路径就不能被完整估计出来，从而就会导致回声泄漏。这种情况下，你可能会想，如果我们发现这些玻璃房间的混响时间太长，是不是把自适应滤波器的长度拉长就可以解决问题了呢？回答这个问题之前，我们先看一下下面的混响衰减曲线图。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/23/0c/234fc7270ec0447e7de6a00dcc11be0c.jpg?wh=1280x720" title="图2 混响衰减曲线图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/23/0c/234fc7270ec0447e7de6a00dcc11be0c.jpg?wh=1280x720" title="图2 混响衰减曲线图" /></p>
 <p>如图2所示，<strong>混响时间我们一般用RT60来表示</strong>，也就是房间混响（Reverberation Time）衰减60dB所需要的时间。普通房间的混响的RT60大约在50～200ms左右，但有的玻璃房间或者大房间的RT60可能高达200ms甚至更多。假设我们音频的采样率是16kHz，也就是说我们的自适应滤波器至少需要3200的长度，如果我们直接使用NLMS来计算，那可能实时性就没有办法得到满足。</p>
 <p>为了克服滤波器长度太长造成的算力过大的问题，我们一般用分块频域自适应滤波器（Partitioned Block Frequency Domain Adaptive Filter， 简称PBFDAF）来解决。<strong>自适应滤波器耗时最长的就是卷积计算</strong>。而<strong>卷积计算是可以采用FFT来进行加速计算</strong>的。</p>
 <p><strong>PBFDAF的思想</strong>就是先把滤波器的权重和输入向量都分成等长的多块，然后通过FFT变换到频域来进行频域滤波，之后再通过IFFT得到滤波后的时域信号，最后把所有小块的结果叠加起来就可以得到滤波器的输出向量了。</p>
@@ -5262,7 +5262,7 @@
 <p>Speex作为较早开源的实时音频库，有不少实时音频系统都在使用它。但我们在实际使用的过程中会发现，<strong>Speex在一些采集播放设备的失真比较大的时候效果就比较差了</strong>。</p>
 <p>在上一讲中我们知道NLMS其实只能解决线性部分的变化，而扬声器、麦克风导致的非线性变化则可能需要非线性处理（Non-linear Process，NLP）来帮助解决。而<strong>Speex并没有NLP模块来处理这种非线性的回声残留</strong>，这也正是Speex的效果在不同设备上表现不稳定的原因。</p>
 <p>相比较于Speex这种主要为DSP设备服务的算法，WebRTC中的AEC由于考虑到要适配不同的设备终端，所以相比于Speex，其主要增加了延迟估计和非线性处理这两个步骤来提高AEC算法的鲁棒性。那么WebRTC中AEC算法里的非线性处理是怎么做的呢？</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6a/e0/6ae66aca0a6108ff68c68856b49811e0.png?wh=623x849" title="图3 WebRTC中的NLP处理（实时语音处理实践指南 中国工信出版社）" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6a/e0/6ae66aca0a6108ff68c68856b49811e0.png?wh=623x849" title="图3 WebRTC中的NLP处理（实时语音处理实践指南 中国工信出版社）" /></p>
 <p>WebRTC AEC代码中的NLP的做法如图3所示，主要是利用信号之间的相干性来做回声抑制的判断。这里的相干性主要是指近端信号$d(n)$和残差信号$e(n)$之间的相干性$c_{de}$，以及近端信号$d(n)$和远端信号$x(n)$之间的相干性$c_{dx}$。</p>
 <p>其实这很容易理解：如果$c_{de}$越大，则代表近端信号和残差信号相似度高，也就是说回声很小，那么就越不需要去抑制；而如果$c_{dx}$越大，则代表近端信号和远端信号很相近，需要更多地抑制回声。</p>
 <p>注意，这里由于非线性部分的回声可能是出现在某些频段上的，所以需要先把频带分解成多个的子带，且在每个子带上都做一个相干性的判断，然后再综合各个子带的相干性来计算回声抑制因子。而根据不同的回声状态，比如双讲情况下线性部分回声泄漏比较大，则需要增加一些overDrive的操作。</p>
@@ -5392,8 +5392,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

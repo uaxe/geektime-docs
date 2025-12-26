@@ -6191,25 +6191,25 @@
 <li><strong>GUI</strong></li>
 </ul>
 <p>如果觉得命令行不够直观，用户还可以使用 Kubernetes 官方的 Dashboard 或类似 Kuboard 这样的图形化界面进行操作。如下图展示了 Kuboard 中一个 Deployment 资源的操作页面。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f4/4c/f429afdd320af0037dc6a3c5abcb7f4c.png?wh=1920x797" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f4/4c/f429afdd320af0037dc6a3c5abcb7f4c.png?wh=1920x797" /></p>
 <p>这种方式实现的原理相对简单，主要是基于前后端分离的架构设计，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0a/3a/0a0fa4c9e76f397cb519a4ecf2c3703a.jpg?wh=1920x292" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0a/3a/0a0fa4c9e76f397cb519a4ecf2c3703a.jpg?wh=1920x292" /></p>
 <p>前端 GUI 通过预设的 REST API 与后端服务器交互，后端服务器再通过 client-go 访问 Kubernetes，最终将结果返回前端展示在 GUI 上。</p>
 <p>无论使用哪种方式，核心都是通过访问 Kubernetes 的 API server 来实现的。举个例子，我们可以用 curl 命令直接与 Kubernetes API 交互：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nx">curl</span><span class="w"> </span><span class="o">-</span><span class="nx">k</span><span class="w"> </span><span class="o">-</span><span class="nx">H</span><span class="w"> </span><span class="s">&quot;Authorization: Bearer xxxxxxxxxxxxxxxxxx&quot;</span><span class="w"> </span>\
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="p">&gt;</span><span class="w">      </span><span class="nx">https</span><span class="p">:</span><span class="c1">//&lt;your k8s server ip&gt;:&lt;your k8s server port&gt;/api/v1/namespaces/default/pods</span>
 </code></pre></div>
 <p>该命令返回的结果如下（由于篇幅原因，省略部分输出）：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/4e/84/4e2c246fe7e2f3edc3d297e5abe85384.png?wh=610x508" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4e/84/4e2c246fe7e2f3edc3d297e5abe85384.png?wh=610x508" /></p>
 <p>Kubernetes 自引入国内已有 10 年之久，从最早只需掌握基本操作，到如今要求熟悉源码，技术要求日益提高。而上面提到的这些交互方式，已经成了程序员的基本功。作为技术从业者，紧跟时代变革至关重要。在 AI 时代，我们可以利用更加智能的方式与 Kubernetes 进行交互。</p>
 <h2 id="kubernetes_1">用自然语言操控 Kubernetes 原理与设计</h2>
 <p>在上一章，我们学习了 Function Calling 和 AI Agent，了解到大模型不仅能够选择合适的工具，还可以利用执行结果进行推理。本章将介绍如何用自然语言控制 Kubernetes。其原理并不复杂，只需将 kubectl 命令或通过 client-go 开发的函数封装成工具，供 Agent 选择执行即可，如下图所示：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ba/b3/ba30da253eebdd58f77762cc9216dcb3.jpg?wh=1623x900" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ba/b3/ba30da253eebdd58f77762cc9216dcb3.jpg?wh=1623x900" /></p>
 <p>接下来我们深入讨论如何使用自然语言操控 Kubernetes 的设计实现。从架构到细节，这将涉及 Cobra 命令行工具、API 设计、Prompt 模板、优化大模型输出以及合规性验证等多个方面。下面将为你介绍如何通过这些技术构建一个智能化的 Kubernetes 交互系统。</p>
 <h3 id="cobra">Cobra 命令行工具</h3>
 <p>对于后端程序员来说，命令行是最熟悉不过的了，它可以让我们在没有前端的时候，也可以做测试或者发布独立应用。</p>
 <p>那用什么方式编写命令行应用呢？既然是云原生课程，那就可以模仿 kubectl 这套优秀的命令行工具。通过阅读 kubectl 源码，我们可以得知，其使用的是 Cobra 库。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0d/2f/0db95d31a026f0981c8425769d36642f.png?wh=1261x349" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0d/2f/0db95d31a026f0981c8425769d36642f.png?wh=1261x349" /></p>
 <p>实际上，Cobra 不仅 kubectl 在用，像是比较出名的包管理工具 Helm 等等也在使用，其已经成为了 Go 语言编写命令行工具的最佳实践。</p>
 <h3 id="api">API 设计</h3>
 <p>在开篇词中，我提到过，在 AI 时代，API 将成为一等公民。在 GUI 时代，对于 K8s 资源管理系统，API 是前端网页客户端访问后端HTTP Server 的工具。而在 AI 时代，API 将会是 Agent 操作 K8s 的工具。之前聚合在一起为前端服务的 API 将会被打散，形成 “AI 微服务”的应用模式。因此我会以 Go 的 Gin 框架为例，一节课让你快速掌握 HTTP Server 开发。</p>
@@ -6224,7 +6224,7 @@
 <h3 id="prompt">Prompt 设计</h3>
 <p>操控 Kubernetes 资源的增删改查中，创建（增）是最为复杂的环节。因为我们需要大模型根据需求生成 Kubernetes 资源 YAML 文件，来用于安装部署。然而，大模型生成的 YAML 文件是否符合要求，往往需要进一步验证和优化。为此，我们可以通过精心设计和调整 prompt 来规范生成内容，确保最终输出的 YAML 文件能够直接用于安装和操作。</p>
 <p>如果我直接对通义千问大模型这样说：“我要创建一个k8s pod 镜像名称是nginx”。效果是这样的：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/3b/67/3b035e794d32e2b5a95bef777af06d67.png?wh=1182x546" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/3b/67/3b035e794d32e2b5a95bef777af06d67.png?wh=1182x546" /></p>
 <p>如图所示，大模型会在 YAML 之前，给出一段文字。我们先不讨论 YAML 内容是否正确以及是否满足我们的要求，仅 YAML 前的这段文字，就需要我们用代码去做数据清洗（删除），非常不便。</p>
 <p>因此，我们可以通过优化 prompt 来让大模型仅输出 YAML。prompt 如下：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>SYSTEM
@@ -6239,7 +6239,7 @@
 <a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>用户输入: {user_input}
 </code></pre></div>
 <p>我们再次通过通义千问测试：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/10/d0/10047d05b741bd30504a434a798256d0.png?wh=1218x612" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/10/d0/10047d05b741bd30504a434a798256d0.png?wh=1218x612" /></p>
 <p>可以看到这一次，通义千问直接给出了 YAML。</p>
 <p>我们在实际业务开发中，其实还可以给出更多的约束规则，来确保大模型生成的 YAML 符合业务需求。例如：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>#key point
@@ -6248,7 +6248,7 @@
 <a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>- 必须根据业务系统设置 pod 名称。例如，订单系统的 pod 名称为 order-pod。如果未指定，默认名称为 unkown-pod。
 </code></pre></div>
 <p>我们再来测试一次：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/e4/57/e43f5a0bfdb09c486dd463a266094357.png?wh=1237x645" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e4/57/e43f5a0bfdb09c486dd463a266094357.png?wh=1237x645" /></p>
 <p>可以看到，这一次的 YAML 完全是按照我们的要求来的。在实际业务中，这部分规则，我们既可以预先填充，也可以结合 RAG 等知识库，让大模型来帮我们填充。总之，这些规则是可定制的。</p>
 <h3 id="kubernetes_2">验证用户输入是否符合 Kubernetes 资源要求</h3>
 <p>实际上，在上一步生成 YAML 模板之前，我们还需要做一些验证工作，用于验证用户输入的 prompt 是否是在创建一个正确的资源。例如用户输入：“我要创建一个k8s hello，镜像是nginx”，很显然，在 K8s 中，没有一个资源叫 hello，因此需要 Agent 在这一步调用工具做验证。</p>
@@ -6378,8 +6378,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

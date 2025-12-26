@@ -7154,7 +7154,7 @@
 <p>概念这么多，命名也这么相似，是不是看起来就让人“头大”？别着急，接下来，咱们以RDD缓存为例，来看看存储系统是如何利用这些数据结构，把RDD封装的数据实体缓存到内存里去。</p>
 <p>在RDD的语境下，我们往往用数据分片（Partitions/Splits）来表示一份分布式数据，但在存储系统的语境下，我们经常会用数据块（Blocks）来表示数据存储的基本单元。<strong>在逻辑关系上，RDD的数据分片与存储系统的Block一一对应，也就是说一个RDD数据分片会被物化成一个内存或磁盘上的Block。</strong></p>
 <p>因此，如果用一句话来概括缓存RDD的过程，就是将RDD计算数据的迭代器（Iterator）进行物化的过程，流程如下所示。具体来说，可以分成三步走。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1y/0b/1yy5fd9f111f4cab0edc7cf582bd2b0b.jpg?wh=4326%2A1359" title="利用MemoryStore在内存中缓存RDD数据内容" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1y/0b/1yy5fd9f111f4cab0edc7cf582bd2b0b.jpg?wh=4326%2A1359" title="利用MemoryStore在内存中缓存RDD数据内容" /></p>
 <p>既然要把数据内容缓存下来，自然得先把RDD的迭代器展开成实实在在的数据值才行。因此，<strong>第一步就是通过调用putIteratorAsValues或是putIteratorAsBytes方法，把RDD迭代器展开为数据值，然后把这些数据值暂存到一个叫做ValuesHolder的数据结构里。</strong>这一步，我们通常把它叫做“Unroll”。</p>
 <p><strong>第二步，为了节省内存开销，我们可以在存储数据值的ValuesHolder上直接调用toArray或是toByteBuffer操作，把ValuesHolder转换为MemoryEntry数据结构。</strong>注意啦，这一步的转换不涉及内存拷贝，也不产生额外的内存开销，因此Spark官方把这一步叫做“从Unroll memory到Storage memory的Transfer（转移）”。</p>
 <p><strong>第三步，这些包含RDD数据值的MemoryEntry和与之对应的BlockId，会被一起存入Key 为BlockId、Value 是MemoryEntry引用的链式哈希字典中。</strong>因此，LinkedHashMap[BlockId, MemoryEntry]缓存的是关于数据存储的元数据，MemoryEntry才是真正保存RDD数据实体的存储单元。换句话说，大面积占用内存的不是哈希字典，而是一个又一个的MemoryEntry。</p>
@@ -7165,7 +7165,7 @@
 <p>不过，要想完成两者之间的转换，像数据块与文件的对应关系、文件路径等等这些元数据是必不可少的。MemoryStore采用链式哈希字典来维护类似的元数据，DiskStore这个狡猾的家伙并没有亲自维护这些元数据，而是请了DiskBlockManager这个给力的帮手。</p>
 <p><strong>DiskBlockManager的主要职责就是，记录逻辑数据块Block与磁盘文件系统中物理文件的对应关系，每个Block都对应一个磁盘文件。</strong>同理，每个磁盘文件都有一个与之对应的Block ID，这就好比货架上的每一件货物都有唯一的 ID 标识。</p>
 <p>DiskBlockManager在初始化的时候，首先根据配置项spark.local.dir在磁盘的相应位置创建文件目录。然后，在spark.local.dir指定的所有目录下分别创建子目录，子目录的个数由配置项spark.diskStore.subDirectories控制，它默认是64。所有这些目录均用于存储通过DiskStore进行物化的数据文件，如RDD缓存文件、Shuffle中间结果文件等。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1e/4f/1eccayy6d9b7348ceea3cf3b12913a4f.jpg?wh=2802%2A1711" title="DiskStore 中数据的存与取" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1e/4f/1eccayy6d9b7348ceea3cf3b12913a4f.jpg?wh=2802%2A1711" title="DiskStore 中数据的存与取" /></p>
 <p>接下来，我们再以Shuffle中间文件为例，来说说DiskStore与DiskBlockManager的交互过程。</p>
 <p><strong>Spark默认采用SortShuffleManager来管理Stages间的数据分发，在Shuffle write过程中，有3类结果文件：temp_shuffle_XXX、shuffle_XXX.data和shuffle_XXX.index。</strong>Data文件存储分区数据，它是由temp文件合并而来的，而index文件记录data文件内不同分区的偏移地址。Shuffle中间文件具体指的就是data文件和index文件，temp文件作为暂存盘文件最终会被删除。</p>
 <p>在Shuffle write的不同阶段，Shuffle manager通过BlockManager调用DiskStore的putBytes方法将数据块写入文件。文件由DiskBlockManager创建，文件名就是putBytes方法中的Block ID，这些文件会以“temp_shuffle”或“shuffle”开头，保存在spark.local.dir目录下的子目录里。</p>
@@ -7326,8 +7326,6 @@ shuffle过程中的文件合并这个逻辑应该是归并排序来实现的吧�
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

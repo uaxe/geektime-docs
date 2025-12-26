@@ -7749,7 +7749,7 @@
 <li>第一个，是我们怎么能够做到Backup Master和Master完全同步？特别是当硬件、网络可能出现故障的情况下，我们怎么能够做到两边的数据始终同步。如果数据不能做到始终同步，那么当真有需要我们切换节点到Backup Master的时候，我们就会遇到数据丢失的情况。</li>
 <li>第二个，是监控程序本身也是一个单点，当我们的监控程序说Master挂了的时候，我们怎么知道Master是真的挂了，还只是监控程序到Master的网络中断了呢？如果是后者的话，会不会出现一个集群里有两个Master的情况？</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b3/3d/b3a8yycfd7ec64214544049bc1e0903d.jpg?wh=2000x963" title="监控程序和原先Master之间出现网络中断，就会出现多个Master，最终导致数据不一致" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b3/3d/b3a8yycfd7ec64214544049bc1e0903d.jpg?wh=2000x963" title="监控程序和原先Master之间出现网络中断，就会出现多个Master，最终导致数据不一致" /></p>
 <p>而这些问题的本质，就是我们接下来要讲解的<strong>分布式共识问题</strong>。并且这个分布式共识问题的解决，最终会落地成为<strong>Chubby</strong>这个粗粒度的分布式锁方案。我会分三个部分来讲解这个问题：</p>
 <ul>
 <li>第一部分，是对于分布式共识问题的探讨，我会讲解二阶段提交和三阶段提交。通过这个过程，带你理解分布式一致性，以及CAP三者共存的挑战。这部分是一个基础知识，你会开始对分布式一致性和分布式事务有一个入门性质的认识。</li>
@@ -7772,11 +7772,11 @@
 <li>第二个阶段是<strong>提交执行</strong>。</li>
 </ul>
 <p>当协调者收到各个参与者的返回结果之后，如果所有人都说它们答应执行这个事务。那么，协调者就可以再次发起请求，告诉大家，可以正式执行刚才的那个事务了。等实际的事务执行完成之后，参与者就会反馈给协调者，而协调者收到所有参与者成功完成的消息之后，整个事务就成功结束。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5b/f1/5bcdd128d5aa647a53f40444de3fc9f1.jpg?wh=2000x1125" title="两阶段提交流程" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5b/f1/5bcdd128d5aa647a53f40444de3fc9f1.jpg?wh=2000x1125" title="两阶段提交流程" /></p>
 <p>这里需要注意的是，所有的参与者，一旦在提交请求阶段答应自己会执行事务，就不能再反悔了。如果参与者觉得自己不能执行对应的事务，就需要在提交请求阶段就拒绝掉。</p>
 <p>比如，如果参与者是一个MySQL数据库，那么如果协调者发起的数据写入请求，可能会违背MySQL里某个表的字段的唯一性约束。这样MySQL数据库就应该在提交请求阶段告诉协调者，而不是等到要实际执行的时候才说。</p>
 <p>而协调者这个时候，就会在提交执行阶段，直接发送事务回滚的请求。这个时候，各个参与者写下的undo logs就会派上用场了，各个节点可以回滚刚才写入的数据，整个事务也就没有发生。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/5a/11/5a22f111c9e2de96b647ba00196b6e11.jpg?wh=2000x1125" title="两阶段提交，任何一个参与者表示无法参与事务时，整个事务会Abort取消掉" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/5a/11/5a22f111c9e2de96b647ba00196b6e11.jpg?wh=2000x1125" title="两阶段提交，任何一个参与者表示无法参与事务时，整个事务会Abort取消掉" /></p>
 <p>如果打一个生活中的比方，这个两阶段提交，就好像我们买卖房子一样，会分成签订合同和实际交房两个阶段。协调者是房屋中介，当他和买卖双方协调完毕，两边都签字确认之后，就不可更改，之后再进行实际交房。</p>
 <p>此时此刻，相信聪明的你一定想起了我们之前一直反复会问的一个问题。那就是，<strong>在这个两阶段提交的过程中，如果出现了硬件和网络故障，会发生什么事情呢？</strong></p>
 <ul>
@@ -7785,10 +7785,10 @@
 </ul>
 <p>那么，这样也就意味着，当硬件出现故障的时候，可能有一个参与者，已经在自己的节点上完成了事务的执行。但是另外一个参与者，可能要过很长一段时间，在硬件和网络恢复之后，才会完成事务。如果这两个参与者是Master和Backup Master，那么在这段时间里，Master和Backup Master之间的数据就是不一致的。</p>
 <p>不过，如果外部所有和参与者的沟通，都需要通过协调者的话，协调者完全可以在Backup Master还没有恢复的时候，都告知外部的客户端等一等，之前的数据操作还没有完成。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7e/51/7e92a6f26350394f367c05f1b143c851.jpg?wh=2000x1125" title="两阶段提交，在单个节点出现问题的时候，整个系统会要阻塞等待，带来较差的可用性" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7e/51/7e92a6f26350394f367c05f1b143c851.jpg?wh=2000x1125" title="两阶段提交，在单个节点出现问题的时候，整个系统会要阻塞等待，带来较差的可用性" /></p>
 <p>看完前面这个描述，相信你也明白了。在两阶段提交的逻辑里，是通过一个位居中间的协调者来对外暴露接口，并对内确认所有的参与者之间的消息是同步的。不过，两阶段提交的问题也很明显，那就是<strong>两阶段提交虽然保障了一致性（C），但是牺牲了可用性（A）</strong>。无论是协调者，还是任何一个参与者出现硬件故障，整个服务器其实就阻塞住了，需要等待对应的节点恢复过来。</p>
 <p>你会发现，两阶段提交里，任何一个服务器节点出问题，都会导致一次“单点故障”。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/0b/f1/0b6115afafe3066673f98b7625yy50f1.jpg?wh=2000x1125" title="2PC本质上是一个CP系统，优先考虑一致性，会牺牲可用性" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/0b/f1/0b6115afafe3066673f98b7625yy50f1.jpg?wh=2000x1125" title="2PC本质上是一个CP系统，优先考虑一致性，会牺牲可用性" /></p>
 <p>而且，两阶段提交的事务里，选择回滚的事务其实非常浪费。每个节点都要在不知道其他节点究竟是否可以执行事务的情况下，先把完成事务和回滚事务的所有动作都准备好。这个开销可并不小，而且在这个过程中，协调者其实是一直在等待所有参与者给出反馈的。</p>
 <p>所以，两阶段提交的分布式事务的<strong>性能往往好不到哪里去</strong>，这个在我们的“大数据”的语境下可不是什么好消息。</p>
 <h2 id="_1">三阶段提交和脑裂问题</h2>
@@ -7802,14 +7802,14 @@
 <p>这个方式，可以提升整个系统的可用性，在出现一些网络延时、阻塞的情况下，整个事务仍然会推进执行，并最终完成。这个是因为，进入到提交执行阶段的时候，至少所有的参与者已经都在PreCommit阶段答应执行事务了。</p>
 <p>如果还拿之前的买房来举例，也就是我们把合同的签订拆分成了两个阶段。</p>
 <p>第一个阶段是房产中介口头来询问买家和卖家，是不是愿意完成交易。第二个阶段，才是把合同发给双方，去实际签订合同。除非出现意外情况，我们一般不会在第二个阶段反悔合同。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7e/a4/7e3f15eda6753b50398194125bb464a4.jpg?wh=2000x1125" title="三阶段提交流程图" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7e/a4/7e3f15eda6753b50398194125bb464a4.jpg?wh=2000x1125" title="三阶段提交流程图" /></p>
 <p>但是，在一种特殊的情况下，三阶段提交带来的问题会比二阶段更糟糕。这种情况是这样的：</p>
 <ul>
 <li>所有参与者在CanCommit阶段都答应了执行事务。</li>
 <li>在PreCommit阶段，协调者发送PreCommit信息给所有的参与者之后，参与者A挂掉了，所以它没有实际执行事务。协调者收到了这个消息，想要告诉参与者B。而这个时候，参与者B和协调者之间的网络中断了。在等待了一段时间之后，参与者B决定继续执行事务。</li>
 <li>而在这个时候，就会发生一个很糟糕的状况，那就是参与者B的状态和其他的参与者都不一致了。也就是出现了所谓的“<strong>脑裂</strong>”，即系统里不同节点出现了两种不同的状态。</li>
 </ul>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/75/63/750ffd5d27ff4161fbe80183c3f1cb63.jpg?wh=2000x1125" title="3PC情况下，为了可用性，可能会导致数据不一致，牺牲了一致性" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/75/63/750ffd5d27ff4161fbe80183c3f1cb63.jpg?wh=2000x1125" title="3PC情况下，为了可用性，可能会导致数据不一致，牺牲了一致性" /></p>
 <p>可以看到，<strong>三阶段提交，其实就是在出现网络分区的情况下，仍然尝试执行事务。同时，又为了减少网络分区下，出现数据不一致的情况，选择拆分了提交请求</strong>。把提交请求变成了一个小开销的CanCommit，和一个大开销的PreCommit。</p>
 <p>这个方法不能不说不好，我们前面指出的那种特殊情况，在传统的数据库事务领域，发生的概率并不高。我们可能只有2~3台服务器，每秒发生的事务也并不多。</p>
 <p>但是，一旦涉及到“大数据”这三个字，问题又变得不同了。在Bigtable的论文讲解里，我们看到的是一个上千台服务器的集群，每秒的数据库读写次数可以上升到百万次。在这个数据量下，所谓的“很少会发生”，就变成了“<strong>必然会发生</strong>”。</p>
@@ -7946,8 +7946,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

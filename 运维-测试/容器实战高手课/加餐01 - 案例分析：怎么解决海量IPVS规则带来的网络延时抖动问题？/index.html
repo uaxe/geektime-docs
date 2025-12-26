@@ -6113,7 +6113,7 @@
 <p>我们的想法是这样的：因为延时产生在节点上，所以可以推测，这个延时有很大的概率发生在Linux内核处理数据包的过程中。</p>
 <p>沿着这个思路，还需要进一步探索。我们想到，可以给每个数据包在内核协议栈关键的函数上都打上时间戳，然后计算数据包在每两个函数之间的时间差，如果这个时间差比较大，就可以说明问题出在这两个内核函数之间。</p>
 <p>要想找到内核协议栈中的关键函数，还是比较容易的。比如下面的这张示意图里，就列出了Linux内核在接收数据包和发送数据包过程中的主要函数：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7a/9d/7aeb58d336ab808b74e8a34e56efa69d.jpeg?wh=3200%2A1800" />
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7a/9d/7aeb58d336ab808b74e8a34e56efa69d.jpeg?wh=3200%2A1800" />
 找到这些主要函数之后，下一个问题就是，想给每个数据包在经过这些函数的时候打上时间戳做记录，应该用什么方法呢？接下来我们一起来看看。</p>
 <p>在不修改内核源代码的情况，要截获内核函数，我们可以利用<a href="https://www.kernel.org/doc/Documentation/kprobes.txt">kprobe</a>或者<a href="https://www.kernel.org/doc/Documentation/trace/tracepoints.txt">tracepoint</a>的接口。</p>
 <p>使用这两种接口的方法也有两种：一是直接写kernel module来调用kprobe或者tracepoint的接口，第二种方法是通过<a href="https://www.kernel.org/doc/html/latest/bpf/index.html">ebpf</a>的接口来调用它们。在后面的课程里，我还会详细讲解ebpf、kprobe、tracepoint，这里你先有个印象就行。</p>
@@ -6122,11 +6122,11 @@
 <p>决定了方法之后，这里我们需要先实现一个ebpf工具，然后用这个工具来对内核网络函数做trace。</p>
 <p>我们工具的具体实现是这样的，针对用户的一个TCP/IP数据流，记录这个流的数据发送包与数据接收包的传输过程，也就是数据发送包从容器的Network Namespace发出，一直到它到达宿主机的eth0的全过程，以及数据接收包从宿主机的eth0返回到容器Network Namespace的eth0的全程。</p>
 <p>在收集了数十万条记录后，我们对数据做了分析，找出前后两步时间差大于50毫秒（ms）的记录。最后，我们终于发现了下面这段记录：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/31/4a/31da6708b94be43cccfd5dd70aa34e4a.jpg?wh=1920%2A2297" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/31/4a/31da6708b94be43cccfd5dd70aa34e4a.jpg?wh=1920%2A2297" /></p>
 <p>在这段记录中，我们先看一下“Network Namespace”这一列。编号3对应的Namespace ID 4026535252是容器里的，而ID4026532057是宿主机上的Host Namespace。</p>
 <p>数据包从1到7的数据表示了，一个数据包从容器里的eth0通过veth发到宿主机上的peer veth cali29cf0fa56ce，然后再通过路由从宿主机的obr0（openvswitch）接口和eth0接口发出。</p>
 <p>为了方便你理解，我在下面画了一张示意图，描述了这个数据包的传输过程：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/89/67/8941bdb41a760382e7382124e6410f67.jpeg?wh=3200%2A1800" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/89/67/8941bdb41a760382e7382124e6410f67.jpeg?wh=3200%2A1800" /></p>
 <p>在这个过程里，我们发现了当数据包从容器的eth0发送到宿主机上的cali29cf0fa56ce，也就是从第3步到第4步之间，花费的时间是10865291752980718-10865291551180388=201800330。</p>
 <p>因为时间戳的单位是纳秒ns，而201800330超过了200毫秒（ms），这个时间显然是不正常的。</p>
 <p>你还记得吗？我们在容器网络模块的<a href="https://time.geekbang.org/column/article/324122">第17讲</a>说过veth pair之间数据的发送，它会触发一个softirq，并且在我们ebpf的记录中也可以看到，当数据包到达cali29cf0fa56ce后，就是softirqd进程在CPU32上对它做处理。</p>
@@ -6141,7 +6141,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a># perf record -C 32 -g -- sleep 10
 </code></pre></div>
 <p>为了方便查看，我们可以把 <code>perf record</code> 输出的结果做成一个火焰图，具体的方法我在下一讲里介绍，这里你需要先理解定位热点的整体思路。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7f/2e/7f66d31a3e32f8bcfc8600abe713962e.jpg?wh=1080%2A685" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7f/2e/7f66d31a3e32f8bcfc8600abe713962e.jpg?wh=1080%2A685" /></p>
 <p>结合前面的数据分析，我们已经知道了问题出现在softirq的处理过程中，那么在查看火焰图的时候，就要特别关注在softirq中被调用到的函数。</p>
 <p>从上面这张图里，我们可以看到，run_timer_softirq所占的比例是比较大的，而在run_timer_softirq中的绝大部分比例又是被一个叫作estimation_timer()的函数所占用的。</p>
 <p>运行完perf之后，我们离真相又近了一步。现在，我们知道了CPU32上softirq的繁忙是因为TIMER softirq引起的，而TIMER softirq里又在不断地调用 <strong>estimation_timer() 这个函数</strong>。</p>
@@ -6152,7 +6152,7 @@
 <p>我们怎样才能得到estimation_timer()函数的执行时间呢？</p>
 <p>你还记得，我们在容器I/O与内存<a href="https://time.geekbang.org/column/article/321330">那一讲</a>里用过的<a href="https://www.kernel.org/doc/Documentation/trace/ftrace.txt">ftrace</a>么？当时我们把ftrace的tracer设置为function_graph，通过这个办法查看内核函数的调用时间。在这里我们也可以用同样的方法，查看estimation_timer()的调用时间。</p>
 <p>这时候，我们会发现在CPU32上的estimation_timer()这个函数每次被调用的时间都特别长，比如下面图里的记录，可以看到CPU32上的时间高达310毫秒！</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/88/29/880a8ce02a8412d2e8d31b4c923cdd29.png?wh=978%2A408" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/88/29/880a8ce02a8412d2e8d31b4c923cdd29.png?wh=978%2A408" /></p>
 <p>现在，我们可以确定问题就出在estimation_timer()这个函数里了。</p>
 <p>接下来，我们需要读一下estimation_timer()在内核中的源代码，看看这个函数到底是干什么的，它为什么耗费了这么长的时间。其实定位到这一步，后面的工作就比较容易了。</p>
 <p>estimation_timer()是<a href="http://www.linuxvirtualserver.org/software/ipvs.html">IPVS</a>模块中每隔2秒钟就要调用的一个函数，它主要用来更新节点上每一条IPVS规则的状态。Kubernetes Cluster里每建一个service，在所有的节点上都会为这个service建立相应的IPVS规则。</p>
@@ -6303,8 +6303,6 @@ softirq 通常是节点内网络延迟的重要线索。不借助 eBPF 工具时
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

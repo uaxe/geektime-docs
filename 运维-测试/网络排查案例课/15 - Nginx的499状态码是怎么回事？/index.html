@@ -6289,9 +6289,9 @@
 <p>这个499错误日志，在流量较大的场景下，特别是面向Internet的Web站点场景下还是很常见的 。但如果你遇到过，第一感觉可能会是一头雾水，不知道499这个状态码具体是用来干啥的，因为确实跟其他的400系列状态码太不同了。</p>
 <p>我在公有云的时候，做过的一个案例正好是关于Nginx的499日志。当时一位客户向我反馈：他们的Nginx服务器会连续几天记录较多的499错误日志，之后几天可能趋零，然后再回升，整体状况起伏不定。</p>
 <p>这个客户经营的是To C的电子产品，跟手机端App协同工作。这个App会定时把消息上传到微信消息网关，后者再把这些消息推送到该客户的服务端（在公有云上）做业务处理，整体的消息量约每日三十万条。那么，对消息网关来说，这个服务端就是一个Web回调接口。下面是架构简图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/93/46/93ea615940b140d18e2c3087e0545346.jpg?wh=1697x809" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/93/46/93ea615940b140d18e2c3087e0545346.jpg?wh=1697x809" /></p>
 <p>他们给我提供了499日志趋势图：</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/4d/71/4d99d187880ecaa09e454526e8a9b371.png?wh=1405x368" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/4d/71/4d99d187880ecaa09e454526e8a9b371.png?wh=1405x368" /></p>
 <p>由于大量499日志的存在，客户非常担心业务已经受到影响，比如他们的终端消费者是否经常上传数据失败？是否已经严重影响了消费者的体验？所以，我们需要搞清楚499错误日志的含义。</p>
 <p>那么，499这个状态码本身能帮到我们什么呢？我们可以查一下它在Nginx里的<a href="https://www.Nginx.com/resources/wiki/extending/api/http">官方定义</a>：</p>
 <blockquote>
@@ -6307,13 +6307,13 @@
 <p>补充：下文中的“客户端”都指微信消息网关，“服务端”指这个客户在公有云的服务器。</p>
 </blockquote>
 <p>这样，我在<strong>服务端</strong>使用tcpdump工具做了抓包，然后用Wireshark打开抓包文件展开分析。从抓包文件中，我一般会寻找一些比较可疑的报文。正好，这次抓包里有不少RST报文，于是我过滤出了一个典型的带RST报文的TCP流，请看下图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/63/8c/63546e3e94690a685f9291eyy837318c.jpg?wh=2418x446" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/63/8c/63546e3e94690a685f9291eyy837318c.jpg?wh=2418x446" /></p>
 <blockquote>
 <p>补充：抓包示例文件已经上传至<a href="https://gitee.com/steelvictor/network-analysis/tree/master/15">Gitee</a>，建议用Wireshark打开文件，结合文稿一起学习。</p>
 </blockquote>
 <p>相信你也一眼就看到了那个结尾处的RST。但问题是，<strong>这个TCP流一定跟499日志有关系吗？</strong></p>
 <p>得益于TCP/IP的精妙的分层设计，应用层只需要通过系统调用，就可以像使用文件IO那样使用网络IO，具体的网络细节都由内核处理了。可是由此也带来了一个问题：<strong>以应用层的视角，是无法“看到”具体的网络报文的</strong>。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ba/a5/ba258d0aa729da8dc7d35a746cec55a5.jpg?wh=1893x831" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ba/a5/ba258d0aa729da8dc7d35a746cec55a5.jpg?wh=1893x831" /></p>
 <p>我们需要根据一些关键信息来确定应用层日志跟网络报文的对应关系。比如在这里，我可以确认上面这个带有RST的TCP流，就是日志中记录的一条499日志记录。这是如何做到的呢？</p>
 <p>就是因为以下三点。</p>
 <ul>
@@ -6328,14 +6328,14 @@
 <p>好，既然确定这个流就是代表了一次499事件，那么我们就需要好好分析一下这些报文里面的文章了。</p>
 <h2 id="tcp">TCP流的解读</h2>
 <p>这里，你可以先注意一下我在下图的这个TCP流示意图中，标记出的红框部分，在后续的分析过程中，我会重点分析这几个部分。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/e3/93/e32e1ef5e9006c7ef650d7a60930d193.jpg?wh=2230x452" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/e3/93/e32e1ef5e9006c7ef650d7a60930d193.jpg?wh=2230x452" /></p>
 <p>首先是报文1~3，表示TCP握手成功。</p>
 <p>然后是报文4（客户端发出），表示客户端（消息网关）向服务器发送报文，这个报文里只包含HTTP header，其声明该请求为POST方法，但不含POST body。这其实是正常的，因为HTTP协议就是这样规定的，数据的先后顺序是：先header（包含method、URL、headers），后body。所以，既然方法（method）和URL单独位于一个报文里面了，那么按顺序来说，body就是在后续的报文里面。</p>
 <p>接下来是报文5（服务端发出），它是一个确认报文。它的意思是：我（服务端）确认收到了你（客户端）发过来的报文4。</p>
 <p>紧接着是报文6（客户端发出），此时距离上一个报文的时间是2秒。这个报文被Wireshark标记为了红色，注释为TCP Previous segment not captured，意思是它之前的TCP报文段没有被抓到。</p>
 <p>什么叫做“之前的TCP报文”呢？其实就是按TCP序列号顺序，排在当前报文之前的报文。我对这个6号报文标注了3处红框，它们都有很重要的含义。这里我们先关注下右边一个红框圈出来的FIN标志位，这说明，<strong>这是一个客户端主动关闭连接的报文。</strong></p>
 <p>我们可以把到目前为止的报文情况，用下面这个示意图来表示：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/54/85/54b3cf96a80e2ac2638840c226ea7285.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/54/85/54b3cf96a80e2ac2638840c226ea7285.jpg?wh=2000x1125" /></p>
 <p>你看这里是不是很奇怪？明明HTTP POST请求的body（也称为HTTP载荷）部分还没发过来，这个客户端就嚷嚷着要关闭连接了？这就好比有个朋友跟你说：“我有个事情要你帮忙，嗯，拜拜~”，你刚听到上半句他的求助意向，还没听到这个忙具体是什么，他就跟你说再见了。惊不惊喜，意不意外？你可能暂时看不出这里究竟出了什么问题，不过没关系，先放一放。</p>
 <p>我们继续看报文7（服务端发出）。服务器收到了FIN+ACK报文（6号报文），但发现序列号并不是它期待的309，而是777，于是服务器TCP协议栈判断：有一个长度为777-309=468的TCP段（TCP segment）丢失了。</p>
 <p>按TCP的约定，这时候服务端只可以确认其收到的字节的最后位置，在这里，就是上一次（报文5）的ACK位置。形式上，报文7就成了一个DupAck（重复确认）。</p>
@@ -6344,19 +6344,19 @@
 <p>补充：如果凑满3个DupAck就重传的机制，被称为快速重传机制，我们在<a href="https://time.geekbang.org/column/article/487082">第12讲</a>我们有深入学习过。</p>
 </blockquote>
 <p>为了帮助理解，这里我再展示下报文4的TCP信息：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b2/83/b253c16c2b861402a215fec7d2598883.jpg?wh=1406x396" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b2/83/b253c16c2b861402a215fec7d2598883.jpg?wh=1406x396" /></p>
 <p>那么，按TCP的设计，客户端将要发送的下一个报文的序列号（309）= 本次序列号（1） + 本次数据长度（308），也就是图中的Next sequence number。</p>
 <p>我们再来看报文8（客户端发出），过了16秒之久，客户端<strong>重传</strong>了这个报文，包含POST body的数据，长度为 <strong>468</strong> 字节。你看，这是不是就跟前面说的777-309=468对应起来了。</p>
 <p>可能你在这里又有点困惑了，明明这个468字节的报文是第一次出现，怎么就算重传了呢？</p>
 <p>其实是因为，这个抓包文件是在服务端生成的，所以它的视角，是无法看到多次传送同样这个报文的现象的。但我判断，在客户端抓包的话，一定可以看到这个468字节的报文被试图传送了多次。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1e/c9/1ed4b43aba2eb399a8137d0a6f9869c9.jpg?wh=1639x722" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1e/c9/1ed4b43aba2eb399a8137d0a6f9869c9.jpg?wh=1639x722" /></p>
 <p>我们就以服务端视角来判断，一开始这个报文应该是走丢了，没有达到服务端，所以没有在这个服务端抓包文件里现身。又因为过了16秒之久才到达，很可能不是单纯一次重传，而是多次重传后才最终到达的。因此从这一点上讲，确实属于重传。</p>
 <p>我们继续分析。接下来就是报文9，服务端对这个POST body的数据包回复了确认报文。</p>
 <p>最后是报文10，服务端发送了HTTP 400的响应报文给消息网关。这个信息并没有被Wireshark直接按HTTP格式进行展示，但是因为HTTP是文本编码的，所以我们可以鼠标选中Transmission Control Protcol部分，在底下的文本栏直接看到HTTP 400这段文本：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/ae/2a/aeed98d07a4cbaeb97a202877e33cc2a.jpg?wh=1656x850" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/ae/2a/aeed98d07a4cbaeb97a202877e33cc2a.jpg?wh=1656x850" /></p>
 <p>有趣的是，这个 <strong>HTTP 400报文也是带FIN标志位的</strong>，也就是服务端操作系统“图省事”了，把应用层的应答数据（HTTP 400），跟操作系统对TCP连接关闭的控制报文（这个FIN），合并在同一个报文里面了。也就是我们在<a href="https://time.geekbang.org/column/article/479163">第3讲</a>提到的搭顺风车（Piggybacking），提升了网络利用效率。</p>
 <p>这个阶段的报文图示如下：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/37/e2/37c17a924795069688bed6b9d69838e2.jpg?wh=1523x739" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/37/e2/37c17a924795069688bed6b9d69838e2.jpg?wh=1523x739" /></p>
 <p>那么，从这些报文的顺序来看，我们会发现它确实是有问题的。特别是有以下几个疑点：</p>
 <ul>
 <li>服务端先收到了HTTP header报文，随后并没有收到期望的HTTP body报文，而是收到了FIN报文，即客户端试图关闭连接。这个行为十分古怪，要知道HTTP请求还没发送到服务端，服务端回复HTTP响应更是无从谈起，这个时候客户端发送FIN就不符合常理了（即前面说的朋友求帮忙的类比）。</li>
@@ -6364,21 +6364,21 @@
 <li>客户端回复RST彻底关闭这个连接。</li>
 </ul>
 <p>而把上面这几条信息综合起来看，你有没有发现一个重要的线索？<strong>客户端先发送了FIN，之后才发送POST body。</strong>现在让我们把全部过程拼接起来，看一下全景图：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a4/17/a45e1cf729d62b8e7a4ce6258e3fe817.jpg?wh=2000x1125" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a4/17/a45e1cf729d62b8e7a4ce6258e3fe817.jpg?wh=2000x1125" /></p>
 <p>这么古怪的行为，可以描述为“<strong>服务端还没回复数据而客户端已经要关闭连接</strong>”。按照499的官方定义，这种行为就被Nginx判定为了499状态。对内表现为记录499日志，对外表现为回复HTTP 400给消息网关。</p>
 <p>所以，在服务端的Nginx日志中，就留下了大量的499日志条目；而在消息网关那头，如果它也做Web日志的话，相信就不是499日志，而是400的报错了。</p>
 <p>那么到这里，问题是水落石出了吗？其实不是。</p>
 <h2 id="_2"><strong>从现象到本质</strong></h2>
 <p>我们还需要搞清楚最底层的疑问：为什么客户端先发送FIN，然后才发送POST body？</p>
 <p>我们回到Wireshark窗口，再次关注下6号报文：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/d2/01/d2ee60e008e21e9b971ac7894f915601.jpg?wh=1712x84" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/d2/01/d2ee60e008e21e9b971ac7894f915601.jpg?wh=1712x84" /></p>
 <p>它离上一个报文相差了2秒，而我们知道这个信息，是因为Wireshark很友好地显示了报文之间的间隔时长。</p>
 <p>我们再往前看4号报文：</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/8f/29/8f79f673e07621c9a8dyycyy151c1929.jpg?wh=1568x82" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8f/29/8f79f673e07621c9a8dyycyy151c1929.jpg?wh=1568x82" /></p>
 <p>离3号报文相差了2.997秒，几乎就是3秒整了。那么加起来，6号报文离TCP握手完成，正好隔了 <strong>5秒整</strong>。</p>
 <p>一般出现这种整数，就越发可疑了，因为如果是系统或者网络的错乱导致的行为，其时间分布上应该是<strong>随机的</strong>，不可能卡在整数时间上。就我的经验来看，<strong>这往往跟某种人为的设置有关系</strong>。</p>
 <p>所以，经过我的提醒，客户自己仔细查看了微信网关的使用文档，果然发现了它确实有5秒超时的设置。也就是说，如果一个HTTP事务（在这个例子里是HTTP POST事务）无法在5秒内完成，就关闭这个连接。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/1d/80/1d35834f2da80aa64da94b0edca08980.jpg?wh=1659x711" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1d/80/1d35834f2da80aa64da94b0edca08980.jpg?wh=1659x711" /></p>
 <p>这个“无法完成”，在这个抓包里面体现为：HTTP header报文发过去了，但HTTP body报文没有一起过去（网络原因导致）。而由于初始阶段报文少，<strong>无法凑齐3个DupAck</strong>，所以快速重传没有被启动，只好依赖超时重传（关于超时重传的知识在<a href="https://time.geekbang.org/column/article/487082">第12讲</a>也有详细的介绍），而且这多次超时重传也失败了，服务端只好持续等待这个丢失的报文。5秒钟过后，客户端（微信消息网关）没有收到服务端的响应，就主动关闭了这次连接（可以下次再试，这次就不继续干等了）。</p>
 <p>也就是说，这个场景里的Nginx 499错误日志的产生，主要是由于两个因素造成的：</p>
 <ul>
@@ -6575,8 +6575,6 @@ opened: Permission denied.  这个怎么解决呢</p>2022-03-29</li><br/><li><sp
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

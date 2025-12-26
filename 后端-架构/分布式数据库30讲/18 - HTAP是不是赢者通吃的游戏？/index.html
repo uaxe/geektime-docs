@@ -14335,7 +14335,7 @@
 <p>你好，我是王磊，你也可以叫我Ivan。</p>
 <p>这一讲的关键词是HTAP，在解释这个概念前，我们先要搞清楚它到底能解决什么问题。</p>
 <p>有关OLTP和OLAP的概念，我们在<a href="https://time.geekbang.org/column/article/271373">第1讲</a>就已经介绍过了。OLTP是面向交易的处理过程，单笔交易的数据量很小，但是要在很短的时间内给出结果；而OLAP场景通常是基于大数据集的运算。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/38/1a/382508db9c5e251760d2eb443ebcc41a.jpg?wh=2700%2A1180" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/38/1a/382508db9c5e251760d2eb443ebcc41a.jpg?wh=2700%2A1180" /></p>
 <p>OLAP和OLTP通过ETL进行衔接。为了提升OLAP的性能，需要在ETL过程中进行大量的预计算，包括数据结构的调整和业务逻辑处理。这样的好处是可以控制OLAP的访问延迟，提升用户体验。但是，因为要避免抽取数据对OLTP系统造成影响，所以必须在日终的交易低谷期才能启动ETL过程。这样一来， OLAP与OLTP的数据延迟通常就在一天左右，习惯上大家把这种时效性表述为T+1。其中，T日就是指OLTP系统产生数据的日期，T+1日是OLAP中数据可用的日期，两者间隔为1天。</p>
 <p>你可能已经发现了，这个体系的主要问题就是OLAP系统的数据时效性，T+1太慢了。是的，进入大数据时代后，商业决策更加注重数据的支撑，而且数据分析也不断向一线操作渗透，这都要求OLAP系统更快速地反映业务的变化。</p>
 <h2 id="_1">两种解决思路</h2>
@@ -14346,7 +14346,7 @@
 </ol>
 <h3 id="olap">重建OLAP体系</h3>
 <p>我们先来看第一种思路。重建OLAP体系，重视数据加工的时效性，正是近年来大数据技术的主要发展方向。Kappa架构就是新体系的代表，它最早由LinkedIn的Jay Kreps在2014年的<a href="https://www.oreilly.com/radar/questioning-the-lambda-architecture/">一篇文章</a>中提出。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/6b/52/6b204f3de97cdf4b75dd197672db2452.jpg?wh=2700%2A1004" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6b/52/6b204f3de97cdf4b75dd197672db2452.jpg?wh=2700%2A1004" /></p>
 <p>在Kappa架构中，原来的批量文件传输方式完全被Kafka替代，通过流计算系统完成数据的快速加工，数据最终落地到Serving DB中提供查询服务。这里的Serving DB泛指各种类型的存储，可以是HBase、Redis或者MySQL。</p>
 <p>要注意的是，Kappa架构还没有完全实现，因为在实践中流计算仍然无法替代批量计算，Serving DB也无法满足各种类型的分析查询需求。未来，Kappa架构需要在两方面继续完善：</p>
 <ol>
@@ -14374,25 +14374,25 @@
 <h4 id="nsm">NSM （行式存储）</h4>
 <p>NSM（N-ary Storage Model）就是行式存储，也是OLTP数据库默认的存储方式，始终伴随着关系型数据库的发展。我们常用的OLTP数据库，比如MySQL（InnoDB）、PostgreSQL、Oracle和SQL Server等等都使用了行式存储。</p>
 <p>顾名思义，行式存储的特点是将一条数据记录集中存在一起，这种方式更加贴近于关系模型。写入的效率较高，在读取时也可以快速获得一个完整数据记录，这种特点称为记录内的局部性（Intra-Record Spatial Locality）。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/aa/6c/aa9a1c530231f625d2fde65d59ba5c6c.jpg?wh=2700%2A1258" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/aa/6c/aa9a1c530231f625d2fde65d59ba5c6c.jpg?wh=2700%2A1258" /></p>
 <p>但是，行式存储对于OLAP分析查询并不友好。OLAP系统的数据往往是从多个OLTP系统中汇合而来，单表可能就有上百个字段。而用户一次查询通常只访问其中的少量字段，如果以行为单位读取数据，查询出的多数字段其实是无用的，也就是说大量I/O操作都是无效的。同时，大量无效数据的读取，又会造成CPU缓存的失效，进一步降低了系统的性能。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/b6/2b/b61bac48bd1d05f8fe58b7ae4904932b.jpg?wh=2700%2A1134" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b6/2b/b61bac48bd1d05f8fe58b7ae4904932b.jpg?wh=2700%2A1134" /></p>
 <p>图中显示CPU缓存的处理情况，我们可以看到很多无效数据被填充到缓存中，挤掉了那些原本有机会复用的数据。</p>
 <h4 id="dsm">DSM（列式存储）</h4>
 <p>DSM（Decomposition Storage Model）就是列式存储，它的出现要晚于行式存储。典型代表系统是C-Store，它是迈克尔 · 斯通布雷克（Micheal Stonebraker）主导的开源项目，后来的商业化产品就是Vertica。</p>
 <p>列式存储就是将所有列集中存储，不仅更加适应OLAP的访问特点，对CACHE也更友好。这种特点称为记录间的局部性（Inter-Record Spatial Locality）。列式存储能够大幅提升查询性能，以速度快著称的ClickHouse就采用了列式存储。</p>
 <p>列式存储的问题是写入开销更大，这是因为根据关系模型，在逻辑上数据的组织单元仍然是行，改为列式存储后，同样的数据量会被写入到更多的数据页（page）中，而数据页直接对应着物理扇区，那么磁盘I/O的开销自然增大了。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/bd/96/bd96a2edb8bfe131bf0ec5aa91509596.jpg?wh=2700%2A1825" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bd/96/bd96a2edb8bfe131bf0ec5aa91509596.jpg?wh=2700%2A1825" /></p>
 <p>列式存储的第二个问题，就是很难将不同列高效地关联起来。毕竟在多数应用场景中，不只是使用单列或单表数据，数据分散后，关联的成本会更高。</p>
 <h4 id="pax">PAX</h4>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/70/08/70c94c6aef3d1d8d27d263d52e6e2c08.jpg?wh=2700%2A1675" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/70/08/70c94c6aef3d1d8d27d263d52e6e2c08.jpg?wh=2700%2A1675" /></p>
 <p>PAX增加了minipage这个概念，是原有的数据页下的二级单位，这样一行数据记录在数据页上的基本分布不会被破坏，而相同列的数据又被集中地存储在一起。PAX本质上还是更接近于行式存储，但它也在努力平衡记录内局部性和记录间局部性，提升了OLAP的性能。</p>
 <p>理论上，PAX提供了一种兼容性更好的存储方式，可让人有些信心不足的是其早在2002年提出，但在Spanner之前却少有落地实现。</p>
 <p>与这个思路类似的设计还有HyPer的<a href="http://db.in.tum.de/downloads/publications/datablocks.pdf">DataBlock</a>(SIGMOD2016)，DataBlock构造了一种独有的数据结构，同时面向OLTP和OLAP场景。</p>
 <h3 id="tiflash">TiFlash：存储分离</h3>
 <p>如果底层存储是一份数据，那么天然就可以保证OLTP和OLAP的数据一致性，这是PAX的最大优势，但是由于访问模式不同，性能的相互影响似乎也是无法避免，只能尽力选择一个平衡点。TiDB展现了一种不同的思路，介于PAX和传统OLAP体系之间，那就是OLTP和OLAP采用不同的存储方式，物理上是分离的，然后通过创新性的复制策略，保证两者的数据一致性。</p>
 <p>TiDB是在较早的版本中就提出了HTAP这个目标，并增加了TiSpark作为OLAP的计算引擎，但仍然共享OLTP的数据存储TiKV，所以两种任务之间的资源竞争依旧不可避免。直到近期的4.0版本中，TiDB正式推出了TiFlash作为OLAP的专用存储。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/7f/83/7fd1f6b5fe9fa85bf85da382fec68083.jpg?wh=2700%2A1177" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/7f/83/7fd1f6b5fe9fa85bf85da382fec68083.jpg?wh=2700%2A1177" /></p>
 <p>我们的关注点集中在TiFlash与TiKV之间的同步机制上。其实，这个同步机制仍然是基于Raft协议的。TiDB在Raft协议原有的Leader和Follower上增加了一个角色Learner。这个Learner和Paxos协议中的同名角色，有类似的职责，就是负责学习已经达成一致的状态，但不参与投票。这就是说，Raft Group在写入过程中统计多数节点时，并没有包含Learner，这样的好处是Learner不会拖慢写操作，但带来的问题是Learner的数据更新必然会落后于Leader。</p>
 <p>看到这里，你可能会问，这不就是一个异步复制吗，换了个马甲而已，有啥创新的。这也保证不了AP与TP之间的数据一致性吧？</p>
 <p>Raft协议能够实现数据一致性，是因为限制了只有主节点提供服务，否则别说是Learner就是Follower直接对外服务，都不能满足数据一致性。所以，这里还有另外一个设计。</p>
@@ -14410,7 +14410,7 @@
 </ol>
 <p>总的来说，HTAP是解决传统OLAP的一种思路，但是推动者只是少数OLTP数据库厂商。再看另一边，以流计算为基础的新OLAP体系，这些技术本身就是大数据技术生态的一部分，有更多的参与者，不断有新的成果落地。至于HTAP具有绝对优势的数据一致性，其实在商业场景中也未必有足够多的刚性需求。所以，从实践效果出发，我个人更加看好后者，也就是新OLAP体系。</p>
 <p>当然HTAP也具有相对优势，那就是通过全家桶方案避免了用户集成多个技术产品，整体技术复杂度有所降低。最后，TiDB给出的解决方案很有新意，但是能否覆盖足够大的OLAP场景，仍有待观察。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/17/73/1782dfac5604f15f3daee70cfbfb4e73.jpg?wh=2700%2A3764" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/17/73/1782dfac5604f15f3daee70cfbfb4e73.jpg?wh=2700%2A3764" /></p>
 <h2 id="_3">思考题</h2>
 <p>课程的最后，我们来看看今天的思考题。今天我们介绍了TiDB的OLAP组件TiFlash，它保持数据一致性的方法是，每次TiFlash接到请求后，都会向TiKV Leader请求最新的日志增量，本地replay日志后再继续处理请求。这种模式虽然能够保证数据足够新，但比起TiFlash独立服务多了一次网络通讯，在延迟上有较大的影响。我的问题就是，你觉得这个模式还能优化吗？在什么情况下不需要与Leader通讯？</p>
 <p>欢迎你在评论区留言和我一起讨论，我会在答疑篇回复这个问题。如果你身边的朋友也对HTAP这个话题感兴趣，你也可以把今天这一讲分享给他，我们一起讨论。</p>
@@ -14539,8 +14539,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

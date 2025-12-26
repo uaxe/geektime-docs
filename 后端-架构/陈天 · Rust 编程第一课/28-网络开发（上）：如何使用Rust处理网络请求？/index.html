@@ -15152,11 +15152,11 @@
 <p>所以对于网络开发，这个非常宏大的议题，我们当然是不可能、也没有必要覆盖全部内容的，今天我们会先简单聊聊网络开发的大全景图，然后重点学习如何使用Rust标准库以及生态系统中的库来做网络处理，包括网络连接、网络数据处理的一些方法，最后也会介绍几种典型的网络通讯模型的使用。</p>
 <p>但即使这样，内容也比较多，我们会分成上下两讲来学习。如果你之前只关注 Web 开发，文中很多内容读起来可能会有点吃力，建议先去弥补相关的知识和概念，再学习会比较容易理解。</p>
 <p>好，我们先来简单回顾一下 ISO/OSI 七层模型以及对应的协议，物理层主要跟 <a href="https://en.wikipedia.org/wiki/Physical_layer">PHY 芯片</a>有关，就不多提了：
-<img alt="" src="https://static001.geekbang.org/resource/image/90/ef/909ec0f611352fyy5b99f27bb2f557ef.jpg?wh=2315x1468" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/90/ef/909ec0f611352fyy5b99f27bb2f557ef.jpg?wh=2315x1468" /></p>
 <p>七层模型中，链路层和网络层一般构建在操作系统之中，我们并不需要直接触及，而表现层和应用层关系紧密，所以在实现过程中，<strong>大部分应用程序只关心网络层、传输层和应用层</strong>。</p>
 <p>网络层目前 IPv4 和 IPv6 分庭抗礼，IPv6 还未完全对 IPv4 取而代之；传输层除了对延迟非常敏感的应用（比如游戏），绝大多数应用都使用 TCP；而在应用层，对用户友好，且对防火墙友好的 HTTP 协议家族：HTTP、WebSocket、HTTP/2，以及尚处在草案之中的 HTTP/3，在漫长的进化中，脱颖而出，成为应用程序主流的选择。</p>
 <p>我们来看看 Rust 生态对网络协议的支持：
-<img alt="" src="https://static001.geekbang.org/resource/image/8f/78/8ff212b28a88d697303a5fcd35174d78.jpg?wh=2463x1504" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/8f/78/8ff212b28a88d697303a5fcd35174d78.jpg?wh=2463x1504" /></p>
 <p>Rust 标准库提供了 std::net，为整个 TCP/IP 协议栈的使用提供了封装。然而 std::net 是同步的，所以，如果你要构建一个高性能的异步网络，可以使用 tokio。tokio::net 提供了和 std::net 几乎一致的封装，一旦你熟悉了 std::net，tokio::net 里的功能对你来说都并不陌生。所以，我们先从std::net开始了解。</p>
 <h2 id="stdnet">std::net</h2>
 <p>std::net 下提供了处理 TCP / UDP 的数据结构，以及一些辅助结构：</p>
@@ -15225,7 +15225,7 @@
 </code></pre></div>
 <p>但是，处理连接的过程，需要放在另一个线程或者另一个异步任务中进行，而不要在主循环中直接处理，因为这样会阻塞主循环，使其在处理完当前的连接前，无法 accept() 新的连接。</p>
 <p>所以，loop + spawn 是处理网络连接的基本方式：
-<img alt="" src="https://static001.geekbang.org/resource/image/1f/93/1f6c58c3944ec6f0f5a01a3235740693.jpg?wh=2463x1325" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/1f/93/1f6c58c3944ec6f0f5a01a3235740693.jpg?wh=2463x1325" /></p>
 <p>但是使用线程处理频繁连接和退出的网络连接，一来会有效率上的问题，二来线程间如何共享公共的数据也让人头疼，我们来详细看看。</p>
 <h3 id="_2">如何处理大量连接？</h3>
 <p>如果不断创建线程，那么当连接数一高，就容易把系统中可用的线程资源吃光。此外，因为线程的调度是操作系统完成的，每次调度都要经历一个复杂的、不那么高效的 save and load 的<a href="https://en.wikipedia.org/wiki/Context_switch">上下文切换</a>过程，所以<strong>如果使用线程，那么，在遭遇到 C10K 的瓶颈，也就是连接数到万这个级别，系统就会遭遇到资源和算力的双重瓶颈</strong>。</p>
@@ -15235,12 +15235,12 @@
 <p>所以，在 Rust 下大部分处理网络相关的代码中，你会看到，很少直接有用 std::net 进行处理的，大部分都是用某个异步网络运行时，比如 tokio。</p>
 <h3 id="_3">如何处理共享信息？</h3>
 <p>第二个问题，在构建服务器时，我们总会有一些共享的状态供所有的连接使用，比如数据库连接。对于这样的场景，如果共享数据不需要修改，我们可以考虑使用 Arc&lt;T&gt;，如果需要修改，可以使用 Arc&lt;RwLock&lt;T&gt;&gt;。
-<img alt="" src="https://static001.geekbang.org/resource/image/9d/2d/9dae3be8e76512611d54eb8875fb962d.jpg?wh=2463x1325" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/9d/2d/9dae3be8e76512611d54eb8875fb962d.jpg?wh=2463x1325" /></p>
 <p>但使用锁，就意味着一旦在关键路径上需要访问被锁住的资源，整个系统的吞吐量都会受到很大的影响。</p>
 <p>一种思路是，我们<strong>把锁的粒度降低</strong>，这样冲突就会减少。比如在 kv server 中，我们把 key 哈希一下模 N，将不同的 key 分摊到 N 个 memory store 中，这样，锁的粒度就降低到之前的 1/N 了：
-<img alt="" src="https://static001.geekbang.org/resource/image/fb/0d/fb40a748abfdbb731ea2f15a4aea590d.jpg?wh=2463x1325" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/fb/0d/fb40a748abfdbb731ea2f15a4aea590d.jpg?wh=2463x1325" /></p>
 <p>另一种思路是我们<strong>改变共享资源的访问方式</strong>，使其只被一个特定的线程访问；其它线程或者协程只能通过给其发消息的方式与之交互。如果你用 Erlang / Golang，这种方式你应该不陌生，在 Rust 下，可以使用 channel 数据结构。
-<img alt="" src="https://static001.geekbang.org/resource/image/b4/44/b4171bafa947d925c11087c83yyb7b44.jpg?wh=2463x1325" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/b4/44/b4171bafa947d925c11087c83yyb7b44.jpg?wh=2463x1325" /></p>
 <p>Rust 下 channel，无论是标准库，还是第三方库，都有非常棒的的实现。同步 channel 的有标准库的 <a href="https://doc.rust-lang.org/std/sync/mpsc/fn.channel.html">mpsc:channel</a> 和第三方的 <a href="https://docs.rs/crossbeam-channel">crossbeam_channel</a>，异步 channel 有tokio 下的 <a href="https://docs.rs/tokio/1.12.0/tokio/sync/mpsc/fn.channel.html">mpsc:channel</a>，以及 <a href="https://docs.rs/flume">flume</a>。</p>
 <h2 id="_4">处理网络数据的一般方法</h2>
 <p>我们再来看看如何处理网络数据。大部分时候，我们可以使用已有的应用层协议来处理网络数据，比如 HTTP。</p>
@@ -15285,7 +15285,7 @@
 <p>所以我们也可以采用这样的方法来处理使用 protobuf 自定义的协议。</p>
 <p>因为这种处理方式很常见，所以 tokio 提供了 <a href="https://docs.rs/tokio-util/0.6.8/tokio_util/codec/length_delimited/index.html">length_delimited codec</a>，来处理用长度隔离的消息帧，它可以和 <a href="https://docs.rs/tokio-util/0.6.8/tokio_util/codec/struct.Framed.html">Framed</a> 结构配合使用。如果你看它的文档，会发现它除了简单支持在消息前加长度外，还支持各种各样复杂的场景。</p>
 <p>比如消息有一个固定的消息头，其中包含 3 字节长度，5 字节其它内容，LengthDelimitedCodec 处理完后，会把完整的数据给你。你也可以通过 num_skip(3) 把长度丢弃，总之非常灵活：
-<img alt="" src="https://static001.geekbang.org/resource/image/91/ed/9186d8aef9aea6fb760d0c2537d3e6ed.png?wh=1920x1252" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/91/ed/9186d8aef9aea6fb760d0c2537d3e6ed.png?wh=1920x1252" /></p>
 <p>下面是我使用 tokio / tokio_util 撰写的服务器和客户端，你可以看到，服务器和客户端都使用了 LengthDelimitedCodec 来处理消息帧。</p>
 <p>服务器的代码：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">use</span><span class="w"> </span><span class="n">anyhow</span><span class="p">::</span><span class="nb">Result</span><span class="p">;</span>
@@ -15576,8 +15576,6 @@ Ok(())
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

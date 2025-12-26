@@ -15175,7 +15175,7 @@
 <p>闭包是将函数，或者说代码和其环境一起存储的一种数据结构。闭包引用的上下文中的自由变量，会被捕获到闭包的结构中，成为闭包类型的一部分（<a href="https://time.geekbang.org/column/article/410038">第二讲</a>）。</p>
 </blockquote>
 <p>闭包会根据内部的使用情况，捕获环境中的自由变量。在 Rust 里，闭包可以用 <code>|args| {code}</code> 来表述，图中闭包 c 捕获了上下文中的 a 和 b，并通过引用来使用这两个自由变量：
-<img alt="" src="https://static001.geekbang.org/resource/image/60/93/6060b99f222ef6e435c9fe7c83f46593.jpg?wh=2935x1544" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/60/93/6060b99f222ef6e435c9fe7c83f46593.jpg?wh=2935x1544" /></p>
 <p>除了用引用来捕获自由变量之外，还有另外一个方法使用 move 关键字 <code>move |args| {code}</code> 。</p>
 <p>之前的课程中，多次见到了创建新线程的 thread::spawn，它的参数就是一个闭包：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">spawn</span><span class="o">&lt;</span><span class="n">F</span><span class="p">,</span><span class="w"> </span><span class="n">T</span><span class="o">&gt;</span><span class="p">(</span><span class="n">f</span><span class="p">:</span><span class="w"> </span><span class="nc">F</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">JoinHandle</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;</span>
@@ -15258,9 +15258,9 @@
 <p>学到这里，前面的第一个问题就解决了，可以看到，不带 move 时，闭包捕获的是对应自由变量的引用；带 move 时，对应自由变量的所有权会被移动到闭包结构中。</p>
 <p>继续分析这段代码的运行结果。</p>
 <p>还知道了，<strong>闭包的大小跟参数、局部变量都无关，只跟捕获的变量有关</strong>。如果你回顾<a href="https://time.geekbang.org/column/article/408409">第一讲</a>函数调用，参数和局部变量在栈中如何存放的图，就很清楚了：因为它们是在调用的时刻才在栈上产生的内存分配，说到底和闭包类型本身是无关的，所以闭包的大小跟它们自然无关。
-<img alt="" src="https://static001.geekbang.org/resource/image/56/8f/568023dcb61859029aa0eb48c5eb1c8f.jpg?wh=2059x2601" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/56/8f/568023dcb61859029aa0eb48c5eb1c8f.jpg?wh=2059x2601" /></p>
 <p>那一个闭包类型在内存中究竟是如何排布的，和结构体有什么区别？我们要再次结合 rust-gdb 探索，看看上面的代码在运行结束前，几个长度不为 0 闭包内存里都放了什么：
-<img alt="" src="https://static001.geekbang.org/resource/image/40/dd/404f3a30a4150a774b8310ab105c3fdd.png?wh=3514x2449" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/40/dd/404f3a30a4150a774b8310ab105c3fdd.png?wh=3514x2449" /></p>
 <p>可以看到，c3 的确是一个引用，把它指向的内存地址的 24 个字节打出来，是 (ptr | cap | len) 的标准结构。如果打印 ptr 对应的堆内存的 3 个字节，是 ‘t’ ‘y’ ‘r’。</p>
 <p>而 c4 捕获的 name 和 table，内存结构和下面的结构体一模一样：</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">struct</span><span class="w"> </span><span class="nc">Closure4</span><span class="w"> </span><span class="p">{</span>
@@ -15279,7 +15279,7 @@
 <a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="p">}</span>
 </code></pre></div>
 <p>从 gdb 中也可以看到同样的结果：
-<img alt="" src="https://static001.geekbang.org/resource/image/f2/02/f216f8bb700965f9ac3b79b71196ea02.png?wh=2668x1149" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f2/02/f216f8bb700965f9ac3b79b71196ea02.png?wh=2668x1149" /></p>
 <p>不过这只是逻辑上的位置，如果你还记得<a href="https://time.geekbang.org/column/article/418235">第 11 讲</a> struct 在内存的排布，Rust 编译器会重排内存，让数据能够以最小的代价对齐，所以有些情况下，内存中数据的顺序可能和 struct 定义不一致。</p>
 <p>所以回到刚才闭包和结构体的比较。在 Rust 里，闭包产生的匿名数据类型，格式和 struct 是一样的。看图中 gdb 的输出，<strong>闭包是存储在栈上，并且除了捕获的数据外，闭包本身不包含任何额外函数指针指向闭包的代码</strong>。如果你理解了 c3 / c4 这两个闭包，c5 是如何构造的就很好理解了。</p>
 <p>现在，你是不是可以回答为什么 thread::spawn 对传入的闭包约束是 Send + 'static 了？究竟什么样的闭包满足它呢？很明显，使用了 move 且 move 到闭包内的数据结构满足 Send，因为此时，闭包的数据结构拥有所有数据的所有权，它的生命周期是 'static。</p>
@@ -15290,7 +15290,7 @@
 <p>因为闭包这玩意，从当前上下文中捕获了些变量，变得有点不伦不类，不像函数那样清楚，尤其是这些被捕获的变量，它们的归属和生命周期处理起来很麻烦。所以，大部分编程语言的闭包很多时候无法放在栈上，需要额外的堆分配。你可以看这个 <a href="https://github.com/golang/go/issues/43210">Golang 的例子</a>。</p>
 <p>不光 Golang，Java / Swift / Python / JavaScript 等语言都是如此，这也是为什么大多数编程语言闭包的性能要远低于函数调用。因为使用闭包就意味着：额外的堆内存分配、潜在的动态分派（很多语言会把闭包处理成函数指针）、额外的内存回收。</p>
 <p>在性能上，唯有 C++ 的 lambda 和 Rust 闭包类似，不过 C++ 的闭包还有<a href="http://www.elbeno.com/blog/?p=1068">一些场景</a>会触发堆内存分配。如果你还记得 16 讲的 Rust / Swift / Kotlin iterator 函数式编程的性能测试：
-<img alt="" src="https://static001.geekbang.org/resource/image/c1/d4/c1e1c1909b761cfa3348115bb417d4d4.png?wh=1430x1072" /></p>
+<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/c1/d4/c1e1c1909b761cfa3348115bb417d4d4.png?wh=1430x1072" /></p>
 <p>Kotlin 运行超时，Swift 很慢，Rust 的性能却和使用命令式编程的 C 几乎一样，除了编译器优化的效果，也因为 Rust 闭包的性能和函数差不多。</p>
 <p>为什么 Rust 可以做到这样呢？这又跟 Rust 从根本上使用所有权和借用，解决了内存归属问题有关。</p>
 <p>在其他语言中，闭包变量因为多重引用导致生命周期不明确，但 Rust 从一开始就消灭了这个问题：</p>
@@ -15505,7 +15505,7 @@
 <li>FnMut 允许在执行时修改闭包的内部数据，可以执行多次；</li>
 <li>Fn 不允许修改闭包的内部数据，也可以执行多次。</li>
 </ul>
-<p>总结一下三种闭包使用的情况以及它们之间的关系：<img alt="" src="https://static001.geekbang.org/resource/image/cb/25/cba964802787a05f173099b13d210b25.jpg?wh=2256x1296" /></p>
+<p>总结一下三种闭包使用的情况以及它们之间的关系：<img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/cb/25/cba964802787a05f173099b13d210b25.jpg?wh=2256x1296" /></p>
 <h3 id="_6">思考题</h3>
 <ol>
 <li>下面的代码，闭包 c 相当于一个什么样的结构体？它的长度多大？代码的最后，main() 函数还能访问变量 name 么？为什么？</li>
@@ -15933,8 +15933,6 @@ println!(&quot;result: {:?}&quot;, call_once(&quot;hi&quot;.into(), c));
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>

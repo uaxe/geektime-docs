@@ -14031,7 +14031,7 @@
 <p>在存量时代，企业开始更专注于服务现有用户，而不仅仅是吸引新用户。数字化转型成为了一个热门的企业发展方向。</p>
 <p>举个例子，地产行业以前只在购房的时候和用户联系，现在则是从物业、商业、写字楼等多个渠道与用户建立联系，从“一生一次的生意”变成“一生一世的生意”。</p>
 <p>为了实现存量用户的精细化运营，企业就需要全面收集客户信息，构建客户的完整画像。</p>
-<p><img alt="" src="https://static001.geekbang.org/resource/image/a1/01/a1ff0cc1a012ecdf677c0d657bdc7601.png?wh=1818x920" /></p>
+<p><img alt="" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/a1/01/a1ff0cc1a012ecdf677c0d657bdc7601.png?wh=1818x920" /></p>
 <p>上面这个图描述了一个典型的CDP业务流程：企业收集用户的各种行为数据、业务数据，通过规则计算、机器算法、数据挖掘等方式处理数据，构建一个客户的360度标签、画像。</p>
 <p>当然，标签、画像构建过程很复杂，比如需要构建用户全域的ONE-ID，也就是将各个渠道收集到的数据，再通过各个系统不同的关联键，比如手机号、微信unionId、设备ID、邮箱等，识别到这些数据是属于同一个人，通过一个ONE-ID把用户所有的标识符都统一起来。经过各种各样的操作，最终把用户对应的数据关联起来。这里提一下，构建ONE-ID的过程一般都会用到图数据库。</p>
 <p>而且过程中还需要涉及数据清洗、离线计算、实时计算等复杂逻辑。</p>
@@ -14047,18 +14047,18 @@
 <p>先来看一下CDP的主要数据模型。</p>
 <h2 id="cdp_2">CDP数据模型</h2>
 <p>CDP号称全域的用户数据平台，首先第一个基础表就是用户属性表cdp_user，包括用户的基本资料，用户的一些属性指标等，像下面这个表。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/bf/ef/bf9de01f83a5ce03b71a62a1ab2b87ef.png?wh=3140x1736" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/bf/ef/bf9de01f83a5ce03b71a62a1ab2b87ef.png?wh=3140x1736" /></p>
 <p>你可以认为这个表是经过了数据清洗后汇总的一个用户表。一般来说，这个汇总表的一条记录，还会对应到另外一个渠道表的来自多个系统的多条用户记录信息。这里我们暂不考虑。</p>
 <p>为了方便统计计算，同时也试试StarRocks在星型模型下的多表Join表现，我们额外创建一个用户的指标属性表cdp_user_metrics，简单定义字段如下。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6f/24/6f100318768d2569be2e42c912296c24.png?wh=2900x1188" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/6f/24/6f100318768d2569be2e42c912296c24.png?wh=2900x1188" /></p>
 <p>接下来就是用来存储，从各个渠道收集用户行为数据的用户行为表cdp_user_event。这里我们将事件的一些参数打平，构建一个宽表。</p>
 <p>看下简化版本的行为表。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/be/d2/be775e6912d8dae621c01d25a61287d2.png?wh=3728x2032" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/be/d2/be775e6912d8dae621c01d25a61287d2.png?wh=3728x2032" /></p>
 <p>用户属性表与行为表其实是标签画像的数据来源，基于这些数据，我们可以根据规则，生成很多用户的标签，标签其实也可以使用多个层级、分类来管理。</p>
 <p>比如第一层，可以分为用户基础属性标签、行为标签、内容标签等。</p>
 <p>第二层，比如内容标签又可以分为兴趣标签、品牌标签等。</p>
 <p>标签表有宽表、高表存储模式，也可以组合不同的数据结构用来存储，比如bitmap，这里我们先用高表的模式来定义一个标签表cdp_tag。</p>
-<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f6/cf/f677b2b41d508410f1fe42a2533958cf.png?wh=2928x1360" /></p>
+<p><img alt="图片" referrerpolicy="no-referrer" src="https://static001.geekbang.org/resource/image/f6/cf/f677b2b41d508410f1fe42a2533958cf.png?wh=2928x1360" /></p>
 <p>注意，同一个tag_id，可以有多个值，有可能这些值是互斥的，也就是一个用户只能有一个值，比如性别，只能选男、女或者未知。但是有些另外的标签，比如阅读偏好，一个用户就可能有多个值了，比如喜欢体育、小说等，所以这时候同一个tag_id、同一个unique_user_id可能在标签表存在多行记录。</p>
 <p>这个章节，我们会以这3个基础表来做示例，看一下如何通过StarRocks的存储，来满足我们下面一些业务场景。</p>
 <h2 id="_1">我们需要考虑的业务场景</h2>
@@ -14193,8 +14193,6 @@
         <script src="../../../javascript/extra.js"></script>
       
         <script src="../../../javascript/giscus.js"></script>
-      
-        <script src="../../../javascript/referrerpolicy.js"></script>
       
     
   </body>
