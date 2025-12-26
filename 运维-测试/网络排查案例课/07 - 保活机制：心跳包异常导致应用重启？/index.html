@@ -1,0 +1,6768 @@
+<!--geek time docs 🚀, MIT license-->
+
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="极客时间文档">
+      
+      
+        <meta name="author" content="zkep">
+      
+      
+        <link rel="canonical" href="https://github.com/uaxe/geektime-docs/%E8%BF%90%E7%BB%B4-%E6%B5%8B%E8%AF%95/%E7%BD%91%E7%BB%9C%E6%8E%92%E6%9F%A5%E6%A1%88%E4%BE%8B%E8%AF%BE/07%20-%20%E4%BF%9D%E6%B4%BB%E6%9C%BA%E5%88%B6%EF%BC%9A%E5%BF%83%E8%B7%B3%E5%8C%85%E5%BC%82%E5%B8%B8%E5%AF%BC%E8%87%B4%E5%BA%94%E7%94%A8%E9%87%8D%E5%90%AF%EF%BC%9F/">
+      
+      
+        <link rel="prev" href="../06%20-%20%E5%AE%9A%E4%BD%8D%E9%98%B2%E7%81%AB%E5%A2%99%EF%BC%88%E4%BA%8C%EF%BC%89%EF%BC%9A%E7%BD%91%E7%BB%9C%E5%B1%82%E7%9A%84%E7%B2%BE%E7%A1%AE%E6%89%93%E5%87%BB/">
+      
+      
+        <link rel="next" href="../08%20-%20%E5%88%86%E6%AE%B5%EF%BC%9AMTU%E5%BC%95%E5%8F%91%E7%9A%84%E8%A1%80%E6%A1%88/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../None">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>07 保活机制：心跳包异常导致应用重启？ - 极客时间文档</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../../stylesheets/style.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#tcp" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+        <aside class="md-banner">
+          <div class="md-banner__inner md-grid md-typeset">
+            
+            
+
+
+          </div>
+          
+        </aside>
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../../.." title="极客时间文档" class="md-header__button md-logo" aria-label="极客时间文档" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            极客时间文档
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              07   保活机制：心跳包异常导致应用重启？
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="indigo"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/zkep/my-geektime" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    zkep/my-geektime
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="标签" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../AI-%E5%A4%A7%E6%95%B0%E6%8D%AE/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  AI-大数据
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E4%BA%A7%E5%93%81-%E8%BF%90%E8%90%A5/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  产品-运营
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E5%89%8D%E7%AB%AF-%E7%A7%BB%E5%8A%A8/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  前端-移动
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E5%90%8E%E7%AB%AF-%E6%9E%B6%E6%9E%84/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  后端-架构
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E7%AE%A1%E7%90%86-%E6%88%90%E9%95%BF/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  管理-成长
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E8%AE%A1%E7%AE%97%E6%9C%BA%E5%9F%BA%E7%A1%80/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  计算机基础
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  运维-测试
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="极客时间文档" class="md-nav__button md-logo" aria-label="极客时间文档" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    极客时间文档
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/zkep/my-geektime" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    zkep/my-geektime
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../AI-%E5%A4%A7%E6%95%B0%E6%8D%AE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI-大数据
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E4%BA%A7%E5%93%81-%E8%BF%90%E8%90%A5/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    产品-运营
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E5%89%8D%E7%AB%AF-%E7%A7%BB%E5%8A%A8/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    前端-移动
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E5%90%8E%E7%AB%AF-%E6%9E%B6%E6%9E%84/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    后端-架构
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E7%AE%A1%E7%90%86-%E6%88%90%E9%95%BF/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    管理-成长
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E8%AE%A1%E7%AE%97%E6%9C%BA%E5%9F%BA%E7%A1%80/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    计算机基础
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    运维-测试
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    运维-测试
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../AI%E9%87%8D%E5%A1%91%E4%BA%91%E5%8E%9F%E7%94%9F%E5%BA%94%E7%94%A8%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98/AI%E9%87%8D%E5%A1%91%E4%BA%91%E5%8E%9F%E7%94%9F%E5%BA%94%E7%94%A8%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI重塑云原生应用开发实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../DevOps%E5%AE%9E%E6%88%98%E7%AC%94%E8%AE%B0/DevOps%E5%AE%9E%E6%88%98%E7%AC%94%E8%AE%B0/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DevOps实战笔记
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Kubernetes%E5%85%A5%E9%97%A8%E5%AE%9E%E6%88%98%E8%AF%BE/Kubernetes%E5%85%A5%E9%97%A8%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kubernetes入门实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Linux%E5%86%85%E6%A0%B8%E6%8A%80%E6%9C%AF%E5%AE%9E%E6%88%98%E8%AF%BE/Linux%E5%86%85%E6%A0%B8%E6%8A%80%E6%9C%AF%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux内核技术实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Linux%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E5%AE%9E%E6%88%98/Linux%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux性能优化实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../SRE%E5%AE%9E%E6%88%98%E6%89%8B%E5%86%8C/SRE%E5%AE%9E%E6%88%98%E6%89%8B%E5%86%8C/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SRE实战手册
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../SRE%E5%AE%9E%E8%B7%B5%EF%BC%9A%E6%9C%8D%E5%8A%A1%E5%8F%AF%E9%9D%A0%E6%80%A7%E6%A1%88%E4%BE%8B%E8%AF%BE/SRE%E5%AE%9E%E8%B7%B5%EF%BC%9A%E6%9C%8D%E5%8A%A1%E5%8F%AF%E9%9D%A0%E6%80%A7%E6%A1%88%E4%BE%8B%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SRE实践：服务可靠性案例课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Serverless%E8%BF%9B%E9%98%B6%E5%AE%9E%E6%88%98%E8%AF%BE/Serverless%E8%BF%9B%E9%98%B6%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serverless进阶实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Web%E6%BC%8F%E6%B4%9E%E6%8C%96%E6%8E%98%E5%AE%9E%E6%88%98/Web%E6%BC%8F%E6%B4%9E%E6%8C%96%E6%8E%98%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web漏洞挖掘实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../eBPF%E6%A0%B8%E5%BF%83%E6%8A%80%E6%9C%AF%E4%B8%8E%E5%AE%9E%E6%88%98/eBPF%E6%A0%B8%E5%BF%83%E6%8A%80%E6%9C%AF%E4%B8%8E%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    eBPF核心技术与实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E4%BA%91%E5%8E%9F%E7%94%9F%E5%9F%BA%E7%A1%80%E6%9E%B6%E6%9E%84%E5%AE%9E%E6%88%98%E8%AF%BE/%E4%BA%91%E5%8E%9F%E7%94%9F%E5%9F%BA%E7%A1%80%E6%9E%B6%E6%9E%84%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    云原生基础架构实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E5%8F%8D%E7%88%AC%E8%99%AB%E5%85%B5%E6%B3%95%E6%BC%94%E7%BB%8E20%E8%AE%B2/%E5%8F%8D%E7%88%AC%E8%99%AB%E5%85%B5%E6%B3%95%E6%BC%94%E7%BB%8E20%E8%AE%B2/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    反爬虫兵法演绎20讲
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E5%AE%89%E5%85%A8%E6%94%BB%E9%98%B2%E6%8A%80%E8%83%BD30%E8%AE%B2/%E5%AE%89%E5%85%A8%E6%94%BB%E9%98%B2%E6%8A%80%E8%83%BD30%E8%AE%B2/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    安全攻防技能30讲
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E5%AE%B9%E5%99%A8%E5%AE%9E%E6%88%98%E9%AB%98%E6%89%8B%E8%AF%BE/%E5%AE%B9%E5%99%A8%E5%AE%9E%E6%88%98%E9%AB%98%E6%89%8B%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    容器实战高手课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E9%AB%98%E6%89%8B%E8%AF%BE/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E9%AB%98%E6%89%8B%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    性能优化高手课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%80%A7%E8%83%BD%E6%B5%8B%E8%AF%95%E5%AE%9E%E6%88%9830%E8%AE%B2/%E6%80%A7%E8%83%BD%E6%B5%8B%E8%AF%95%E5%AE%9E%E6%88%9830%E8%AE%B2/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    性能测试实战30讲
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%8C%81%E7%BB%AD%E4%BA%A4%E4%BB%9836%E8%AE%B2/%E6%8C%81%E7%BB%AD%E4%BA%A4%E4%BB%9836%E8%AE%B2/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    持续交付36讲
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%8E%A5%E5%8F%A3%E6%B5%8B%E8%AF%95%E5%85%A5%E9%97%A8%E8%AF%BE/%E6%8E%A5%E5%8F%A3%E6%B5%8B%E8%AF%95%E5%85%A5%E9%97%A8%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    接口测试入门课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%B7%B1%E5%85%A5%E5%89%96%E6%9E%90Kubernetes/%E6%B7%B1%E5%85%A5%E5%89%96%E6%9E%90Kubernetes/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    深入剖析Kubernetes
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%B7%B1%E5%85%A5%E6%B5%85%E5%87%BA%E4%BA%91%E8%AE%A1%E7%AE%97/%E6%B7%B1%E5%85%A5%E6%B5%85%E5%87%BA%E4%BA%91%E8%AE%A1%E7%AE%97/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    深入浅出云计算
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E7%A8%8B%E5%BA%8F%E5%91%98%E7%9A%84%E6%B5%8B%E8%AF%95%E8%AF%BE/%E7%A8%8B%E5%BA%8F%E5%91%98%E7%9A%84%E6%B5%8B%E8%AF%95%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    程序员的测试课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_23" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7_23" id="__nav_7_23_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    网络排查案例课
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_23_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7_23">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    网络排查案例课
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E7%BD%91%E7%BB%9C%E6%8E%92%E6%9F%A5%E6%A1%88%E4%BE%8B%E8%AF%BE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    网络排查案例课
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%BC%80%E7%AF%87%E8%AF%8D%20-%20%E7%BD%91%E7%BB%9C%E6%8E%92%E6%9F%A5%E6%98%AF%E5%B7%A5%E7%A8%8B%E5%B8%88%E7%9A%84%E5%BF%85%E5%A4%87%E8%83%BD%E5%8A%9B/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    开篇词   网络排查是工程师的必备能力
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01%20-%20%E7%BD%91%E7%BB%9C%E6%A8%A1%E5%9E%8B%E5%92%8C%E5%B7%A5%E5%85%B7%EF%BC%9A%E7%BD%91%E7%BB%9C%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E5%88%86%E5%B1%82%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01   网络模型和工具：网络为什么要分层？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02%20-%20%E6%8A%93%E5%8C%85%E5%88%86%E6%9E%90%E6%8A%80%E6%9C%AF%E5%88%9D%E6%8E%A2%EF%BC%9A%E4%BD%A0%E4%BC%9A%E7%94%A8tcpdump%E5%92%8CWireshark%E5%90%97%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    02   抓包分析技术初探：你会用tcpdump和Wireshark吗？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03%20-%20%E6%8F%A1%E6%89%8B%EF%BC%9ATCP%E8%BF%9E%E6%8E%A5%E9%83%BD%E6%98%AF%E7%94%A8TCP%E5%8D%8F%E8%AE%AE%E6%B2%9F%E9%80%9A%E7%9A%84%E5%90%97%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    03   握手：TCP连接都是用TCP协议沟通的吗？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04%20-%20%E6%8C%A5%E6%89%8B%EF%BC%9ANginx%E6%97%A5%E5%BF%97%E6%8A%A5connection%20reset%20by%20peer%E6%98%AF%E6%80%8E%E4%B9%88%E5%9B%9E%E4%BA%8B%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04   挥手：Nginx日志报connection reset by peer是怎么回事？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05%20-%20%E5%AE%9A%E4%BD%8D%E9%98%B2%E7%81%AB%E5%A2%99%EF%BC%88%E4%B8%80%EF%BC%89%EF%BC%9A%E4%BC%A0%E8%BE%93%E5%B1%82%E7%9A%84%E5%AF%B9%E6%AF%94%E5%88%86%E6%9E%90/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05   定位防火墙（一）：传输层的对比分析
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E7%AD%94%E7%96%91%EF%BC%88%E4%B8%80%EF%BC%89-%20%E7%AC%AC1~5%E8%AE%B2%E6%80%9D%E8%80%83%E9%A2%98%E7%AD%94%E6%A1%88/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    答疑（一）  第1~5讲思考题答案
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06%20-%20%E5%AE%9A%E4%BD%8D%E9%98%B2%E7%81%AB%E5%A2%99%EF%BC%88%E4%BA%8C%EF%BC%89%EF%BC%9A%E7%BD%91%E7%BB%9C%E5%B1%82%E7%9A%84%E7%B2%BE%E7%A1%AE%E6%89%93%E5%87%BB/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06   定位防火墙（二）：网络层的精确打击
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    07   保活机制：心跳包异常导致应用重启？
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    07   保活机制：心跳包异常导致应用重启？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#tcp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TCP长连接为何总中断？
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TCP长连接为何总中断？">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        应用概况
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        排查思路
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        结论：排除网络，追查代码
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        理解心跳机制的原理
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="理解心跳机制的原理">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tcp-keep-alive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TCP Keep-alive
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#http-keep-alive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HTTP Keep-alive
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        小结
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        思考题
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        附录
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08%20-%20%E5%88%86%E6%AE%B5%EF%BC%9AMTU%E5%BC%95%E5%8F%91%E7%9A%84%E8%A1%80%E6%A1%88/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    08   分段：MTU引发的血案
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09%20-%20%E9%95%BF%E8%82%A5%E7%AE%A1%E9%81%93%EF%BC%9A%E4%B8%BA%E4%BD%95%E6%96%87%E4%BB%B6%E4%BC%A0%E8%BE%93%E9%80%9F%E5%BA%A6%E8%BF%99%E4%B9%88%E6%85%A2%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    09   长肥管道：为何文件传输速度这么慢？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10%20-%20%E7%AA%97%E5%8F%A3%EF%BC%9ATCP%20Window%20Full%E4%BC%9A%E5%BD%B1%E5%93%8D%E4%BC%A0%E8%BE%93%E6%95%88%E7%8E%87%E5%90%97%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10   窗口：TCP Window Full会影响传输效率吗？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E7%AD%94%E7%96%91%EF%BC%88%E4%BA%8C%EF%BC%89-%20%E7%AC%AC6~10%E8%AE%B2%E6%80%9D%E8%80%83%E9%A2%98%E7%AD%94%E6%A1%88/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    答疑（二）  第6~10讲思考题答案
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../11%20-%20%E6%8B%A5%E5%A1%9E%EF%BC%9ATCP%E6%98%AF%E5%A6%82%E4%BD%95%E6%8E%A2%E6%B5%8B%E5%88%B0%E6%8B%A5%E5%A1%9E%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    11   拥塞：TCP是如何探测到拥塞的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../12%20-%20%E9%87%8D%E4%BC%A0%E7%9A%84%E8%AE%A4%E8%AF%86%EF%BC%9A%E9%87%8D%E4%BC%A0%E5%88%B0%E5%BA%95%E6%98%AF%E6%80%8E%E4%B9%88%E5%9B%9E%E4%BA%8B%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    12   重传的认识：重传到底是怎么回事？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13%20-%20%E9%87%8D%E4%BC%A0%E7%9A%84%E5%86%8D%E8%AE%A4%E8%AF%86%EF%BC%9A%E6%B2%A1%E6%9C%89%E4%BB%BB%E4%BD%95%E4%B8%A2%E5%8C%85%E5%8D%B4%E4%B9%9F%E4%B8%80%E7%9B%B4%E9%87%8D%E4%BC%A0%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    13   重传的再认识：没有任何丢包却也一直重传？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../14%20-%20%E5%AE%89%E5%85%A8%EF%BC%9A%E7%94%A8Wireshark%E6%8A%8ADDoS%E6%94%BB%E5%87%BB%E7%85%A7%E5%87%BA%E5%8E%9F%E5%BD%A2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    14   安全：用Wireshark把DDoS攻击照出原形
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E6%98%A5%E8%8A%82%E7%89%B9%E5%88%AB%E6%94%BE%E9%80%81%EF%BC%88%E4%B8%80%EF%BC%89-%20%E4%B9%A6%E5%8D%95%E6%8E%A8%E8%8D%90/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    春节特别放送（一）  书单推荐
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E6%98%A5%E8%8A%82%E7%89%B9%E5%88%AB%E6%94%BE%E9%80%81%EF%BC%88%E4%BA%8C%EF%BC%89-%20%E8%81%8A%E8%81%8A%E8%83%BD%E5%8A%9B%E9%99%B7%E9%98%B1%E5%92%8C%E7%BB%88%E8%BA%AB%E5%AD%A6%E4%B9%A0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    春节特别放送（二）  聊聊能力陷阱和终身学习
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E6%98%A5%E8%8A%82%E7%89%B9%E5%88%AB%E6%94%BE%E9%80%81%EF%BC%88%E4%B8%89%EF%BC%89-%20%E6%88%91%E7%9A%84%E5%AD%A6%E4%B9%A0%E8%B5%84%E6%96%99%E5%92%8C%E5%B7%A5%E5%85%B7/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    春节特别放送（三）  我的学习资料和工具
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E6%98%A5%E8%8A%82%E7%89%B9%E5%88%AB%E6%94%BE%E9%80%81%EF%BC%88%E5%9B%9B%EF%BC%89-%20%E6%B5%8B%E4%B8%80%E6%B5%8B%E4%BD%A0%E7%9A%84%E7%BD%91%E7%BB%9C%E6%8E%92%E6%9F%A5%E8%83%BD%E5%8A%9B/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    春节特别放送（四）  测一测你的网络排查能力
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../15%20-%20Nginx%E7%9A%84499%E7%8A%B6%E6%80%81%E7%A0%81%E6%98%AF%E6%80%8E%E4%B9%88%E5%9B%9E%E4%BA%8B%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    15   Nginx的499状态码是怎么回事？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E7%AD%94%E7%96%91%EF%BC%88%E4%B8%89%EF%BC%89-%20%E7%AC%AC11~15%E8%AE%B2%E6%80%9D%E8%80%83%E9%A2%98%E7%AD%94%E6%A1%88/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    答疑（三）  第11~15讲思考题答案
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../16%20-%20%E6%9C%8D%E5%8A%A1%E5%99%A8%E4%B8%BA%E4%BB%80%E4%B9%88%E5%9B%9E%E5%A4%8DHTTP%20400%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    16   服务器为什么回复HTTP 400？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../17%20-%20%E4%B8%BA%E4%BB%80%E4%B9%88%E5%89%8D%E7%AB%AF%E9%A1%B5%E9%9D%A2%E9%87%8C%E5%A4%9A%E9%80%89%E4%B8%80%E4%B8%AA%E5%9F%8E%E5%B8%82%E5%B0%B1%E6%8A%A5%E9%94%99%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    17   为什么前端页面里多选一个城市就报错？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../18%20-%20%E5%81%B6%E5%8F%91%E6%80%A7%E9%97%AE%E9%A2%98%E5%A6%82%E4%BD%95%E6%8E%92%E6%9F%A5%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    18   偶发性问题如何排查？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../19%20-%20TLS%E7%9A%84%E5%90%84%E7%A7%8D%E7%89%B9%E6%80%A7%EF%BC%9ATLS%E6%8F%A1%E6%89%8B%E4%B8%BA%E4%BB%80%E4%B9%88%E4%BC%9A%E5%A4%B1%E8%B4%A5%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    19   TLS的各种特性：TLS握手为什么会失败？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../20%20-%20TLS%E5%8A%A0%E8%A7%A3%E5%AF%86%EF%BC%9A%E5%A6%82%E4%BD%95%E8%A7%A3%E5%AF%86HTTPS%E6%B5%81%E9%87%8F%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    20   TLS加解密：如何解密HTTPS流量？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E7%AD%94%E7%96%91%EF%BC%88%E5%9B%9B%EF%BC%89-%20%E7%AC%AC16~20%E8%AE%B2%E6%80%9D%E8%80%83%E9%A2%98%E7%AD%94%E6%A1%88/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    答疑（四）  第16~20讲思考题答案
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../21%20-%20%E4%B8%BA%E4%BB%80%E4%B9%88%E7%94%A8%E4%BA%86%E8%B4%9F%E8%BD%BD%E5%9D%87%E8%A1%A1%E6%9B%B4%E5%8A%A0%E4%B8%8D%E5%9D%87%E8%A1%A1%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    21   为什么用了负载均衡更加不均衡？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../22%20-%20%E4%B8%BA%E4%BB%80%E4%B9%88%E5%8E%8B%E5%8A%9B%E6%B5%8B%E8%AF%95TPS%E6%80%BB%E6%98%AF%E4%B8%8A%E4%B8%8D%E5%8E%BB%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    22   为什么压力测试TPS总是上不去？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../23%20-%20%E8%B7%AF%E5%BE%84%E6%8E%92%E6%9F%A5%EF%BC%9A%E6%B2%A1%E6%9C%89%E7%BD%91%E7%BB%9C%E8%AE%BE%E5%A4%87%E6%9D%83%E9%99%90%E8%A6%81%E5%A6%82%E4%BD%95%E5%81%9A%E6%8E%92%E6%9F%A5%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    23   路径排查：没有网络设备权限要如何做排查？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../24%20-%20%E4%B8%A2%E5%8C%85%EF%BC%9A%E5%A6%82%E4%BD%95%E7%A1%AE%E5%AE%9A%E4%B8%A2%E5%8C%85%E7%9A%84%E5%AD%98%E5%9C%A8%E5%8F%8A%E5%85%B6%E7%A8%8B%E5%BA%A6%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    24   丢包：如何确定丢包的存在及其程度？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E4%B8%8D%E5%AE%9A%E6%9C%9F%E5%8A%A0%E9%A4%90%EF%BC%88%E4%B8%80%EF%BC%89%20-%20%E5%85%AB%E4%BB%99%E8%BF%87%E6%B5%B7%EF%BC%8C%E5%90%84%E6%98%BE%E7%A5%9E%E9%80%9A%EF%BC%9A%E9%80%8F%E4%BC%A0%E7%9C%9F%E5%AE%9E%E6%BA%90IP%E7%9A%84%E5%90%84%E7%A7%8D%E6%96%B9%E6%B3%95/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    不定期加餐（一）   八仙过海，各显神通：透传真实源IP的各种方法
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E7%94%A8%E6%88%B7%E6%95%85%E4%BA%8B%20-%20%E5%B0%8FS%EF%BC%9A%E5%AD%A6%E4%B9%A0%E6%98%AF%E4%BA%BA%E7%94%9F%E8%B7%AF%E4%B8%8A%E7%94%9F%E7%94%9F%E4%B8%8D%E6%81%AF%E7%9A%84%E6%B4%BB%E6%B3%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    用户故事   小S：学习是人生路上生生不息的活泉
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E7%94%A8%E6%88%B7%E6%95%85%E4%BA%8B%20-%20%E7%8E%8B%E6%9C%AA%EF%BC%9A%E7%BD%91%E7%BB%9C%E6%8E%92%E6%9F%A5%E8%83%BD%E5%8A%9B%E6%98%AF%E4%B8%80%E5%90%8D%E5%90%88%E6%A0%BC%E8%BF%90%E7%BB%B4%E5%B7%A5%E7%A8%8B%E5%B8%88%E7%9A%84%E5%BF%85%E5%A4%87%E6%8A%80%E8%83%BD/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    用户故事   王未：网络排查能力是一名合格运维工程师的必备技能
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../25%20-%20%E6%8A%93%E5%8C%85%E5%88%86%E6%9E%90%E7%9A%84%E5%9B%9E%E9%A1%BE%E3%80%81%E6%8B%BE%E9%81%97%EF%BC%8C%E5%92%8C%E6%8F%90%E9%AB%98/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    25   抓包分析的回顾、拾遗，和提高
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E7%BB%93%E6%9D%9F%E8%AF%AD%20-%20%E7%8F%8D%E6%83%9C%E6%8F%A1%E6%89%8B%EF%BC%8C%E9%9A%BE%E8%AF%B4%E5%86%8D%E8%A7%81/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    结束语   珍惜握手，难说再见
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E7%BB%93%E8%AF%BE%E6%B5%8B%E8%AF%95%20-%20%E2%80%9C%E7%BD%91%E7%BB%9C%E6%8E%92%E6%9F%A5%E6%A1%88%E4%BE%8B%E8%AF%BE%E2%80%9D100%E5%88%86%E8%AF%95%E5%8D%B7%E7%AD%89%E4%BD%A0%E6%9D%A5%E6%8C%91%E6%88%98%EF%BC%81/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    结课测试   “网络排查案例课”100分试卷等你来挑战！
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%87%AA%E5%8A%A8%E5%8C%96%E6%B5%8B%E8%AF%95%E9%AB%98%E6%89%8B%E8%AF%BE/%E8%87%AA%E5%8A%A8%E5%8C%96%E6%B5%8B%E8%AF%95%E9%AB%98%E6%89%8B%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    自动化测试高手课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%AF%B4%E9%80%8F%E6%95%8F%E6%8D%B7/%E8%AF%B4%E9%80%8F%E6%95%8F%E6%8D%B7/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    说透敏捷
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%B5%B5%E6%88%90%E7%9A%84%E8%BF%90%E7%BB%B4%E4%BD%93%E7%B3%BB%E7%AE%A1%E7%90%86%E8%AF%BE/%E8%B5%B5%E6%88%90%E7%9A%84%E8%BF%90%E7%BB%B4%E4%BD%93%E7%B3%BB%E7%AE%A1%E7%90%86%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    赵成的运维体系管理课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%BD%AF%E4%BB%B6%E6%B5%8B%E8%AF%9552%E8%AE%B2/%E8%BD%AF%E4%BB%B6%E6%B5%8B%E8%AF%9552%E8%AE%B2/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    软件测试52讲
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%BF%90%E7%BB%B4%E7%9B%91%E6%8E%A7%E7%B3%BB%E7%BB%9F%E5%AE%9E%E6%88%98%E7%AC%94%E8%AE%B0/%E8%BF%90%E7%BB%B4%E7%9B%91%E6%8E%A7%E7%B3%BB%E7%BB%9F%E5%AE%9E%E6%88%98%E7%AC%94%E8%AE%B0/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    运维监控系统实战笔记
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E9%9B%B6%E5%9F%BA%E7%A1%80%E6%8B%BF%E4%B8%8B%E4%BA%91%E5%8E%9F%E7%94%9FCKA%E8%AE%A4%E8%AF%81/%E9%9B%B6%E5%9F%BA%E7%A1%80%E6%8B%BF%E4%B8%8B%E4%BA%91%E5%8E%9F%E7%94%9FCKA%E8%AE%A4%E8%AF%81/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    零基础拿下云原生CKA认证
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E9%AB%98%E6%A5%BC%E7%9A%84%E6%80%A7%E8%83%BD%E5%B7%A5%E7%A8%8B%E5%AE%9E%E6%88%98%E8%AF%BE/%E9%AB%98%E6%A5%BC%E7%9A%84%E6%80%A7%E8%83%BD%E5%B7%A5%E7%A8%8B%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    高楼的性能工程实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#tcp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TCP长连接为何总中断？
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TCP长连接为何总中断？">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        应用概况
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        排查思路
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        结论：排除网络，追查代码
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        理解心跳机制的原理
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="理解心跳机制的原理">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tcp-keep-alive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TCP Keep-alive
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#http-keep-alive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HTTP Keep-alive
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        小结
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        思考题
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        附录
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+  <h1>07   保活机制：心跳包异常导致应用重启？</h1>
+
+<p>你好，我是胜辉。这节课，咱们来聊聊TCP的保活机制。</p>
+<p>以前的电视剧里经常会有这样的剧情：女主因为车祸失去了记忆，男主一边摇着女主的肩膀，一边痛苦地问道：“还记得我吗？我是欧巴啊！”可是女主已经对此毫无记忆，迷茫地反问道：“欧巴是谁？”</p>
+<p>类似地，TCP其实也需要一种机制，让双方能保持这种“记忆”。Keep-alive这个词，你可能也听说过。特别是当遇到一些连接方面的报错的时候，可能有人会告诉你“嗯，你需要设置下Keep-alive”，然后问题确实解决了。</p>
+<p>不过，你有没有深入思考过这样几个问题呢：</p>
+<ul>
+<li>Keep-alive跟长连接是什么关系？</li>
+<li>它是应用层代码独立实现，还是依赖操作系统的TCP协议栈去实现？</li>
+<li>在HTTP层面也有一个Keep-alive的概念，它跟TCP的Keep-alive，是同一个东西吗？</li>
+</ul>
+<p>如果你对这几个问题的答案还不清楚，那么这节课，我就来帮助你厘清这些概念。以后你再遇到长连接失效、被重置、异常关闭等问题的时候，就知道如何通过抓包分析，解读出心跳包相关的信息，然后运用Keep-alive的相关知识点，去真正解决前面说的一系列问题。</p>
+<p>好，按惯例，我们还是从案例说起。</p>
+<h2 id="tcp">TCP长连接为何总中断？</h2>
+<p>当时我在云计算公司就职，有个客户的应用基于TCP长连接，但长连接经常中断，引起了应用方面的大量报错。由于客户的业务是支付相关的，对实时性和安全性要求很高，这类报错就产生了较大的负面影响，所以急需解决。</p>
+<h3 id="_1">应用概况</h3>
+<p>这个应用的架构比较简单：客户在云平台上部署了多台云主机，其中一台云主机专门做加解密，称之为加密服务器。另外几台云主机作为这台加密服务器的客户端，跟这台加密服务器保持TCP长连接。这些客户端会不时地跟加密服务器进行通信，完成加密操作。每45秒，客户端还会发送一次心跳包，这有两个作用：</p>
+<ul>
+<li>维持这个长连接不被中断，即<strong>心跳保活</strong>，让长连接在两端保持下去；</li>
+<li>探测加密服务器的可用性，即<strong>健康检查</strong>，一旦服务不可用，客户端就要去掉这个失效的连接。</li>
+</ul>
+<p>就像下图这样：</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/ac/49/ac7d92d0d0a77e425byy00ef52b0a149.jpg?wh=2000x1125" /></p>
+<p>如果加密服务器能在<strong>1秒内</strong>对心跳包进行回复，那么客户端就认为服务端正常可用，后续的数据交互（即加密请求）将继续在这条长连接上进行。而如果服务端未能在1秒内回复，那么客户端会认为该长连接已经中断，于是重启应用，发起一条新的长连接，并在日志中记录一次报错。</p>
+<p>用类Python语法来描述，大体是这样的：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>while true:
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>sleep(45)
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>if Keep_alive_probe() is true:
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>continue
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>else:
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>restart()
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>log_error()
+</code></pre></div>
+<h3 id="_2">排查思路</h3>
+<p>整体的排查思路跟<a href="https://time.geekbang.org/column/article/477510">网络分层模型</a>有点类似，逐层往下。我们需要先从应用层查找原因，然后是操作系统层面，最后是网络层分析。排查的顺序就是这样的：</p>
+<blockquote>
+<p><strong>应用层代码 -&gt; 操作系统的时间配置 -&gt; 网络的抓包分析</strong></p>
+</blockquote>
+<p>首先，客户自查了应用，没有发现可疑代码，并且尝试过重新部署代码、重装系统、更换IP等，但都未奏效。</p>
+<p>那么，会不会是时间服务（ntp）的问题呢？我们检查了两侧机器的ntpd服务的状态，都是正常的。对比了两端机器的实际时间，也没有发现明显的误差。于是这个可能性也被排除了。</p>
+<p>然后就需要排查网络了。我们在一台客户端上启动了抓包程序tcpdump，过滤条件是对端加密服务器的IP和端口。抓多久呢？因为问题大约十几分钟出现一次，那么按照这个频率，我们设定抓包时长为半个小时，得到了抓包文件。这样就能覆盖到一到两次的错误了。</p>
+<blockquote>
+<p>补充：抓包示例文件已经上传至<a href="https://gitee.com/steelvictor/network-analysis/blob/master/07/heartbeat.pcap">Gitee</a>，建议用Wireshark打开文件，结合文稿学习。</p>
+</blockquote>
+<p>因此，通过检查应用日志，我们发现在抓包时间段内，应用日志又记下了两次报错，比如下面这个：</p>
+<p><img alt="图片" src="https://static001.geekbang.org/resource/image/84/89/84d35533cb2e21e39f5c06504dcdb689.png?wh=498x63" /></p>
+<p>从日志上看，17:08:02这个时间点发生了一次报错，17:08:10发生了一次程序的重启。</p>
+<p>有了应用层的信息，接下来，我们就需要在抓包文件中，<strong>找到传输层和网络层的信息来与应用层信息对应</strong>，这样排查工作才能继续推进。</p>
+<p>但是日志记录的时间戳粒度太粗了，只精确到了秒级，而网络报文在Wireshark中都是微秒级的，一秒内可能会有成百上千个报文。所以，仅凭精确到秒的一个时间戳，还不足以让我们在几十个报文中，精确地找到对应的报文。这个时候，我们需要调整一下抓包文件分析工作的切入点。</p>
+<p>一个常规的做法是，<strong>跳过案例本身的问题特殊性不谈，先从宏观上把握一下排查思路</strong>。也就是先不纠结于根据日志时间来寻找报文的难题，而是先看Expert Information，找一找有没有比较可疑的报文。打开Expert Information窗口，如下：</p>
+<p><img alt="图片" src="https://static001.geekbang.org/resource/image/58/73/587e830687d8b9786f09dffe8fba7773.png?wh=1880x306" /></p>
+<p>可见，有80个Error级别的Malformed Packet（格式错误）报文和2个RST报文，都很可疑。</p>
+<p>我们先看这80个Malformed Packet报文，这传递了什么信息呢？在Protocol栏显示SIGCOMP，说明Wireshark认为这80个报文是SIGCOMP协议的（SIP的信令压缩协议）。不过，客户的应用不是SIP相关的，显然这些报文应该是被Wiresharek误会了。</p>
+<blockquote>
+<p>在这里，我也给你一个小小的<strong>提醒</strong>：毕竟只有被公开广泛支持的数据格式和协议才能在Wireshark中正确展示，所以如果你看到类似这种Malformed Packet的时候，还是要统筹考虑当前案例的实际情况，未必Malformed报文就真的是格式错误，也可能只是Wireshark不了解某种“方言”而已。</p>
+</blockquote>
+<p>让我们看看这些报文究竟是什么。点开Error，选中一个报文。比如我这里选择37号报文：</p>
+<p><img alt="图片" src="https://static001.geekbang.org/resource/image/07/fd/0760eb16f56ec70837ab52e27894affd.png?wh=1880x372" /></p>
+<p>随后光标会自动定位到37号报文这里：</p>
+<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b5/51/b50d75ae1b923d05a6b5997067416751.png?wh=1213x177" /></p>
+<p>然后选了另外几个Malformed Packet，发现它们都是成对出现的。它们还有一个特征是：</p>
+<ul>
+<li>前一个报文的TCP载荷数据是01（十六进制）；</li>
+<li>后一个报文的TCP载荷数据是41（十六进制）。</li>
+</ul>
+<p>这就像是某种“联动”机制了，会不会就是心跳报文呢？你注意下TCP Seglen这一栏（这是我添加的表示TCP载荷长度的列），有没有发现这类报文的长度都是1 ？我们就以 <code>tcp.len eq 1</code> 为过滤器，过滤出报文：</p>
+<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9e/91/9e44b98d20161159yyceabc3a11cfc91.png?wh=1225x274" /></p>
+<p>可见，37和38是0秒发生的，76和77是45秒后发生的，然后97和98以及后面每一对报文，也都符合45秒间隔的规律，正好跟客户程序的<strong>45秒</strong>心跳包机制对上了。我们可以确认这些报文就是<strong>心跳报文</strong>了！更确切地说，每次成对出现的两个报文中：</p>
+<ul>
+<li>前一个是心跳探测包，它的TCP载荷数据为01（十六进制）；</li>
+<li>后一个是心跳回复包，它的TCP载荷数据为41（十六进制）。</li>
+</ul>
+<p><strong>这是第一个比较明显的进展。</strong>也就是说，我们已经可以找到应用层的心跳包在网络层的展示形式了，这对于后续的排查非常有帮助。</p>
+<p>不过，也不要忘了，我们是来排查“心跳包失败导致连接中断”的问题的，现在只是找到了心跳包的特征，还需要找到真正的跟日志报错相关的报文，而这个报文是跟“连接中断”现象有关的。</p>
+<p>那么会是什么样的报文呢？其实，我们在第4讲就研究过<a href="https://time.geekbang.org/column/article/480068">TCP挥手</a>。你应该还记得，TCP的连接断开，无非跟两种报文有关：<strong>FIN和RST</strong>。</p>
+<p>我们先尝试寻找FIN报文。输入过滤器：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>tcp.flags.fin eq 1
+</code></pre></div>
+<p>结果发现什么报文都没有出来。可见，这次抓包里，连接的断开并不是用FIN完成的。</p>
+<p><img alt="图片" src="https://static001.geekbang.org/resource/image/77/c1/7751974162ebff9452195c208f2752c1.png?wh=783x202" /></p>
+<p>接着就是寻找RST报文。其实，在Expert Information里面，就有2个RST报文，我们可以直接从那里入手。当然，用过滤器也同样方便，输入：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>tcp.flags.reset eq 1
+</code></pre></div>
+<p>我们能找到2个RST报文：</p>
+<p><img alt="图片" src="https://static001.geekbang.org/resource/image/25/e3/25f575477b2af6be54f51340a39040e3.png?wh=1111x79" /></p>
+<p>我们选中575号报文，然后Follow -&gt; TCP Stream，得到了这个RST所在的TCP流的全部报文：</p>
+<p><img alt="图片" src="https://static001.geekbang.org/resource/image/1y/38/1yyb053e46e3dcf4702bdfa2df015f38.png?wh=1235x416" /></p>
+<p>报文很多，上图显示的只是一部分报文。我往前翻阅了更前面的报文，也能看到很多相对长的时间间隔，有17秒、39秒、11秒的，但也没有什么规律。这时候，我们就需要结合前面刚分析到的一些信息，要不然就要在报文的海洋里迷失方向了。</p>
+<p>我们通过前面的分析发现，心跳探测包的报文数据是01，心跳回复包的报文数据是41。所以，让我们再次借助强大的过滤器。在 <code>tcp.stream eq 0</code> 后面添加 <code>and tcp.payload eq 01</code>，即整体过滤器变为：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>tcp.stream eq 0 and tcp.payload eq 01
+</code></pre></div>
+<p>这样就过滤出了这个TCP流里面，<strong>所有的心跳探测包</strong>：</p>
+<p><img alt="图片" src="https://static001.geekbang.org/resource/image/6c/0c/6c86e426b76f84dc529a66d05169cd0c.png?wh=1246x408" /></p>
+<p>可见，这些心跳探测包也是很明显遵循了45秒间隔的规律。不过，等一下，为什么572号心跳探测包跟它的上一次心跳探测，间隔的时间是<strong>58秒</strong>，而不是45秒呢？</p>
+<p><img alt="图片" src="https://static001.geekbang.org/resource/image/fe/18/fed696dbb35675c0fb989a9728bf7218.png?wh=1221x41" /></p>
+<p><strong>这很反常，也是第二个很重要的发现。</strong>要知道，这45秒的机制是在代码里实现的，照理说不可能出现13秒这么大的误差。现在，我们把 <code>tcp.payload eq 01</code> 这个条件去掉，回到这个TCP流的完整报文区域来综合分析：</p>
+<p><img alt="图片" src="https://static001.geekbang.org/resource/image/f7/43/f760066db14b0f950d3c71329ee22043.png?wh=1243x392" /></p>
+<p>我来给你解读一下：</p>
+<ul>
+<li>572号报文（客户端发出）是心跳探测包；</li>
+<li>573号报文（服务端发出）是心跳回复包；</li>
+<li>574号报文（客户端发出）是客户端对573号报文的确认；</li>
+<li>575号报文（客户端发出）是一个RST报文，它跟客户端日志报错有直接的关系。</li>
+</ul>
+<p>以上4个报文之间几乎没有时间上的停顿。这里，你可能会有个小疑问：为什么572号报文跟上一个报文的间隔是17秒而不是45秒呢？其实，这是<strong>Time列的类型</strong>导致的，我这里用的是Delta time displayed类型，是跟前一个被显示的报文的间隔时间。</p>
+<p>之前我们看到很多个整齐的45秒，是因为那个窗口里显示的报文，都是过滤过的心跳报文，跟这里<strong>显示的报文</strong>不同，所以显示的间隔时间也不同。Wireshark里的Time一列有多种配置可选，所以你一方面要理解这里面各种Time的区别，一方面自己做分析的时候，也可以根据实际需要，灵活选择Time类型。</p>
+<p><img alt="图片" src="https://static001.geekbang.org/resource/image/60/10/6020ec054ae4fc6a79062fe025fde810.png?wh=738x259" /></p>
+<p>考虑到这里的问题就是跟心跳包和挥手包直接相关，排除掉无关报文，可以让我们的分析思路也变得更加清晰。所以，我们再一次调整过滤器，改为：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>tcp.stream eq 0 and (tcp.len == 1 or tcp.flags.reset == 1)
+</code></pre></div>
+<p>就得到这个TCP流里面的心跳包和挥手包：</p>
+<p><img alt="图片" src="https://static001.geekbang.org/resource/image/2d/ec/2df9da0f4fc2a4cfbda7752e38de98ec.png?wh=1920x523" /></p>
+<p>我们最后再确认一下时间戳。这个隔了58秒才发出的心跳包，发送的时间是在17:08:10：</p>
+<p><img alt="图片" src="https://static001.geekbang.org/resource/image/38/c9/38ced831f878b7b94fb4d28af42e1cc9.png?wh=640x138" /></p>
+<p>跟日志中restart时间一致：</p>
+<p><img alt="图片" src="https://static001.geekbang.org/resource/image/7c/f3/7c9bbea46yyd3641448e2d502b8acff3.png?wh=548x73" /></p>
+<p>现在，事实已经很清楚了：客户端在连接被断开之前的心跳探测包，并没有遵循客户声称的“每隔45秒”，而是很意外地隔了58秒。我们结合程序逻辑，已经可以推断出真实的状况了。看示意图：</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/f0/7e/f03e54e7cb407456f4e324b85c8d7e7e.jpg?wh=2000x1125" /></p>
+<h3 id="_3">结论：排除网络，追查代码</h3>
+<p>现在，我们已经清楚了这个报错的原因：客户端程序出了一个Bug，某一次心跳探测包发出的时候是在上一次心跳的58秒以后（也就是相对正常情况，迟了13秒）。那么，服务端虽然立即发送了心跳回复包，但也一样是在58秒以后了。程序的逻辑非常简单粗暴：一旦心跳回复包的到达时间超过了第46秒（也就是45秒+1秒超时），就认为是心跳探测失败。</p>
+<p><strong>为什么探测包本身会比预定的时间晚了13秒才发出呢？</strong>根据这个很明确的信息，客户再次检查了应用代码，终于定位到了出问题的代码段。修复代码后，问题随之解决。</p>
+<p>补充一下，在这个案例中，<strong>异常时的心跳包探测和回复的耗时本身是正常的</strong>。我们可以看到包号572是客户端发出的心跳探测包，包号573是服务端发出的心跳回复包。两者之间，间隔只有0.000370秒，即0.37毫秒，完全是同机房内网时延的正常水平。</p>
+<h2 id="_4">理解心跳机制的原理</h2>
+<p>显然，这个案例是关于应用层自己实现的心跳机制的，有一定的特殊性。但在机制上，也体现了心跳包的一些特点，比如：</p>
+<ul>
+<li>定时发送心跳探测包；</li>
+<li>对于心跳回复包有超时限制。</li>
+</ul>
+<p>而从更普适的尺度上来看，其实TCP本身提供的Keep-alive机制更为安全易用。</p>
+<p>一般来说，对于操作系统已经实现的特性，我们最好<strong>直接去利用，而不是自己创造一个类似的轮子</strong>。这好比你想基于UDP，在应用层实现类似TCP的种种传输保障机制，也不是不可以，但实现起来会相当复杂（参考<a href="https://devopedia.org/quic">QUIC协议</a>）。TCP心跳机制看似简单，但从上面这个案例来看，稍有不慎，还是很容易发生错误的。</p>
+<h3 id="tcp-keep-alive">TCP Keep-alive</h3>
+<p>那么TCP自身的Keep-alive，究竟是怎样的一个存在呢？</p>
+<p>其实，如果不做显式的配置，默认创建出来的TCP Socket是不启用Keep-alive的，也就是都不会发送心跳包。不过，大部分应用程序已经在代码里启用了Keep-alive，所以你平时不太会遇到连接失效的问题。比如我稍后要演示的一个含心跳包的抓包文件，抓取的就是Chrome浏览器的流量，里面就有很多心跳包，因为Chrome浏览器启用了TCP心跳保活机制。</p>
+<p>要打开这个TCP Keep-alive特性，你需要使用setsockopt()系统调用，对已经创建的Socket进行配置，启用Keep-alive。具体的调用方法，你可以参考<strong>man setsockopt</strong>。</p>
+<p>在Linux操作系统层级，也有三个跟Keep-alive有关的全局配置项。</p>
+<ul>
+<li><strong>间隔时间</strong>：net.ipv4.tcp_keepalive_time，其值默认为7200（秒），也就是2个小时。</li>
+<li><strong>最大探测次数</strong>：net.ipv4.tcp_keepalive_probes，在探测无响应的情况下，可以发送的最多连续探测次数，其默认值为9（次）。</li>
+<li><strong>最长间隔</strong>：net.ipv4.tcp_keepalive_intvl，在探测无响应的情况下，连续探测之间的最长间隔，其值默认为75（秒）。</li>
+</ul>
+<blockquote>
+<p>补充：你可以在Linux系统里面，执行<strong>man tcp</strong>，查看内核对TCP协议栈的详细文档。这里我摘录一下关于Keep-alive的部分：</p>
+<ul>
+<li>tcp_keepalive_intvl (integer; default: 75; since Linux 2.4)</li>
+</ul>
+<p>The number of seconds between TCP keep-alive probes.
+- tcp_keepalive_probes (integer; default: 9; since Linux 2.2)</p>
+<p>The  maximum number of TCP keep-alive probes to send before giving up and killing the connection if no response is obtained from the other end.
+- tcp_keepalive_time (integer; default: 7200; since Linux 2.2)</p>
+<p>The number of seconds a connection needs to be idle before TCP  begins  sending  out  keep-alive probes.   Keep-alives are sent only when the SO_KEEPALIVE socket option is enabled.  The default value is 7200 seconds (2 hours).  An idle connection is terminated after approximately an  additional 11 minutes (9 probes an interval of 75 seconds apart) when keep-alive is enabled.</p>
+</blockquote>
+<p>如果我们连接启用了Keep-alive，但没有设定自定义的数值，那么就会使用上面这些默认值，即：当连接闲置（没有数据交互）达到7200秒（2小时）时发送心跳包，每次心跳包超时时间为75秒，最多重试9次。</p>
+<p>这样的话，对于一个已经失效的TCP连接，最大需要7200+75*9=7875秒（约等于2小时11分钟）才能探测到。</p>
+<p>毫无疑问，这个时间是相当长的。不过结合时代背景，这个其实也可以理解：TCP Keep-alive被设计的时候是八十年代，当时因特网还很初级，所以设计者们并不想让心跳包占据太多的网络资源。从而，就有了这么一个感知时间很长的心跳机制。关于TCP Keep-alive的一些更多信息在<a href="https://datatracker.ietf.org/doc/html/rfc1122#page-101">RFC1122</a>里，你有兴趣的话可以去研究一下。</p>
+<p>另外一个值得注意的地方，是Keep-alive报文本身的特点。在上面的案例中，这个特定的应用层代码设定的心跳包特征是这样的：</p>
+<ul>
+<li>心跳探测包，载荷为1个字节，其值为01。</li>
+<li>心跳回复包，载荷也为1个字节，其值为41。</li>
+</ul>
+<p>但是TCP本身提供的Keep-alive报文特征就非常不同了。首先，它的序列号就很奇特，是上一个报文的序列号<strong>减1</strong>，载荷<strong>为0</strong>。回复的报文也同样特别，确认号为收到的序列号<strong>加1</strong>。而且，无论是探测包还是回复包，其载荷长度都<strong>为0</strong>。</p>
+<p>文字描述不是很容易理解，我给你看一个实际的例子。这是某一次我用Chrome浏览器访问网站时做的抓包：</p>
+<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ed/1a/ed092d46acc5594db8ae276f927b2f1a.png?wh=1920x453" /></p>
+<p>上图的红色底色的多个报文，就是Wireshark识别出来的TCP心跳包。我也把需要关注的信息用红色方框标注出来了。</p>
+<p>25号报文是离心跳包最近的一个常规报文，Wireshark告诉我们：它的下一个序列号（图中的NextSeq）是1578。也就是说，如果下一个是常规报文，那么这个常规报文的序列号就是1578。然后看同是这个客户端发出的报文27，这就是一个心跳包，它的序列号却是1577（也就是<strong>1578-1</strong>），载荷为0（Len=0）。对端对这个心跳包做了回应（包号28），确认号为1578（<strong>1577+1</strong>），载荷也为0。</p>
+<p>我们再来看一下示意图：</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/5b/6c/5b04d1eee64f3ea50185a479b55fc06c.jpg?wh=2000x803" /></p>
+<p>要是你了解TCP握手和挥手阶段的确认号的话，你对这个+1机制是不是感觉很熟悉？可见，TCP认为心跳包也是十分重要的，它跟握手和挥手一样，都属于控制报文，它的确认号机制也体现了这一特点。</p>
+<p>有趣的是，RFC1122里并没有规定心跳探测包的载荷一定是0，它也可以是1。只是从我有限的抓包经验来看，心跳包都是载荷为0的，看来这是比较常见的实现方式。</p>
+<h3 id="http-keep-alive">HTTP Keep-alive</h3>
+<p>那么我们也经常听到的HTTP Keep-alive，又是一个什么东西呢？难道是应用层实现的心跳保活机制？意味着HTTP也有心跳包这种东西吗？</p>
+<p>其实没有那么复杂。<strong>HTTP的Keep-alive，是用Connection这样一个HTTP header来实现的。</strong>你应该知道，HTTP报文的header形式是Key: value。比如常见的header有：</p>
+<ul>
+<li>User-Agent: curl/7.68.0 （客户端发出）</li>
+<li>Host: www.baidu.com （客户端发出）</li>
+<li>Content-Type: text/html （服务端发出）</li>
+<li>Server: bfe/1.0.8.18 （服务端发出）</li>
+</ul>
+<p>而Keep-alive头部，就是这个形式：<strong>Connection: Keep-alive</strong>（注意这里有一个“-”符号）。</p>
+<p>客户端和服务端都可以发送这个保活头部。表达的意思也跟外交人员的语言一样优雅专业：“我方真诚地希望，贵方能切实履行我们的协议，按照长连接待遇来处理本次连接，谢谢配合”。</p>
+<p>你应该也知道，HTTP的版本有0.9、1.0、1.1、2.0。HTTP/0.9现在基本不再使用了，而HTTP/1.0占的流量比例也已经很低了（在公网上小于1%）。目前占主流的是HTTP/1.1和HTTP/2，而这两者都<strong>默认使用长连接</strong>。</p>
+<p>那既然HTTP/1.1默认是长连接了，为什么还要有这个Connection头部呢？在我看来，这有两个原因。</p>
+<ul>
+<li><strong>协议兼容性</strong></li>
+</ul>
+<p>在HTTP/1.0版本中，默认用的是短连接。这导致了一个明显的问题：每次HTTP请求都需要创建一个新的TCP连接。随着因特网带宽和各类资源迅速增长，每次建立TCP连接的开销变成了主要矛盾。</p>
+<p>为了克服这个不足，Connection: Keep-alive头部被扩充进了HTTP/1.0，用来显式地声明这应该是一次长连接。当然，从HTTP/1.1开始，长连接已经是默认设置了，但为了兼容1.0版本的HTTP请求，Connection这个头部在HTTP/1.1里得到了保留。</p>
+<ul>
+<li><strong>关闭连接的现实需求</strong></li>
+</ul>
+<p>即使在HTTP/1.1里，也并非所有的长连接都需要永久维持。有时候任意一方想要关闭这个连接，又想用一种“优雅”（graceful）的方式，那么就可以用 <strong>Connection: Close</strong> 这个头部来达到“通知对端关闭连接”的目的，体面而有效。另外，在HTTP/2里，连接关闭是通过另外的机制实现的，与Connection头部无关。</p>
+<p>这个Connection头部看似简单，其实有时候也能起到很大的作用。在eBay，我们每年有大量的流量迁移的工作。其中，这个Connection头部就在迁移的<strong>平滑度和收敛速度</strong>上，起到了很关键的作用。</p>
+<p>具体来说，我们在新老两个VIP之间迁移流量，用的是名称解析（基于DNS/GSLB）的返回值的比例，来控制真实的HTTP流量比例，这就可以逐步从新老比例为1:99，到50:50，最后到100:0也就是全部到新VIP。</p>
+<p>但是这样会有这么个问题：因为流量基本都是HTTP/1.1（即默认是长连接），客户端依然坚持使用着老的VIP，造成DNS/GSLB的比值调整没有起到应有的效果，真正观察到的流量经常跟DNS/GSLB的设置值相差甚远，或者说<strong>有很强的滞后性</strong>。</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/e2/fe/e2864876efec290dc58ebf62393d76fe.jpg?wh=2000x659" /></p>
+<p>从上图中可以看到，客户端在查询GSLB（相当于智能DNS）的时候，拿到的新老IP的比例为2:2，那么访问量应该也是符合这个比例。但是因为长连接的存在，这些拥有长连接的客户端连问都不会去问GSLB，而是会继续往老的连接（也就是连着老VIP的连接）上发送流量，那么我们迁移流量的工作，就受到影响了。</p>
+<p>为了解决这个问题，我们当然可以选择等待（比如几小时甚至几天）它自然收敛，但其实我们找到了更好的办法：在新老VIP上都添加了rewrite policy，使得每一定比例的HTTP响应里面，都带上Connection: Close这个头部。</p>
+<p>客户端收到这个头部后，按照协议规定，它必须关闭这条长连接。在下一次HTTP请求的时候，客户端就会遵循“DNS解析-&gt;发起新连接-&gt;发送HTTP请求”这样的工作路径，于是新发起的连接数跟DNS解析数量基本对齐，也就达到了我们的目的。</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/b6/5c/b608c91ef62f7b824cb8b3fa5935f65c.jpg?wh=2000x660" /></p>
+<p>下图是在迁移尾声时候的流量趋势图。在这个阶段，老VIP已经从DNS/GSLB里禁用了。但原先不插入这种Connection: Close头部的话，总还是有很多请求在老的VIP上。在插入了Connection: Close头部后，老VIP上的流量几乎立刻停止，可谓立竿见影。</p>
+<p><img alt="图片" src="https://static001.geekbang.org/resource/image/64/52/641ebb1db456baebfcda566b35d4ff52.png?wh=1920x392" /></p>
+<h2 id="_5">小结</h2>
+<p>这节课，我们通过一个奇特的案例，详细探究了一种应用层保活机制的Bug引发的报错。在这个排查过程中，<strong>Wireshark过滤器</strong>的使用，很大程度上帮助了这次排查。所以，这里我推荐你要熟悉以下这些过滤器，在你以后的网络排查工作中，应该能给到不少的帮助：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>tcp.len eq 长度
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>tcp.flags.fin eq 1
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>tcp.flags.reset eq 1
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>tcp.payload eq 数据
+</code></pre></div>
+<p>抓包分析中，面对Wireshark里千奇百怪的报文，有时候也会遇到不知道从何下手的窘况，那么你可以<strong>直接查看Expert Information</strong>，从那里寻找线索也不失为一个有效的办法。</p>
+<p>另外，在原理部分，我还给你介绍了TCP层面的Keep-alive和HTTP层面的Keep-alive的联系和区别。应该说，这确实是两个容易令人困惑的概念，不仅名称一样，作用也接近。通过这次讲解，希望能帮助你彻底理解这两个概念。</p>
+<p>最后，我再给你梳理提炼一下这节课的关键知识点。</p>
+<p>首先，对于TCP Keep-alive，你需要掌握：</p>
+<ul>
+<li>默认TCP连接并不启用Keep-alive，若要打开的话要<strong>显式地调用setsockopt()</strong>，来设置保活包的发送间隔、等待时间、重试个数等配置。在全局层面，Linux还默认有3个跟Keep-alive相关的内核配置项可以调整：tcp_Keepalive_time，tcp_Keepalive_probes，还有tcp_Keepalive_intvl。</li>
+<li>TCP心跳包的特点是，它的序列号是<strong>上一个包的下个序列号-1</strong>，而心跳回复包的确认号是这个序列号-1+1（即还是这个序列号）。</li>
+</ul>
+<p>然后，对于HTTP Keep-alive的知识点，你需要理解：</p>
+<ul>
+<li>HTTP/1.0默认是短连接，HTTP/1.1和2默认是长连接。</li>
+<li><strong>Connection: Keep-alive</strong> 在HTTP/1.0里，能起到维持长连接的作用，而在HTTP/1.1里面没有这个作用（因为默认就是长连接）。</li>
+<li><strong>Connection: Close</strong> 在HTTP/1.1里，可以起到优雅关闭连接的作用。这个头部在流量调度场景下也很有用，能明显加快基于DNS/GSLB的流量调整的收敛速度。</li>
+</ul>
+<h2 id="_6">思考题</h2>
+<p>最后再给你留两道思考题：</p>
+<ol>
+<li><code>tcp.payload eq abc</code>，这个过滤器可以搜索到精确匹配“abc”字符串的报文。那么，如果是模糊匹配，比如只要<strong>包含“abc”</strong>的报文我都想搜到，这个过滤器又该如何写呢?</li>
+<li>在工作中，你遇到过跟TCP Keep-alive相关的问题吗？你是怎么解决的呢？</li>
+</ol>
+<p>欢迎你把答案分享到留言区，我们一起进步成长。</p>
+<h2 id="_7">附录</h2>
+<p>抓包示例文件：<a href="https://gitee.com/steelvictor/network-analysis/tree/master/07">https://gitee.com/steelvictor/network-analysis/tree/master/07</a></p>
+<div><strong>精选留言（15）</strong></div>
+<ul>
+<li><span>江山如画</span> 👍（22） 💬（4）<p>问题1:
+方法1: frame contains abc
+方法2: ip contains abc
+方法3: tcp contains abc
+方法4: http contains abc
+方法5: tcp.payload contains 61-62-63
+
+
+问题2:
+工作中目前还没有碰到过和 tcp keep-alive 有关的问题，不过之前看一些建立网络隧道的软件有 keep-alive 这个参数，查询说和 SNAT 有关，一值很迷惑。
+今天学习了老师的课又深究了下，virtual tunnel 会建立虚拟网卡，和物理网卡之间需要做流量的桥接，进而需要做 SNAT，SNAT 会维护一个端口映射表，因为链接太多可能会占满本地端口，如果没有设置 keep-alive，在一段时间内都没有传输数据，会把端口转换的记录给删掉，这时候通信双方想再通信就不行了。所以需要每隔一段时间发送心跳包，保证 SNAT 端口映射表中的记录不被删掉，从而保证连接存活。
+
+
+总结二者的区别:
+1. http keep-alive 是七层特性，tcp keep-alive 是四层特性
+2. http keep-alive 旨在较短时间内，复用 tcp 链接，快速传输大量数据，减少重复握手挥手带来的时延消耗和网络拥堵，比如用浏览器访问一个带有大量 js,css 或图片的网页；
+tcp  keep-alive 旨在相对较长的一段时间内，检查 tcp 链接是否存活，它的传输频率很低，传输数据量也很小，感觉类似网络隧道软件，语音，聊天软件中可能会用到 tcp keep-alive。
+3. http keep-alive 的内部实现不依赖于 tcp  keep-alive, 二者实现上没有关系。</p>2022-01-26</li><br/><li><span>Geek_535c45</span> 👍（8） 💬（4）<p>老师好，关于TCP的keep-alive，有个疑惑
+1、是否开启keep-alive 取决于客户端程序是否调用setsockopt()，而与服务端(被连接方)无关 ？
+2、Linux 上的net.ipv4.tcp_keepalive 参数是控制运行在linux上的客户端进程和目标服务之间的长连接保活的参数，与服务器端(假设也为linux)设置的net.ipv4.tcp_keepalive 参数无关 ？
+3、HTTP keep-alive 是否依赖TCP keep-alive，如果HTTP的 keep_alive_request_time 比TCP 的keep-alive 时长配置的长，HTTP在开启长连接的情况下客户端请求发起一次之后中间就一直没有再请求，中间这个间隔时长大于了TCP 的keep-alive，是否会中断？</p>2022-03-07</li><br/><li><span>webmin</span> 👍（6） 💬（1）<p>为什么要心跳检查，因为目前讨论的数据连接场景，都是无源连接，排除NAT的情况，连接就是存在于src和dest两端OS中的状态机，为什么会要用无源连接呢，有源是连接建立带宽就分配好了，不传有效数据这个带宽也被占用着，这不就浪费了，虚拟信号时代的电话就是有源的。
+心跳检查是两端都要做的，不做的那一端一样存在状态不对而不自知的情况。</p>2022-01-26</li><br/><li><span>那时刻</span> 👍（6） 💬（3）<p>请问老师，例子中的心跳消息显示push ack是为何呢？</p>2022-01-26</li><br/><li><span>Cavalier</span> 👍（3） 💬（1）<p>老师您好，我有一台设备网络会时不时就断，但是只要上面一直跑着ping就不会断开。这个有什么思路？</p>2022-04-02</li><br/><li><span>天问</span> 👍（2） 💬（1）<p>tcp contains &quot;abc&quot;显示包含abc的数据包</p>2022-01-26</li><br/><li><span>LEON</span> 👍（1） 💬（1）<p>您好，这句话我感觉描述的有问题-----------”客户端收到这个头部后，按照协议规定，它必须关闭这条长连接。在下一次 HTTP 请求的时候，客户端就会遵循“DNS 解析 -&gt; 发起新连接 -&gt; 发送 HTTP 请求”------我理解Connection: Close的调整只会影响HTTP的行为，和DNS 无关，如果客户端LDNS或本地有缓存，也不会重新到GSLB发起新的解析，会基于缓存的老的VS地址链接到老的VS上，从而影响切换。</p>2022-08-03</li><br/><li><span>Realm</span> 👍（1） 💬（2）<p>1 tcp.payload include abc
+2 我们遇到一个web应用，在浏览器上请求一个需要长时间才得到结果的请求，最后返回超时错误，估计被中间网络设备给reset掉了.</p>2022-01-26</li><br/><li><span>Wade_阿伟</span> 👍（0） 💬（2）<p>分享一个之前在工作场景中遇到的关于TCP Keep-alive的问题。公司是国内其中一家手机厂商，业务是push场景。一次因为机器上的TCP Keep-alive间隔参数设置的太小，从而导致用户手机端耗电明细增加。经过排查，将net.ipv4.tcp_keepalive_time设置为合理的值后，问题得到解决。</p>2024-05-07</li><br/><li><span>Summer</span> 👍（0） 💬（1）<p>老师，问下 Delta time 和Delta time displayed 的区别和应用场景各是什么呢
+Delta time displayed的意思是[Time delta from previous displayed frame]，直观上看到后者在应用过滤器之后会发生变化</p>2023-11-06</li><br/><li><span>Geek_49b49f</span> 👍（0） 💬（1）<p>如何在vip级别上插入connection close 头部呢？</p>2023-09-06</li><br/><li><span>斯蒂芬.赵</span> 👍（0） 💬（1）<p>看完还是没
+明白心跳包为啥异常？能说一下具体跟因是啥么</p>2022-12-02</li><br/><li><span>斯蒂芬.赵</span> 👍（0） 💬（1）<p>为什么探测包本身会比预定的时间晚了 13 秒才发出呢？根据这个很明确的信息，客户再次检查了应用代码，终于定位到了出问题的代码段。修复代码后，问题随之解决。
+想问一下老师这个问题的原因是啥，客户端为啥完了13秒，客户端的代码有啥问题？根因是啥？</p>2022-12-02</li><br/><li><span>上杉夏香</span> 👍（0） 💬（2）<p>知晓了TCP keep-alive时心跳包的特点，老师的『TCP 心跳包的特点是，它的序列号是上一个包的序列号 -1』，是不是应该改成『它的序列号应该是此次普通包的序列号-1，而不是上一个包的序列号-1』</p>2022-08-23</li><br/><li><span>piboye</span> 👍（0） 💬（1）<p>nginx 优雅重启是不是也可以达到 connection:close 的效果?</p>2022-08-02</li><br/>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="页脚" >
+        
+          
+          <a href="../06%20-%20%E5%AE%9A%E4%BD%8D%E9%98%B2%E7%81%AB%E5%A2%99%EF%BC%88%E4%BA%8C%EF%BC%89%EF%BC%9A%E7%BD%91%E7%BB%9C%E5%B1%82%E7%9A%84%E7%B2%BE%E7%A1%AE%E6%89%93%E5%87%BB/" class="md-footer__link md-footer__link--prev" aria-label="上一页: 06   定位防火墙（二）：网络层的精确打击">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                上一页
+              </span>
+              <div class="md-ellipsis">
+                06   定位防火墙（二）：网络层的精确打击
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../08%20-%20%E5%88%86%E6%AE%B5%EF%BC%9AMTU%E5%BC%95%E5%8F%91%E7%9A%84%E8%A1%80%E6%A1%88/" class="md-footer__link md-footer__link--next" aria-label="下一页: 08   分段：MTU引发的血案">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                下一页
+              </span>
+              <div class="md-ellipsis">
+                08   分段：MTU引发的血案
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright © 2025-Present zkep
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["content.code.annotate", "content.code.copy", "content.tooltips", "toc.follow", "navigation.top", "navigation.tabs", "navigation.tabs.sticky", "navigation.prune", "navigation.footer", "navigation.tracking", "navigation.instant", "navigation.instant.progress", "navigation.indexes", "content.tabs.link"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../../javascript/extra.js"></script>
+      
+        <script src="../../../javascript/giscus.js"></script>
+      
+        <script src="../../../javascript/referrerpolicy.js"></script>
+      
+    
+  </body>
+</html>

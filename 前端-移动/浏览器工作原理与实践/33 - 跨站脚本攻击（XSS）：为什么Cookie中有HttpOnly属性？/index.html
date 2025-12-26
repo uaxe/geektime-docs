@@ -1,0 +1,6379 @@
+<!--geek time docs 🚀, MIT license-->
+
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="极客时间文档">
+      
+      
+        <meta name="author" content="zkep">
+      
+      
+        <link rel="canonical" href="https://github.com/uaxe/geektime-docs/%E5%89%8D%E7%AB%AF-%E7%A7%BB%E5%8A%A8/%E6%B5%8F%E8%A7%88%E5%99%A8%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86%E4%B8%8E%E5%AE%9E%E8%B7%B5/33%20-%20%E8%B7%A8%E7%AB%99%E8%84%9A%E6%9C%AC%E6%94%BB%E5%87%BB%EF%BC%88XSS%EF%BC%89%EF%BC%9A%E4%B8%BA%E4%BB%80%E4%B9%88Cookie%E4%B8%AD%E6%9C%89HttpOnly%E5%B1%9E%E6%80%A7%EF%BC%9F/">
+      
+      
+        <link rel="prev" href="../32%20-%20%E5%90%8C%E6%BA%90%E7%AD%96%E7%95%A5%EF%BC%9A%E4%B8%BA%E4%BB%80%E4%B9%88XMLHttpRequest%E4%B8%8D%E8%83%BD%E8%B7%A8%E5%9F%9F%E8%AF%B7%E6%B1%82%E8%B5%84%E6%BA%90%EF%BC%9F/">
+      
+      
+        <link rel="next" href="../34%20-%20CSRF%E6%94%BB%E5%87%BB%EF%BC%9A%E9%99%8C%E7%94%9F%E9%93%BE%E6%8E%A5%E4%B8%8D%E8%A6%81%E9%9A%8F%E4%BE%BF%E7%82%B9/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../None">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>33 跨站脚本攻击（XSS）：为什么Cookie中有HttpOnly属性？ - 极客时间文档</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../../stylesheets/style.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#xss" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+        <aside class="md-banner">
+          <div class="md-banner__inner md-grid md-typeset">
+            
+            
+
+
+          </div>
+          
+        </aside>
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../../.." title="极客时间文档" class="md-header__button md-logo" aria-label="极客时间文档" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            极客时间文档
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              33   跨站脚本攻击（XSS）：为什么Cookie中有HttpOnly属性？
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="indigo"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/zkep/my-geektime" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    zkep/my-geektime
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="标签" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../AI-%E5%A4%A7%E6%95%B0%E6%8D%AE/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  AI-大数据
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E4%BA%A7%E5%93%81-%E8%BF%90%E8%90%A5/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  产品-运营
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  前端-移动
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E5%90%8E%E7%AB%AF-%E6%9E%B6%E6%9E%84/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  后端-架构
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E7%AE%A1%E7%90%86-%E6%88%90%E9%95%BF/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  管理-成长
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E8%AE%A1%E7%AE%97%E6%9C%BA%E5%9F%BA%E7%A1%80/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  计算机基础
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E8%BF%90%E7%BB%B4-%E6%B5%8B%E8%AF%95/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  运维-测试
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="极客时间文档" class="md-nav__button md-logo" aria-label="极客时间文档" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    极客时间文档
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/zkep/my-geektime" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    zkep/my-geektime
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../AI-%E5%A4%A7%E6%95%B0%E6%8D%AE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI-大数据
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E4%BA%A7%E5%93%81-%E8%BF%90%E8%90%A5/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    产品-运营
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    前端-移动
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    前端-移动
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Android%E5%BC%80%E5%8F%91%E9%AB%98%E6%89%8B%E8%AF%BE/Android%E5%BC%80%E5%8F%91%E9%AB%98%E6%89%8B%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Android开发高手课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Flutter%E6%A0%B8%E5%BF%83%E6%8A%80%E6%9C%AF%E4%B8%8E%E5%AE%9E%E6%88%98/Flutter%E6%A0%B8%E5%BF%83%E6%8A%80%E6%9C%AF%E4%B8%8E%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Flutter核心技术与实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../JavaScript%E6%A0%B8%E5%BF%83%E5%8E%9F%E7%90%86%E8%A7%A3%E6%9E%90/JavaScript%E6%A0%B8%E5%BF%83%E5%8E%9F%E7%90%86%E8%A7%A3%E6%9E%90/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    JavaScript核心原理解析
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../JavaScript%E8%BF%9B%E9%98%B6%E5%AE%9E%E6%88%98%E8%AF%BE/JavaScript%E8%BF%9B%E9%98%B6%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    JavaScript进阶实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../React%20Hooks%20%E6%A0%B8%E5%BF%83%E5%8E%9F%E7%90%86%E4%B8%8E%E5%AE%9E%E6%88%98/React%20Hooks%20%E6%A0%B8%E5%BF%83%E5%8E%9F%E7%90%86%E4%B8%8E%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    React Hooks 核心原理与实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../React%20Native%20%E6%96%B0%E6%9E%B6%E6%9E%84%E5%AE%9E%E6%88%98%E8%AF%BE/React%20Native%20%E6%96%B0%E6%9E%B6%E6%9E%84%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    React Native 新架构实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Serverless%E5%85%A5%E9%97%A8%E8%AF%BE/Serverless%E5%85%A5%E9%97%A8%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serverless入门课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Vue%203%20%E4%BC%81%E4%B8%9A%E7%BA%A7%E9%A1%B9%E7%9B%AE%E5%AE%9E%E6%88%98%E8%AF%BE/Vue%203%20%E4%BC%81%E4%B8%9A%E7%BA%A7%E9%A1%B9%E7%9B%AE%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vue 3 企业级项目实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../WebAssembly%E5%85%A5%E9%97%A8%E8%AF%BE/WebAssembly%E5%85%A5%E9%97%A8%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WebAssembly入门课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../iOS%E5%BC%80%E5%8F%91%E9%AB%98%E6%89%8B%E8%AF%BE/iOS%E5%BC%80%E5%8F%91%E9%AB%98%E6%89%8B%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    iOS开发高手课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E4%BB%8E0%E6%89%93%E9%80%A0%E9%9F%B3%E8%A7%86%E9%A2%91%E7%9B%B4%E6%92%AD%E7%B3%BB%E7%BB%9F/%E4%BB%8E0%E6%89%93%E9%80%A0%E9%9F%B3%E8%A7%86%E9%A2%91%E7%9B%B4%E6%92%AD%E7%B3%BB%E7%BB%9F/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    从0打造音视频直播系统
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E5%89%8D%E7%AB%AF%E5%85%A8%E9%93%BE%E8%B7%AF%E4%BC%98%E5%8C%96%E5%AE%9E%E6%88%98%E8%AF%BE/%E5%89%8D%E7%AB%AF%E5%85%A8%E9%93%BE%E8%B7%AF%E4%BC%98%E5%8C%96%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    前端全链路优化实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E5%9B%BE%E8%A7%A3%20Google%20V8/%E5%9B%BE%E8%A7%A3%20Google%20V8/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    图解 Google V8
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E5%BF%AB%E6%89%8B%20%C2%B7%20%E7%A7%BB%E5%8A%A8%E7%AB%AF%E9%9F%B3%E8%A7%86%E9%A2%91%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98/%E5%BF%AB%E6%89%8B%20%C2%B7%20%E7%A7%BB%E5%8A%A8%E7%AB%AF%E9%9F%B3%E8%A7%86%E9%A2%91%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    快手 · 移动端音视频开发实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E5%BF%AB%E6%89%8B%20%C2%B7%20%E9%9F%B3%E8%A7%86%E9%A2%91%E6%8A%80%E6%9C%AF%E5%85%A5%E9%97%A8%E8%AF%BE/%E5%BF%AB%E6%89%8B%20%C2%B7%20%E9%9F%B3%E8%A7%86%E9%A2%91%E6%8A%80%E6%9C%AF%E5%85%A5%E9%97%A8%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    快手 · 音视频技术入门课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%90%9E%E5%AE%9A%E9%9F%B3%E9%A2%91%E6%8A%80%E6%9C%AF/%E6%90%9E%E5%AE%9A%E9%9F%B3%E9%A2%91%E6%8A%80%E6%9C%AF/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    搞定音频技术
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%94%BB%E5%85%8B%E8%A7%86%E9%A2%91%E6%8A%80%E6%9C%AF/%E6%94%BB%E5%85%8B%E8%A7%86%E9%A2%91%E6%8A%80%E6%9C%AF/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    攻克视频技术
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%9C%B1%E6%B6%9B%20%C2%B7%20Kotlin%E7%BC%96%E7%A8%8B%E7%AC%AC%E4%B8%80%E8%AF%BE/%E6%9C%B1%E6%B6%9B%20%C2%B7%20Kotlin%E7%BC%96%E7%A8%8B%E7%AC%AC%E4%B8%80%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    朱涛 · Kotlin编程第一课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_20" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_20" id="__nav_3_20_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    浏览器工作原理与实践
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_20_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_20">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    浏览器工作原理与实践
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E6%B5%8F%E8%A7%88%E5%99%A8%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86%E4%B8%8E%E5%AE%9E%E8%B7%B5/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    浏览器工作原理与实践
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%BC%80%E7%AF%87%E8%AF%8D%20-%20%E5%8F%82%E9%80%8F%E4%BA%86%E6%B5%8F%E8%A7%88%E5%99%A8%E7%9A%84%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86%EF%BC%8C%E4%BD%A0%E5%B0%B1%E8%83%BD%E8%A7%A3%E5%86%B380%25%E7%9A%84%E5%89%8D%E7%AB%AF%E9%9A%BE%E9%A2%98/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    开篇词   参透了浏览器的工作原理，你就能解决80%的前端难题
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01%20-%20Chrome%E6%9E%B6%E6%9E%84%EF%BC%9A%E4%BB%85%E4%BB%85%E6%89%93%E5%BC%80%E4%BA%861%E4%B8%AA%E9%A1%B5%E9%9D%A2%EF%BC%8C%E4%B8%BA%E4%BB%80%E4%B9%88%E6%9C%894%E4%B8%AA%E8%BF%9B%E7%A8%8B%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01   Chrome架构：仅仅打开了1个页面，为什么有4个进程？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02%20-%20TCP%E5%8D%8F%E8%AE%AE%EF%BC%9A%E5%A6%82%E4%BD%95%E4%BF%9D%E8%AF%81%E9%A1%B5%E9%9D%A2%E6%96%87%E4%BB%B6%E8%83%BD%E8%A2%AB%E5%AE%8C%E6%95%B4%E9%80%81%E8%BE%BE%E6%B5%8F%E8%A7%88%E5%99%A8%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    02   TCP协议：如何保证页面文件能被完整送达浏览器？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03%20-%20HTTP%E8%AF%B7%E6%B1%82%E6%B5%81%E7%A8%8B%EF%BC%9A%E4%B8%BA%E4%BB%80%E4%B9%88%E5%BE%88%E5%A4%9A%E7%AB%99%E7%82%B9%E7%AC%AC%E4%BA%8C%E6%AC%A1%E6%89%93%E5%BC%80%E9%80%9F%E5%BA%A6%E4%BC%9A%E5%BE%88%E5%BF%AB%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    03   HTTP请求流程：为什么很多站点第二次打开速度会很快？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04%20-%20%E5%AF%BC%E8%88%AA%E6%B5%81%E7%A8%8B%EF%BC%9A%E4%BB%8E%E8%BE%93%E5%85%A5URL%E5%88%B0%E9%A1%B5%E9%9D%A2%E5%B1%95%E7%A4%BA%EF%BC%8C%E8%BF%99%E4%B8%AD%E9%97%B4%E5%8F%91%E7%94%9F%E4%BA%86%E4%BB%80%E4%B9%88%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04   导航流程：从输入URL到页面展示，这中间发生了什么？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05%20-%20%E6%B8%B2%E6%9F%93%E6%B5%81%E7%A8%8B%EF%BC%88%E4%B8%8A%EF%BC%89%EF%BC%9AHTML%E3%80%81CSS%E5%92%8CJavaScript%EF%BC%8C%E6%98%AF%E5%A6%82%E4%BD%95%E5%8F%98%E6%88%90%E9%A1%B5%E9%9D%A2%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05   渲染流程（上）：HTML、CSS和JavaScript，是如何变成页面的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06%20-%20%E6%B8%B2%E6%9F%93%E6%B5%81%E7%A8%8B%EF%BC%88%E4%B8%8B%EF%BC%89%EF%BC%9AHTML%E3%80%81CSS%E5%92%8CJavaScript%EF%BC%8C%E6%98%AF%E5%A6%82%E4%BD%95%E5%8F%98%E6%88%90%E9%A1%B5%E9%9D%A2%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06   渲染流程（下）：HTML、CSS和JavaScript，是如何变成页面的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07%20-%20%E5%8F%98%E9%87%8F%E6%8F%90%E5%8D%87%EF%BC%9AJavaScript%E4%BB%A3%E7%A0%81%E6%98%AF%E6%8C%89%E9%A1%BA%E5%BA%8F%E6%89%A7%E8%A1%8C%E7%9A%84%E5%90%97%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    07   变量提升：JavaScript代码是按顺序执行的吗？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08%20-%20%E8%B0%83%E7%94%A8%E6%A0%88%EF%BC%9A%E4%B8%BA%E4%BB%80%E4%B9%88JavaScript%E4%BB%A3%E7%A0%81%E4%BC%9A%E5%87%BA%E7%8E%B0%E6%A0%88%E6%BA%A2%E5%87%BA%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    08   调用栈：为什么JavaScript代码会出现栈溢出？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09%20-%20%E5%9D%97%E7%BA%A7%E4%BD%9C%E7%94%A8%E5%9F%9F%EF%BC%9Avar%E7%BC%BA%E9%99%B7%E4%BB%A5%E5%8F%8A%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E5%BC%95%E5%85%A5let%E5%92%8Cconst%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    09   块级作用域：var缺陷以及为什么要引入let和const？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10%20-%20%E4%BD%9C%E7%94%A8%E5%9F%9F%E9%93%BE%E5%92%8C%E9%97%AD%E5%8C%85%20%EF%BC%9A%E4%BB%A3%E7%A0%81%E4%B8%AD%E5%87%BA%E7%8E%B0%E7%9B%B8%E5%90%8C%E7%9A%84%E5%8F%98%E9%87%8F%EF%BC%8CJavaScript%E5%BC%95%E6%93%8E%E6%98%AF%E5%A6%82%E4%BD%95%E9%80%89%E6%8B%A9%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10   作用域链和闭包 ：代码中出现相同的变量，JavaScript引擎是如何选择的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../11%20-%20this%EF%BC%9A%E4%BB%8EJavaScript%E6%89%A7%E8%A1%8C%E4%B8%8A%E4%B8%8B%E6%96%87%E7%9A%84%E8%A7%86%E8%A7%92%E8%AE%B2%E6%B8%85%E6%A5%9Athis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    11   this：从JavaScript执行上下文的视角讲清楚this
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../12%20-%20%E6%A0%88%E7%A9%BA%E9%97%B4%E5%92%8C%E5%A0%86%E7%A9%BA%E9%97%B4%EF%BC%9A%E6%95%B0%E6%8D%AE%E6%98%AF%E5%A6%82%E4%BD%95%E5%AD%98%E5%82%A8%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    12   栈空间和堆空间：数据是如何存储的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13%20-%20%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%EF%BC%9A%E5%9E%83%E5%9C%BE%E6%95%B0%E6%8D%AE%E6%98%AF%E5%A6%82%E4%BD%95%E8%87%AA%E5%8A%A8%E5%9B%9E%E6%94%B6%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    13   垃圾回收：垃圾数据是如何自动回收的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../14%20-%20%E7%BC%96%E8%AF%91%E5%99%A8%E5%92%8C%E8%A7%A3%E9%87%8A%E5%99%A8%EF%BC%9AV8%E6%98%AF%E5%A6%82%E4%BD%95%E6%89%A7%E8%A1%8C%E4%B8%80%E6%AE%B5JavaScript%E4%BB%A3%E7%A0%81%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    14   编译器和解释器：V8是如何执行一段JavaScript代码的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../15%20-%20%E6%B6%88%E6%81%AF%E9%98%9F%E5%88%97%E5%92%8C%E4%BA%8B%E4%BB%B6%E5%BE%AA%E7%8E%AF%EF%BC%9A%E9%A1%B5%E9%9D%A2%E6%98%AF%E6%80%8E%E4%B9%88%E2%80%9C%E6%B4%BB%E2%80%9D%E8%B5%B7%E6%9D%A5%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    15   消息队列和事件循环：页面是怎么“活”起来的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../16%20-%20WebAPI%EF%BC%9AsetTimeout%E6%98%AF%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    16   WebAPI：setTimeout是如何实现的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../17%20-%20WebAPI%EF%BC%9AXMLHttpRequest%E6%98%AF%E6%80%8E%E4%B9%88%E5%AE%9E%E7%8E%B0%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    17   WebAPI：XMLHttpRequest是怎么实现的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../18%20-%20%E5%AE%8F%E4%BB%BB%E5%8A%A1%E5%92%8C%E5%BE%AE%E4%BB%BB%E5%8A%A1%EF%BC%9A%E4%B8%8D%E6%98%AF%E6%89%80%E6%9C%89%E4%BB%BB%E5%8A%A1%E9%83%BD%E6%98%AF%E4%B8%80%E4%B8%AA%E5%BE%85%E9%81%87/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    18   宏任务和微任务：不是所有任务都是一个待遇
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../19%20-%20Promise%EF%BC%9A%E4%BD%BF%E7%94%A8Promise%EF%BC%8C%E5%91%8A%E5%88%AB%E5%9B%9E%E8%B0%83%E5%87%BD%E6%95%B0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    19   Promise：使用Promise，告别回调函数
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../20%20-%20async-await%EF%BC%9A%E4%BD%BF%E7%94%A8%E5%90%8C%E6%AD%A5%E7%9A%84%E6%96%B9%E5%BC%8F%E5%8E%BB%E5%86%99%E5%BC%82%E6%AD%A5%E4%BB%A3%E7%A0%81/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    20   async await：使用同步的方式去写异步代码
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../21%20-%20Chrome%E5%BC%80%E5%8F%91%E8%80%85%E5%B7%A5%E5%85%B7%EF%BC%9A%E5%88%A9%E7%94%A8%E7%BD%91%E7%BB%9C%E9%9D%A2%E6%9D%BF%E5%81%9A%E6%80%A7%E8%83%BD%E5%88%86%E6%9E%90/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    21   Chrome开发者工具：利用网络面板做性能分析
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../22%20-%20DOM%E6%A0%91%EF%BC%9AJavaScript%E6%98%AF%E5%A6%82%E4%BD%95%E5%BD%B1%E5%93%8DDOM%E6%A0%91%E6%9E%84%E5%BB%BA%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    22   DOM树：JavaScript是如何影响DOM树构建的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../23%20-%20%E6%B8%B2%E6%9F%93%E6%B5%81%E6%B0%B4%E7%BA%BF%EF%BC%9ACSS%E5%A6%82%E4%BD%95%E5%BD%B1%E5%93%8D%E9%A6%96%E6%AC%A1%E5%8A%A0%E8%BD%BD%E6%97%B6%E7%9A%84%E7%99%BD%E5%B1%8F%E6%97%B6%E9%97%B4%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    23   渲染流水线：CSS如何影响首次加载时的白屏时间？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../24%20-%20%E5%88%86%E5%B1%82%E5%92%8C%E5%90%88%E6%88%90%E6%9C%BA%E5%88%B6%EF%BC%9A%E4%B8%BA%E4%BB%80%E4%B9%88CSS%E5%8A%A8%E7%94%BB%E6%AF%94JavaScript%E9%AB%98%E6%95%88%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    24   分层和合成机制：为什么CSS动画比JavaScript高效？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../25%20-%20%E9%A1%B5%E9%9D%A2%E6%80%A7%E8%83%BD%EF%BC%9A%E5%A6%82%E4%BD%95%E7%B3%BB%E7%BB%9F%E5%9C%B0%E4%BC%98%E5%8C%96%E9%A1%B5%E9%9D%A2%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    25   页面性能：如何系统地优化页面？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../26%20-%20%E8%99%9A%E6%8B%9FDOM%EF%BC%9A%E8%99%9A%E6%8B%9FDOM%E5%92%8C%E5%AE%9E%E9%99%85%E7%9A%84DOM%E6%9C%89%E4%BD%95%E4%B8%8D%E5%90%8C%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    26   虚拟DOM：虚拟DOM和实际的DOM有何不同？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../27%20-%20%E6%B8%90%E8%BF%9B%E5%BC%8F%E7%BD%91%E9%A1%B5%E5%BA%94%E7%94%A8%EF%BC%88PWA%EF%BC%89%EF%BC%9A%E5%AE%83%E7%A9%B6%E7%AB%9F%E8%A7%A3%E5%86%B3%E4%BA%86Web%E5%BA%94%E7%94%A8%E7%9A%84%E5%93%AA%E4%BA%9B%E9%97%AE%E9%A2%98%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    27   渐进式网页应用（PWA）：它究竟解决了Web应用的哪些问题？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../28%20-%20WebComponent%EF%BC%9A%E5%83%8F%E6%90%AD%E7%A7%AF%E6%9C%A8%E4%B8%80%E6%A0%B7%E6%9E%84%E5%BB%BAWeb%E5%BA%94%E7%94%A8/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    28   WebComponent：像搭积木一样构建Web应用
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../29%20-%20HTTP-1%EF%BC%9AHTTP%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    29   HTTP 1：HTTP性能优化
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../30-HTTP-2%EF%BC%9A%E5%A6%82%E4%BD%95%E6%8F%90%E5%8D%87%E7%BD%91%E7%BB%9C%E9%80%9F%E5%BA%A6%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    30 HTTP 2：如何提升网络速度？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../31-HTTP-3%EF%BC%9A%E7%94%A9%E6%8E%89TCP%E3%80%81TLS%20%E7%9A%84%E5%8C%85%E8%A2%B1%EF%BC%8C%E6%9E%84%E5%BB%BA%E9%AB%98%E6%95%88%E7%BD%91%E7%BB%9C/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    31 HTTP 3：甩掉TCP、TLS 的包袱，构建高效网络
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../32%20-%20%E5%90%8C%E6%BA%90%E7%AD%96%E7%95%A5%EF%BC%9A%E4%B8%BA%E4%BB%80%E4%B9%88XMLHttpRequest%E4%B8%8D%E8%83%BD%E8%B7%A8%E5%9F%9F%E8%AF%B7%E6%B1%82%E8%B5%84%E6%BA%90%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    32   同源策略：为什么XMLHttpRequest不能跨域请求资源？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    33   跨站脚本攻击（XSS）：为什么Cookie中有HttpOnly属性？
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    33   跨站脚本攻击（XSS）：为什么Cookie中有HttpOnly属性？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#xss" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        什么是XSS攻击
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        恶意脚本是怎么注入的
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="恶意脚本是怎么注入的">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-xss" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 存储型XSS攻击
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-xss" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 反射型XSS攻击
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-domxss" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 基于DOM的XSS攻击
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#xss_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        如何阻止XSS攻击
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="如何阻止XSS攻击">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 服务器对输入脚本进行过滤或转码
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-csp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 充分利用CSP
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-httponly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 使用HttpOnly属性
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        总结
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        思考时间
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../34%20-%20CSRF%E6%94%BB%E5%87%BB%EF%BC%9A%E9%99%8C%E7%94%9F%E9%93%BE%E6%8E%A5%E4%B8%8D%E8%A6%81%E9%9A%8F%E4%BE%BF%E7%82%B9/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    34   CSRF攻击：陌生链接不要随便点
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../35%20-%20%E5%AE%89%E5%85%A8%E6%B2%99%E7%AE%B1%EF%BC%9A%E9%A1%B5%E9%9D%A2%E5%92%8C%E7%B3%BB%E7%BB%9F%E4%B9%8B%E9%97%B4%E7%9A%84%E9%9A%94%E7%A6%BB%E5%A2%99/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    35   安全沙箱：页面和系统之间的隔离墙
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../36%20-%20HTTPS%EF%BC%9A%E8%AE%A9%E6%95%B0%E6%8D%AE%E4%BC%A0%E8%BE%93%E6%9B%B4%E5%AE%89%E5%85%A8/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    36   HTTPS：让数据传输更安全
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E7%BB%93%E6%9D%9F%E8%AF%AD%20-%20%E5%A4%A7%E9%81%93%E8%87%B3%E7%AE%80/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    结束语   大道至简
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E7%AC%AC%E4%BA%8C%E5%AD%A3%E5%9B%9E%E5%BD%92%20-%20%E8%BF%99%E6%AC%A1%E6%88%91%E4%BB%AC%E6%9D%A5%E4%B8%93%E9%97%A8%E8%81%8A%E8%81%8AV8/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    第二季回归   这次我们来专门聊聊V8
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E7%BB%93%E8%AF%BE%E6%B5%8B%E8%AF%95%20-%20%E8%BF%99%E4%BA%9B%E6%B5%8F%E8%A7%88%E5%99%A8%E7%9A%84%E7%9F%A5%E8%AF%86%E4%BD%A0%E9%83%BD%E6%8E%8C%E6%8F%A1%E4%BA%86%E5%90%97%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    结课测试   这些浏览器的知识你都掌握了吗？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%8A%A0%E9%A4%90%E4%B8%80-%E6%B5%8F%E8%A7%88%E4%B8%8A%E4%B8%8B%E6%96%87%E7%BB%84%EF%BC%9A%E5%A6%82%E4%BD%95%E8%AE%A1%E7%AE%97Chrome%E4%B8%AD%E6%B8%B2%E6%9F%93%E8%BF%9B%E7%A8%8B%E7%9A%84%E4%B8%AA%E6%95%B0%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    加餐一 浏览上下文组：如何计算Chrome中渲染进程的个数？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%8A%A0%E9%A4%90%E4%BA%8C-%E4%BB%BB%E5%8A%A1%E8%B0%83%E5%BA%A6%EF%BC%9A%E6%9C%89%E4%BA%86setTimeOut%EF%BC%8C%E4%B8%BA%E4%BB%80%E4%B9%88%E8%BF%98%E8%A6%81%E4%BD%BF%E7%94%A8rAF%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    加餐二 任务调度：有了setTimeOut，为什么还要使用rAF？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%8A%A0%E9%A4%90%E4%B8%89-%E5%8A%A0%E8%BD%BD%E9%98%B6%E6%AE%B5%E6%80%A7%E8%83%BD%EF%BC%9A%E4%BD%BF%E7%94%A8Audits%E6%9D%A5%E4%BC%98%E5%8C%96Web%E6%80%A7%E8%83%BD/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    加餐三 加载阶段性能：使用Audits来优化Web性能
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%8A%A0%E9%A4%90%E5%9B%9B-%E9%A1%B5%E9%9D%A2%E6%80%A7%E8%83%BD%E5%B7%A5%E5%85%B7%EF%BC%9A%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A8Performance%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    加餐四 页面性能工具：如何使用Performance？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%8A%A0%E9%A4%90%E4%BA%94%20-%20%E6%80%A7%E8%83%BD%E5%88%86%E6%9E%90%E5%B7%A5%E5%85%B7%EF%BC%9A%E5%A6%82%E4%BD%95%E5%88%86%E6%9E%90Performance%E4%B8%AD%E7%9A%84Main%E6%8C%87%E6%A0%87%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    加餐五   性能分析工具：如何分析Performance中的Main指标？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%8A%A0%E9%A4%90%E5%85%AD-HTTPS%EF%BC%9A%E6%B5%8F%E8%A7%88%E5%99%A8%E5%A6%82%E4%BD%95%E9%AA%8C%E8%AF%81%E6%95%B0%E5%AD%97%E8%AF%81%E4%B9%A6%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    加餐六 HTTPS：浏览器如何验证数字证书？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E7%8E%A9%E8%BD%ACVue%203%E5%85%A8%E5%AE%B6%E6%A1%B6/%E7%8E%A9%E8%BD%ACVue%203%E5%85%A8%E5%AE%B6%E6%A1%B6/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    玩转Vue 3全家桶
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E7%8E%B0%E4%BB%A3React%20Web%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98/%E7%8E%B0%E4%BB%A3React%20Web%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    现代React Web开发实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%AF%B4%E9%80%8F%E4%BD%8E%E4%BB%A3%E7%A0%81/%E8%AF%B4%E9%80%8F%E4%BD%8E%E4%BB%A3%E7%A0%81/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    说透低代码
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%B7%9F%E6%9C%88%E5%BD%B1%E5%AD%A6%E5%8F%AF%E8%A7%86%E5%8C%96/%E8%B7%9F%E6%9C%88%E5%BD%B1%E5%AD%A6%E5%8F%AF%E8%A7%86%E5%8C%96/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    跟月影学可视化
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E9%87%8D%E5%AD%A6%E5%89%8D%E7%AB%AF/%E9%87%8D%E5%AD%A6%E5%89%8D%E7%AB%AF/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    重学前端
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E5%90%8E%E7%AB%AF-%E6%9E%B6%E6%9E%84/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    后端-架构
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E7%AE%A1%E7%90%86-%E6%88%90%E9%95%BF/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    管理-成长
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E8%AE%A1%E7%AE%97%E6%9C%BA%E5%9F%BA%E7%A1%80/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    计算机基础
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E8%BF%90%E7%BB%B4-%E6%B5%8B%E8%AF%95/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    运维-测试
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#xss" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        什么是XSS攻击
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        恶意脚本是怎么注入的
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="恶意脚本是怎么注入的">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-xss" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 存储型XSS攻击
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-xss" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 反射型XSS攻击
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-domxss" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 基于DOM的XSS攻击
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#xss_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        如何阻止XSS攻击
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="如何阻止XSS攻击">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 服务器对输入脚本进行过滤或转码
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-csp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 充分利用CSP
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-httponly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 使用HttpOnly属性
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        总结
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        思考时间
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+  <h1>33   跨站脚本攻击（XSS）：为什么Cookie中有HttpOnly属性？</h1>
+
+<p>通过<a href="https://time.geekbang.org/column/article/151370">上篇文章</a>的介绍，我们知道了同源策略可以隔离各个站点之间的DOM交互、页面数据和网络通信，虽然严格的同源策略会带来更多的安全，但是也束缚了Web。这就需要在安全和自由之间找到一个平衡点，所以我们默认页面中可以引用任意第三方资源，然后又引入CSP策略来加以限制；默认XMLHttpRequest和Fetch不能跨站请求资源，然后又通过CORS策略来支持其跨域。</p>
+<p>不过支持页面中的第三方资源引用和CORS也带来了很多安全问题，其中最典型的就是XSS攻击。</p>
+<h2 id="xss">什么是XSS攻击</h2>
+<p>XSS全称是Cross Site Scripting，为了与“CSS”区分开来，故简称XSS，翻译过来就是“跨站脚本”。XSS攻击是指黑客往HTML文件中或者DOM中注入恶意脚本，从而在用户浏览页面时利用注入的恶意脚本对用户实施攻击的一种手段。</p>
+<p>最开始的时候，这种攻击是通过跨域来实现的，所以叫“跨域脚本”。但是发展到现在，往HTML文件中注入恶意代码的方式越来越多了，所以是否跨域注入脚本已经不是唯一的注入手段了，但是XSS这个名字却一直保留至今。</p>
+<p>当页面被注入了恶意JavaScript脚本时，浏览器无法区分这些脚本是被恶意注入的还是正常的页面内容，所以恶意注入JavaScript脚本也拥有所有的脚本权限。下面我们就来看看，如果页面被注入了恶意JavaScript脚本，恶意脚本都能做哪些事情。</p>
+<ul>
+<li>可以<strong>窃取Cookie信息</strong>。恶意JavaScript可以通过“document.cookie”获取Cookie信息，然后通过XMLHttpRequest或者Fetch加上CORS功能将数据发送给恶意服务器；恶意服务器拿到用户的Cookie信息之后，就可以在其他电脑上模拟用户的登录，然后进行转账等操作。</li>
+<li>可以<strong>监听用户行为</strong>。恶意JavaScript可以使用“addEventListener”接口来监听键盘事件，比如可以获取用户输入的信用卡等信息，将其发送到恶意服务器。黑客掌握了这些信息之后，又可以做很多违法的事情。</li>
+<li>可以通过<strong>修改DOM</strong>伪造假的登录窗口，用来欺骗用户输入用户名和密码等信息。</li>
+<li>还可以<strong>在页面内生成浮窗广告</strong>，这些广告会严重地影响用户体验。</li>
+</ul>
+<p>除了以上几种情况外，恶意脚本还能做很多其他的事情，这里就不一一介绍了。总之，如果让页面插入了恶意脚本，那么就相当于把我们页面的隐私数据和行为完全暴露给黑客了。</p>
+<h2 id="_1">恶意脚本是怎么注入的</h2>
+<p>现在我们知道了页面中被注入恶意的JavaScript脚本是一件非常危险的事情，所以网站开发者会尽可能地避免页面中被注入恶意脚本。要想避免站点被注入恶意脚本，就要知道有哪些常见的注入方式。通常情况下，主要有<strong>存储型XSS攻击、反射型XSS攻击</strong>和<strong>基于DOM的XSS攻击</strong>三种方式来注入恶意脚本。</p>
+<h3 id="1-xss">1. 存储型XSS攻击</h3>
+<p>我们先来看看存储型XSS攻击是怎么向HTML文件中注入恶意脚本的，你可以参考下图：</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/2e/14/2ed3d8b93035df3c2bcfcc223dc47914.png?wh=1142%2A847" /></p>
+<p>存储型XSS攻击</p>
+<p>通过上图，我们可以看出存储型XSS攻击大致需要经过如下步骤：</p>
+<ul>
+<li>首先黑客利用站点漏洞将一段恶意JavaScript代码提交到网站的数据库中；</li>
+<li>然后用户向网站请求包含了恶意JavaScript脚本的页面；</li>
+<li>当用户浏览该页面的时候，恶意脚本就会将用户的Cookie信息等数据上传到服务器。</li>
+</ul>
+<p>下面我们来看个例子，2015年喜马拉雅就被曝出了存储型XSS漏洞。起因是在用户设置专辑名称时，服务器对关键字过滤不严格，比如可以将专辑名称设置为一段JavaScript，如下图所示：</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/54/49/5479e94a06d9a7cdf3920c60bf834249.png?wh=1142%2A925" /></p>
+<p>黑客将恶意代码存储到漏洞服务器上</p>
+<p>当黑客将专辑名称设置为一段JavaScript代码并提交时，喜马拉雅的服务器会保存该段JavaScript代码到数据库中。然后当用户打开黑客设置的专辑时，这段代码就会在用户的页面里执行（如下图），这样就可以获取用户的Cookie等数据信息。</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/ef/3a/efaf4123438f37da4c7366b87ed1403a.png?wh=1068%2A1020" /></p>
+<p>用户打开了含有恶意脚本的页面</p>
+<p>当用户打开黑客设置的专辑页面时，服务器也会将这段恶意JavaScript代码返回给用户，因此这段恶意脚本就在用户的页面中执行了。</p>
+<p>恶意脚本可以通过XMLHttpRequest或者Fetch将用户的Cookie数据上传到黑客的服务器，如下图所示：</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/b1/cb/b19300e39a753774f4a94635b46af7cb.png?wh=1142%2A1030" /></p>
+<p>将Cookie等数据上传到黑客服务器</p>
+<p>黑客拿到了用户Cookie信息之后，就可以利用Cookie信息在其他机器上登录该用户的账号（如下图），并利用用户账号进行一些恶意操作。</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/72/52/720c6daf21a8adf55329af9eaa5ab052.png?wh=1142%2A625" /></p>
+<p>黑客利用Cookie信息登录用户账户</p>
+<p>以上就是存储型XSS攻击的一个典型案例，这是乌云网在2015年曝出来的，虽然乌云网由于某些原因被关停了，但是你依然可以通过<a href="https://shuimugan.com/bug/view?bug_no=138479">这个站点</a>来查看乌云网的一些备份信息。</p>
+<h3 id="2-xss">2. 反射型XSS攻击</h3>
+<p>在一个反射型XSS攻击过程中，恶意JavaScript脚本属于用户发送给网站请求中的一部分，随后网站又把恶意JavaScript脚本返回给用户。当恶意JavaScript脚本在用户页面中被执行时，黑客就可以利用该脚本做一些恶意操作。</p>
+<p>这样讲有点抽象，下面我们结合一个简单的Node服务程序来看看什么是反射型XSS。首先我们使用Node来搭建一个简单的页面环境，搭建好的服务代码如下所示：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>var express = require(&#39;express&#39;);
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>var router = express.Router();
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>/* GET home page. */
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>router.get(&#39;/&#39;, function(req, res, next) {
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>res.render(&#39;index&#39;, { title: &#39;Express&#39;,xss:req.query.xss });
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>});
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>module.exports = router;
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>&lt;!DOCTYPE html&gt;
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>&lt;html&gt;
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>&lt;head&gt;
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>&lt;title&gt;&lt;%= title %&gt;&lt;/title&gt;
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>&lt;link rel=&#39;stylesheet&#39; href=&#39;/stylesheets/style.css&#39; /&gt;
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>&lt;/head&gt;
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>&lt;body&gt;
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>&lt;h1&gt;&lt;%= title %&gt;&lt;/h1&gt;
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>&lt;p&gt;Welcome to &lt;%= title %&gt;&lt;/p&gt;
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>&lt;div&gt;
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>&lt;%- xss %&gt;
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>&lt;/div&gt;
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>&lt;/body&gt;
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>&lt;/html&gt;
+</code></pre></div>
+<p>上面这两段代码，第一段是路由，第二段是视图，作用是将URL中xss参数的内容显示在页面。我们可以在本地演示下，比如打开<code>http://localhost:3000/?xss=123</code>这个链接，这样在页面中展示就是“123”了（如下图），是正常的，没有问题的。</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/7e/db/7ecb717abadfff2637a168d39f0c3cdb.png?wh=1142%2A599" /></p>
+<p>正常打开页面</p>
+<p>但当打开<code>http://localhost:3000/?xss=&lt;script&gt;alert('你被xss攻击了')&lt;/script&gt;</code>这段URL时，其结果如下图所示：</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/4d/fa/4dff7d83fe2eecc6cb52c126b4f650fa.png?wh=1142%2A367" /></p>
+<p>反射型XSS攻击</p>
+<p>通过这个操作，我们会发现用户将一段含有恶意代码的请求提交给Web服务器，Web服务器接收到请求时，又将恶意代码反射给了浏览器端，这就是反射型XSS攻击。在现实生活中，黑客经常会通过QQ群或者邮件等渠道诱导用户去点击这些恶意链接，所以对于一些链接我们一定要慎之又慎。</p>
+<p>另外需要注意的是，<strong>Web服务器不会存储反射型XSS攻击的恶意脚本，这是和存储型XSS攻击不同的地方</strong>。</p>
+<h3 id="3-domxss">3. 基于DOM的XSS攻击</h3>
+<p>基于DOM的XSS攻击是不牵涉到页面Web服务器的。具体来讲，黑客通过各种手段将恶意脚本注入用户的页面中，比如通过网络劫持在页面传输过程中修改HTML页面的内容，这种劫持类型很多，有通过WiFi路由器劫持的，有通过本地恶意软件来劫持的，它们的共同点是在Web资源传输过程或者在用户使用页面的过程中修改Web页面的数据。</p>
+<h2 id="xss_1">如何阻止XSS攻击</h2>
+<p>我们知道存储型XSS攻击和反射型XSS攻击都是需要经过Web服务器来处理的，因此可以认为这两种类型的漏洞是服务端的安全漏洞。而基于DOM的XSS攻击全部都是在浏览器端完成的，因此基于DOM的XSS攻击是属于前端的安全漏洞。</p>
+<p>但无论是何种类型的XSS攻击，它们都有一个共同点，那就是首先往浏览器中注入恶意脚本，然后再通过恶意脚本将用户信息发送至黑客部署的恶意服务器上。</p>
+<p>所以要阻止XSS攻击，我们可以通过阻止恶意JavaScript脚本的注入和恶意消息的发送来实现。</p>
+<p>接下来我们就来看看一些常用的阻止XSS攻击的策略。</p>
+<h3 id="1">1. 服务器对输入脚本进行过滤或转码</h3>
+<p>不管是反射型还是存储型XSS攻击，我们都可以在服务器端将一些关键的字符进行转码，比如最典型的：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>code:&lt;script&gt;alert(&#39;你被xss攻击了&#39;)&lt;/script&gt;
+</code></pre></div>
+<p>这段代码过滤后，只留下了：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>code:
+</code></pre></div>
+<p>这样，当用户再次请求该页面时，由于<code>&lt;script&gt;</code>标签的内容都被过滤了，所以这段脚本在客户端是不可能被执行的。</p>
+<p>除了过滤之外，服务器还可以对这些内容进行转码，还是上面那段代码，经过转码之后，效果如下所示：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>code:&amp;lt;script&amp;gt;alert(&amp;#39;你被xss攻击了&amp;#39;)&amp;lt;/script&amp;gt;
+</code></pre></div>
+<p>经过转码之后的内容，如<code>&lt;script&gt;</code>标签被转换为<code>&amp;lt;script&amp;gt;</code>，因此即使这段脚本返回给页面，页面也不会执行这段脚本。</p>
+<h3 id="2-csp">2. 充分利用CSP</h3>
+<p>虽然在服务器端执行过滤或者转码可以阻止 XSS 攻击的发生，但完全依靠服务器端依然是不够的，我们还需要把CSP等策略充分地利用起来，以降低 XSS攻击带来的风险和后果。</p>
+<p>实施严格的CSP可以有效地防范XSS攻击，具体来讲CSP有如下几个功能：</p>
+<ul>
+<li>限制加载其他域下的资源文件，这样即使黑客插入了一个JavaScript文件，这个JavaScript文件也是无法被加载的；</li>
+<li>禁止向第三方域提交数据，这样用户数据也不会外泄；</li>
+<li>禁止执行内联脚本和未授权的脚本；</li>
+<li>还提供了上报机制，这样可以帮助我们尽快发现有哪些XSS攻击，以便尽快修复问题。</li>
+</ul>
+<p>因此，利用好CSP能够有效降低XSS攻击的概率。</p>
+<h3 id="3-httponly">3. 使用HttpOnly属性</h3>
+<p>由于很多XSS攻击都是来盗用Cookie的，因此还可以通过使用HttpOnly属性来保护我们Cookie的安全。</p>
+<p>通常服务器可以将某些Cookie设置为HttpOnly标志，HttpOnly是服务器通过HTTP响应头来设置的，下面是打开Google时，HTTP响应头中的一段：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>set-cookie: NID=189=M8q2FtWbsR8RlcldPVt7qkrqR38LmFY9jUxkKo3-4Bi6Qu_ocNOat7nkYZUTzolHjFnwBw0izgsATSI7TZyiiiaV94qGh-BzEYsNVa7TZmjAYTxYTOM9L_-0CN9ipL6cXi8l6-z41asXtm2uEwcOC5oh9djkffOMhWqQrlnCtOI; expires=Sat, 18-Apr-2020 06:52:22 GMT; path=/; domain=.google.com; HttpOnly
+</code></pre></div>
+<p>我们可以看到，set-cookie属性值最后使用了HttpOnly来标记该Cookie。顾名思义，使用HttpOnly标记的Cookie只能使用在HTTP请求过程中，所以无法通过JavaScript来读取这段Cookie。我们还可以通过Chrome开发者工具来查看哪些Cookie被标记了HttpOnly，如下图：</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/de/bb/defa78c90a4e8f0debb09564561ab9bb.png?wh=1142%2A416" /></p>
+<p>HttpOnly演示</p>
+<p>从图中可以看出，NID这个Cookie的HttpOlny属性是被勾选上的，所以NID的内容是无法通过document.cookie是来读取的。</p>
+<p>由于JavaScript无法读取设置了HttpOnly的Cookie数据，所以即使页面被注入了恶意JavaScript脚本，也是无法获取到设置了HttpOnly的数据。因此一些比较重要的数据我们建议设置HttpOnly标志。</p>
+<h2 id="_2">总结</h2>
+<p>好了，今天我们就介绍到这里，下面我来总结下本文的主要内容。</p>
+<p>XSS攻击就是黑客往页面中注入恶意脚本，然后将页面的一些重要数据上传到恶意服务器。常见的三种XSS攻击模式是存储型XSS攻击、反射型XSS攻击和基于DOM的XSS攻击。</p>
+<p>这三种攻击方式的共同点是都需要往用户的页面中注入恶意脚本，然后再通过恶意脚本将用户数据上传到黑客的恶意服务器上。而三者的不同点在于注入的方式不一样，有通过服务器漏洞来进行注入的，还有在客户端直接注入的。</p>
+<p>针对这些XSS攻击，主要有三种防范策略，第一种是通过服务器对输入的内容进行过滤或者转码，第二种是充分利用好CSP，第三种是使用HttpOnly来保护重要的Cookie信息。</p>
+<p>当然除了以上策略之外，我们还可以通过添加验证码防止脚本冒充用户提交危险操作。而对于一些不受信任的输入，还可以限制其输入长度，这样可以增大XSS攻击的难度。</p>
+<h2 id="_3">思考时间</h2>
+<p>今天留给你的思考题是：你认为前端开发者对XSS攻击应该负多大责任？</p>
+<p>欢迎在留言区与我分享你的想法，也欢迎你在留言区记录你的思考过程。感谢阅读，如果你觉得这篇文章对你有帮助的话，也欢迎把它分享给更多的朋友。</p>
+<div><strong>精选留言（15）</strong></div>
+<ul>
+<li><span>mfist</span> 👍（6） 💬（6）<p>跨站脚本攻击前端和后端7 3分吧。毕竟是在浏览器上面出了问题，前端怎么解释也是自己的锅。
+存储型xss和反射型的xss一个原则不要信任前端的输入，任何前端的输入东西都进行编码。这个地方出了问题后端是有责任的
+基于dom的xss，传输过程中被篡改，用https之后会防止全部场景吗？ </p>2019-10-28</li><br/><li><span>杨越</span> 👍（47） 💬（1）<p>内容安全策略( CSP )详细文档：https:&#47;&#47;developer.mozilla.org&#47;zh-CN&#47;docs&#47;Web&#47;HTTP&#47;CSP</p>2020-03-29</li><br/><li><span>Snooker</span> 👍（30） 💬（1）<p>除去架构不谈，就产品、后端、前端、测试而言。
+产品：
+1.业务逻辑层面安全验证，保证即使被攻击也要尽量避免或减少损失，如：资金转出、敏感信息操作（修改登录密码、支付密码）等
+后端：
+1.存储型和反射性XSS，后端占比较大，考虑到可以通过接口绕过前端，所以内容编码后端处理比较可靠。
+2.重点头信息返回httponly，这也需要后端实现
+前端：
+1.基于 DOM 的 XSS 攻击，CSP等前端技术运用，这边主要是前端
+测试：
+1.丰富测试框架，正对输入框：长度、类型、是否为空、是否重复、组成范围外，也应了解学习安全性测试：XSS攻击、Sql注入等攻击类型。
+总体而言，个人觉得前端在XSS攻击中责任占比不大。</p>2020-06-23</li><br/><li><span>neohope</span> 👍（17） 💬（1）<p>其实对于跨站攻击，前端应该承担的责任并不高，原因如下：
+1、前端的JS代码，在提交表单时，处理特殊字符或处理脚本的函数，完全可以被绕过。所以依赖前端代码彻底解决注入问题，本身就是不可能的，无论如何后端要做好
+2、可以通过浏览器插件，进行伪装，随意组织想提交的内容，和前端没有关系
+3、网站设置、服务器安全策略，应该是网站运维和安全组的事情，和前端关系也不大
+4、测试放过安全bug，也有一定责任
+5、其实在框架层，已经做了不少这方面的防范，无论是前端还是后端，所以框架组也要负责
+6、如果被注入脚本了，要防止脚本运行，让浏览器按text处理而不是脚本处理，这个前端要负责的。但被注入本身后端责任更大，所以相当于前端背锅了。
+</p>2020-07-16</li><br/><li><span>潘启宝</span> 👍（10） 💬（0）<p>&lt;meta http-equiv=&quot;Content-Security-Policy&quot; content=&quot;default-src &#39;self&#39;; img-src https:&#47;&#47;*; child-src &#39;none&#39;;&quot;&gt;</p>2019-10-21</li><br/><li><span>许童童</span> 👍（8） 💬（0）<p>前端首先要能够意识到有这个攻击的可能性，然后配合后端人员把这些漏洞修复上。其次应该加强测试方的渗透测试，重视安全。</p>2019-10-19</li><br/><li><span>早起不吃虫</span> 👍（6） 💬（7）<p>老师请教一个问题，ＣＳP是可以通过meta标签设置的，如果恶意插入的是关于CSP的meta设置呢？</p>2019-10-19</li><br/><li><span>3Spiders</span> 👍（5） 💬（5）<p>前端需要负大部分责任，因为如果你只是添加字符串，却使用了添加DOM的操作，这不是给XSS攻击留下机会吗。如果非要添加DOM操作，也应该对script、meta等脚本标签做过滤。至于cookie的窃取，正如老师所说，设置httpOnly就行，我总认为前端操作cookie是一种不安全的手段。</p>2019-10-22</li><br/><li><span>niexia</span> 👍（3） 💬（0）<p>关于 CSP，可以看一下 MDN 的说明 https:&#47;&#47;developer.mozilla.org&#47;zh-CN&#47;docs&#47;Web&#47;HTTP&#47;CSP</p>2019-12-23</li><br/><li><span>anthonyliu</span> 👍（2） 💬（4）<p>老师！我有个疑问：“黑客拿到了用户 Cookie 信息之后，就可以利用 Cookie 信息在其他机器上登录该用户的账号”。黑客的服务器拿到用户的cookie信息，怎么在黑客的客户端模拟登录了？是cookie中有用户的登录名和密码吗？我觉得这个不太可能。如果这不可能，那是什么情况下，黑客可以通过cookie来登录？</p>2021-01-25</li><br/><li><span>覃</span> 👍（2） 💬（5）<p>基于dom的攻击，https应该能完全防护吧。</p>2019-10-19</li><br/><li><span>kelinlawu</span> 👍（1） 💬（0）<p>&lt;script&gt;alert(&#39;你被xss攻击了&#39;)&lt;&#47;script&gt;</p>2022-09-10</li><br/><li><span>昵称</span> 👍（1） 💬（0）<p>前端不主动innerHTML的话，都和前端责任不大。存储型、反射型的源头都是服务端不做过滤、转码。Dom插入攻击是第三方插入的，如wifi路由器、运营商等，这个就没办法了，前端只能通过csp配置一下策略，还有最好就是上https了。</p>2020-07-26</li><br/><li><span>LEON</span> 👍（1） 💬（3）<p>请教老师。存储型XSS是不是也可以修改DOM进行攻击。这种方式和DOM型XSS有什么区别？</p>2019-12-24</li><br/><li><span>隔夜果酱</span> 👍（1） 💬（1）<p>比如Chrome扩展，油猴脚本这些应该算基于dom的xss么？对于基于dom的攻击，网站就没有办法了吧。</p>2019-10-19</li><br/>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="页脚" >
+        
+          
+          <a href="../32%20-%20%E5%90%8C%E6%BA%90%E7%AD%96%E7%95%A5%EF%BC%9A%E4%B8%BA%E4%BB%80%E4%B9%88XMLHttpRequest%E4%B8%8D%E8%83%BD%E8%B7%A8%E5%9F%9F%E8%AF%B7%E6%B1%82%E8%B5%84%E6%BA%90%EF%BC%9F/" class="md-footer__link md-footer__link--prev" aria-label="上一页: 32   同源策略：为什么XMLHttpRequest不能跨域请求资源？">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                上一页
+              </span>
+              <div class="md-ellipsis">
+                32   同源策略：为什么XMLHttpRequest不能跨域请求资源？
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../34%20-%20CSRF%E6%94%BB%E5%87%BB%EF%BC%9A%E9%99%8C%E7%94%9F%E9%93%BE%E6%8E%A5%E4%B8%8D%E8%A6%81%E9%9A%8F%E4%BE%BF%E7%82%B9/" class="md-footer__link md-footer__link--next" aria-label="下一页: 34   CSRF攻击：陌生链接不要随便点">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                下一页
+              </span>
+              <div class="md-ellipsis">
+                34   CSRF攻击：陌生链接不要随便点
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright © 2025-Present zkep
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["content.code.annotate", "content.code.copy", "content.tooltips", "toc.follow", "navigation.top", "navigation.tabs", "navigation.tabs.sticky", "navigation.prune", "navigation.footer", "navigation.tracking", "navigation.instant", "navigation.instant.progress", "navigation.indexes", "content.tabs.link"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../../javascript/extra.js"></script>
+      
+        <script src="../../../javascript/giscus.js"></script>
+      
+        <script src="../../../javascript/referrerpolicy.js"></script>
+      
+    
+  </body>
+</html>

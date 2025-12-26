@@ -1,0 +1,6326 @@
+<!--geek time docs 🚀, MIT license-->
+
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="极客时间文档">
+      
+      
+        <meta name="author" content="zkep">
+      
+      
+        <link rel="canonical" href="https://github.com/uaxe/geektime-docs/%E8%BF%90%E7%BB%B4-%E6%B5%8B%E8%AF%95/%E5%AE%B9%E5%99%A8%E5%AE%9E%E6%88%98%E9%AB%98%E6%89%8B%E8%AF%BE/07%20-%20Load%20Average%EF%BC%9A%E5%8A%A0%E4%BA%86CPU%20Cgroup%E9%99%90%E5%88%B6%EF%BC%8C%E4%B8%BA%E4%BB%80%E4%B9%88%E6%88%91%E7%9A%84%E5%AE%B9%E5%99%A8%E8%BF%98%E6%98%AF%E5%BE%88%E6%85%A2%EF%BC%9F/">
+      
+      
+        <link rel="prev" href="../06%20-%20%E5%AE%B9%E5%99%A8CPU%EF%BC%882%EF%BC%89%EF%BC%9A%E5%A6%82%E4%BD%95%E6%AD%A3%E7%A1%AE%E5%9C%B0%E6%8B%BF%E5%88%B0%E5%AE%B9%E5%99%A8CPU%E7%9A%84%E5%BC%80%E9%94%80%EF%BC%9F/">
+      
+      
+        <link rel="next" href="../08%20-%20%E5%AE%B9%E5%99%A8%E5%86%85%E5%AD%98%EF%BC%9A%E6%88%91%E7%9A%84%E5%AE%B9%E5%99%A8%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A2%AB%E6%9D%80%E4%BA%86%EF%BC%9F/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../None">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>07 Load Average：加了CPU Cgroup限制，为什么我的容器还是很慢？ - 极客时间文档</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../../stylesheets/style.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#_1" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+        <aside class="md-banner">
+          <div class="md-banner__inner md-grid md-typeset">
+            
+            
+
+
+          </div>
+          
+        </aside>
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../../.." title="极客时间文档" class="md-header__button md-logo" aria-label="极客时间文档" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            极客时间文档
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              07   Load Average：加了CPU Cgroup限制，为什么我的容器还是很慢？
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="indigo"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/zkep/my-geektime" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    zkep/my-geektime
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="标签" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../AI-%E5%A4%A7%E6%95%B0%E6%8D%AE/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  AI-大数据
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E4%BA%A7%E5%93%81-%E8%BF%90%E8%90%A5/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  产品-运营
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E5%89%8D%E7%AB%AF-%E7%A7%BB%E5%8A%A8/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  前端-移动
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E5%90%8E%E7%AB%AF-%E6%9E%B6%E6%9E%84/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  后端-架构
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E7%AE%A1%E7%90%86-%E6%88%90%E9%95%BF/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  管理-成长
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E8%AE%A1%E7%AE%97%E6%9C%BA%E5%9F%BA%E7%A1%80/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  计算机基础
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  运维-测试
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="极客时间文档" class="md-nav__button md-logo" aria-label="极客时间文档" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    极客时间文档
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/zkep/my-geektime" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    zkep/my-geektime
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../AI-%E5%A4%A7%E6%95%B0%E6%8D%AE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI-大数据
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E4%BA%A7%E5%93%81-%E8%BF%90%E8%90%A5/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    产品-运营
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E5%89%8D%E7%AB%AF-%E7%A7%BB%E5%8A%A8/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    前端-移动
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E5%90%8E%E7%AB%AF-%E6%9E%B6%E6%9E%84/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    后端-架构
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E7%AE%A1%E7%90%86-%E6%88%90%E9%95%BF/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    管理-成长
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E8%AE%A1%E7%AE%97%E6%9C%BA%E5%9F%BA%E7%A1%80/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    计算机基础
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    运维-测试
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    运维-测试
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../AI%E9%87%8D%E5%A1%91%E4%BA%91%E5%8E%9F%E7%94%9F%E5%BA%94%E7%94%A8%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98/AI%E9%87%8D%E5%A1%91%E4%BA%91%E5%8E%9F%E7%94%9F%E5%BA%94%E7%94%A8%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI重塑云原生应用开发实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../DevOps%E5%AE%9E%E6%88%98%E7%AC%94%E8%AE%B0/DevOps%E5%AE%9E%E6%88%98%E7%AC%94%E8%AE%B0/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DevOps实战笔记
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Kubernetes%E5%85%A5%E9%97%A8%E5%AE%9E%E6%88%98%E8%AF%BE/Kubernetes%E5%85%A5%E9%97%A8%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kubernetes入门实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Linux%E5%86%85%E6%A0%B8%E6%8A%80%E6%9C%AF%E5%AE%9E%E6%88%98%E8%AF%BE/Linux%E5%86%85%E6%A0%B8%E6%8A%80%E6%9C%AF%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux内核技术实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Linux%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E5%AE%9E%E6%88%98/Linux%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux性能优化实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../SRE%E5%AE%9E%E6%88%98%E6%89%8B%E5%86%8C/SRE%E5%AE%9E%E6%88%98%E6%89%8B%E5%86%8C/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SRE实战手册
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../SRE%E5%AE%9E%E8%B7%B5%EF%BC%9A%E6%9C%8D%E5%8A%A1%E5%8F%AF%E9%9D%A0%E6%80%A7%E6%A1%88%E4%BE%8B%E8%AF%BE/SRE%E5%AE%9E%E8%B7%B5%EF%BC%9A%E6%9C%8D%E5%8A%A1%E5%8F%AF%E9%9D%A0%E6%80%A7%E6%A1%88%E4%BE%8B%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SRE实践：服务可靠性案例课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Serverless%E8%BF%9B%E9%98%B6%E5%AE%9E%E6%88%98%E8%AF%BE/Serverless%E8%BF%9B%E9%98%B6%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serverless进阶实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Web%E6%BC%8F%E6%B4%9E%E6%8C%96%E6%8E%98%E5%AE%9E%E6%88%98/Web%E6%BC%8F%E6%B4%9E%E6%8C%96%E6%8E%98%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web漏洞挖掘实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../eBPF%E6%A0%B8%E5%BF%83%E6%8A%80%E6%9C%AF%E4%B8%8E%E5%AE%9E%E6%88%98/eBPF%E6%A0%B8%E5%BF%83%E6%8A%80%E6%9C%AF%E4%B8%8E%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    eBPF核心技术与实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E4%BA%91%E5%8E%9F%E7%94%9F%E5%9F%BA%E7%A1%80%E6%9E%B6%E6%9E%84%E5%AE%9E%E6%88%98%E8%AF%BE/%E4%BA%91%E5%8E%9F%E7%94%9F%E5%9F%BA%E7%A1%80%E6%9E%B6%E6%9E%84%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    云原生基础架构实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E5%8F%8D%E7%88%AC%E8%99%AB%E5%85%B5%E6%B3%95%E6%BC%94%E7%BB%8E20%E8%AE%B2/%E5%8F%8D%E7%88%AC%E8%99%AB%E5%85%B5%E6%B3%95%E6%BC%94%E7%BB%8E20%E8%AE%B2/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    反爬虫兵法演绎20讲
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E5%AE%89%E5%85%A8%E6%94%BB%E9%98%B2%E6%8A%80%E8%83%BD30%E8%AE%B2/%E5%AE%89%E5%85%A8%E6%94%BB%E9%98%B2%E6%8A%80%E8%83%BD30%E8%AE%B2/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    安全攻防技能30讲
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_15" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7_15" id="__nav_7_15_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    容器实战高手课
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_15_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7_15">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    容器实战高手课
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%AE%B9%E5%99%A8%E5%AE%9E%E6%88%98%E9%AB%98%E6%89%8B%E8%AF%BE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    容器实战高手课
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%BC%80%E7%AF%87%E8%AF%8D%20-%20%E4%B8%80%E4%B8%AA%E6%80%81%E5%BA%A6%E4%B8%A4%E4%B8%AA%E6%AD%A5%E9%AA%A4%EF%BC%8C%E6%88%90%E4%B8%BA%E5%AE%B9%E5%99%A8%E5%AE%9E%E6%88%98%E9%AB%98%E6%89%8B/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    开篇词   一个态度两个步骤，成为容器实战高手
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01%20-%20%E8%AE%A4%E8%AF%86%E5%AE%B9%E5%99%A8%EF%BC%9A%E5%AE%B9%E5%99%A8%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%93%8D%E4%BD%9C%E5%92%8C%E5%AE%9E%E7%8E%B0%E5%8E%9F%E7%90%86/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01   认识容器：容器的基本操作和实现原理
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02%20-%20%E7%90%86%E8%A7%A3%E8%BF%9B%E7%A8%8B%EF%BC%881%EF%BC%89%EF%BC%9A%E4%B8%BA%E4%BB%80%E4%B9%88%E6%88%91%E5%9C%A8%E5%AE%B9%E5%99%A8%E4%B8%AD%E4%B8%8D%E8%83%BDkill%201%E5%8F%B7%E8%BF%9B%E7%A8%8B%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    02   理解进程（1）：为什么我在容器中不能kill 1号进程？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03-%E7%90%86%E8%A7%A3%E8%BF%9B%E7%A8%8B%EF%BC%882%EF%BC%89%EF%BC%9A%E4%B8%BA%E4%BB%80%E4%B9%88%E6%88%91%E7%9A%84%E5%AE%B9%E5%99%A8%E9%87%8C%E6%9C%89%E8%BF%99%E4%B9%88%E5%A4%9A%E5%83%B5%E5%B0%B8%E8%BF%9B%E7%A8%8B%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    03 理解进程（2）：为什么我的容器里有这么多僵尸进程？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04%20-%20%E7%90%86%E8%A7%A3%E8%BF%9B%E7%A8%8B%EF%BC%883%EF%BC%89%EF%BC%9A%E4%B8%BA%E4%BB%80%E4%B9%88%E6%88%91%E5%9C%A8%E5%AE%B9%E5%99%A8%E4%B8%AD%E7%9A%84%E8%BF%9B%E7%A8%8B%E8%A2%AB%E5%BC%BA%E5%88%B6%E6%9D%80%E6%AD%BB%E4%BA%86%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04   理解进程（3）：为什么我在容器中的进程被强制杀死了？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05-%E5%AE%B9%E5%99%A8CPU%EF%BC%881%EF%BC%89%EF%BC%9A%E6%80%8E%E4%B9%88%E9%99%90%E5%88%B6%E5%AE%B9%E5%99%A8%E7%9A%84CPU%E4%BD%BF%E7%94%A8%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05 容器CPU（1）：怎么限制容器的CPU使用？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06%20-%20%E5%AE%B9%E5%99%A8CPU%EF%BC%882%EF%BC%89%EF%BC%9A%E5%A6%82%E4%BD%95%E6%AD%A3%E7%A1%AE%E5%9C%B0%E6%8B%BF%E5%88%B0%E5%AE%B9%E5%99%A8CPU%E7%9A%84%E5%BC%80%E9%94%80%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06   容器CPU（2）：如何正确地拿到容器CPU的开销？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    07   Load Average：加了CPU Cgroup限制，为什么我的容器还是很慢？
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    07   Load Average：加了CPU Cgroup限制，为什么我的容器还是很慢？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        问题再现
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#load-average" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        什么是Load Average?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#load-average_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        现象解释：为什么Load Average会升高？
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        重点总结
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        思考题
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08%20-%20%E5%AE%B9%E5%99%A8%E5%86%85%E5%AD%98%EF%BC%9A%E6%88%91%E7%9A%84%E5%AE%B9%E5%99%A8%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A2%AB%E6%9D%80%E4%BA%86%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    08   容器内存：我的容器为什么被杀了？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09%20-%20Page%20Cache%EF%BC%9A%E4%B8%BA%E4%BB%80%E4%B9%88%E6%88%91%E7%9A%84%E5%AE%B9%E5%99%A8%E5%86%85%E5%AD%98%E4%BD%BF%E7%94%A8%E9%87%8F%E6%80%BB%E6%98%AF%E5%9C%A8%E4%B8%B4%E7%95%8C%E7%82%B9%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    09   Page Cache：为什么我的容器内存使用量总是在临界点？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10%20-%20Swap%EF%BC%9A%E5%AE%B9%E5%99%A8%E5%8F%AF%E4%BB%A5%E4%BD%BF%E7%94%A8Swap%E7%A9%BA%E9%97%B4%E5%90%97%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10   Swap：容器可以使用Swap空间吗？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../11%20-%20%E5%AE%B9%E5%99%A8%E6%96%87%E4%BB%B6%E7%B3%BB%E7%BB%9F%EF%BC%9A%E6%88%91%E5%9C%A8%E5%AE%B9%E5%99%A8%E4%B8%AD%E8%AF%BB%E5%86%99%E6%96%87%E4%BB%B6%E6%80%8E%E4%B9%88%E5%8F%98%E6%85%A2%E4%BA%86%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    11   容器文件系统：我在容器中读写文件怎么变慢了？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../12%20-%20%E5%AE%B9%E5%99%A8%E6%96%87%E4%BB%B6Quota%EF%BC%9A%E5%AE%B9%E5%99%A8%E4%B8%BA%E4%BB%80%E4%B9%88%E6%8A%8A%E5%AE%BF%E4%B8%BB%E6%9C%BA%E7%9A%84%E7%A3%81%E7%9B%98%E5%86%99%E6%BB%A1%E4%BA%86%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    12   容器文件Quota：容器为什么把宿主机的磁盘写满了？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13%20-%20%E5%AE%B9%E5%99%A8%E7%A3%81%E7%9B%98%E9%99%90%E9%80%9F%EF%BC%9A%E6%88%91%E7%9A%84%E5%AE%B9%E5%99%A8%E9%87%8C%E7%A3%81%E7%9B%98%E8%AF%BB%E5%86%99%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E7%A8%B3%E5%AE%9A%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    13   容器磁盘限速：我的容器里磁盘读写为什么不稳定？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../14%20-%20%E5%AE%B9%E5%99%A8%E4%B8%AD%E7%9A%84%E5%86%85%E5%AD%98%E4%B8%8EI-O%EF%BC%9A%E5%AE%B9%E5%99%A8%E5%86%99%E6%96%87%E4%BB%B6%E7%9A%84%E5%BB%B6%E6%97%B6%E4%B8%BA%E4%BB%80%E4%B9%88%E6%B3%A2%E5%8A%A8%E5%BE%88%E5%A4%A7%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    14   容器中的内存与I O：容器写文件的延时为什么波动很大？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../15%20-%20%E5%AE%B9%E5%99%A8%E7%BD%91%E7%BB%9C%EF%BC%9A%E6%88%91%E4%BF%AE%E6%94%B9%E4%BA%86-proc-sys-net%E4%B8%8B%E7%9A%84%E5%8F%82%E6%95%B0%EF%BC%8C%E4%B8%BA%E4%BB%80%E4%B9%88%E5%9C%A8%E5%AE%B9%E5%99%A8%E4%B8%AD%E4%B8%8D%E8%B5%B7%E6%95%88%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    15   容器网络：我修改了 proc sys net下的参数，为什么在容器中不起效？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../16%20-%20%E5%AE%B9%E5%99%A8%E7%BD%91%E7%BB%9C%E9%85%8D%E7%BD%AE%EF%BC%881%EF%BC%89%EF%BC%9A%E5%AE%B9%E5%99%A8%E7%BD%91%E7%BB%9C%E4%B8%8D%E9%80%9A%E4%BA%86%E8%A6%81%E6%80%8E%E4%B9%88%E8%B0%83%E8%AF%95%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    16   容器网络配置（1）：容器网络不通了要怎么调试？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../17-%E5%AE%B9%E5%99%A8%E7%BD%91%E7%BB%9C%E9%85%8D%E7%BD%AE%EF%BC%882%EF%BC%89%EF%BC%9A%E5%AE%B9%E5%99%A8%E7%BD%91%E7%BB%9C%E5%BB%B6%E6%97%B6%E8%A6%81%E6%AF%94%E5%AE%BF%E4%B8%BB%E6%9C%BA%E4%B8%8A%E7%9A%84%E9%AB%98%E5%90%97%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    17 容器网络配置（2）：容器网络延时要比宿主机上的高吗？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../18%20-%20%E5%AE%B9%E5%99%A8%E7%BD%91%E7%BB%9C%E9%85%8D%E7%BD%AE%EF%BC%883%EF%BC%89%EF%BC%9A%E5%AE%B9%E5%99%A8%E4%B8%AD%E7%9A%84%E7%BD%91%E7%BB%9C%E4%B9%B1%E5%BA%8F%E5%8C%85%E6%80%8E%E4%B9%88%E8%BF%99%E4%B9%88%E9%AB%98%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    18   容器网络配置（3）：容器中的网络乱序包怎么这么高？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../19%20-%20%E5%AE%B9%E5%99%A8%E5%AE%89%E5%85%A8%EF%BC%881%EF%BC%89%EF%BC%9A%E6%88%91%E7%9A%84%E5%AE%B9%E5%99%A8%E7%9C%9F%E7%9A%84%E9%9C%80%E8%A6%81privileged%E6%9D%83%E9%99%90%E5%90%97%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    19   容器安全（1）：我的容器真的需要privileged权限吗？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../20%20-%20%E5%AE%B9%E5%99%A8%E5%AE%89%E5%85%A8%EF%BC%882%EF%BC%89%EF%BC%9A%E5%9C%A8%E5%AE%B9%E5%99%A8%E4%B8%AD%EF%BC%8C%E6%88%91%E4%B8%8D%E4%BB%A5root%E7%94%A8%E6%88%B7%E6%9D%A5%E8%BF%90%E8%A1%8C%E7%A8%8B%E5%BA%8F%E5%8F%AF%E4%BB%A5%E5%90%97%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    20   容器安全（2）：在容器中，我不以root用户来运行程序可以吗？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E7%BB%93%E6%9D%9F%E8%AF%AD%20-%20%E8%B7%B3%E5%87%BA%E8%88%92%E9%80%82%E5%8C%BA%EF%BC%8C%E7%AA%81%E7%A0%B4%E6%80%9D%E8%80%83%E7%9A%84%E6%83%B0%E6%80%A7/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    结束语   跳出舒适区，突破思考的惰性
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E7%BB%93%E8%AF%BE%E6%B5%8B%E8%AF%95-%E8%BF%99%E4%BA%9B%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF%E7%9A%84%E9%97%AE%E9%A2%98%EF%BC%8C%E4%BD%A0%E9%83%BD%E6%8E%8C%E6%8F%A1%E4%BA%86%E4%B9%88%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    结课测试 这些容器技术的问题，你都掌握了么？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E7%94%A8%E6%88%B7%E6%95%85%E4%BA%8B%20-%20%E8%8E%AB%E5%90%8D%EF%BC%9A%E7%9B%B8%E4%BF%A1%E5%9D%9A%E6%8C%81%E7%9A%84%E5%8A%9B%E9%87%8F%EF%BC%8C%E7%BB%88%E4%BC%9A%E5%8E%9A%E7%A7%AF%E8%96%84%E5%8F%91/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    用户故事   莫名：相信坚持的力量，终会厚积薄发
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%8A%A0%E9%A4%90%E7%A6%8F%E5%88%A9%20-%20%E8%AF%BE%E5%90%8E%E6%80%9D%E8%80%83%E9%A2%98%E7%AD%94%E6%A1%88%E5%90%88%E9%9B%86/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    加餐福利   课后思考题答案合集
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%8A%A0%E9%A4%9001%20-%20%E6%A1%88%E4%BE%8B%E5%88%86%E6%9E%90%EF%BC%9A%E6%80%8E%E4%B9%88%E8%A7%A3%E5%86%B3%E6%B5%B7%E9%87%8FIPVS%E8%A7%84%E5%88%99%E5%B8%A6%E6%9D%A5%E7%9A%84%E7%BD%91%E7%BB%9C%E5%BB%B6%E6%97%B6%E6%8A%96%E5%8A%A8%E9%97%AE%E9%A2%98%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    加餐01   案例分析：怎么解决海量IPVS规则带来的网络延时抖动问题？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%8A%A0%E9%A4%9002%20-%20%E7%90%86%E8%A7%A3perf%EF%BC%9A%E6%80%8E%E4%B9%88%E7%94%A8perf%E8%81%9A%E7%84%A6%E7%83%AD%E7%82%B9%E5%87%BD%E6%95%B0%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    加餐02   理解perf：怎么用perf聚焦热点函数？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%8A%A0%E9%A4%9003%20-%20%E7%90%86%E8%A7%A3ftrace%EF%BC%881%EF%BC%89%EF%BC%9A%E6%80%8E%E4%B9%88%E5%BA%94%E7%94%A8ftrace%E6%9F%A5%E7%9C%8B%E9%95%BF%E5%BB%B6%E6%97%B6%E5%86%85%E6%A0%B8%E5%87%BD%E6%95%B0%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    加餐03   理解ftrace（1）：怎么应用ftrace查看长延时内核函数？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%8A%A0%E9%A4%9004%20-%20%E7%90%86%E8%A7%A3ftrace%EF%BC%882%EF%BC%89%EF%BC%9A%E6%80%8E%E4%B9%88%E7%90%86%E8%A7%A3ftrace%E8%83%8C%E5%90%8E%E7%9A%84%E6%8A%80%E6%9C%AFtracepoint%E5%92%8Ckprobe%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    加餐04   理解ftrace（2）：怎么理解ftrace背后的技术tracepoint和kprobe？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%8A%A0%E9%A4%9005%20-%20eBPF%EF%BC%9A%E6%80%8E%E4%B9%88%E6%9B%B4%E5%8A%A0%E6%B7%B1%E5%85%A5%E5%9C%B0%E6%9F%A5%E7%9C%8B%E5%86%85%E6%A0%B8%E4%B8%AD%E7%9A%84%E5%87%BD%E6%95%B0%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    加餐05   eBPF：怎么更加深入地查看内核中的函数？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%8A%A0%E9%A4%9006%20-%20BCC%EF%BC%9A%E5%85%A5%E9%97%A8eBPF%E7%9A%84%E5%89%8D%E7%AB%AF%E5%B7%A5%E5%85%B7/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    加餐06   BCC：入门eBPF的前端工具
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E9%AB%98%E6%89%8B%E8%AF%BE/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E9%AB%98%E6%89%8B%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    性能优化高手课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%80%A7%E8%83%BD%E6%B5%8B%E8%AF%95%E5%AE%9E%E6%88%9830%E8%AE%B2/%E6%80%A7%E8%83%BD%E6%B5%8B%E8%AF%95%E5%AE%9E%E6%88%9830%E8%AE%B2/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    性能测试实战30讲
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%8C%81%E7%BB%AD%E4%BA%A4%E4%BB%9836%E8%AE%B2/%E6%8C%81%E7%BB%AD%E4%BA%A4%E4%BB%9836%E8%AE%B2/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    持续交付36讲
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%8E%A5%E5%8F%A3%E6%B5%8B%E8%AF%95%E5%85%A5%E9%97%A8%E8%AF%BE/%E6%8E%A5%E5%8F%A3%E6%B5%8B%E8%AF%95%E5%85%A5%E9%97%A8%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    接口测试入门课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%B7%B1%E5%85%A5%E5%89%96%E6%9E%90Kubernetes/%E6%B7%B1%E5%85%A5%E5%89%96%E6%9E%90Kubernetes/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    深入剖析Kubernetes
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%B7%B1%E5%85%A5%E6%B5%85%E5%87%BA%E4%BA%91%E8%AE%A1%E7%AE%97/%E6%B7%B1%E5%85%A5%E6%B5%85%E5%87%BA%E4%BA%91%E8%AE%A1%E7%AE%97/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    深入浅出云计算
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E7%A8%8B%E5%BA%8F%E5%91%98%E7%9A%84%E6%B5%8B%E8%AF%95%E8%AF%BE/%E7%A8%8B%E5%BA%8F%E5%91%98%E7%9A%84%E6%B5%8B%E8%AF%95%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    程序员的测试课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E7%BD%91%E7%BB%9C%E6%8E%92%E6%9F%A5%E6%A1%88%E4%BE%8B%E8%AF%BE/%E7%BD%91%E7%BB%9C%E6%8E%92%E6%9F%A5%E6%A1%88%E4%BE%8B%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    网络排查案例课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%87%AA%E5%8A%A8%E5%8C%96%E6%B5%8B%E8%AF%95%E9%AB%98%E6%89%8B%E8%AF%BE/%E8%87%AA%E5%8A%A8%E5%8C%96%E6%B5%8B%E8%AF%95%E9%AB%98%E6%89%8B%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    自动化测试高手课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%AF%B4%E9%80%8F%E6%95%8F%E6%8D%B7/%E8%AF%B4%E9%80%8F%E6%95%8F%E6%8D%B7/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    说透敏捷
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%B5%B5%E6%88%90%E7%9A%84%E8%BF%90%E7%BB%B4%E4%BD%93%E7%B3%BB%E7%AE%A1%E7%90%86%E8%AF%BE/%E8%B5%B5%E6%88%90%E7%9A%84%E8%BF%90%E7%BB%B4%E4%BD%93%E7%B3%BB%E7%AE%A1%E7%90%86%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    赵成的运维体系管理课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%BD%AF%E4%BB%B6%E6%B5%8B%E8%AF%9552%E8%AE%B2/%E8%BD%AF%E4%BB%B6%E6%B5%8B%E8%AF%9552%E8%AE%B2/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    软件测试52讲
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%BF%90%E7%BB%B4%E7%9B%91%E6%8E%A7%E7%B3%BB%E7%BB%9F%E5%AE%9E%E6%88%98%E7%AC%94%E8%AE%B0/%E8%BF%90%E7%BB%B4%E7%9B%91%E6%8E%A7%E7%B3%BB%E7%BB%9F%E5%AE%9E%E6%88%98%E7%AC%94%E8%AE%B0/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    运维监控系统实战笔记
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E9%9B%B6%E5%9F%BA%E7%A1%80%E6%8B%BF%E4%B8%8B%E4%BA%91%E5%8E%9F%E7%94%9FCKA%E8%AE%A4%E8%AF%81/%E9%9B%B6%E5%9F%BA%E7%A1%80%E6%8B%BF%E4%B8%8B%E4%BA%91%E5%8E%9F%E7%94%9FCKA%E8%AE%A4%E8%AF%81/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    零基础拿下云原生CKA认证
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E9%AB%98%E6%A5%BC%E7%9A%84%E6%80%A7%E8%83%BD%E5%B7%A5%E7%A8%8B%E5%AE%9E%E6%88%98%E8%AF%BE/%E9%AB%98%E6%A5%BC%E7%9A%84%E6%80%A7%E8%83%BD%E5%B7%A5%E7%A8%8B%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    高楼的性能工程实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        问题再现
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#load-average" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        什么是Load Average?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#load-average_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        现象解释：为什么Load Average会升高？
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        重点总结
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        思考题
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+  <h1>07   Load Average：加了CPU Cgroup限制，为什么我的容器还是很慢？</h1>
+
+<p>你好，我是程远。今天我想聊一聊平均负载（Load Average）的话题。</p>
+<p>在上一讲中，我们提到过CPU Cgroup可以限制进程的CPU资源使用，但是CPU Cgroup对容器的资源限制是存在盲点的。</p>
+<p>什么盲点呢？就是无法通过CPU Cgroup来控制Load Average的平均负载。而没有这个限制，就会影响我们系统资源的合理调度，很可能导致我们的系统变得很慢。</p>
+<p>那么今天这一讲，我们要来讲一下为什么加了CPU Cgroup的配置后，即使保证了容器的CPU资源，容器中的进程还是会运行得很慢？</p>
+<h2 id="_1">问题再现</h2>
+<p>在Linux的系统维护中，我们需要经常查看CPU使用情况，再根据这个情况分析系统整体的运行状态。有时候你可能会发现，明明容器里所有进程的CPU使用率都很低，甚至整个宿主机的CPU使用率都很低，而机器的Load Average里的值却很高，容器里进程运行得也很慢。</p>
+<p>这么说有些抽象，我们一起动手再现一下这个情况，这样你就能更好地理解这个问题了。</p>
+<p>比如说下面的top输出，第三行可以显示当前的CPU使用情况，我们可以看到整个机器的CPU Usage几乎为0，因为"id"显示99.9%，这说明CPU是处于空闲状态的。</p>
+<p>但是请你注意，这里1分钟的"load average"的值却高达9.09，这里的数值9几乎就意味着使用了9个CPU了，这样CPU Usage和Load Average的数值看上去就很矛盾了。</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/50/be/507d6732efd350d47161174bc0a8e9be.png?wh=1858%2A278" /></p>
+<p>那问题来了，我们在看一个系统里CPU使用情况时，到底是看CPU Usage还是Load Average呢？</p>
+<p>这里就涉及到今天要解决的两大问题：</p>
+<ol>
+<li>Load Average到底是什么，CPU Usage和Load Average有什么差别？</li>
+<li>如果Load Average值升高，应用的性能下降了，这背后的原因是什么呢？</li>
+</ol>
+<p>好了，这一讲我们就带着这两个问题，一起去揭开谜底。</p>
+<h2 id="load-average">什么是Load Average?</h2>
+<p>要回答前面的问题，很显然我们要搞明白这个Linux里的"load average"这个值是什么意思，又是怎样计算的。</p>
+<p>Load Average这个概念，你可能在使用Linux的时候就已经注意到了，无论你是运行uptime, 还是top，都可以看到类似这个输出"load average：2.02, 1.83, 1.20"。那么这一串输出到底是什么意思呢？</p>
+<p>最直接的办法当然是看手册了，如果我们用"Linux manual page"搜索uptime或者top，就会看到对这个"load average"和后面三个数字的解释是"the system load averages for the past 1, 5, and 15 minutes"。</p>
+<p>这个解释就是说，后面的三个数值分别代表过去1分钟，5分钟，15分钟在这个节点上的Load Average，但是看了手册上的解释，我们还是不能理解什么是Load Average。</p>
+<p>这个时候，你如果再去网上找资料，就会发现Load Average是一个很古老的概念了。上个世纪70年代，早期的Unix系统上就已经有了这个Load Average，IETF还有一个<a href="https://tools.ietf.org/html/rfc546">RFC546</a>定义了Load Average，这里定义的Load Average是<strong>一种CPU资源需求的度量。</strong></p>
+<p>举个例子，对于一个单个CPU的系统，如果在1分钟的时间里，处理器上始终有一个进程在运行，同时操作系统的进程可运行队列中始终都有9个进程在等待获取CPU资源。那么对于这1分钟的时间来说，系统的"load average"就是1+9=10，这个定义对绝大部分的Unix系统都适用。</p>
+<p>对于Linux来说，如果只考虑CPU的资源，Load Averag等于单位时间内正在运行的进程加上可运行队列的进程，这个定义也是成立的。通过这个定义和我自己的观察，我给你归纳了下面三点对Load Average的理解。</p>
+<p>第一，不论计算机CPU是空闲还是满负载，Load Average都是Linux进程调度器中<strong>可运行队列（Running Queue）里的一段时间的平均进程数目。</strong></p>
+<p>第二，计算机上的CPU还有空闲的情况下，CPU Usage可以直接反映到"load average"上，什么是CPU还有空闲呢？具体来说就是可运行队列中的进程数目小于CPU个数，这种情况下，单位时间进程CPU Usage相加的平均值应该就是"load average"的值。</p>
+<p>第三，计算机上的CPU满负载的情况下，计算机上的CPU已经是满负载了，同时还有更多的进程在排队需要CPU资源。这时"load average"就不能和CPU Usage等同了。</p>
+<p>比如对于单个CPU的系统，CPU Usage最大只是有100%，也就1个CPU；而"load average"的值可以远远大于1，因为"load average"看的是操作系统中可运行队列中进程的个数。</p>
+<p>这样的解释可能太抽象了，为了方便你理解，我们一起动手验证一下。</p>
+<p>怎么验证呢？我们可以执行个程序来模拟一下,先准备好一个可以消耗任意CPU Usage的<a href="https://github.com/chengyli/training/tree/master/cpu/cgroup_cpu/threads-cpu">程序</a>，在执行这个程序的时候，后面加个数字作为参数，</p>
+<p>比如下面的设置，参数是2，就是说这个进程会创建出两个线程，并且每个线程都跑满100%的CPU，2个线程就是2 * 100% = 200%的CPU Usage，也就是消耗了整整两个CPU的资源。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a># ./threads-cpu 2
+</code></pre></div>
+<p>准备好了这个CPU Usage的模拟程序，我们就可以用它来查看CPU Usage和Load Average之间的关系了。</p>
+<p>接下来我们一起跑两个例子，第一个例子是执行2个满负载的线程，第二个例子执行6个满负载的线程，同样都是在一台4个CPU的节点上。</p>
+<p>先来看第一个例子，我们在一台4个CPU的计算机节点上运行刚才这个模拟程序，还是设置参数为2，也就是使用2个CPU Usage。在这个程序运行了几分钟之后，我们运行top来查看一下CPU Usage和Load Average。</p>
+<p>我们可以看到两个threads-cpu各自都占了将近100%的CPU，两个就是200%，2个CPU，对于4个CPU的计算机来说，CPU Usage占了50%，空闲了一半，这个我们也可以从 idle （id）：49.9%得到印证。</p>
+<p>这时候，Load Average里第一项（也就是前1分钟的数值）为1.98，近似于2。这个值和我们一直运行的200%CPU Usage相对应，也验证了我们之前归纳的第二点——<strong>CPU Usage可以反映到Load Average上。</strong></p>
+<p>因为运行的时间不够，前5分钟，前15分钟的Load Average还没有到2，而且后面我们的例子程序一般都只会运行几分钟，所以这里我们只看前1分钟的Load Average值就行。</p>
+<p>另外，Linux内核中不使用浮点计算，这导致Load Average里的1分钟，5分钟，15分钟的时间值并不精确，但这不影响我们查看Load Average的数值，所以先不用管这个时间的准确性。</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/11/52/110f67d3b31a62d3d7f27bb4a28aa552.png?wh=1606%2A420" />
+那我们再来跑第二个例子，同样在这个4个CPU的计算机节点上，如果我们执行CPU Usage模拟程序threads-cpu，设置参数为6，让这个进程建出6个线程，这样每个线程都会尽量去抢占CPU，但是计算机总共只有4个CPU，所以这6个线程的CPU Usage加起来只是400%。</p>
+<p>显然这时候4个CPU都被占满了，我们可以看到整个节点的idle（id）也已经是0.0%了。</p>
+<p>但这个时候，我们看看前1分钟的Load Average，数值不是4而是5.93接近6，我们正好模拟了6个高CPU需求的线程。这也告诉我们，Load Average表示的是一段时间里运行队列中需要被调度的进程/线程平均数目。</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/3c/26/3caf637cb3bc20yy5610b3d0bf59bd26.png?wh=1628%2A614" /></p>
+<p>讲到这里，我们是不是就可以认定Load Average就代表一段时间里运行队列中需要被调度的进程或者线程平均数目了呢? 或许对其他的Unix系统来说，这个理解已经够了，但是对于Linux系统还不能这么认定。</p>
+<p>为什么这么说呢？故事还要从Linux早期的历史说起，那时开发者Matthias有这么一个发现，比如把快速的磁盘换成了慢速的磁盘，运行同样的负载，系统的性能是下降的，但是Load Average却没有反映出来。</p>
+<p>他发现这是因为Load Average只考虑运行态的进程数目，而没有考虑等待I/O的进程。所以，他认为Load Average如果只是考虑进程运行队列中需要被调度的进程或线程平均数目是不够的，因为对于处于I/O资源等待的进程都是处于TASK_UNINTERRUPTIBLE状态的。</p>
+<p>那他是怎么处理这件事的呢？估计你也猜到了，他给内核加一个patch（补丁），把处于TASK_UNINTERRUPTIBLE状态的进程数目也计入了Load Average中。</p>
+<p>在这里我们又提到了TASK_UNINTERRUPTIBLE状态的进程，在前面的章节中我们介绍过，我再给你强调一下，<strong>TASK_UNINTERRUPTIBLE是Linux进程状态的一种，是进程为等待某个系统资源而进入了睡眠的状态，并且这种睡眠的状态是不能被信号打断的。</strong></p>
+<p>下面就是1993年Matthias的kernel patch，你有兴趣的话，可以读一下。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>From:<span class="w"> </span>Matthias<span class="w"> </span>Urlichs<span class="w"> </span>&lt;urlichs@smurf.sub.org&gt;
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>Subject:<span class="w"> </span>Load<span class="w"> </span>average<span class="w"> </span>broken<span class="w"> </span>?
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>Date:<span class="w"> </span>Fri,<span class="w"> </span><span class="m">29</span><span class="w"> </span>Oct<span class="w"> </span><span class="m">1993</span><span class="w"> </span><span class="m">11</span>:37:23<span class="w"> </span>+0200
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>The<span class="w"> </span>kernel<span class="w"> </span>only<span class="w"> </span>counts<span class="w"> </span><span class="s2">&quot;runnable&quot;</span><span class="w"> </span>processes<span class="w"> </span>when<span class="w"> </span>computing<span class="w"> </span>the<span class="w"> </span>load<span class="w"> </span>average.
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>I<span class="w"> </span>don<span class="err">&#39;</span>t<span class="w"> </span>like<span class="w"> </span>that<span class="p">;</span><span class="w"> </span>the<span class="w"> </span>problem<span class="w"> </span>is<span class="w"> </span>that<span class="w"> </span>processes<span class="w"> </span>which<span class="w"> </span>are<span class="w"> </span>swapping<span class="w"> </span>or
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>waiting<span class="w"> </span>on<span class="w"> </span><span class="s2">&quot;fast&quot;</span>,<span class="w"> </span>i.e.<span class="w"> </span>noninterruptible,<span class="w"> </span>I/O,<span class="w"> </span>also<span class="w"> </span>consume<span class="w"> </span>resources.
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>It<span class="w"> </span>seems<span class="w"> </span>somewhat<span class="w"> </span>nonintuitive<span class="w"> </span>that<span class="w"> </span>the<span class="w"> </span>load<span class="w"> </span>average<span class="w"> </span>goes<span class="w"> </span>down<span class="w"> </span>when<span class="w"> </span>you
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>replace<span class="w"> </span>your<span class="w"> </span>fast<span class="w"> </span>swap<span class="w"> </span>disk<span class="w"> </span>with<span class="w"> </span>a<span class="w"> </span>slow<span class="w"> </span>swap<span class="w"> </span>disk...
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>Anyway,<span class="w"> </span>the<span class="w"> </span>following<span class="w"> </span>patch<span class="w"> </span>seems<span class="w"> </span>to<span class="w"> </span>make<span class="w"> </span>the<span class="w"> </span>load<span class="w"> </span>average<span class="w"> </span>much<span class="w"> </span>more
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>consistent<span class="w"> </span>WRT<span class="w"> </span>the<span class="w"> </span>subjective<span class="w"> </span>speed<span class="w"> </span>of<span class="w"> </span>the<span class="w"> </span>system.<span class="w"> </span>And,<span class="w"> </span>most<span class="w"> </span>important,<span class="w"> </span>the
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>load<span class="w"> </span>is<span class="w"> </span>still<span class="w"> </span>zero<span class="w"> </span>when<span class="w"> </span>nobody<span class="w"> </span>is<span class="w"> </span>doing<span class="w"> </span>anything.<span class="w"> </span><span class="p">;</span>-<span class="o">)</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>---<span class="w"> </span>kernel/sched.c.orig<span class="w"> </span>Fri<span class="w"> </span>Oct<span class="w"> </span><span class="m">29</span><span class="w"> </span><span class="m">10</span>:31:11<span class="w"> </span><span class="m">1993</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>+++<span class="w"> </span>kernel/sched.c<span class="w"> </span>Fri<span class="w"> </span>Oct<span class="w"> </span><span class="m">29</span><span class="w"> </span><span class="m">10</span>:32:51<span class="w"> </span><span class="m">1993</span>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>@@<span class="w"> </span>-414,7<span class="w"> </span>+414,9<span class="w"> </span>@@
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>unsigned<span class="w"> </span>long<span class="w"> </span><span class="nv">nr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="p">;</span>
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>
+<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="k">for</span><span class="o">(</span><span class="nv">p</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">&amp;</span>LAST_TASK<span class="p">;</span><span class="w"> </span>p<span class="w"> </span>&gt;<span class="w"> </span><span class="p">&amp;</span>FIRST_TASK<span class="p">;</span><span class="w"> </span>--p<span class="o">)</span>
+<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>-<span class="w">       </span><span class="k">if</span><span class="w"> </span><span class="o">(</span>*p<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="o">(</span>*p<span class="o">)</span>-&gt;state<span class="w"> </span><span class="o">==</span><span class="w"> </span>TASK_RUNNING<span class="o">)</span>
+<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>+<span class="w">       </span><span class="k">if</span><span class="w"> </span><span class="o">(</span>*p<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="o">((</span>*p<span class="o">)</span>-&gt;state<span class="w"> </span><span class="o">==</span><span class="w"> </span>TASK_RUNNING<span class="o">)</span><span class="w"> </span><span class="o">||</span>
+<a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>+<span class="w">                  </span><span class="o">(</span>*p<span class="o">)</span>-&gt;state<span class="w"> </span><span class="o">==</span><span class="w"> </span>TASK_UNINTERRUPTIBLE<span class="o">)</span><span class="w"> </span><span class="o">||</span>
+<a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>+<span class="w">                  </span><span class="o">(</span>*p<span class="o">)</span>-&gt;state<span class="w"> </span><span class="o">==</span><span class="w"> </span>TASK_SWAPPING<span class="o">))</span>
+<a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a><span class="nv">nr</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span>FIXED_1<span class="p">;</span>
+<a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a><span class="k">return</span><span class="w"> </span>nr<span class="p">;</span>
+<a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a><span class="o">}</span>
+</code></pre></div>
+<p>那么对于Linux的Load Average来说，除了可运行队列中的进程数目，等待队列中的UNINTERRUPTIBLE进程数目也会增加Load Average。</p>
+<p>为了验证这一点，我们可以模拟一下UNINTERRUPTIBLE的进程，来看看Load Average的变化。</p>
+<p>这里我们做一个<a href="https://github.com/chengyli/training/tree/master/cpu/load_average/uninterruptable/kmod">kernel module</a>，通过一个/proc文件系统给用户程序提供一个读取的接口，只要用户进程读取了这个接口就会进入UNINTERRUPTIBLE。这样我们就可以模拟两个处于UNINTERRUPTIBLE状态的进程，然后查看一下Load Average有没有增加。</p>
+<p>我们发现程序跑了几分钟之后，前1分钟的Load Average差不多从0增加到了2.16，节点上CPU Usage几乎为0，idle为99.8%。</p>
+<p>可以看到，可运行队列（Running Queue）中的进程数目是0，只有休眠队列（Sleeping Queue）中有两个进程，并且这两个进程显示为D state进程，这个D state进程也就是我们模拟出来的TASK_UNINTERRUPTIBLE状态的进程。</p>
+<p>这个例子证明了Linux将TASK_UNINTERRUPTIBLE状态的进程数目计入了Load Average中，所以即使CPU上不做任何的计算，Load Average仍然会升高。如果TASK_UNINTERRUPTIBLE状态的进程数目有几百几千个，那么Load Average的数值也可以达到几百几千。</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/e0/a9/e031338191bcec89b7fb02c19af843a9.png?wh=1622%2A438" /></p>
+<p>好了，到这里我们就可以准确定义Linux系统里的Load Average了，其实也很简单，你只需要记住，平均负载统计了这两种情况的进程：</p>
+<p>第一种是Linux进程调度器中可运行队列（Running Queue）一段时间（1分钟，5分钟，15分钟）的进程平均数。</p>
+<p>第二种是Linux进程调度器中休眠队列（Sleeping Queue）里的一段时间的TASK_UNINTERRUPTIBLE状态下的进程平均数。</p>
+<p>所以，最后的公式就是：<strong>Load Average=可运行队列进程平均数+休眠队列中不可打断的进程平均数</strong></p>
+<p>如果打个比方来说明Load Average的统计原理。你可以想象每个CPU就是一条道路，每个进程都是一辆车，怎么科学统计道路的平均负载呢？就是看单位时间通过的车辆，一条道上的车越多，那么这条道路的负载也就越高。</p>
+<p>此外，Linux计算系统负载的时候，还额外做了个补丁把TASK_UNINTERRUPTIBLE状态的进程也考虑了，这个就像道路中要把红绿灯情况也考虑进去。一旦有了红灯，汽车就要停下来排队，那么即使道路很空，但是红灯多了，汽车也要排队等待，也开不快。</p>
+<h2 id="load-average_1">现象解释：为什么Load Average会升高？</h2>
+<p>解释了Load Average这个概念，我们再回到这一讲最开始的问题，为什么对容器已经用CPU Cgroup限制了它的CPU Usage，容器里的进程还是可以造成整个系统很高的Load Average。</p>
+<p>我们理解了Load Average这个概念之后，就能区分出Load Averge和CPU使用率的区别了。那么这个看似矛盾的问题也就很好回答了，因为<strong>Linux下的Load Averge不仅仅计算了CPU Usage的部分，它还计算了系统中TASK_UNINTERRUPTIBLE状态的进程数目。</strong></p>
+<p>讲到这里为止，我们找到了第一个问题的答案，那么现在我们再看第二个问题：如果Load Average值升高，应用的性能已经下降了，真正的原因是什么？问题就出在TASK_UNINTERRUPTIBLE状态的进程上了。</p>
+<p>怎么验证这个判断呢？这时候我们只要运行 <code>ps aux | grep “ D ”</code> ，就可以看到容器中有多少TASK_UNINTERRUPTIBLE状态（在ps命令中这个状态的进程标示为"D"状态）的进程，为了方便理解，后面我们简称为D状态进程。而正是这些D状态进程引起了Load Average的升高。</p>
+<p>找到了Load Average升高的问题出在D状态进程了，我们想要真正解决问题，还有必要了解D状态进程产生的本质是什么？</p>
+<p>在Linux内核中有数百处调用点，它们会把进程设置为D状态，主要集中在disk I/O 的访问和信号量（Semaphore）锁的访问上，因此D状态的进程在Linux里是很常见的。</p>
+<p><strong>无论是对disk I/O的访问还是对信号量的访问，都是对Linux系统里的资源的一种竞争。</strong>当进程处于D状态时，就说明进程还没获得资源，这会在应用程序的最终性能上体现出来，也就是说用户会发觉应用的性能下降了。</p>
+<p>那么D状态进程导致了性能下降，我们肯定是想方设法去做调试的。但目前D状态进程引起的容器中进程性能下降问题，Cgroups还不能解决，这也就是为什么我们用Cgroups做了配置，即使保证了容器的CPU资源， 容器中的进程还是运行很慢的根本原因。</p>
+<p>这里我们进一步做分析，为什么CPU Cgroups不能解决这个问题呢？就是因为Cgroups更多的是以进程为单位进行隔离，而D状态进程是内核中系统全局资源引入的，所以Cgroups影响不了它。</p>
+<p>所以我们可以做的是，在生产环境中监控容器的宿主机节点里D状态的进程数量，然后对D状态进程数目异常的节点进行分析，比如磁盘硬件出现问题引起D状态进程数目增加，这时就需要更换硬盘。</p>
+<h2 id="_2">重点总结</h2>
+<p>这一讲我们从CPU Usage和Load Average差异这个现象讲起，最主要的目的是讲清楚Linux下的Load Average这个概念。</p>
+<p>在其他Unix操作系统里Load Average只考虑CPU部分，Load Average计算的是进程调度器中可运行队列（Running Queue）里的一段时间（1分钟，5分钟，15分钟）的平均进程数目，而Linux在这个基础上，又加上了进程调度器中休眠队列（Sleeping Queue）里的一段时间的TASK_UNINTERRUPTIBLE状态的平均进程数目。</p>
+<p>这里你需要重点掌握Load Average的计算公式，如下图。</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/e6/4e/e672a6a35248420d623e55d7f7ddf34e.jpeg?wh=3200%2A1800" /></p>
+<p>因为TASK_UNINTERRUPTIBLE状态的进程同样也会竞争系统资源，所以它会影响到应用程序的性能。我们可以在容器宿主机的节点对D状态进程做监控，定向分析解决。</p>
+<p>最后，我还想强调一下，这一讲中提到的对D状态进程进行监控也很重要，因为这是通用系统性能的监控方法。</p>
+<h2 id="_3">思考题</h2>
+<p>结合今天的学习，你可以自己动手感受一下Load Average是怎么产生的，请你创建一个容器，在容器中运行一个消耗100%CPU的进程，运行10分钟后，然后查看Load Average的值。</p>
+<p>欢迎在留言区晒出你的经历和疑问。如果有收获，也欢迎你把这篇文章分享给你的朋友，一起学习和讨论。</p>
+<div><strong>精选留言（15）</strong></div>
+<ul>
+<li><span>garnett</span> 👍（18） 💬（2）<p>请问老师，引入为 TASK_UNINTERRUPTIBLE 状态的进程的案例，top 输出中为什么wa使用率这一项没有增长？</p>2020-11-30</li><br/><li><span>莫名</span> 👍（12） 💬（4）<p>推荐 stress 压测工具：stress -c 1 -t 600
+
+平均负载计算公式（nr_active 表示单位时间内平均活跃进程个数，每个 CPU 对应一个 运行队列 rq，rq-&gt;nr_running、rq-&gt;nr_uninterruptible 分别表示该运行队列上可运行进程、不可中断进程的个数。累积的 nr_active 再进行指数衰减平均得到最终的平均负载）
+
+&#47;*
+* The global load average is an exponentially decaying average of nr_running +
+* nr_uninterruptible.
+*&#47;
+nr_active = 0;
+for_each_possible_cpu(cpu)
+nr_active += cpu_of(cpu)-&gt;nr_running + cpu_of(cpu)-&gt;nr_uninterruptible;</p>2020-11-30</li><br/><li><span>争光 Alan</span> 👍（9） 💬（4）<p>感谢分享
+
+我想问下
+1.如果出现就D进程，我为什么好的故障方法排查在等待什么吗？
+2.一直有个疑问，是不是linux的进程数不能太多？太多会有很多的调度时间造成很卡？
+3.容器目前每个节点官方推荐是110个pod，openshift是250个，能问下你们这边的最佳实践不引起性能下降的前提下节点最大pod是多少个吗？</p>2020-12-02</li><br/><li><span>游离的鱼</span> 👍（6） 💬（2）<p>首先很感谢老师，然后我还是有一些些不太明白，第一个: 处于task_interruptible的进程，虽然它在等信号量和等待io上，但是我理解这个时候其实cpu是空闲的，为什么不把cpu资源让出来，等io完成或者有信号量时再把它放入可运行的队列中去等待调用呢，类似于回调函数那样的思想。第二个: 如果是我的机器长期平均负载过高，是不是一定是D状态的进程或线程引起的。 第三个: 我有四个cpu的机器，现有五个进程，有四个在cpu中运行，其中三个是处于运行状态，另一个是处于task_interruptable状态，也就是D状态，还有一个在排队，那这个时候的负载是不是就是5？如果除了刚刚的D状态的进程其他的进程都运行完了，负载是不是又变成1了。 第四个: 根据老师的定义和公式，平均负载是...的平均进程数，我感觉平均进程数是一个整数，为什么我们看到的平均负载都是带小数的。希望老师帮忙解答一下，帮我解除疑惑。万分感谢</p>2020-12-01</li><br/><li><span>Jackson Wu</span> 👍（3） 💬（1）<p>老师好，一个CPU只能同时处理一个进程，为什么还能把CPU分为0.5C的单位呢，这个cpu的单位是怎么理解的呢</p>2020-12-06</li><br/><li><span>笃定</span> 👍（2） 💬（1）<p>文中的第二个实验，四个cpu的系统，运行六个进程。理论上六个进程同一时刻不可能都处于R状态吧？一个cpu同一时刻不是只能处理一个进程吗？我的理解top输出应该是四个R状态两个S状态</p>2021-03-28</li><br/><li><span>Harold</span> 👍（2） 💬（1）<p>对于 load average 的值还是有些模糊，不考虑 D 进程的情况下，1台8核的机器有 16个 running 的进程，cpu并没有占满100%的情况下，load average取的值是 16*(1 - cpu idle) 还是 16？换句话说，是不是只要 cpu idle 不是0，取的都是 cpu usage 的值。望解答。</p>2021-01-12</li><br/><li><span>po</span> 👍（2） 💬（9）<p>有事，好几天没来留言了，我有个确认点：
+1. 如果一台2个cpu的机器，跑了8个进程，每个进程使用一个cpu的10%，那么load average应该是0.8吧？
+2. 平常说的物理机CPU，比如2核4线程，这个在Linux里面看是几个cpu呢？</p>2020-12-09</li><br/><li><span>Geek4329</span> 👍（2） 💬（2）<p>感谢老师，受益匪浅！
+
+有一点不是很懂，想请教下：
+“这里我们做一个kernel module，通过一个 &#47;proc 文件系统给用户程序提供一个读取的接口，只要用户进程读取了这个接口就会进入 UNINTERRUPTIBLE。”
+
+老师上面给的kernel module中，我的理解是只调用sleep，然后用户调用这个接口就进入D state，算是模拟DISK IO状态时获取不到资源时的状态吗？老师能不能给个参考，用户进程读是如何取了这个接口呢？</p>2020-11-30</li><br/><li><span>钱米</span> 👍（1） 💬（1）<p>请问老师，我的宿主机的memory cgroup很多，处于上升趋势，未下降
+~# cat &#47;proc&#47;cgroups
+#subsys_name    hierarchy   num_cgroups enabled
+cpuset  3   30  1
+cpu 2   101 1
+cpuacct 2   101 1
+blkio   6   99  1
+memory  7   1013    1
+devices 4   99  1
+freezer 9   30  1
+net_cls 10  30  1
+perf_event  8   30  1
+net_prio    10  30  1
+pids    5   100 1
+这个影响了api对容器的创建和启动，改如何处理呢？</p>2021-01-22</li><br/><li><span>瑞</span> 👍（1） 💬（1）<p>文首提到的Cgroup无法限制LoadAverage，从而可能导致整个系统性能下降。指的是处于D状态进程的性能下降，而D状态进程对同一资源的竞争越来越多，整体表现出来就是系统性能下降。这样理解对吗？</p>2020-12-08</li><br/><li><span>Geek2014</span> 👍（1） 💬（2）<p>“在 Linux 的系统维护中，我们需要经常查看 CPU 使用情况，再根据这个情况分析系统整体的运行状态。有时候你可能会发现，明明容器里所有进程的 CPU 使用率都很低，甚至整个宿主机的 CPU 使用率都很低，而机器的 Load Average 里的值却很高，容器里进程运行得也很慢。”
+
+老师，这个问题，我是不是可以这么理解
+
+假设系统4CPU，平均负载很高为8，每个任务使用100% CPU可发挥最高性能
+1. 如果都是CPU密集型负载，那么CPU使用率不超过50%，应用性能肯定下降
+2. 如果全部是IO密集型负载，那么都在竞争IO资源，应用性能肯定下降
+3. 假设有小于4个的CPU密集型负载，其他都是IO密集型负载，那么CPU密集型负载的性能应该不受影响。</p>2020-12-01</li><br/><li><span>水蒸蛋</span> 👍（0） 💬（1）<p>老师cpu平均是活动进程&#47;cpu核数，sleep平均也是sleep&#47;CPUcore数量？</p>2020-12-01</li><br/><li><span>朱新威</span> 👍（22） 💬（1）<p>做个不太恰当的比喻：
+
+cpu：比做一条高速公路
+
+进程占用：比做一辆辆汽车
+
+高速公路上的拥堵情况（load average）= 正在跑的汽车 + 收费站排队等待进入的汽车 + 服务站加油、吃饭的汽车（D进程）；
+
+把D进程考虑进去是因为，服务站里的汽车随时可能进入高速公路，造成拥堵程度增加</p>2021-01-12</li><br/><li><span>InfoQ_09e721f0120c</span> 👍（0） 💬（0）<p>mac上man top对load average的解释：
+
+LoadAvg     Load average over 1, 5, and 15 minutes.  The load average is the average number of jobs in the run queue.
+</p>2024-07-07</li><br/>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="页脚" >
+        
+          
+          <a href="../06%20-%20%E5%AE%B9%E5%99%A8CPU%EF%BC%882%EF%BC%89%EF%BC%9A%E5%A6%82%E4%BD%95%E6%AD%A3%E7%A1%AE%E5%9C%B0%E6%8B%BF%E5%88%B0%E5%AE%B9%E5%99%A8CPU%E7%9A%84%E5%BC%80%E9%94%80%EF%BC%9F/" class="md-footer__link md-footer__link--prev" aria-label="上一页: 06   容器CPU（2）：如何正确地拿到容器CPU的开销？">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                上一页
+              </span>
+              <div class="md-ellipsis">
+                06   容器CPU（2）：如何正确地拿到容器CPU的开销？
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../08%20-%20%E5%AE%B9%E5%99%A8%E5%86%85%E5%AD%98%EF%BC%9A%E6%88%91%E7%9A%84%E5%AE%B9%E5%99%A8%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A2%AB%E6%9D%80%E4%BA%86%EF%BC%9F/" class="md-footer__link md-footer__link--next" aria-label="下一页: 08   容器内存：我的容器为什么被杀了？">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                下一页
+              </span>
+              <div class="md-ellipsis">
+                08   容器内存：我的容器为什么被杀了？
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright © 2025-Present zkep
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["content.code.annotate", "content.code.copy", "content.tooltips", "toc.follow", "navigation.top", "navigation.tabs", "navigation.tabs.sticky", "navigation.prune", "navigation.footer", "navigation.tracking", "navigation.instant", "navigation.instant.progress", "navigation.indexes", "content.tabs.link"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../../javascript/extra.js"></script>
+      
+        <script src="../../../javascript/giscus.js"></script>
+      
+        <script src="../../../javascript/referrerpolicy.js"></script>
+      
+    
+  </body>
+</html>

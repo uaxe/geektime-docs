@@ -1,0 +1,5799 @@
+<!--geek time docs 🚀, MIT license-->
+
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="极客时间文档">
+      
+      
+        <meta name="author" content="zkep">
+      
+      
+        <link rel="canonical" href="https://github.com/uaxe/geektime-docs/%E5%89%8D%E7%AB%AF-%E7%A7%BB%E5%8A%A8/%E5%9B%BE%E8%A7%A3%20Google%20V8/15%20-%20%E9%9A%90%E8%97%8F%E7%B1%BB%EF%BC%9A%E5%A6%82%E4%BD%95%E5%9C%A8%E5%86%85%E5%AD%98%E4%B8%AD%E5%BF%AB%E9%80%9F%E6%9F%A5%E6%89%BE%E5%AF%B9%E8%B1%A1%E5%B1%9E%E6%80%A7%EF%BC%9F/">
+      
+      
+        <link rel="prev" href="../14-%E5%AD%97%E8%8A%82%E7%A0%81%EF%BC%88%E4%BA%8C%EF%BC%89%EF%BC%9A%E8%A7%A3%E9%87%8A%E5%99%A8%E6%98%AF%E5%A6%82%E4%BD%95%E8%A7%A3%E9%87%8A%E6%89%A7%E8%A1%8C%E5%AD%97%E8%8A%82%E7%A0%81%E7%9A%84%EF%BC%9F/">
+      
+      
+        <link rel="next" href="../16%20-%20%E7%AD%94%E7%96%91%EF%BC%9A%20V8%E6%98%AF%E6%80%8E%E4%B9%88%E9%80%9A%E8%BF%87%E5%86%85%E8%81%94%E7%BC%93%E5%AD%98%E6%9D%A5%E6%8F%90%E5%8D%87%E5%87%BD%E6%95%B0%E6%89%A7%E8%A1%8C%E6%95%88%E7%8E%87%E7%9A%84%EF%BC%9F/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../None">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>15 隐藏类：如何在内存中快速查找对象属性？ - 极客时间文档</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../../stylesheets/style.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#_1" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+        <aside class="md-banner">
+          <div class="md-banner__inner md-grid md-typeset">
+            
+            
+
+
+          </div>
+          
+        </aside>
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../../.." title="极客时间文档" class="md-header__button md-logo" aria-label="极客时间文档" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            极客时间文档
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              15   隐藏类：如何在内存中快速查找对象属性？
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="indigo"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/zkep/my-geektime" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    zkep/my-geektime
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="标签" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../AI-%E5%A4%A7%E6%95%B0%E6%8D%AE/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  AI-大数据
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E4%BA%A7%E5%93%81-%E8%BF%90%E8%90%A5/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  产品-运营
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  前端-移动
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E5%90%8E%E7%AB%AF-%E6%9E%B6%E6%9E%84/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  后端-架构
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E7%AE%A1%E7%90%86-%E6%88%90%E9%95%BF/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  管理-成长
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E8%AE%A1%E7%AE%97%E6%9C%BA%E5%9F%BA%E7%A1%80/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  计算机基础
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E8%BF%90%E7%BB%B4-%E6%B5%8B%E8%AF%95/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  运维-测试
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="极客时间文档" class="md-nav__button md-logo" aria-label="极客时间文档" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    极客时间文档
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/zkep/my-geektime" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    zkep/my-geektime
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../AI-%E5%A4%A7%E6%95%B0%E6%8D%AE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI-大数据
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E4%BA%A7%E5%93%81-%E8%BF%90%E8%90%A5/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    产品-运营
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    前端-移动
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    前端-移动
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Android%E5%BC%80%E5%8F%91%E9%AB%98%E6%89%8B%E8%AF%BE/Android%E5%BC%80%E5%8F%91%E9%AB%98%E6%89%8B%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Android开发高手课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Flutter%E6%A0%B8%E5%BF%83%E6%8A%80%E6%9C%AF%E4%B8%8E%E5%AE%9E%E6%88%98/Flutter%E6%A0%B8%E5%BF%83%E6%8A%80%E6%9C%AF%E4%B8%8E%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Flutter核心技术与实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../JavaScript%E6%A0%B8%E5%BF%83%E5%8E%9F%E7%90%86%E8%A7%A3%E6%9E%90/JavaScript%E6%A0%B8%E5%BF%83%E5%8E%9F%E7%90%86%E8%A7%A3%E6%9E%90/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    JavaScript核心原理解析
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../JavaScript%E8%BF%9B%E9%98%B6%E5%AE%9E%E6%88%98%E8%AF%BE/JavaScript%E8%BF%9B%E9%98%B6%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    JavaScript进阶实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../React%20Hooks%20%E6%A0%B8%E5%BF%83%E5%8E%9F%E7%90%86%E4%B8%8E%E5%AE%9E%E6%88%98/React%20Hooks%20%E6%A0%B8%E5%BF%83%E5%8E%9F%E7%90%86%E4%B8%8E%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    React Hooks 核心原理与实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../React%20Native%20%E6%96%B0%E6%9E%B6%E6%9E%84%E5%AE%9E%E6%88%98%E8%AF%BE/React%20Native%20%E6%96%B0%E6%9E%B6%E6%9E%84%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    React Native 新架构实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Serverless%E5%85%A5%E9%97%A8%E8%AF%BE/Serverless%E5%85%A5%E9%97%A8%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serverless入门课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Vue%203%20%E4%BC%81%E4%B8%9A%E7%BA%A7%E9%A1%B9%E7%9B%AE%E5%AE%9E%E6%88%98%E8%AF%BE/Vue%203%20%E4%BC%81%E4%B8%9A%E7%BA%A7%E9%A1%B9%E7%9B%AE%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vue 3 企业级项目实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../WebAssembly%E5%85%A5%E9%97%A8%E8%AF%BE/WebAssembly%E5%85%A5%E9%97%A8%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WebAssembly入门课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../iOS%E5%BC%80%E5%8F%91%E9%AB%98%E6%89%8B%E8%AF%BE/iOS%E5%BC%80%E5%8F%91%E9%AB%98%E6%89%8B%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    iOS开发高手课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E4%BB%8E0%E6%89%93%E9%80%A0%E9%9F%B3%E8%A7%86%E9%A2%91%E7%9B%B4%E6%92%AD%E7%B3%BB%E7%BB%9F/%E4%BB%8E0%E6%89%93%E9%80%A0%E9%9F%B3%E8%A7%86%E9%A2%91%E7%9B%B4%E6%92%AD%E7%B3%BB%E7%BB%9F/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    从0打造音视频直播系统
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E5%89%8D%E7%AB%AF%E5%85%A8%E9%93%BE%E8%B7%AF%E4%BC%98%E5%8C%96%E5%AE%9E%E6%88%98%E8%AF%BE/%E5%89%8D%E7%AB%AF%E5%85%A8%E9%93%BE%E8%B7%AF%E4%BC%98%E5%8C%96%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    前端全链路优化实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_14" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_14" id="__nav_3_14_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    图解 Google V8
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_14_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_14">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    图解 Google V8
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%9B%BE%E8%A7%A3%20Google%20V8/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    图解 Google V8
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%BC%80%E7%AF%87%E8%AF%8D%20-%20%E5%A6%82%E4%BD%95%E5%AD%A6%E4%B9%A0%E8%B0%B7%E6%AD%8C%E9%AB%98%E6%80%A7%E8%83%BD%20JavaScript%20%E5%BC%95%E6%93%8EV8%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    开篇词   如何学习谷歌高性能 JavaScript 引擎V8？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01%20-%20V8%E6%98%AF%E5%A6%82%E4%BD%95%E6%89%A7%E8%A1%8C%E4%B8%80%E6%AE%B5JavaScript%E4%BB%A3%E7%A0%81%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01   V8是如何执行一段JavaScript代码的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02%20-%20%E5%87%BD%E6%95%B0%E5%8D%B3%E5%AF%B9%E8%B1%A1%EF%BC%9A%E4%B8%80%E7%AF%87%E6%96%87%E7%AB%A0%E5%BD%BB%E5%BA%95%E6%90%9E%E6%87%82JavaScript%E7%9A%84%E5%87%BD%E6%95%B0%E7%89%B9%E7%82%B9/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    02   函数即对象：一篇文章彻底搞懂JavaScript的函数特点
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03%20-%20%E5%BF%AB%E5%B1%9E%E6%80%A7%E5%92%8C%E6%85%A2%E5%B1%9E%E6%80%A7%EF%BC%9AV8%E6%98%AF%E6%80%8E%E6%A0%B7%E6%8F%90%E5%8D%87%E5%AF%B9%E8%B1%A1%E5%B1%9E%E6%80%A7%E8%AE%BF%E9%97%AE%E9%80%9F%E5%BA%A6%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    03   快属性和慢属性：V8是怎样提升对象属性访问速度的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04%20-%20%E5%87%BD%E6%95%B0%E8%A1%A8%E8%BE%BE%E5%BC%8F%EF%BC%9A%E6%B6%89%E5%8F%8A%E5%A4%A7%E9%87%8F%E6%A6%82%E5%BF%B5%EF%BC%8C%E5%87%BD%E6%95%B0%E8%A1%A8%E8%BE%BE%E5%BC%8F%E5%88%B0%E5%BA%95%E8%AF%A5%E6%80%8E%E4%B9%88%E5%AD%A6%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04   函数表达式：涉及大量概念，函数表达式到底该怎么学？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05-%E5%8E%9F%E5%9E%8B%E9%93%BE%EF%BC%9AV8%E6%98%AF%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0%E5%AF%B9%E8%B1%A1%E7%BB%A7%E6%89%BF%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05 原型链：V8是如何实现对象继承的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06-%E4%BD%9C%E7%94%A8%E5%9F%9F%E9%93%BE%EF%BC%9AV8%E6%98%AF%E5%A6%82%E4%BD%95%E6%9F%A5%E6%89%BE%E5%8F%98%E9%87%8F%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06 作用域链：V8是如何查找变量的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07-%E7%B1%BB%E5%9E%8B%E8%BD%AC%E6%8D%A2%EF%BC%9AV8%E6%98%AF%E6%80%8E%E4%B9%88%E5%AE%9E%E7%8E%B01%2B%E2%80%9C2%E2%80%9D%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    07 类型转换：V8是怎么实现1+“2”的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08-%E7%AD%94%E7%96%91%EF%BC%9A%E5%A6%82%E4%BD%95%E6%9E%84%E5%BB%BA%E5%92%8C%E4%BD%BF%E7%94%A8V8%E7%9A%84%E8%B0%83%E8%AF%95%E5%B7%A5%E5%85%B7d8%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    08 答疑：如何构建和使用V8的调试工具d8？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09%20-%20%E8%BF%90%E8%A1%8C%E6%97%B6%E7%8E%AF%E5%A2%83%EF%BC%9A%E8%BF%90%E8%A1%8CJavaScript%E4%BB%A3%E7%A0%81%E7%9A%84%E5%9F%BA%E7%9F%B3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    09   运行时环境：运行JavaScript代码的基石
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10%20-%20%E6%9C%BA%E5%99%A8%E4%BB%A3%E7%A0%81%EF%BC%9A%E4%BA%8C%E8%BF%9B%E5%88%B6%E6%9C%BA%E5%99%A8%E7%A0%81%E7%A9%B6%E7%AB%9F%E6%98%AF%E5%A6%82%E4%BD%95%E8%A2%ABCPU%E6%89%A7%E8%A1%8C%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10   机器代码：二进制机器码究竟是如何被CPU执行的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../11%20-%20%E5%A0%86%E5%92%8C%E6%A0%88%EF%BC%9A%E5%87%BD%E6%95%B0%E8%B0%83%E7%94%A8%E6%98%AF%E5%A6%82%E4%BD%95%E5%BD%B1%E5%93%8D%E5%88%B0%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    11   堆和栈：函数调用是如何影响到内存布局的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../12%20-%20%E5%BB%B6%E8%BF%9F%E8%A7%A3%E6%9E%90%EF%BC%9AV8%E6%98%AF%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0%E9%97%AD%E5%8C%85%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    12   延迟解析：V8是如何实现闭包的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13%20-%20%E5%AD%97%E8%8A%82%E7%A0%81%EF%BC%88%E4%B8%80%EF%BC%89%EF%BC%9AV8%E4%B8%BA%E4%BB%80%E4%B9%88%E5%8F%88%E9%87%8D%E6%96%B0%E5%BC%95%E5%85%A5%E5%AD%97%E8%8A%82%E7%A0%81%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    13   字节码（一）：V8为什么又重新引入字节码？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../14-%E5%AD%97%E8%8A%82%E7%A0%81%EF%BC%88%E4%BA%8C%EF%BC%89%EF%BC%9A%E8%A7%A3%E9%87%8A%E5%99%A8%E6%98%AF%E5%A6%82%E4%BD%95%E8%A7%A3%E9%87%8A%E6%89%A7%E8%A1%8C%E5%AD%97%E8%8A%82%E7%A0%81%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    14 字节码（二）：解释器是如何解释执行字节码的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    15   隐藏类：如何在内存中快速查找对象属性？
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    15   隐藏类：如何在内存中快速查找对象属性？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        为什么静态语言的效率更高？
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hidden-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        什么是隐藏类(Hidden Class）？
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        实践：通过d8查看隐藏类
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        多个对象共用一个隐藏类
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        重新构建隐藏类
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        最佳实践
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        总结
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        思考题
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../16%20-%20%E7%AD%94%E7%96%91%EF%BC%9A%20V8%E6%98%AF%E6%80%8E%E4%B9%88%E9%80%9A%E8%BF%87%E5%86%85%E8%81%94%E7%BC%93%E5%AD%98%E6%9D%A5%E6%8F%90%E5%8D%87%E5%87%BD%E6%95%B0%E6%89%A7%E8%A1%8C%E6%95%88%E7%8E%87%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    16   答疑： V8是怎么通过内联缓存来提升函数执行效率的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../17%20-%20%E6%B6%88%E6%81%AF%E9%98%9F%E5%88%97%EF%BC%9AV8%E6%98%AF%E6%80%8E%E4%B9%88%E5%AE%9E%E7%8E%B0%E5%9B%9E%E8%B0%83%E5%87%BD%E6%95%B0%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    17   消息队列：V8是怎么实现回调函数的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../18%20-%20%E5%BC%82%E6%AD%A5%E7%BC%96%E7%A8%8B%EF%BC%88%E4%B8%80%EF%BC%89%EF%BC%9AV8%E6%98%AF%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0%E5%BE%AE%E4%BB%BB%E5%8A%A1%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    18   异步编程（一）：V8是如何实现微任务的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../19-%E5%BC%82%E6%AD%A5%E7%BC%96%E7%A8%8B%EF%BC%88%E4%BA%8C%EF%BC%89%EF%BC%9AV8%E6%98%AF%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0async-await%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    19 异步编程（二）：V8是如何实现async await的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../20%20-%20%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%EF%BC%88%E4%B8%80%EF%BC%89%EF%BC%9AV8%E7%9A%84%E4%B8%A4%E4%B8%AA%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E5%99%A8%E6%98%AF%E5%A6%82%E4%BD%95%E5%B7%A5%E4%BD%9C%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    20   垃圾回收（一）：V8的两个垃圾回收器是如何工作的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../21%20-%20%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%EF%BC%88%E4%BA%8C%EF%BC%89%EF%BC%9AV8%E6%98%AF%E5%A6%82%E4%BD%95%E4%BC%98%E5%8C%96%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E5%99%A8%E6%89%A7%E8%A1%8C%E6%95%88%E7%8E%87%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    21   垃圾回收（二）：V8是如何优化垃圾回收器执行效率的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../22-%E7%AD%94%E7%96%91%EF%BC%9A%E5%87%A0%E7%A7%8D%E5%B8%B8%E8%A7%81%E5%86%85%E5%AD%98%E9%97%AE%E9%A2%98%E7%9A%84%E8%A7%A3%E5%86%B3%E7%AD%96%E7%95%A5/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    22 答疑：几种常见内存问题的解决策略
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E7%BB%93%E6%9D%9F%E8%AF%AD%20-%20%E6%88%91%E7%9A%84%E5%89%8D%E7%AB%AF%E5%AD%A6%E4%B9%A0%E8%B8%A9%E5%9D%91%E5%8F%B2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    结束语   我的前端学习踩坑史
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E7%BB%93%E8%AF%BE%E6%B5%8B%E8%AF%95%20-%20%E8%BF%99%E4%BA%9BV8%E7%9A%84%E7%9F%A5%E8%AF%86%E4%BD%A0%E9%83%BD%E6%8E%8C%E6%8F%A1%E4%BA%86%E5%90%97%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    结课测试   这些V8的知识你都掌握了吗？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E5%BF%AB%E6%89%8B%20%C2%B7%20%E7%A7%BB%E5%8A%A8%E7%AB%AF%E9%9F%B3%E8%A7%86%E9%A2%91%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98/%E5%BF%AB%E6%89%8B%20%C2%B7%20%E7%A7%BB%E5%8A%A8%E7%AB%AF%E9%9F%B3%E8%A7%86%E9%A2%91%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    快手 · 移动端音视频开发实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E5%BF%AB%E6%89%8B%20%C2%B7%20%E9%9F%B3%E8%A7%86%E9%A2%91%E6%8A%80%E6%9C%AF%E5%85%A5%E9%97%A8%E8%AF%BE/%E5%BF%AB%E6%89%8B%20%C2%B7%20%E9%9F%B3%E8%A7%86%E9%A2%91%E6%8A%80%E6%9C%AF%E5%85%A5%E9%97%A8%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    快手 · 音视频技术入门课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%90%9E%E5%AE%9A%E9%9F%B3%E9%A2%91%E6%8A%80%E6%9C%AF/%E6%90%9E%E5%AE%9A%E9%9F%B3%E9%A2%91%E6%8A%80%E6%9C%AF/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    搞定音频技术
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%94%BB%E5%85%8B%E8%A7%86%E9%A2%91%E6%8A%80%E6%9C%AF/%E6%94%BB%E5%85%8B%E8%A7%86%E9%A2%91%E6%8A%80%E6%9C%AF/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    攻克视频技术
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%9C%B1%E6%B6%9B%20%C2%B7%20Kotlin%E7%BC%96%E7%A8%8B%E7%AC%AC%E4%B8%80%E8%AF%BE/%E6%9C%B1%E6%B6%9B%20%C2%B7%20Kotlin%E7%BC%96%E7%A8%8B%E7%AC%AC%E4%B8%80%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    朱涛 · Kotlin编程第一课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%B5%8F%E8%A7%88%E5%99%A8%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86%E4%B8%8E%E5%AE%9E%E8%B7%B5/%E6%B5%8F%E8%A7%88%E5%99%A8%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86%E4%B8%8E%E5%AE%9E%E8%B7%B5/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    浏览器工作原理与实践
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E7%8E%A9%E8%BD%ACVue%203%E5%85%A8%E5%AE%B6%E6%A1%B6/%E7%8E%A9%E8%BD%ACVue%203%E5%85%A8%E5%AE%B6%E6%A1%B6/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    玩转Vue 3全家桶
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E7%8E%B0%E4%BB%A3React%20Web%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98/%E7%8E%B0%E4%BB%A3React%20Web%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    现代React Web开发实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%AF%B4%E9%80%8F%E4%BD%8E%E4%BB%A3%E7%A0%81/%E8%AF%B4%E9%80%8F%E4%BD%8E%E4%BB%A3%E7%A0%81/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    说透低代码
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%B7%9F%E6%9C%88%E5%BD%B1%E5%AD%A6%E5%8F%AF%E8%A7%86%E5%8C%96/%E8%B7%9F%E6%9C%88%E5%BD%B1%E5%AD%A6%E5%8F%AF%E8%A7%86%E5%8C%96/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    跟月影学可视化
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E9%87%8D%E5%AD%A6%E5%89%8D%E7%AB%AF/%E9%87%8D%E5%AD%A6%E5%89%8D%E7%AB%AF/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    重学前端
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E5%90%8E%E7%AB%AF-%E6%9E%B6%E6%9E%84/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    后端-架构
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E7%AE%A1%E7%90%86-%E6%88%90%E9%95%BF/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    管理-成长
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E8%AE%A1%E7%AE%97%E6%9C%BA%E5%9F%BA%E7%A1%80/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    计算机基础
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E8%BF%90%E7%BB%B4-%E6%B5%8B%E8%AF%95/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    运维-测试
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        为什么静态语言的效率更高？
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hidden-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        什么是隐藏类(Hidden Class）？
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        实践：通过d8查看隐藏类
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        多个对象共用一个隐藏类
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        重新构建隐藏类
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        最佳实践
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        总结
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        思考题
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+  <h1>15   隐藏类：如何在内存中快速查找对象属性？</h1>
+
+<p>你好，我是李兵。</p>
+<p>我们知道JavaScript是一门动态语言，其执行效率要低于静态语言，V8为了提升JavaScript的执行速度，借鉴了很多静态语言的特性，比如实现了JIT机制，为了提升对象的属性访问速度而引入了隐藏类，为了加速运算而引入了内联缓存。</p>
+<p>今天我们来重点分析下V8中的隐藏类，看看它是怎么提升访问对象属性值速度的。</p>
+<h2 id="_1">为什么静态语言的效率更高？</h2>
+<p>由于隐藏类借鉴了部分静态语言的特性，因此要解释清楚这个问题，我们就先来分析下为什么静态语言比动态语言的执行效率更高。</p>
+<p>我们通过下面两段代码，来对比一下动态语言和静态语言在运行时的一些特征，一段是动态语言的JavaScript，另外一段静态语言的C++的源码，具体源码你可以参看下图：</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/20/d7/205a2fa05c6aba57ade25f3a1df2bad7.jpg?wh=2284%2A1116" /></p>
+<p>那么在运行时，这两段代码的执行过程有什么区别呢？</p>
+<p>我们知道，JavaScript在运行时，对象的属性是可以被修改的，所以当V8使用了一个对象时，比如使用了 start.x的时候，它并不知道该对象中是否有x，也不知道x相对于对象的偏移量是多少，也可以说V8并不知道该对象的具体的形状。</p>
+<p>那么，当在JavaScript中要查询对象start中的x属性时，V8会按照具体的规则一步一步来查询，这个过程非常的慢且耗时（具体查找过程你可以参考《<a href="https://time.geekbang.org/column/article/213250">03｜快属性和慢属性：V8是怎样提升对象属性访问速度的？</a>》这节课程中的内容）。</p>
+<p>这种动态查询对象属性的方式和C++这种静态语言不同，C++在声明一个对象之前需要定义该对象的结构，我们也可以称为形状，比如Point结构体就是一种形状，我们可以使用这个形状来定义具体的对象。</p>
+<p>C++代码在执行之前需要先被编译，编译的时候，每个对象的形状都是固定的，也就是说，在代码的执行过程中，Point的形状是无法被改变的。</p>
+<p>那么在C++中访问一个对象的属性时，自然就知道该属性相对于该对象地址的偏移值了，比如在C++中使用start.x的时候，编译器会直接将x相对于start的地址写进汇编指令中，那么当使用了对象start中的x属性时，CPU就可以直接去内存地址中取出该内容即可，没有任何中间的查找环节。</p>
+<p>因为静态语言中，可以直接通过偏移量查询来查询对象的属性值，这也就是静态语言的执行效率高的一个原因。</p>
+<h2 id="hidden-class">什么是隐藏类(Hidden Class）？</h2>
+<p>既然静态语言的查询效率这么高，那么是否能将这种静态的特性引入到V8中呢？</p>
+<p>答案是<strong>可行</strong>的。</p>
+<p>目前所采用的一个思路就是将JavaScript中的对象静态化，也就是V8在运行JavaScript的过程中，会假设JavaScript中的对象是静态的，具体地讲，V8对每个对象做如下两点假设：</p>
+<ul>
+<li>对象创建好了之后就不会添加新的属性；</li>
+<li>对象创建好了之后也不会删除属性。</li>
+</ul>
+<p>符合这两个假设之后，V8就可以对JavaScript中的对象做深度优化了，那么怎么优化呢？</p>
+<p>具体地讲，V8会为每个对象创建一个隐藏类，对象的隐藏类中记录了该对象一些基础的布局信息，包括以下两点：</p>
+<ul>
+<li>对象中所包含的所有的属性；</li>
+<li>每个属性相对于对象的偏移量。</li>
+</ul>
+<p>有了隐藏类之后，那么当V8访问某个对象中的某个属性时，就会先去隐藏类中查找该属性相对于它的对象的偏移量，有了偏移量和属性类型，V8就可以直接去内存中取出对于的属性值，而不需要经历一系列的查找过程，那么这就大大提升了V8查找对象的效率。</p>
+<p>我们可以结合一段代码来分析下隐藏类是怎么工作的：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>let point = {x:100,y:200}
+</code></pre></div>
+<p>当V8执行到这段代码时，会先为point对象创建一个隐藏类，在V8中，把隐藏类又称为<strong>map</strong>，每个对象都有一个map属性，其值指向内存中的隐藏类。</p>
+<p>隐藏类描述了对象的属性布局，它主要包括了属性名称和每个属性所对应的偏移量，比如point对象的隐藏类就包括了x和y属性，x的偏移量是4，y的偏移量是8。</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/4e/6d/4eab311ab4ab94693325a0ca24618b6d.jpg?wh=2284%2A1285" /></p>
+<p>注意，这是point对象的map，它不是point对象本身。关于point对象和map之间的关系，你可以参看下图：</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/51/f8/51f5034a7f80e4e5684d5a301178c2f8.jpg?wh=2284%2A1183" /></p>
+<p>在这张图中，左边的是point对象在内存中的布局，右边是point对象的map，我们可以看到，point对象的第一个属性就指向了它的map，关于如何通过浏览器查看对象的map，我们在《<a href="https://time.geekbang.org/column/article/213250">03｜快属性和慢属性：V8是怎样提升对象属性访问速度的？</a>》这节课也做过简单的分析，你可以回顾下这节内容。</p>
+<p>有了map之后，当你再次使用point.x访问x属性时，V8会查询point的map中x属性相对point对象的偏移量，然后将point对象的起始位置加上偏移量，就得到了x属性的值在内存中的位置，有了这个位置也就拿到了x的值，这样我们就省去了一个比较复杂的查找过程。</p>
+<p>这就是将动态语言静态化的一个操作，V8通过引入隐藏类，模拟C++这种静态语言的机制，从而达到静态语言的执行效率。</p>
+<h2 id="d8">实践：通过d8查看隐藏类</h2>
+<p>了解了隐藏类的工作机制，我们可以使用d8提供的API DebugPrint来查看point对象中的隐藏类。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>let point = {x:100,y:200};
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>%DebugPrint(point);
+</code></pre></div>
+<p>这里你需要注意，在使用d8内部API时，有一点很容易出错，就是需要为JavaScript代码加上分号，不然d8会报错，所以这段代码里面我都加上了分号。</p>
+<p>然后将下面这段代码保存test.js文件中，再执行：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>d8 --allow-natives-syntax test.js
+</code></pre></div>
+<p>执行这段命令，就可以打印出point对象的基础结构了，打印出来的结果如下所示：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>DebugPrint: 0x19dc080c5af5: [JS_OBJECT_TYPE]
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>- map: 0x19dc08284d11 &lt;Map(HOLEY_ELEMENTS)&gt; [FastProperties]
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>- prototype: 0x19dc08241151 &lt;Object map = 0x19dc082801c1&gt;
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>- elements: 0x19dc080406e9 &lt;FixedArray[0]&gt; [HOLEY_ELEMENTS]
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>- properties: 0x19dc080406e9 &lt;FixedArray[0]&gt; {
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>#x: 100 (const data field 0)
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>#y: 200 (const data field 1)
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>}
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>0x19dc08284d11: [Map]
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>- type: JS_OBJECT_TYPE
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>- instance size: 20
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>- inobject properties: 2
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>- elements kind: HOLEY_ELEMENTS
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>- unused property fields: 0
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>- enum length: invalid
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>- stable_map
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>- back pointer: 0x19dc08284ce9 &lt;Map(HOLEY_ELEMENTS)&gt;
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>- prototype_validity cell: 0x19dc081c0451 &lt;Cell value= 1&gt;
+<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>- instance descriptors (own) #2: 0x19dc080c5b25 &lt;DescriptorArray[2]&gt;
+<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>- prototype: 0x19dc08241151 &lt;Object map = 0x19dc082801c1&gt;
+<a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>- constructor: 0x19dc0824116d &lt;JSFunction Object (sfi = 0x19dc081c55ad)&gt;
+<a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>- dependent code: 0x19dc080401ed &lt;Other heap object (WEAK_FIXED_ARRAY_TYPE)&gt;
+<a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>- construction counter: 0
+</code></pre></div>
+<p>从这段point的内存结构中，我们可以看到，point对象的第一个属性就是map，它指向了0x19dc08284d11这个地址，这个地址就是V8为point对象创建的隐藏类，除了map属性之外，还有我们之前介绍过的prototype属性，elements属性和properties属性（关于这些属性的函数，你可以参看《<a href="https://time.geekbang.org/column/article/213250">03｜快属性和慢属性：V8是怎样提升对象属性访问速度的？</a>》和《<a href="https://time.geekbang.org/column/article/215425">05｜原型链：V8是如何实现对象继承的？</a>》这两节的内容）。</p>
+<h2 id="_2">多个对象共用一个隐藏类</h2>
+<p>现在我们知道了在V8中，每个对象都有一个map属性，该属性值指向该对象的隐藏类。不过如果两个对象的形状是相同的，V8就会为其复用同一个隐藏类，这样有两个好处：</p>
+<ol>
+<li>减少隐藏类的创建次数，也间接加速了代码的执行速度；</li>
+<li>减少了隐藏类的存储空间。</li>
+</ol>
+<p>那么，什么情况下两个对象的形状是相同的，要满足以下两点：</p>
+<ul>
+<li>相同的属性名称；</li>
+<li>相等的属性个数。</li>
+</ul>
+<p>接下来我们就来创建两个形状一样的对象，然后看看它们的map属性是不是指向了同一个隐藏类，你可以参看下面的代码：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>let point = {x:100,y:200};
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>let point2 = {x:3,y:4};
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>%DebugPrint(point);
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>%DebugPrint(point2);
+</code></pre></div>
+<p>当V8执行到这段代码时，首先会为point对象创建一个隐藏类，然后继续创建point2对象。在创建point2对象的过程中，发现它的形状和point是一样的。这时候，V8就会将point的隐藏类给point2复用，具体效果你可以参看下图：</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/9f/78/9f0de55e75463406fbbff452dcef2178.jpg?wh=2284%2A1285" /></p>
+<p>你也可以使用d8来证实下，同样使用这个命令：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>d8 --allow-natives-syntax test.js
+</code></pre></div>
+<p>打印出来的point和point2对象，你会发现它们的map属性都指向了同一个地址，这也就意味着它们共用了同一个map。</p>
+<h2 id="_3">重新构建隐藏类</h2>
+<p>关于隐藏类，还有一个问题你需要注意一下。在这节课开头我们提到了，V8为了实现隐藏类，需要两个假设条件：</p>
+<ul>
+<li>对象创建好了之后就不会添加新的属性；</li>
+<li>对象创建好了之后也不会删除属性。</li>
+</ul>
+<p>但是，JavaScript依然是动态语言，在执行过程中，对象的形状是可以被改变的，如果某个对象的形状改变了，隐藏类也会随着改变，这意味着V8要为新改变的对象重新构建新的隐藏类，这对于V8的执行效率来说，是一笔大的开销。</p>
+<p>通俗地理解，给一个对象添加新的属性，删除新的属性，或者改变某个属性的数据类型都会改变这个对象的形状，那么势必也就会触发V8为改变形状后的对象重建新的隐藏类。</p>
+<p>我们可以看一个简单的例子：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>let point = {};
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>%DebugPrint(point);
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>point.x = 100;
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>%DebugPrint(point);
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>point.y = 200;
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>%DebugPrint(point);
+</code></pre></div>
+<p>将这段代码保存到test.js文件中，然后执行：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>d8 --allow-natives-syntax test.js
+</code></pre></div>
+<p>执行这段命令，d8会打印出来不同阶段的point对象所指向的隐藏类，在这里我们只关心point对象map的指向，所以我将其他的一些信息都省略了，最终打印出来的结果如下所示：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>DebugPrint: 0x986080c5b35: [JS_OBJECT_TYPE]
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>- map: 0x0986082802d9 &lt;Map(HOLEY_ELEMENTS)&gt; [FastProperties]
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>- ...
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>DebugPrint: 0x986080c5b35: [JS_OBJECT_TYPE]
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>- map: 0x098608284ce9 &lt;Map(HOLEY_ELEMENTS)&gt; [FastProperties]
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>- ...
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>- properties: 0x0986080406e9 &lt;FixedArray[0]&gt; {
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>#x: 100 (const data field 0)
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>}
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>
+<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>
+<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>DebugPrint: 0x986080c5b35: [JS_OBJECT_TYPE]
+<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a>- map: 0x098608284d11 &lt;Map(HOLEY_ELEMENTS)&gt; [FastProperties]
+<a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a>- p
+<a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a>- ...
+<a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a>- properties: 0x0986080406e9 &lt;FixedArray[0]&gt; {
+<a id="__codelineno-8-19" name="__codelineno-8-19" href="#__codelineno-8-19"></a>#x: 100 (const data field 0)
+<a id="__codelineno-8-20" name="__codelineno-8-20" href="#__codelineno-8-20"></a>#y: 200 (const data field 1)
+</code></pre></div>
+<p>根据这个打印出来的结果，我们可以明显看到，每次给对象添加了一个新属性之后，该对象的隐藏类的地址都会改变，这也就意味着隐藏类也随着改变了，改变过程你可以参看下图：</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/84/11/84048c09badc17ef896023ec30f45111.jpg?wh=2284%2A880" /></p>
+<p>同样，如果你删除了对象的某个属性，那么对象的形状也就随着发生了改变，这时V8也会重建该对象的隐藏类，我们可以看下面这样的一个例子：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>let point = {x:100,y:200};
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>delete point.x
+</code></pre></div>
+<p>我们再次使用d8来打印这段代码中不同阶段的point对象属性，移除多余的信息，最终打印出来的结果如下所示</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>DebugPrint: 0x1c2f080c5b1d: [JS_OBJECT_TYPE]
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>- map: 0x1c2f08284d11 &lt;Map(HOLEY_ELEMENTS)&gt; [FastProperties]
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>-...
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>- properties: 0x1c2f080406e9 &lt;FixedArray[0]&gt; {
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>#x: 100 (const data field 0)
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>#y: 200 (const data field 1)
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>}
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>DebugPrint: 0x1c2f080c5b1d: [JS_OBJECT_TYPE]
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>- map: 0x1c2f08284d11 &lt;Map(HOLEY_ELEMENTS)&gt; [FastProperties]
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>- ...
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>- properties: 0x1c2f08045567 &lt;FixedArray[0]&gt; {
+<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>#y: 200 (const data field 1)
+<a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a>}
+</code></pre></div>
+<h2 id="_4">最佳实践</h2>
+<p>好了，现在我们知道了V8会为每个对象分配一个隐藏类，在执行过程中：</p>
+<ul>
+<li>如果对象的形状没有发生改变，那么该对象就会一直使用该隐藏类；</li>
+<li>如果对象的形状发生了改变，那么V8会重建一个新的隐藏类给该对象。</li>
+</ul>
+<p>我们当然希望对象中的隐藏类不要随便被改变，因为这样会触发V8重构该对象的隐藏类，直接影响到了程序的执行性能。那么在实际工作中，我们应该尽量注意以下几点：</p>
+<p><strong>一，使用字面量初始化对象时，要保证属性的顺序是一致的。</strong>比如先通过字面量x、y的顺序创建了一个point对象，然后通过字面量y、x的顺序创建一个对象point2，代码如下所示：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>let point = {x:100,y:200};
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>let point2 = {y:100,x:200};
+</code></pre></div>
+<p>虽然创建时的对象属性一样，但是它们初始化的顺序不一样，这也会导致形状不同，所以它们会有不同的隐藏类，所以我们要尽量避免这种情况。</p>
+<p><strong>二，尽量使用字面量一次性初始化完整对象属性。</strong>因为每次为对象添加一个属性时，V8都会为该对象重新设置隐藏类。</p>
+<p><strong>三，尽量避免使用delete方法。</strong>delete方法会破坏对象的形状，同样会导致V8为该对象重新生成新的隐藏类。</p>
+<h2 id="_5">总结</h2>
+<p>这节课我们介绍了V8中隐藏类的工作机制，我们先分析了V8引入隐藏类的动机。因为JavaScript是一门动态语言，对象属性在执行过程中是可以被修改的，这就导致了在运行时，V8无法知道对象的完整形状，那么当查找对象中的属性时，V8就需要经过一系列复杂的步骤才能获取到对象属性。</p>
+<p>为了加速查找对象属性的速度，V8在背后为每个对象提供了一个隐藏类，隐藏类描述了该对象的具体形状。有了隐藏类，V8就可以根据隐藏类中描述的偏移地址获取对应的属性值，这样就省去了复杂的查找流程。</p>
+<p>不过隐藏类是建立在两个假设基础之上的：</p>
+<ul>
+<li>对象创建好了之后就不会添加新的属性；</li>
+<li>对象创建好了之后也不会删除属性。</li>
+</ul>
+<p>一旦对象的形状发生了改变，这意味着V8需要为对象重建新的隐藏类，这就会带来效率问题。为了避免一些不必要的性能问题，我们在程序中尽量不要随意改变对象的形状。我在这节课中也给你列举了几个最佳实践的策略。</p>
+<p>最后，关于隐藏类，我们记住以下几点。</p>
+<ul>
+<li>在V8中，每个对象都有一个隐藏类，隐藏类在V8中又被称为map。</li>
+<li>在V8中，每个对象的第一个属性的指针都指向其map地址。</li>
+<li>map描述了其对象的内存布局，比如对象都包括了哪些属性，这些数据对应于对象的偏移量是多少？</li>
+<li>如果添加新的属性，那么需要重新构建隐藏类。</li>
+<li>如果删除了对象中的某个属性，同样也需要构建隐藏类。</li>
+</ul>
+<h2 id="_6">思考题</h2>
+<p>现在我们知道了V8为每个对象配置了一个隐藏类，隐藏类描述了该对象的形状，V8可以通过隐藏类快速获取对象的属性值。不过这里还有另外一类问题需要考虑。</p>
+<p>比如我定义了一个获取对象属性值的函数loadX，loadX有一个参数，然后返回该参数的x属性值：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>function loadX(o) {
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>return o.x
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>}
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>var o = { x: 1,y:3}
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>var o1 = { x: 3 ,y:6}
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>for (var i = 0; i &lt; 90000; i++) {
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>loadX(o)
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>loadX(o1)
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>}
+</code></pre></div>
+<p>当V8调用loadX的时候，会先查找参数o的隐藏类，然后利用隐藏类中的x属性的偏移量查找到x的属性值，虽然利用隐藏类能够快速提升对象属性的查找速度，但是依然有一个查找隐藏类和查找隐藏类中的偏移量两个操作，如果loadX在代码中会被重复执行，依然影响到了属性的查找效率。</p>
+<p>那么留给你的问题是：如果你是V8的设计者，你会采用什么措施来提高loadX函数的执行效率？欢迎你在留言区与我分享讨论。</p>
+<p>感谢你的阅读，如果你觉得这一讲的内容对你有所启发，也欢迎把它分享给你的朋友。</p>
+<div><strong>精选留言（15）</strong></div>
+<ul>
+<li><span>文蔺</span> 👍（10） 💬（1）<p>最后的思考题，答案应该是使用『内联缓存』吧。我找到了一篇讲内联缓存的文章，挺好的  https:&#47;&#47;blog.csdn.net&#47;szengtal&#47;article&#47;details&#47;72861133</p>2020-04-18</li><br/><li><span>大力</span> 👍（4） 💬（1）<p>老师，我有个疑问：
+
+文中介绍了，隐藏类包含有以下信息：
+1.对象中所包含的所有的属性；
+2.“每种类型”相对于对象的偏移量。
+
+这里第二点的“每种类型”是不是应该为”每个属性“？</p>2020-05-15</li><br/><li><span>文蔺</span> 👍（3） 💬（2）<p>有个问题，例子中d8打印出来的 x&#47;y 这俩字段为什么是在properties里面？按照第三讲，x和y不应该是快属性吗。可能是我理解不到位，烦请老师解惑</p>2020-04-18</li><br/><li><span>奕</span> 👍（2） 💬（4）<p>什么情况下两个对象的形状是相同的，要满足以下两点：
+相同的属性名称
+相等的属性个数
+
+这里还要要求：相同的属性顺序吧</p>2020-04-19</li><br/><li><span>我来人间一趟</span> 👍（19） 💬（9）<p>老师 我有个疑问 通过你给的截图 用delete删除一个属性的时候 隐藏类map的地址并没有变呀 只不过是properties的地址变了 这是怎么回事呀</p>2020-05-08</li><br/><li><span>我来人间一趟</span> 👍（11） 💬（4）<p>老师好，听了今天的课，我有几个问题想还请老师帮忙解惑
+1、v8会为每个对象创建隐藏类map，那还有必要创建快属性和慢属性的查找机制吗？
+2、文中老师多次提起v8会为以字面量方式创建的对象添加隐藏类，那么以new的方式还会创建隐藏类吗？
+3、文中老师提到如果两个字面量对象属性名和属性个数相同，就会使用同一个隐藏类，这样是不是每声明一个对象，都要对现有所有对象的隐藏类做遍历比对呀，这样有没有性能损耗呢？</p>2020-06-03</li><br/><li><span>Longerian</span> 👍（11） 💬（1）<p>第3节已经提到了动态添加的数据利用elements 属性和 properties 属性提升属性的访问速度了，本文又介绍了隐藏类，那么有了隐藏类，还需要 elements 属性和 properties 属性的机制吗？</p>2020-04-19</li><br/><li><span>奕</span> 👍（7） 💬（0）<p>V8 有了隐藏了，所有的查询属性的操作都会走隐藏了吗？ 这里除了内联缓存，还会走挨个遍历的属性的方法吗？ 或者什么时候隐藏类会失效，退化为挨个遍历的属性 查找属性？</p>2020-04-19</li><br/><li><span>潇潇雨歇</span> 👍（4） 💬（0）<p>使用缓存，执行loadX，将其隐藏类缓存起来，再一次调用直接从缓存里查找对象。</p>2020-04-19</li><br/><li><span>小童</span> 👍（2） 💬（1）<p>老师我不明白，隐藏类和前面讲的 elements和properties 有什么关联？</p>2021-04-01</li><br/><li><span>子云</span> 👍（2） 💬（0）<p>我有个疑问呀，从上文d8 print 打印出来的 ` point = {x:100,y:200};` 结构里的 map，我找不到哪里有偏移量的字段呀？
+
+```
+0x19dc08284d11: [Map]
+- type: JS_OBJECT_TYPE
+- instance size: 20
+- inobject properties: 2
+- elements kind: HOLEY_ELEMENTS
+- unused property fields: 0
+- enum length: invalid
+- stable_map
+- back pointer: 0x19dc08284ce9 &lt;Map(HOLEY_ELEMENTS)&gt;
+- prototype_validity cell: 0x19dc081c0451 &lt;Cell value= 1&gt;
+- instance descriptors (own) #2: 0x19dc080c5b25 &lt;DescriptorArray[2]&gt;
+- prototype: 0x19dc08241151 &lt;Object map = 0x19dc082801c1&gt;
+- constructor: 0x19dc0824116d &lt;JSFunction Object (sfi = 0x19dc081c55ad)&gt;
+- dependent code: 0x19dc080401ed &lt;Other heap object (WEAK_FIXED_ARRAY_TYPE)&gt;
+- construction counter: 0
+```</p>2020-05-27</li><br/><li><span>3Spiders</span> 👍（2） 💬（3）<p>我想请教一个问题。用new Obejct和new Map创建有什么区别。Map有什么优化？</p>2020-04-21</li><br/><li><span>peggy</span> 👍（1） 💬（0）<p>1.查找map中的属性不是一样要花时间吗？
+2. 生成隐藏类后，怎么发现point2的隐藏类与point相同？这样的对比机制是不是也要花时间</p>2022-11-08</li><br/><li><span>Aaaaaaaaaaayou</span> 👍（1） 💬（2）<p>“有了 map 之后，当你再次使用 point.x 访问 x 属性时，V8 会查询 point 的 map 中 x 属性相对 point 对象的偏移量，然后将 point 对象的起始位置加上偏移量，就得到了 x 属性的值在内存中的位置，有了这个位置也就拿到了 x 的值，这样我们就省去了一个比较复杂的查找过程。” 但是去隐藏类里面查找 x 这个属性还是得查找吧，这里又是怎么优化的呢？</p>2020-05-18</li><br/><li><span>王楚然</span> 👍（1） 💬（0）<p>思考题：
+能调用loadX方法的对象，都需要有x属性。可不可以直接把x属性地址缓存起来，每次不必通过隐藏类去查找？</p>2020-04-18</li><br/>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="页脚" >
+        
+          
+          <a href="../14-%E5%AD%97%E8%8A%82%E7%A0%81%EF%BC%88%E4%BA%8C%EF%BC%89%EF%BC%9A%E8%A7%A3%E9%87%8A%E5%99%A8%E6%98%AF%E5%A6%82%E4%BD%95%E8%A7%A3%E9%87%8A%E6%89%A7%E8%A1%8C%E5%AD%97%E8%8A%82%E7%A0%81%E7%9A%84%EF%BC%9F/" class="md-footer__link md-footer__link--prev" aria-label="上一页: 14 字节码（二）：解释器是如何解释执行字节码的？">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                上一页
+              </span>
+              <div class="md-ellipsis">
+                14 字节码（二）：解释器是如何解释执行字节码的？
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../16%20-%20%E7%AD%94%E7%96%91%EF%BC%9A%20V8%E6%98%AF%E6%80%8E%E4%B9%88%E9%80%9A%E8%BF%87%E5%86%85%E8%81%94%E7%BC%93%E5%AD%98%E6%9D%A5%E6%8F%90%E5%8D%87%E5%87%BD%E6%95%B0%E6%89%A7%E8%A1%8C%E6%95%88%E7%8E%87%E7%9A%84%EF%BC%9F/" class="md-footer__link md-footer__link--next" aria-label="下一页: 16   答疑： V8是怎么通过内联缓存来提升函数执行效率的？">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                下一页
+              </span>
+              <div class="md-ellipsis">
+                16   答疑： V8是怎么通过内联缓存来提升函数执行效率的？
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright © 2025-Present zkep
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["content.code.annotate", "content.code.copy", "content.tooltips", "toc.follow", "navigation.top", "navigation.tabs", "navigation.tabs.sticky", "navigation.prune", "navigation.footer", "navigation.tracking", "navigation.instant", "navigation.instant.progress", "navigation.indexes", "content.tabs.link"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../../javascript/extra.js"></script>
+      
+        <script src="../../../javascript/giscus.js"></script>
+      
+        <script src="../../../javascript/referrerpolicy.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,8080 @@
+<!--geek time docs 🚀, MIT license-->
+
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="极客时间文档">
+      
+      
+        <meta name="author" content="zkep">
+      
+      
+        <link rel="canonical" href="https://github.com/uaxe/geektime-docs/AI-%E5%A4%A7%E6%95%B0%E6%8D%AE/%E5%A4%A7%E6%95%B0%E6%8D%AE%E7%BB%8F%E5%85%B8%E8%AE%BA%E6%96%87%E8%A7%A3%E8%AF%BB/14%20-%20%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81Chubby%EF%BC%88%E4%B8%89%EF%BC%89%20%EF%BC%9A%E7%A7%BB%E5%BD%A2%E6%8D%A2%E5%BD%B1%E4%BF%9D%E9%9A%9C%E9%AB%98%E5%8F%AF%E7%94%A8/">
+      
+      
+        <link rel="prev" href="../13%20-%20%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81Chubby%EF%BC%88%E4%BA%8C%EF%BC%89%20%EF%BC%9A%E4%BC%97%E5%8F%A3%E9%93%84%E9%87%91%E7%9A%84%E7%9C%9F%E7%9B%B8/">
+      
+      
+        <link rel="next" href="../15%20-%20Hive%EF%BC%9A%E6%9D%A5%E6%9D%A5%E5%8E%BB%E5%8E%BB%E7%9A%84DSL%EF%BC%8C%E6%B0%B8%E7%94%9F%E4%B8%8D%E6%AD%BB%E7%9A%84SQL/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../None">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>14 分布式锁Chubby（三） ：移形换影保障高可用 - 极客时间文档</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../../stylesheets/style.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#chubby" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+        <aside class="md-banner">
+          <div class="md-banner__inner md-grid md-typeset">
+            
+            
+
+
+          </div>
+          
+        </aside>
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../../.." title="极客时间文档" class="md-header__button md-logo" aria-label="极客时间文档" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            极客时间文档
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              14   分布式锁Chubby（三） ：移形换影保障高可用
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="indigo"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/zkep/my-geektime" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    zkep/my-geektime
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="标签" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  AI-大数据
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E4%BA%A7%E5%93%81-%E8%BF%90%E8%90%A5/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  产品-运营
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E5%89%8D%E7%AB%AF-%E7%A7%BB%E5%8A%A8/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  前端-移动
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E5%90%8E%E7%AB%AF-%E6%9E%B6%E6%9E%84/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  后端-架构
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E7%AE%A1%E7%90%86-%E6%88%90%E9%95%BF/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  管理-成长
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E8%AE%A1%E7%AE%97%E6%9C%BA%E5%9F%BA%E7%A1%80/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  计算机基础
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E8%BF%90%E7%BB%B4-%E6%B5%8B%E8%AF%95/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  运维-测试
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="极客时间文档" class="md-nav__button md-logo" aria-label="极客时间文档" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    极客时间文档
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/zkep/my-geektime" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    zkep/my-geektime
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI-大数据
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_1" id="__nav_1_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    AI-大数据
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../A-B%E6%B5%8B%E8%AF%95%E4%BB%8E0%E5%88%B01/A-B%E6%B5%8B%E8%AF%95%E4%BB%8E0%E5%88%B01/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A-B测试从0到1
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../AI%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B9%8B%E7%BE%8E/AI%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B9%8B%E7%BE%8E/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI大模型之美
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../AI%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%AE%9E%E6%88%98%E9%AB%98%E6%89%8B%E8%AF%BE/AI%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%AE%9E%E6%88%98%E9%AB%98%E6%89%8B%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI大模型实战高手课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../AI%E5%A4%A7%E6%A8%A1%E5%9E%8B%E7%B3%BB%E7%BB%9F%E5%AE%9E%E6%88%98/AI%E5%A4%A7%E6%A8%A1%E5%9E%8B%E7%B3%BB%E7%BB%9F%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI大模型系统实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../AI%E5%A4%A7%E6%A8%A1%E5%9E%8B%E9%A1%B9%E7%9B%AE%E8%90%BD%E5%9C%B0%E5%AE%9E%E6%88%98/AI%E5%A4%A7%E6%A8%A1%E5%9E%8B%E9%A1%B9%E7%9B%AE%E8%90%BD%E5%9C%B0%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI大模型项目落地实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../AI%E6%8A%80%E6%9C%AF%E5%86%85%E5%8F%82/AI%E6%8A%80%E6%9C%AF%E5%86%85%E5%8F%82/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI技术内参
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../AI%E7%BB%98%E7%94%BB%E6%A0%B8%E5%BF%83%E6%8A%80%E6%9C%AF%E4%B8%8E%E5%AE%9E%E6%88%98/AI%E7%BB%98%E7%94%BB%E6%A0%B8%E5%BF%83%E6%8A%80%E6%9C%AF%E4%B8%8E%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI绘画核心技术与实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../AI%E9%87%8D%E5%A1%91%E4%BA%91%E5%8E%9F%E7%94%9F%E5%BA%94%E7%94%A8%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98/AI%E9%87%8D%E5%A1%91%E4%BA%91%E5%8E%9F%E7%94%9F%E5%BA%94%E7%94%A8%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI重塑云原生应用开发实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../DeepSeek%20%E5%BA%94%E7%94%A8%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98/DeepSeek%20%E5%BA%94%E7%94%A8%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DeepSeek 应用开发实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../LLM%20%26%20RAG%E5%BF%AB%E9%80%9F%E5%BA%94%E7%94%A8%E5%B0%8F%E5%86%8C/LLM%20%26%20RAG%E5%BF%AB%E9%80%9F%E5%BA%94%E7%94%A8%E5%B0%8F%E5%86%8C/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM & RAG快速应用小册
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../LLM%E8%87%AA%E4%B8%BB%E6%99%BA%E8%83%BD%E4%BD%93%E5%BA%94%E7%94%A8%E5%AE%9E%E6%88%98%E8%AF%BE/LLM%E8%87%AA%E4%B8%BB%E6%99%BA%E8%83%BD%E4%BD%93%E5%BA%94%E7%94%A8%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM自主智能体应用实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../LLaMA%203%E5%89%8D%E6%B2%BF%E6%A8%A1%E5%9E%8B%E5%AE%9E%E6%88%98%E8%AF%BE/LLaMA%203%E5%89%8D%E6%B2%BF%E6%A8%A1%E5%9E%8B%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLaMA 3前沿模型实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../LangChain%E5%AE%9E%E6%88%98%E8%AF%BE/LangChain%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LangChain实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../PyTorch%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0%E5%AE%9E%E6%88%98/PyTorch%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PyTorch深度学习实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../RAG%E5%BF%AB%E9%80%9F%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98/RAG%E5%BF%AB%E9%80%9F%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RAG快速开发实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../RAG%E7%B3%BB%E7%BB%9F%E5%AE%9E%E6%88%98%E8%AF%BE/RAG%E7%B3%BB%E7%BB%9F%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RAG系统实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Spark%E6%80%A7%E8%83%BD%E8%B0%83%E4%BC%98%E5%AE%9E%E6%88%98/Spark%E6%80%A7%E8%83%BD%E8%B0%83%E4%BC%98%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark性能调优实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E4%B8%AD%E5%9B%BD%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD%E6%88%90%E7%86%9F%E5%BA%A6%E6%A8%A1%E5%9E%8B%E6%8A%A5%E5%91%8A/%E4%B8%AD%E5%9B%BD%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD%E6%88%90%E7%86%9F%E5%BA%A6%E6%A8%A1%E5%9E%8B%E6%8A%A5%E5%91%8A/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    中国人工智能成熟度模型报告
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD%E5%9F%BA%E7%A1%80%E8%AF%BE/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD%E5%9F%BA%E7%A1%80%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    人工智能基础课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E4%BB%8E0%E5%BC%80%E5%A7%8B%E5%AD%A6%E5%A4%A7%E6%95%B0%E6%8D%AE/%E4%BB%8E0%E5%BC%80%E5%A7%8B%E5%AD%A6%E5%A4%A7%E6%95%B0%E6%8D%AE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    从0开始学大数据
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1_22" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_1_22" id="__nav_1_22_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    大数据经典论文解读
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_1_22_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_1_22">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    大数据经典论文解读
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%A4%A7%E6%95%B0%E6%8D%AE%E7%BB%8F%E5%85%B8%E8%AE%BA%E6%96%87%E8%A7%A3%E8%AF%BB/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    大数据经典论文解读
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%BC%80%E7%AF%87%E8%AF%8D%20-%20%E8%AF%BB%E8%AE%BA%E6%96%87%E6%98%AF%E6%88%90%E4%B8%BA%E4%BC%98%E7%A7%80%E5%B7%A5%E7%A8%8B%E5%B8%88%E7%9A%84%E6%88%90%E5%B9%B4%E7%A4%BC/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    开篇词   读论文是成为优秀工程师的成年礼
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01%20-%20%E4%BB%80%E4%B9%88%E6%98%AF%E5%A4%A7%E6%95%B0%E6%8D%AE%EF%BC%9A%E4%BB%8EGFS%E5%88%B0Dataflow%EF%BC%8C12%E5%B9%B4%E5%A4%A7%E6%95%B0%E6%8D%AE%E7%94%9F%E6%80%81%E6%BC%94%E5%8C%96%E5%9B%BE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01   什么是大数据：从GFS到Dataflow，12年大数据生态演化图
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02%20-%20%E5%AD%A6%E4%B9%A0%E6%96%B9%E6%B3%95%EF%BC%9A%E5%BB%BA%E7%AB%8B%E4%BD%A0%E7%9A%84%E5%A4%A7%E6%95%B0%E6%8D%AE%E7%9F%A5%E8%AF%86%E7%BD%91%E7%BB%9C/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    02   学习方法：建立你的大数据知识网络
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03%20-%20The%20Google%20File%20System%20%EF%BC%88%E4%B8%80%EF%BC%89%EF%BC%9A%20Master%E7%9A%84%E4%B8%89%E4%B8%AA%E8%BA%AB%E4%BB%BD/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    03   The Google File System （一）： Master的三个身份
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04%20-%20The%20Google%20File%20System%20%EF%BC%88%E4%BA%8C%EF%BC%89%EF%BC%9A%20%E5%A6%82%E4%BD%95%E5%BA%94%E5%AF%B9%E7%BD%91%E7%BB%9C%E7%93%B6%E9%A2%88%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04   The Google File System （二）： 如何应对网络瓶颈？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05%20-%20The%20Google%20File%20System%20%EF%BC%88%E4%B8%89%EF%BC%89%EF%BC%9A%20%E5%A4%9A%E5%86%99%E5%87%A0%E6%AC%A1%E4%B9%9F%E6%B2%A1%E5%85%B3%E7%B3%BB/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05   The Google File System （三）： 多写几次也没关系
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06%20-%20MapReduce%EF%BC%88%E4%B8%80%EF%BC%89%EF%BC%9A%E6%BA%90%E8%B5%B7Unix%E7%9A%84%E8%AE%BE%E8%AE%A1%E6%80%9D%E6%83%B3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06   MapReduce（一）：源起Unix的设计思想
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07%20-%20MapReduce%EF%BC%88%E4%BA%8C%EF%BC%89%EF%BC%9A%E4%B8%8D%E6%80%95%E5%A4%B1%E8%B4%A5%E7%9A%84%E8%AE%A1%E7%AE%97%E6%A1%86%E6%9E%B6/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    07   MapReduce（二）：不怕失败的计算框架
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08%20-%20Bigtable%EF%BC%88%E4%B8%80%EF%BC%89%EF%BC%9A%E9%94%99%E5%A4%B1%E7%99%BE%E4%BA%BF%E7%9A%84Friendster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    08   Bigtable（一）：错失百亿的Friendster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09%20-%20Bigtable%EF%BC%88%E4%BA%8C%EF%BC%89%EF%BC%9A%E4%B8%8D%E8%AE%A4%E8%AF%86%E2%80%9C%E4%B8%BB%E4%BA%BA%E2%80%9D%E7%9A%84%E5%88%86%E5%B8%83%E5%BC%8F%E6%9E%B6%E6%9E%84/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    09   Bigtable（二）：不认识“主人”的分布式架构
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10%20-%20Bigtable%EF%BC%88%E4%B8%89%EF%BC%89%EF%BC%9ASSTable%E5%AD%98%E5%82%A8%E5%BC%95%E6%93%8E%E8%AF%A6%E8%A7%A3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10   Bigtable（三）：SSTable存储引擎详解
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../11%20-%20%E9%80%9A%E8%BF%87Thrift%E5%BA%8F%E5%88%97%E5%8C%96%EF%BC%9A%E6%88%91%E4%BB%AC%E8%A6%81%E9%A2%84%E7%9F%A5%E6%9C%AA%E6%9D%A5%E6%89%8D%E8%83%BD%E5%90%91%E5%90%8E%E5%85%BC%E5%AE%B9%E5%90%97%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    11   通过Thrift序列化：我们要预知未来才能向后兼容吗？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../12%20-%20%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81Chubby%EF%BC%88%E4%B8%80%EF%BC%89%20%EF%BC%9A%E4%BA%A4%E6%98%93%E4%B9%8B%E5%89%8D%E5%85%88%E7%AD%BE%E5%90%88%E5%90%8C/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    12   分布式锁Chubby（一） ：交易之前先签合同
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13%20-%20%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81Chubby%EF%BC%88%E4%BA%8C%EF%BC%89%20%EF%BC%9A%E4%BC%97%E5%8F%A3%E9%93%84%E9%87%91%E7%9A%84%E7%9C%9F%E7%9B%B8/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    13   分布式锁Chubby（二） ：众口铄金的真相
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    14   分布式锁Chubby（三） ：移形换影保障高可用
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    14   分布式锁Chubby（三） ：移形换影保障高可用
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#chubby" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        通过Chubby转移可用性和“共识”问题
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#chubby_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chubby的系统架构
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Chubby的系统架构">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#chubby_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chubby的系统架构
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chubby_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chubby对外提供的接口
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chubby_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chubby作为分布式锁的挑战
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#caching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        留给你自己读的Caching部分
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        小结
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        推荐阅读
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        思考题
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../15%20-%20Hive%EF%BC%9A%E6%9D%A5%E6%9D%A5%E5%8E%BB%E5%8E%BB%E7%9A%84DSL%EF%BC%8C%E6%B0%B8%E7%94%9F%E4%B8%8D%E6%AD%BB%E7%9A%84SQL/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    15   Hive：来来去去的DSL，永生不死的SQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../16%20-%20%E4%BB%8EDremel%E5%88%B0Parquet%EF%BC%88%E4%B8%80%EF%BC%89%EF%BC%9A%E6%B7%B1%E5%85%A5%E5%89%96%E6%9E%90%E5%88%97%E5%BC%8F%E5%AD%98%E5%82%A8/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    16   从Dremel到Parquet（一）：深入剖析列式存储
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../17%20-%20%E4%BB%8EDremel%E5%88%B0Parquet%EF%BC%88%E4%BA%8C%EF%BC%89%EF%BC%9A%E4%BB%96%E5%B1%B1%E4%B9%8B%E7%9F%B3%E7%9A%84MPP%E6%95%B0%E6%8D%AE%E5%BA%93/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    17   从Dremel到Parquet（二）：他山之石的MPP数据库
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../18%20-%20Spark%EF%BC%9A%E5%88%AB%E5%BF%98%E4%BA%86%E5%86%85%E5%AD%98%E6%AF%94%E7%A3%81%E7%9B%98%E5%BF%AB%E5%A4%9A%E5%B0%91/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    18   Spark：别忘了内存比磁盘快多少
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../19%20-%20Megastore%EF%BC%88%E4%B8%80%EF%BC%89%EF%BC%9A%E5%85%A8%E5%9B%BD%E5%90%84%E5%9C%B0%E9%83%BD%E8%83%BD%E5%86%99%E5%85%A5%E7%9A%84%E6%95%B0%E6%8D%AE%E5%BA%93/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    19   Megastore（一）：全国各地都能写入的数据库
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../20%20-%20Megastore%EF%BC%88%E4%BA%8C%EF%BC%89%EF%BC%9A%E6%8A%8ABigtable%E7%8E%A9%E5%87%BA%E8%8A%B1%E6%9D%A5/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    20   Megastore（二）：把Bigtable玩出花来
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../21%20-%20Megastore%EF%BC%88%E4%B8%89%EF%BC%89%EF%BC%9A%E8%AE%A9Paxos%E8%B7%A8%E8%B6%8A%E2%80%9C%E5%9B%BD%E7%95%8C%E2%80%9D/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    21   Megastore（三）：让Paxos跨越“国界”
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../22%20-%20Spanner%EF%BC%88%E4%B8%80%EF%BC%89%EF%BC%9A%E2%80%9C%E9%87%8D%E5%86%99%E2%80%9DBigtable%E5%92%8CMegastore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    22   Spanner（一）：“重写”Bigtable和Megastore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../23%20-%20Spanner%EF%BC%88%E4%BA%8C%EF%BC%89%EF%BC%9A%E6%97%B6%E9%97%B4%E7%9A%84%E6%82%96%E8%AE%BA/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    23   Spanner（二）：时间的悖论
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../24%20-%20Spanner%EF%BC%88%E4%B8%89%EF%BC%89%EF%BC%9A%E4%B8%A5%E6%A0%BC%E4%B8%B2%E8%A1%8C%E5%8C%96%E7%9A%84%E5%88%86%E5%B8%83%E5%BC%8F%E7%B3%BB%E7%BB%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    24   Spanner（三）：严格串行化的分布式系统
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../25%20-%20%E4%BB%8ES4%E5%88%B0Storm%EF%BC%88%E4%B8%80%EF%BC%89%EF%BC%9A%E5%BD%93%E5%88%86%E5%B8%83%E5%BC%8F%E9%81%87%E4%B8%8A%E5%AE%9E%E6%97%B6%E8%AE%A1%E7%AE%97/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    25   从S4到Storm（一）：当分布式遇上实时计算
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../26%20-%20%E4%BB%8ES4%E5%88%B0Storm%EF%BC%88%E4%BA%8C%EF%BC%89%EF%BC%9A%E4%BD%8D%E8%BF%90%E7%AE%97%E6%98%AF%E4%B8%AA%E5%A5%BD%E4%B8%9C%E8%A5%BF/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    26   从S4到Storm（二）：位运算是个好东西
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../27%20-%20Kafka%EF%BC%88%E4%B8%80%EF%BC%89%EF%BC%9A%E6%B6%88%E6%81%AF%E9%98%9F%E5%88%97%E7%9A%84%E6%96%B0%E6%A0%87%E5%87%86/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    27   Kafka（一）：消息队列的新标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../28%20-%20Kafka%EF%BC%88%E4%BA%8C%EF%BC%89%EF%BC%9A%E4%BB%8ELambda%E5%88%B0Kappa%EF%BC%8C%E6%B5%81%E6%89%B9%E4%B8%80%E4%BD%93%E8%AE%A1%E7%AE%97%E7%9A%84%E8%B5%B7%E6%BA%90/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    28   Kafka（二）：从Lambda到Kappa，流批一体计算的起源
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../29%20-%20Dataflow%EF%BC%88%E4%B8%80%EF%BC%89%EF%BC%9A%E6%AD%A3%E7%A1%AE%E6%80%A7%E3%80%81%E5%AE%B9%E9%94%99%E5%92%8C%E6%97%B6%E9%97%B4%E7%AA%97%E5%8F%A3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    29   Dataflow（一）：正确性、容错和时间窗口
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../30%20-%20Dataflow%EF%BC%88%E4%BA%8C%EF%BC%89%EF%BC%9AMillWheel%EF%BC%8C%E4%B8%80%E4%B8%AA%E6%97%A9%E6%9C%9F%E5%AE%9E%E7%8E%B0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    30   Dataflow（二）：MillWheel，一个早期实现
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../31%20-%20Dataflow%EF%BC%88%E4%B8%89%EF%BC%89%EF%BC%9A%E4%B8%80%E4%B8%AA%E7%BB%9F%E4%B8%80%E7%9A%84%E7%BC%96%E7%A8%8B%E6%A8%A1%E5%9E%8B/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    31   Dataflow（三）：一个统一的编程模型
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%A4%8D%E4%B9%A0%E8%AF%BE%EF%BC%88%E4%B8%80%EF%BC%89-%20The%20Google%20File%20System/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    复习课（一）  The Google File System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%A4%8D%E4%B9%A0%E8%AF%BE%EF%BC%88%E4%BA%8C%EF%BC%89-%20MapReduce/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    复习课（二）  MapReduce
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%A4%8D%E4%B9%A0%E8%AF%BE%EF%BC%88%E4%B8%89%EF%BC%89-%20Bigtable/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    复习课（三）  Bigtable
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%A4%8D%E4%B9%A0%E8%AF%BE%EF%BC%88%E5%9B%9B%EF%BC%89-%20Thrift/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    复习课（四）  Thrift
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%A4%8D%E4%B9%A0%E8%AF%BE%EF%BC%88%E4%BA%94%EF%BC%89-%20Chubby/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    复习课（五）  Chubby
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%A4%8D%E4%B9%A0%E8%AF%BE%EF%BC%88%E5%85%AD%EF%BC%89-%20Hive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    复习课（六）  Hive
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%A4%8D%E4%B9%A0%E8%AF%BE%EF%BC%88%E4%B8%83%EF%BC%89-%20Dremel/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    复习课（七）  Dremel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%A4%8D%E4%B9%A0%E8%AF%BE%EF%BC%88%E5%85%AB%EF%BC%89-%20Resilient%20Distributed%20Datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    复习课（八）  Resilient Distributed Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%A4%8D%E4%B9%A0%E8%AF%BE%EF%BC%88%E4%B9%9D%EF%BC%89-%20Megastore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    复习课（九）  Megastore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%A4%8D%E4%B9%A0%E8%AF%BE%EF%BC%88%E5%8D%81%EF%BC%89-%20Spanner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    复习课（十）  Spanner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%8A%A0%E9%A4%901%20-%20%E9%80%89%E6%8B%A9%E5%92%8C%E5%8A%AA%E5%8A%9B%E5%90%8C%E6%A0%B7%E9%87%8D%E8%A6%81%EF%BC%9A%E8%81%8A%E8%81%8A%E5%A6%82%E4%BD%95%E8%AF%BB%E8%AE%BA%E6%96%87%E5%92%8C%E9%80%89%E8%AE%BA%E6%96%87/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    加餐1   选择和努力同样重要：聊聊如何读论文和选论文
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%8A%A0%E9%A4%902%20-%20%E8%AE%BE%E7%BD%AE%E4%BD%A0%E7%9A%84%E5%AD%A6%E4%B9%A0%E2%80%9C%E6%AF%8D%E9%A2%98%E2%80%9D%EF%BC%9A%E5%A6%82%E4%BD%95%E9%80%89%E6%8B%A9%E9%98%85%E8%AF%BB%E6%9D%90%E6%96%99%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    加餐2   设置你的学习“母题”：如何选择阅读材料？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%8A%A0%E9%A4%903%20-%20%E6%88%91%E8%AF%A5%E4%BD%BF%E7%94%A8%E4%BB%80%E4%B9%88%E6%A0%B7%E7%9A%84%E5%A4%A7%E6%95%B0%E6%8D%AE%E7%B3%BB%E7%BB%9F%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    加餐3   我该使用什么样的大数据系统？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../32%20-%20Raft%EF%BC%88%E4%B8%80%EF%BC%89%EF%BC%9A%E4%B8%8D%E4%BC%9A%E8%83%8C%E5%8F%9B%E7%9A%84%E4%BF%A1%E4%BD%BF/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    32   Raft（一）：不会背叛的信使
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../33%20-%20Raft%EF%BC%88%E4%BA%8C%EF%BC%89%EF%BC%9A%E6%9C%8D%E5%8A%A1%E5%99%A8%E5%A2%9E%E5%87%8F%E7%9A%84%E2%80%9C%E8%87%AA%E4%B8%BE%E2%80%9D%E5%AE%9E%E7%8E%B0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    33   Raft（二）：服务器增减的“自举”实现
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../34%20-%20Borg%EF%BC%88%E4%B8%80%EF%BC%89%EF%BC%9A%E5%BD%93%E7%94%B5%E5%8A%9B%E6%88%90%E4%B8%BA%E6%88%90%E6%9C%AC%E7%93%B6%E9%A2%88/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    34   Borg（一）：当电力成为成本瓶颈
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../35%20-%20Borg%EF%BC%88%E4%BA%8C%EF%BC%89%EF%BC%9A%E4%BA%92%E4%B8%8D%E2%80%9C%E4%BF%A1%E4%BB%BB%E2%80%9D%E7%9A%84%E8%B0%83%E5%BA%A6%E7%B3%BB%E7%BB%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    35   Borg（二）：互不“信任”的调度系统
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../36%20-%20%E4%BB%8EOmega%E5%88%B0Kubernetes%EF%BC%9A%E5%93%BA%E8%82%B2%E4%BA%91%E5%8E%9F%E7%94%9F%E7%9A%84%E5%BC%80%E6%BA%90%E9%A1%B9%E7%9B%AE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    36   从Omega到Kubernetes：哺育云原生的开源项目
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E7%94%A8%E6%88%B7%E6%95%85%E4%BA%8B%20-%20%E9%99%88%E7%85%8C%EF%BC%9A%E5%94%AF%E6%9C%89%E8%87%AA%E5%BC%BA%E4%B8%8D%E6%81%AF%EF%BC%8C%E6%96%B9%E8%83%BD%E5%B1%B9%E7%AB%8B%E4%B8%8D%E5%80%92/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    用户故事   陈煌：唯有自强不息，方能屹立不倒
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E7%94%A8%E6%88%B7%E6%95%85%E4%BA%8B%20-%20%E9%BB%84%E6%B6%9B%EF%BC%9A%E6%B0%B4%E6%BB%B4%E7%9F%B3%E7%A9%BF%E3%80%81%E5%9D%9A%E6%8C%81%E4%B8%8D%E6%87%88%EF%BC%8C%E5%BF%85%E8%83%BD%E6%9C%89%E6%89%80%E7%B2%BE%E8%BF%9B/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    用户故事   黄涛：水滴石穿、坚持不懈，必能有所精进
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E7%94%A8%E6%88%B7%E6%95%85%E4%BA%8B%20-%20%E8%AE%B8%E7%81%B5%EF%BC%9A%E4%B8%8D%E6%8A%9B%E5%BC%83%E4%B8%8D%E6%94%BE%E5%BC%83/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    用户故事   许灵：不抛弃不放弃
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E7%94%A8%E6%88%B7%E6%95%85%E4%BA%8B%20-%20%E6%A0%B8%E6%A1%83%EF%BC%9A95%E5%90%8E%E7%9A%84%E6%8A%80%E6%9C%AF%E6%88%90%E9%95%BF%E4%B9%8B%E8%B7%AF/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    用户故事   核桃：95后的技术成长之路
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../37%20-%20%E5%BD%93%E6%95%B0%E6%8D%AE%E9%81%87%E4%B8%8AAI%EF%BC%8CTwitter%E7%9A%84%E6%95%B0%E6%8D%AE%E6%8C%96%E6%8E%98%E5%AE%9E%E6%88%98%EF%BC%88%E4%B8%80%EF%BC%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    37   当数据遇上AI，Twitter的数据挖掘实战（一）
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../38%20-%20%E5%BD%93%E6%95%B0%E6%8D%AE%E9%81%87%E4%B8%8AAI%EF%BC%8CTwitter%E7%9A%84%E6%95%B0%E6%8D%AE%E6%8C%96%E6%8E%98%E5%AE%9E%E6%88%98%EF%BC%88%E4%BA%8C%EF%BC%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    38   当数据遇上AI，Twitter的数据挖掘实战（二）
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../39%20-%20%E5%8D%81%E5%B9%B4%E4%B8%80%E6%A2%A6%EF%BC%8C%E4%B8%80%E8%B5%B7%E6%9D%A5%E7%9C%8BFacebook%E7%9A%84%E6%95%B0%E6%8D%AE%E4%BB%93%E5%BA%93%E5%8F%98%E8%BF%81%EF%BC%88%E4%B8%80%EF%BC%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    39   十年一梦，一起来看Facebook的数据仓库变迁（一）
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../40%20-%20%E5%8D%81%E5%B9%B4%E4%B8%80%E6%A2%A6%EF%BC%8C%E4%B8%80%E8%B5%B7%E6%9D%A5%E7%9C%8BFacebook%E7%9A%84%E6%95%B0%E6%8D%AE%E4%BB%93%E5%BA%93%E5%8F%98%E8%BF%81%EF%BC%88%E4%BA%8C%EF%BC%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    40   十年一梦，一起来看Facebook的数据仓库变迁（二）
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E7%BB%93%E6%9D%9F%E8%AF%AD%20-%20%E9%95%BF%E9%A3%8E%E7%A0%B4%E6%B5%AA%E4%BC%9A%E6%9C%89%E6%97%B6%EF%BC%8C%E7%9B%B4%E6%8C%82%E4%BA%91%E5%B8%86%E6%B5%8E%E6%B2%A7%E6%B5%B7/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    结束语   长风破浪会有时，直挂云帆济沧海
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%BA%94%E7%94%A8%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%BA%94%E7%94%A8%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    大模型应用开发实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E5%A4%A7%E8%A7%84%E6%A8%A1%E6%95%B0%E6%8D%AE%E5%A4%84%E7%90%86%E5%AE%9E%E6%88%98/%E5%A4%A7%E8%A7%84%E6%A8%A1%E6%95%B0%E6%8D%AE%E5%A4%84%E7%90%86%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    大规模数据处理实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E5%AE%9E%E7%94%A8%E5%AF%86%E7%A0%81%E5%AD%A6/%E5%AE%9E%E7%94%A8%E5%AF%86%E7%A0%81%E5%AD%A6/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    实用密码学
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%89%8B%E6%8A%8A%E6%89%8B%E5%B8%A6%E4%BD%A0%E6%90%AD%E5%BB%BA%E6%8E%A8%E8%8D%90%E7%B3%BB%E7%BB%9F/%E6%89%8B%E6%8A%8A%E6%89%8B%E5%B8%A6%E4%BD%A0%E6%90%AD%E5%BB%BA%E6%8E%A8%E8%8D%90%E7%B3%BB%E7%BB%9F/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    手把手带你搭建推荐系统
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%8E%A8%E8%8D%90%E7%B3%BB%E7%BB%9F%E4%B8%89%E5%8D%81%E5%85%AD%E5%BC%8F/%E6%8E%A8%E8%8D%90%E7%B3%BB%E7%BB%9F%E4%B8%89%E5%8D%81%E5%85%AD%E5%BC%8F/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    推荐系统三十六式
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%95%B0%E6%8D%AE%E5%88%86%E6%9E%90%E5%AE%9E%E6%88%9845%E8%AE%B2/%E6%95%B0%E6%8D%AE%E5%88%86%E6%9E%90%E5%AE%9E%E6%88%9845%E8%AE%B2/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    数据分析实战45讲
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%95%B0%E6%8D%AE%E5%88%86%E6%9E%90%E6%80%9D%E7%BB%B4%E8%AF%BE/%E6%95%B0%E6%8D%AE%E5%88%86%E6%9E%90%E6%80%9D%E7%BB%B4%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    数据分析思维课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%9C%BA%E5%99%A8%E5%AD%A6%E4%B9%A040%E8%AE%B2/%E6%9C%BA%E5%99%A8%E5%AD%A6%E4%B9%A040%E8%AE%B2/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    机器学习40讲
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%A3%80%E7%B4%A2%E6%8A%80%E6%9C%AF%E6%A0%B8%E5%BF%8320%E8%AE%B2/%E6%A3%80%E7%B4%A2%E6%8A%80%E6%9C%AF%E6%A0%B8%E5%BF%8320%E8%AE%B2/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    检索技术核心20讲
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0%E6%8E%A8%E8%8D%90%E7%B3%BB%E7%BB%9F%E5%AE%9E%E6%88%98/%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0%E6%8E%A8%E8%8D%90%E7%B3%BB%E7%BB%9F%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    深度学习推荐系统实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E7%A8%8B%E5%BA%8F%E5%91%98%E7%9A%84AI%E5%BC%80%E5%8F%91%E7%AC%AC%E4%B8%80%E8%AF%BE/%E7%A8%8B%E5%BA%8F%E5%91%98%E7%9A%84AI%E5%BC%80%E5%8F%91%E7%AC%AC%E4%B8%80%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    程序员的AI开发第一课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E9%9B%B6%E5%9F%BA%E7%A1%80GPT%E5%BA%94%E7%94%A8%E5%85%A5%E9%97%A8%E8%AF%BE/%E9%9B%B6%E5%9F%BA%E7%A1%80GPT%E5%BA%94%E7%94%A8%E5%85%A5%E9%97%A8%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    零基础GPT应用入门课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E9%9B%B6%E5%9F%BA%E7%A1%80%E5%85%A5%E9%97%A8Spark/%E9%9B%B6%E5%9F%BA%E7%A1%80%E5%85%A5%E9%97%A8Spark/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    零基础入门Spark
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E9%9B%B6%E5%9F%BA%E7%A1%80%E5%AE%9E%E6%88%98%E6%9C%BA%E5%99%A8%E5%AD%A6%E4%B9%A0/%E9%9B%B6%E5%9F%BA%E7%A1%80%E5%AE%9E%E6%88%98%E6%9C%BA%E5%99%A8%E5%AD%A6%E4%B9%A0/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    零基础实战机器学习
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E4%BA%A7%E5%93%81-%E8%BF%90%E8%90%A5/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    产品-运营
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E5%89%8D%E7%AB%AF-%E7%A7%BB%E5%8A%A8/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    前端-移动
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E5%90%8E%E7%AB%AF-%E6%9E%B6%E6%9E%84/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    后端-架构
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E7%AE%A1%E7%90%86-%E6%88%90%E9%95%BF/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    管理-成长
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E8%AE%A1%E7%AE%97%E6%9C%BA%E5%9F%BA%E7%A1%80/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    计算机基础
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E8%BF%90%E7%BB%B4-%E6%B5%8B%E8%AF%95/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    运维-测试
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#chubby" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        通过Chubby转移可用性和“共识”问题
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#chubby_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chubby的系统架构
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Chubby的系统架构">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#chubby_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chubby的系统架构
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chubby_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chubby对外提供的接口
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chubby_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chubby作为分布式锁的挑战
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#caching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        留给你自己读的Caching部分
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        小结
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        推荐阅读
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        思考题
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+  <h1>14   分布式锁Chubby（三） ：移形换影保障高可用</h1>
+
+<p>你好，我是徐文浩。</p>
+<p>过去的两讲里，我们都在尝试做一件事情，就是在Master和Backup Master之间保持数据的同步复制。无论是通过分布式事务的两阶段提交算法，还是通过分布式共识的Paxos算法，都是为了做到这一点。</p>
+<p>而我们要去保障Master和Backup Master之间的同步复制，也是为了一个小小的目标，那就是<strong>整个系统的高可用性</strong>。因为系统中只有一个Master节点，我们希望能够在Master节点挂掉的时候，快速切换到另外一个节点，所以我们需要这两个节点的数据是完全同步的。不然的话，我们就可能会丢失一部分数据。</p>
+<p>不过，无论是GFS也好，Bigtable也好，我们能看到它们都是一个单Master系统，而不是有多个Master，能够同时接受外部的请求来保持高可用性。所以，尽管在论文里面，Google没有说GFS在Master和Backup Master之间数据的同步复制是怎么进行的，但是根据我的推测，采用一个两阶段提交的方式会更简单直接一点。</p>
+<p>那么，现在你可能就会觉得有问题了：如果还是使用两阶段提交这样的方式，我们不还是会面临单点故障吗？而且，我们上一讲所说的Paxos算法也用不上啊？</p>
+<p>要回答这个问题，就请你一起来和我学习今天这一讲，也就是Chubby这个系统到底是怎么一回事儿。通过这一讲，我会让你知道：</p>
+<ul>
+<li>Chubby这个分布式锁系统是怎么一回事儿，它和Paxos算法的关系是什么；</li>
+<li>GFS和Bigtable这样的系统，是如何通过Chubby来保障可用性和一致性的；</li>
+<li>在系统设计层面，如何尽可能在设计上降低长期协同开发的成本。</li>
+</ul>
+<p>好，下面就让我们一起来看看，Chubby这个系统是怎么一回事情吧。</p>
+<h2 id="chubby">通过Chubby转移可用性和“共识”问题</h2>
+<p>无论是GFS还是Bigtable，其实都是一个单Master的系统。而为了让这样的系统保障高可用性，我们通常会采用两个策略。</p>
+<p>第一个，是对它进行<strong>同步复制</strong>，数据会同步写入另外一个Backup Master，这个方法最简单，我们可以用两阶段提交来解决。第二个，是<strong>对Master进行监控</strong>，一旦Master出现故障，我们就把它切换到Backup Master就好了。</p>
+<p>但我们之前也说过，这里面有两个问题，首先是两阶段提交也有单点故障，其次是监控程序怎么去判断Master是真的挂掉了，还是只是监控程序和Master之间的网络中断了呢？</p>
+<p>其实，解决这两个问题的答案，就是Chubby，也就是Paxos算法。Chubby具体的技术实现并不简单，但是思路却非常简单。那就是，我们的“共识”并不需要在每一个操作、每一条日志写入的时候发生，我们只需要有一个“共识”，确认哪一个是Master就好了。</p>
+<p>这样，系统的可用性以及容错机制，就从原先的系统里被剥离出来了。我们原先的系统只需要Master，即使是做同步数据复制，也只需要通过两阶段提交这样的策略就可以了。而一旦出现单点故障，我们只需要做一件事情，就是把故障的节点切换到它同步备份的节点就行。</p>
+<p>而我们担心的，系统里会有两个Master的问题，通过Paxos算法来解决就好了。</p>
+<p>只要通过Paxos算法，让一个一致性模块达成共识，当前哪一个是Master就好，其他的节点都通过这个一致性模块，获取到谁是最新的Master即可。而且，这个一致性模块本身会有多个节点，比如5个节点，另外我们在部署的时候，还会把它们放到不同的机架上，也就是不同的交换机下。这样一来，一致性模块里单个节点出现故障，也并不会影响这个一致性模块对外提供服务。</p>
+<p>那么，在Chubby这个系统里，它其实针对Paxos做了封装，把对外提供的接口变成一个锁。这样，Chubby就变成了一个通用的分布式锁服务，而不是一个Paxos的一致性模块。在锁服务下达成的共识，就不是谁是Master了，而是哪一台服务器持有了Master的锁。对于应用系统来说，谁持有Master的锁，我们就认为这台服务器就是Master。</p>
+<p>事实上，把Chubby对外暴露的接口，变成一个分布式锁服务，Google是经过深思熟虑的。对于锁服务来说，大部分工程师都是非常熟悉的，无论是MySQL这样的关系数据库，还是Redis这样的KV数据库，或者是Java标准库里的Lock类，都是我们经常使用的开发工具。</p>
+<p>但是Paxos算法，大部分工程师可能都没有听说过。我们之前在<a href="https://time.geekbang.org/column/article/423595">MapReduce的论文</a>里就说过，<strong>一个好的分布式系统的设计，就是要让使用系统的开发人员意识不到分布式的存在。</strong>那么，通过把Paxos协议封装成一个分布式锁，就可以让所有开发人员立刻上手使用，而不需要让每个人都学习Paxos和共识问题，从而能够更容易地在整个组织的层面快速开发出好用的系统。</p>
+<p>而且，Chubby这个锁服务，是一个<strong>粗粒度的锁服务</strong>。所谓粗粒度，指的是外部客户端占用锁的时间是比较长的。比如说，我们的Master只要不出现故障，就可以一直占用这把锁。但是，我们并不会用这个锁做很多细粒度的动作，不会通过这个分布式的锁，在Bigtable上去实现一个多行数据写入的数据库事务。</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/ac/70/acca79d3b8da9be21c13bf4688cc3d70.jpg?wh=2000x1125" title="Chubby的锁，是一个粗粒度锁，持有锁的时间，可以以秒乃至分钟来计" /></p>
+<p>这是因为，像Master的切换这样的操作，发生的频率其实很低。这就意味着，Chubby负载也很低。而像Bigtable里面的数据库事务操作，每秒可以有百万次，如果通过Chubby来实现，那Chubby的负载肯定是承受不了的。要知道，Chubby的底层算法，也是Paxos。我们上一讲刚刚一起来了解过这个算法，它的每一个共识的达成，都是需要通过至少两轮的RPC协商来完成的，性能肯定跟不上。</p>
+<p>事实上，在Bigtable里，Chubby也主要是被用来做四件事情，第一个是Master的高可用性切换；第二个是存储引导位置（Bootstrap Location），让客户端能够找到METADATA数据的存储位置；第三个是Tablet和Tablet Server之间的分配关系；最后一个是Bigtable里表的Schema。可以看到，Chubby存储的这些数据都是很少变化，但是一旦丢失就会导致数据不一致的元数据。</p>
+<p>那么相信到这里，你对Chubby在整个分布式系统中的作用应该就弄明白了。Chubby并不是提供一个底层的Paxos算法库，然后让所有的GFS、Bigtable等等，基于Paxos协议来实现数据库事务。<strong>而是把自己变成了一个分布式锁服务</strong>，主要解决GFS、Bigtable这些系统的元数据的一致性问题，以及容错场景下的灾难恢复问题。</p>
+<p>GFS和Bigtable这些系统，仍然会采用单个Master，然后对数据进行分区的方式，来提升整个系统的性能容量。但是在关键的元数据管理，以及Master节点挂掉切换的时候，会利用Chubby这个分布式锁服务，来确保整个分布式系统是有“共识”的，避免出现多个人都说自己是Master这样“真假美猴王”的情况出现。</p>
+<h2 id="chubby_1">Chubby的系统架构</h2>
+<p>理解完了Chubby在整个分布式系统中的作用，我们下面就来深入看一下，整个Chubby的系统是怎么样的。我们会一起来了解下Chubby的系统架构、Chubby对外提供的接口，以及看看具体这个分布式锁是如何使用的。</p>
+<h3 id="chubby_2">Chubby的系统架构</h3>
+<p>首先，Chubby这个系统也是有Master的。</p>
+<p>在Chubby里，它自己的多个节点，会先通过“共识”算法，确认一个Master节点。这个Master节点，会作为系统中唯一的一个提案者（Proposer），所有对于Chubby的写入数据的请求，比如获取某个锁，都会发送到这个Master节点，由它作为提案者发起提案，然后所有节点都会作为接受者来接受提案达成共识。</p>
+<p>只有一个提案者带来的好处就是，大部分时间，我们不太会因为两个Proposer之间竞争提案，而导致需要很多轮协商才能达成一致的情况。</p>
+<p>那看到这里你可能会问了，如果Chubby的Master挂掉了怎么办呢？</p>
+<p>不要紧，我们可以通过剩下的节点，<strong>通过共识算法再找一个Master出来</strong>。而且如果是因为网络故障，导致有两个Master的话，也会很快通过共识算法确定一个Master出来。另外，两个Master其实只是一致性模块里的两个提案者，即使两边都接受外部请求，也都会通过共识算法，只选择一个值出来。</p>
+<p>在论文里面，Master的生命周期被称之为<strong>租期</strong>（lease）。也就是说，Master发起的共识算法达成的共识，是在一段时间T之内，它是Master。而只要Master不崩溃，一般它都会在这个T的时间到期之前，进行续租。而如果Master崩溃了，当T的时间到了，那么所有节点都可以发起自己是Master的一次提案，最终确认一个新的Master。</p>
+<p>可以看到，虽然Paxos这样的共识算法其实是不需要单一的Master节点的。但是为了实际应用中的效率问题，我们会采用选举出一个Master的办法，来让整个系统更加简化。</p>
+<p>对于Chubby的整个服务器端来说，我们可以把它看成一个三层的系统。最底层，是一个Paxos协议实现的同步日志复制的系统，也就是我们上一讲所说的<strong>状态机复制的系统</strong>。上面一层，就是通过这个状态机实现的<strong>数据库</strong>了，Google是直接采用了BerkeleyDB作为这个数据库。换句话说，Chubby是通过Paxos在多个BerkeleyDB里，实现数据库的同步复制。在BerkeleyDB之上，才是由Chubby自己实现的<strong>锁服务</strong>。</p>
+<p><img alt="图片" src="https://static001.geekbang.org/resource/image/04/c2/0430de0becff1f1aed642a1a866e4dc2.jpg?wh=1920x1080" title="Paxos算法，就是用来同步复制BerkeleyDB里的日志" /></p>
+<p>除了服务器端，Chubby还给所有想要使用Chubby的应用提供了一个客户端。客户端会通过DNS拿到所有的Chubby的服务端的节点，然后可以去里面任何一个节点询问，哪一个是Master。无论是读还是写的请求，客户端都是通过访问Master来获取的。</p>
+<p>对于数据写入的请求，Master会作为刚才我们说过的提案者，在所有的Chubby服务器节点上通过Paxos算法进行同步复制。而对于读请求，Master直接返回本地数据就好，因为所有服务器节点上的数据是有共识的。</p>
+<p><img alt="图片" src="https://static001.geekbang.org/resource/image/9e/af/9e6a0b56d5275c6fe0c54fb92d8f85af.jpg?wh=1920x1080" title="来自论文中的系统架构图" /></p>
+<h3 id="chubby_3">Chubby对外提供的接口</h3>
+<p>既然Chubby的底层存储系统，是BerkeleyDB这样一个KV数据库，那么我们就可以通过它做很多事情了。Chubby对外封装的访问接口，是一个类似于Unix文件系统的接口。使用这个形式，同样也降低了使用Chubby的用户的门槛。毕竟每个工程师都熟悉用ls命令，去查询目录下的子目录和文件列表。</p>
+<p>Chubby里的每一个目录或者文件，都被称之为一个节点（node）。<strong>外部应用所使用的分布式“锁”，其实就是锁在这个节点上。</strong>哪个客户端获得了锁，就可以向对应的目录或者文件里面写入数据。比如谁是真正的Master，就是看谁获得了某个特定的文件锁。</p>
+<p>举个例子，我们可以定义/gfs/master这个命名空间，就用来存放Master的相关信息。这样，Master服务器会通过RPC锁住这个文件，然后往里面写下自己的IP地址以及其他相关的元数据就好了。而其他客户端在这个时候，就无法获得这个锁，自然也就无法把Master改成自己。所有想要知道谁是Master的客户端，就只需要去查询/gfs/master这个文件就行。</p>
+<p>而所有的这些其实是目录和文件的“节点”，在Chubby中会分成<strong>永久</strong>（permanent）节点和<strong>临时</strong>（ephemeral）节点两种。</p>
+<p>对于永久节点来说，客户端需要显式地调用API，才能够删除掉。比如Bigtable里面，Chubby存放的引导位置的信息，就肯定应该使用永久节点。而临时节点，则是一旦客户端和服务器的Session断开，就会自动消失掉。一个比较典型的使用方式，就是我们在Bigtable中所说的<a href="https://time.geekbang.org/column/article/423602">Tablet Server的注册</a>。</p>
+<p>我们可以用一个Chubby里面的目录/bigtable/tablet_servers，来存放所有上线的Tablet Server，每个Tablet Server都可以在里面创建一个文件，比如/bigtable/tablet_servers/ts1、/bigtable/tablet_servers/ts2… /bigtable/tablet_servers/ts100这样排列下去。</p>
+<p>Tablet Server会一直和Chubby之间维护着一个会话，一旦这个会话结束了，那么对应的节点会被自动删除掉，也就意味着这个节点下线无法使用了。这样，由于网络故障导致的Tablet Server下线，也会表现为会话超时，由此一来，它就很容易在Chubby这样的服务里面实现了。</p>
+<p>回顾一下我们之前讲过的Bigtable的论文，Bigtable的Master一旦发现这种情况，就会尝试去Chubby里面获取这个节点对应的锁，如果能够获取到，那么说明Master到Chubby的网络没有问题，Master就会认为是Tablet Server节点下线了，它就要去调度其他的Tablet Server，去承接这个下线了的服务器之前服务的那些tablet。Master只需要监控/bigtable/tablet_servers这个目录，就能够知道线上有哪些Tablet Server可供使用了。</p>
+<p>而为了减少Chubby的负载，我们不希望所有想要知道Chubby里面节点变更的客户端，都来不断地轮询查询各个目录和文件的最新变更。因为Chubby管理的通常是各种元数据，这些数据的变更并不频繁。所以，Chubby实现了一个<strong>事件通知的机制</strong>。</p>
+<p>这是一个典型的设计模式中的<strong>观察者模型（observer pattern）</strong>。客户端可以注册它自己对哪些事件感兴趣，比如特定目录或者文件的内容变更，或者是或者是某个文件或者目录被删除了，一旦这些事件发生了，Chubby就会推送对应的事件信息给这些应用客户端，应用客户端就可以去做类似于调度Tablet Server这样的操作了。</p>
+<p><img alt="图片" src="https://static001.geekbang.org/resource/image/ca/7c/cace0104113ccffa85c2a56ce40b007c.jpg?wh=1920x1080" title="Chubby支持监听的事件类型" /></p>
+<h3 id="chubby_4">Chubby作为分布式锁的挑战</h3>
+<p>现在我们知道，每一个Chubby的目录或者文件，就是一把锁。那么是不是我们有了锁之后，分布式共识的问题就被解决了呢？如果你是这么想的，那么你肯定还没有在网络延时上吃到足够的亏。</p>
+<p>首先，作为分布式锁，客户端去获取的锁都是有时效的，也就是它只能占用这个锁一段时间。这个和我们前面提到的Chubby的Master的“租约”原理类似，<strong>主要是为了避免某个客户端获取了锁之后，它因为网络或者硬件原因下线了。</strong></p>
+<p>这样乍一听起来，我们只要给锁的时间设置一个时效就好了。不过，一旦涉及到不可靠的网络，事情就没有那么简单了。</p>
+<p>Chubby的论文里给出了这样一种情况，我们可以一起来看一下：</p>
+<ul>
+<li>我们有一个应用的客户端A，获取了某个Chubby里面的锁，比方说/chubby/geektime这个文件。A对这个节点的租期呢，是一段时间T。而这个锁，是告诉我们这个客户端可以往外部的Bigtable数据库的一个geektime的行，写入数据。</li>
+<li>在获取到了锁之后，过了一小段时间，A仍然还持有这个锁，于是A就向Bigtable发起一个请求X，想要往geektime这个行里面去写入数据。</li>
+<li>但是这个时候，可能A和Bigtable之间的网络非常拥堵，这个请求花了比较长的时间才到达Bigtable。</li>
+<li>而当这个写入请求X还在路上的时候，客户端A的“租约”到期了。这个时候，另外一个客户端B获取到了对应的锁，然后它往这个Bigtable的geektime的行里，写入了数据Y。</li>
+<li>当Y被写入之后，请求X才到了Bigtable。但是Bigtable并不知道谁拥有锁，它只会认为应用层面已经通过锁，实现了对于资源的保护。那么，之前客户端A的数据会覆盖掉客户端B写入的数据。但是这个情况肯定是我们不愿意接受的，因为对于客户端B来说，我明明已经持有了锁，为什么我写入的数据会被此时此刻没有锁的人覆盖掉呢？而且，客户端A的数据也是更早版本的数据。</li>
+</ul>
+<p>这个就好像你租了一个仓库，租期是一年。你呢，在租期快要到期的时候，向仓库里发了一批货。但是因为物流延误，货在路上耽搁了。当你的仓库租期到期的时候，房东把仓库租给了别人，别人也已经往仓库里面放了他自己的货物。而这个时候，你的货到了，但是因为仓库的门卫并不知道房东把仓库租给了谁，它不会检查你是不是还租着仓库，就直接把你的货物也入库了，而把新的租客的货物给“覆盖”掉了。</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/e8/cc/e8536914798d1a31b98b2a0a1c3520cc.jpg?wh=2000x1125" title="因为网络延时，并不是获取到锁，写入数据就能保障我们期望的线性一致的表现的了" /></p>
+<p>当然，Chubby也解决了这个问题，它主要是通过两种方式来解决的。</p>
+<ul>
+<li><strong>首先是锁延迟（lock-delay）</strong></li>
+</ul>
+<p>也就是当客户端A的“租约”不是正常到期由客户端主动释放的话，它会让客户端继续持有这个锁一段时间。这很好理解，如果是客户端主动释放的话，意味着它已经明确告诉Chubby，我不会再往里面写入数据。而没有主动释放，很有可能是还有请求在网络上传输，我们就再稍微等一会儿。</p>
+<p>而如果等一会儿还是没有过来，那么Chubby就会再把锁释放掉。这个就好像你在现实生活中租房子，租约要到期了，如果你是主动和房东说你不再续租了，房东自然可以立刻租给别人。但是可能你因为出差或者疫情隔离，没有来得及和房东沟通，房东也会善意地多等你几天，直到一段时间之后你还是失去联系了，才再会去租给别人。</p>
+<ul>
+<li><strong>其次是锁序列器（lock-sequencer）</strong></li>
+</ul>
+<p>它本质上是一个<a href="https://en.wikipedia.org/wiki/Optimistic_concurrency_control">乐观锁</a>，或者在很多地方也叫做Fencing令牌。这种方式是这样的：客户端在获取Chubby的锁的时候，就要拿到对应的锁的序号，比方说23。在发送请求的时候，客户端会带上这个序号。而当Chubby把锁给了别的客户端之后，对应的锁的序号会变大，变成了24。而我们对应的业务服务，比如Bigtable呢，也要记录每次请求的锁序列号，通过对比锁序列号来确定是否会有之前的锁，尝试去覆盖最新的数据。当遇到这种情况的时候，我们姗姗来迟的来自上一个锁的客户端请求，就会被业务服务拒绝掉。</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/bb/b6/bb7cdd1e84de98e1b8ddee3ebd0f12b6.jpg?wh=2000x1125" title="通过一个锁序列器这样的一个乐观锁的解决方案，我们避免了网络延迟带来的数据不一致性" /></p>
+<p>所以你会看到，Chubby的每个锁，除了文件、目录本身，以及ACL权限这样的元数据之外，还有这样四个编号。</p>
+<ul>
+<li><strong>实例编号</strong>（instance number）：当这个“节点”每次被创建的时候自增。</li>
+<li><strong>文件内容编号</strong>（content generation number）：当文件内容被写入的时候会自增。</li>
+<li><strong>锁编号</strong>（lock generation number）：当锁从“释放”（Free）的状态转变为“持有”（Held）的状态的时候自增。</li>
+<li><strong>ACL编号</strong>（ACL generation number）：当这个“节点”的权限ACL信息更新的时候会自增。</li>
+</ul>
+<p>这样，通过锁编号，我们就很容易实现前面所说的锁序列器的功能。其他的编号，也都是实现了数据的“版本”功能。这个也使得我们在不确定的网络情况下，能确保写入的数据是按照我们期望的顺序。如果我们尝试拿过时“版本”的锁来更新最新的数据，那么更新就不会成功。</p>
+<h3 id="caching">留给你自己读的Caching部分</h3>
+<p>最后，和其他的分布式系统一样，为了提升性能，Chubby也会在客户端里维护它拿到的数据缓存。Chubby也有像代理、分区等等其他一系列的机制，来让整个系统更容易扩展，不过这些，就不是Chubby在整个大数据领域的核心和重点功能了，我把这部分内容留给你自己去好好研读啦。</p>
+<h2 id="_1">小结</h2>
+<p>我们漫长的旅程终于告一段落了。在过去三讲里，我们从GFS的Master的“同步复制”这个需求出发，逐步了解了两阶段提交、三阶段提交，以及Paxos算法，并且最终在今天一起学习完了Chubby的论文。</p>
+<p>我们能看到，Google并没有非常僵化地在所有的分布式系统里面，都简单通过实现一遍Paxos算法，来解决单点故障问题，<strong>而是选择通过Chubby实现了一个粗粒度的锁</strong>。这个锁，只是帮助我们解决大型分布式系统的元数据管理的一致性，以及Master节点出现故障后的容错恢复问题。</p>
+<p>因为<strong>大型分布式系统，并不是时时刻刻都会出现数据不一致的风险的</strong>。把“哪一个是Master”这个问题通过共识算法来解决，我们在系统的容错恢复上，就避免了出现两个Master的情况。而Chubby也是一个非常适合拿来管理非常重要的元数据的地方，这一点我们在Bigtable的论文里，其实已经看到了。</p>
+<p>Chubby的系统本身，其实是通过Paxos实现了多个BerkeleyDB之间日志的同步复制。Chubby相当于是在BerkeleyDB之上，封装好了一个Unix文件系统形式的对外访问接口。并且，为了减轻自己的负载，Chubby还实现了一个<strong>观察者模式</strong>，外部的客户端可以监听Chubby里的某一个“目录”或者“文件”，一旦内容变更，Chubby会通知这些客户端，而不需要客户端反复过来轮询。这个也是为了提升系统的整体性能。</p>
+<p>另外，由于网络延时的存在，即使我们的客户端获取到了锁，当写入请求到达锁对应的业务系统的时候，可能这个锁已经过期了。这个会导致我们错误地用旧数据去覆盖新数据，或者说，在没有获取对应资源的锁的情况下，写入了数据。不过，Chubby通过<strong>锁延迟和锁序列器</strong>这两种方式解决了这个问题。</p>
+<p>可以看到，和所有之前Google发布的系统一样，Chubby并没有发明什么新的理论，而是巧妙地通过系统工程，来保障系统的可用性。并且在这个过程中，Google选择了尽可能使用各种一般工程师都熟悉的编程模型。Google没有开发一个Paxos库，让所有工程师去学习分布式共识算法，而是提供了一个分布式锁服务Chubby。而在Chubby里，提供的也是我们熟悉的类似Unix的文件系统、观察者模式这样，普通工程师耳熟能详的编程模型。</p>
+<p>这一点，在大型组织中设计基础设施的时候非常关键。<strong>我们设计系统的时候，不能光考虑对应系统的功能，如何让整个系统对于其他团队的开发者和使用者易用，也非常关键。</strong>我们不仅在Chubby这个系统里看到了这一点，从GFS、MapReduce、Bigtable这些系统里面也能看到这个设计思路，其实这是一个一以贯之的设计思想。</p>
+<p>到这里，我们对于大数据论文的基础知识部分就已经学习完了。接下来，我们就要迈入对于大数据论文里面关于数据库部分的学习啦。</p>
+<h2 id="_2">推荐阅读</h2>
+<p>市面上，对于Paxos算法的教程和分析着实不少，但是对于Chubby这篇论文的讲解反倒是不太容易找到。如果你希望阅读中文资料，我推荐你去读一读<a href="https://book.douban.com/subject/26292004/">《从Paxos到Zookeeper-分布式一致性原理与实践》</a>这本书的第三章，里面有对Chubby系统比较详细的讲解。如果你习惯于看视频的话，那么这个Youtube上，Data Council社区放出来的关于Chubby的<a href="https://www.youtube.com/watch?v=PqItueBaiRg">讲解视频</a>，值得去好好看一看。</p>
+<h2 id="_3">思考题</h2>
+<p>最后，给你留一道思考题。</p>
+<p>我们之前提到过分布式系统的CAP三者难以同时满足的问题，并且我们也看到，两阶段提交是一个CP系统，保障一致性但是会牺牲可用性。而三阶段提交则是一个AP系统，提升可用性但是会牺牲一致性。</p>
+<p>那么，在使用Chubby帮助我们解决了Master的容错切换问题之后，我们的系统在CAP上是否都满足了呢？有人说，CAP之间难以满足是一个伪问题，在学完了过去这几讲之后，你对这个问题的看法是什么呢？</p>
+<p>欢迎在留言区分享下你的观点，和其他同学共同讨论学习。</p>
+<div><strong>精选留言（10）</strong></div>
+<ul>
+<li><span>Cc</span> 👍（6） 💬（0）<p>选主的时候没有办法提供服务 应该是牺牲了可用性吧</p>2021-10-22</li><br/><li><span>Geek_26755e</span> 👍（2） 💬（0）<p>介绍 lock-sequencer 这种方案时作者似乎漏了一种子方案？即在应用侧收到请求时拿着 sequencer 去 consistent cache 中校验一把锁是否还有效，这个子方案相比应用侧只校验 lock generation number 单增适用范围更广（比方说支持多对象的资源锁），缺点是要维护 session（其中含有 cache）。不知道这种子方案在业界是否有实践应用呢？
+
+对应原文：
+The recipient server is expected to test whether the sequencer is still valid and has the appropriate mode; if not, it should reject the request. The validity of a sequencer can be checked against the server’s Chubby cache or, if the server does not wish to maintain a session with Chubby, against the most recent sequencer that the server has observed.</p>2023-01-28</li><br/><li><span>泊浮目</span> 👍（2） 💬（0）<p>&quot;CAP 之间难以满足是一个伪问题&quot;感觉要引出BASE了啊</p>2021-10-27</li><br/><li><span>Geek_26755e</span> 👍（1） 💬（0）<p>关于思考题：使用 Chubby 提高了应用层 Master 的可用性并不是解决了可用性问题，实际是 Chubby 向外屏蔽了可用性问题（基于 Paxos 的服务如果挂了多余半数的服务也就不能向外服务了，如果向外提供服务就是牺牲了一致性）。</p>2023-01-28</li><br/><li><span>边城路远</span> 👍（1） 💬（0）<p>master挂掉后，临时文件被释放，这个时候backup master观察到这一事件去创建文件（拿到锁）将自己的ip和port写入，从而实现master模块的高可用</p>2022-04-09</li><br/><li><span>LJK</span> 👍（1） 💬（1）<p>老师好，所以通过chubby选master的话只是在master选举上达到共识，解决了谁是master的问题，这个跟big table里面存储的数据本身的一致性有什么关系吗？
+我理解对数据的写入和同步机制好像没什么影响，一些replica如果和master之间有同步延迟的话还是会产生数据不一致，不知道这个理解对吗？</p>2022-01-23</li><br/><li><span>核桃</span> 👍（0） 💬（0）<p>关于CAP的选择，目前很多系统是追求最终一致性比较多的，牺牲了可用性，例如leader切换的时候，事务的执行是非常容易出现问题的。但是实际上，学术界也有论文讲述了这个问题，在master切换的时候，并不需要停止原来的业务，可以通过repair这些算法来修复，但是难度会很大，这些目前我们也在逐渐实现。</p>2022-02-19</li><br/><li><span>clpsz</span> 👍（0） 💬（0）<p>重剑无锋</p>2022-02-13</li><br/><li><span>青阳</span> 👍（0） 💬（1）<p>怎么感觉和redis的哨兵集群有点相似</p>2021-11-19</li><br/><li><span>hunt5</span> 👍（0） 💬（1）<p>非常感谢作者的分享 受益匪浅哈
+有个问题:
+1.Chubby发现master断掉需要选出新的master
+2.master失效的广播由于网络分区没有到达客户端A
+3.客户端A依旧发数据到挂掉的master进行二阶段提交
+4.客户端B发数据到新的master进行二阶段提交
+所以是否每次写入都要和Chubby交互来保持一致性呢?</p>2021-11-04</li><br/>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="页脚" >
+        
+          
+          <a href="../13%20-%20%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81Chubby%EF%BC%88%E4%BA%8C%EF%BC%89%20%EF%BC%9A%E4%BC%97%E5%8F%A3%E9%93%84%E9%87%91%E7%9A%84%E7%9C%9F%E7%9B%B8/" class="md-footer__link md-footer__link--prev" aria-label="上一页: 13   分布式锁Chubby（二） ：众口铄金的真相">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                上一页
+              </span>
+              <div class="md-ellipsis">
+                13   分布式锁Chubby（二） ：众口铄金的真相
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../15%20-%20Hive%EF%BC%9A%E6%9D%A5%E6%9D%A5%E5%8E%BB%E5%8E%BB%E7%9A%84DSL%EF%BC%8C%E6%B0%B8%E7%94%9F%E4%B8%8D%E6%AD%BB%E7%9A%84SQL/" class="md-footer__link md-footer__link--next" aria-label="下一页: 15   Hive：来来去去的DSL，永生不死的SQL">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                下一页
+              </span>
+              <div class="md-ellipsis">
+                15   Hive：来来去去的DSL，永生不死的SQL
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright © 2025-Present zkep
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["content.code.annotate", "content.code.copy", "content.tooltips", "toc.follow", "navigation.top", "navigation.tabs", "navigation.tabs.sticky", "navigation.prune", "navigation.footer", "navigation.tracking", "navigation.instant", "navigation.instant.progress", "navigation.indexes", "content.tabs.link"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../../javascript/extra.js"></script>
+      
+        <script src="../../../javascript/giscus.js"></script>
+      
+        <script src="../../../javascript/referrerpolicy.js"></script>
+      
+    
+  </body>
+</html>

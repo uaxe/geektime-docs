@@ -1,0 +1,6489 @@
+<!--geek time docs 🚀, MIT license-->
+
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="极客时间文档">
+      
+      
+        <meta name="author" content="zkep">
+      
+      
+        <link rel="canonical" href="https://github.com/uaxe/geektime-docs/%E8%BF%90%E7%BB%B4-%E6%B5%8B%E8%AF%95/eBPF%E6%A0%B8%E5%BF%83%E6%8A%80%E6%9C%AF%E4%B8%8E%E5%AE%9E%E6%88%98/04%20-%20%E8%BF%90%E8%A1%8C%E5%8E%9F%E7%90%86%EF%BC%9AeBPF%E6%98%AF%E4%B8%80%E4%B8%AA%E6%96%B0%E7%9A%84%E8%99%9A%E6%8B%9F%E6%9C%BA%E5%90%97%EF%BC%9F/">
+      
+      
+        <link rel="prev" href="../03%20-%20%E5%88%9D%E7%AA%A5%E9%97%A8%E5%BE%84%EF%BC%9A%E5%BC%80%E5%8F%91%E5%B9%B6%E8%BF%90%E8%A1%8C%E4%BD%A0%E7%9A%84%E7%AC%AC%E4%B8%80%E4%B8%AAeBPF%E7%A8%8B%E5%BA%8F/">
+      
+      
+        <link rel="next" href="../05%20-%20%E7%BC%96%E7%A8%8B%E6%8E%A5%E5%8F%A3%EF%BC%9AeBPF%E7%A8%8B%E5%BA%8F%E6%98%AF%E6%80%8E%E4%B9%88%E8%B7%9F%E5%86%85%E6%A0%B8%E8%BF%9B%E8%A1%8C%E4%BA%A4%E4%BA%92%E7%9A%84%EF%BC%9F/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../None">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>04 运行原理：eBPF是一个新的虚拟机吗？ - 极客时间文档</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../../stylesheets/style.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#ebpf" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+        <aside class="md-banner">
+          <div class="md-banner__inner md-grid md-typeset">
+            
+            
+
+
+          </div>
+          
+        </aside>
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../../.." title="极客时间文档" class="md-header__button md-logo" aria-label="极客时间文档" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            极客时间文档
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              04   运行原理：eBPF是一个新的虚拟机吗？
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="indigo"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/zkep/my-geektime" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    zkep/my-geektime
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="标签" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../AI-%E5%A4%A7%E6%95%B0%E6%8D%AE/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  AI-大数据
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E4%BA%A7%E5%93%81-%E8%BF%90%E8%90%A5/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  产品-运营
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E5%89%8D%E7%AB%AF-%E7%A7%BB%E5%8A%A8/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  前端-移动
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E5%90%8E%E7%AB%AF-%E6%9E%B6%E6%9E%84/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  后端-架构
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E7%AE%A1%E7%90%86-%E6%88%90%E9%95%BF/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  管理-成长
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E8%AE%A1%E7%AE%97%E6%9C%BA%E5%9F%BA%E7%A1%80/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  计算机基础
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  运维-测试
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="极客时间文档" class="md-nav__button md-logo" aria-label="极客时间文档" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    极客时间文档
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/zkep/my-geektime" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    zkep/my-geektime
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../AI-%E5%A4%A7%E6%95%B0%E6%8D%AE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI-大数据
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E4%BA%A7%E5%93%81-%E8%BF%90%E8%90%A5/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    产品-运营
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E5%89%8D%E7%AB%AF-%E7%A7%BB%E5%8A%A8/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    前端-移动
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E5%90%8E%E7%AB%AF-%E6%9E%B6%E6%9E%84/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    后端-架构
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E7%AE%A1%E7%90%86-%E6%88%90%E9%95%BF/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    管理-成长
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E8%AE%A1%E7%AE%97%E6%9C%BA%E5%9F%BA%E7%A1%80/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    计算机基础
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    运维-测试
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    运维-测试
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../AI%E9%87%8D%E5%A1%91%E4%BA%91%E5%8E%9F%E7%94%9F%E5%BA%94%E7%94%A8%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98/AI%E9%87%8D%E5%A1%91%E4%BA%91%E5%8E%9F%E7%94%9F%E5%BA%94%E7%94%A8%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI重塑云原生应用开发实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../DevOps%E5%AE%9E%E6%88%98%E7%AC%94%E8%AE%B0/DevOps%E5%AE%9E%E6%88%98%E7%AC%94%E8%AE%B0/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DevOps实战笔记
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Kubernetes%E5%85%A5%E9%97%A8%E5%AE%9E%E6%88%98%E8%AF%BE/Kubernetes%E5%85%A5%E9%97%A8%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kubernetes入门实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Linux%E5%86%85%E6%A0%B8%E6%8A%80%E6%9C%AF%E5%AE%9E%E6%88%98%E8%AF%BE/Linux%E5%86%85%E6%A0%B8%E6%8A%80%E6%9C%AF%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux内核技术实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Linux%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E5%AE%9E%E6%88%98/Linux%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux性能优化实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../SRE%E5%AE%9E%E6%88%98%E6%89%8B%E5%86%8C/SRE%E5%AE%9E%E6%88%98%E6%89%8B%E5%86%8C/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SRE实战手册
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../SRE%E5%AE%9E%E8%B7%B5%EF%BC%9A%E6%9C%8D%E5%8A%A1%E5%8F%AF%E9%9D%A0%E6%80%A7%E6%A1%88%E4%BE%8B%E8%AF%BE/SRE%E5%AE%9E%E8%B7%B5%EF%BC%9A%E6%9C%8D%E5%8A%A1%E5%8F%AF%E9%9D%A0%E6%80%A7%E6%A1%88%E4%BE%8B%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SRE实践：服务可靠性案例课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Serverless%E8%BF%9B%E9%98%B6%E5%AE%9E%E6%88%98%E8%AF%BE/Serverless%E8%BF%9B%E9%98%B6%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serverless进阶实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Web%E6%BC%8F%E6%B4%9E%E6%8C%96%E6%8E%98%E5%AE%9E%E6%88%98/Web%E6%BC%8F%E6%B4%9E%E6%8C%96%E6%8E%98%E5%AE%9E%E6%88%98/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web漏洞挖掘实战
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_11" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7_11" id="__nav_7_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    eBPF核心技术与实战
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_11_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    eBPF核心技术与实战
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../eBPF%E6%A0%B8%E5%BF%83%E6%8A%80%E6%9C%AF%E4%B8%8E%E5%AE%9E%E6%88%98/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    eBPF核心技术与实战
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%BC%80%E7%AF%87%E8%AF%8D%20-%20%E6%83%B3%E8%A6%81%E6%B4%9E%E6%82%89%E7%B3%BB%E7%BB%9F%E5%BA%95%E5%B1%82%E7%9A%84%E9%BB%91%E7%9B%92%EF%BC%9F%E5%85%88%E6%8E%8C%E6%8F%A1eBPF/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    开篇词   想要洞悉系统底层的黑盒？先掌握eBPF
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01-%E6%8A%80%E6%9C%AF%E6%A6%82%E8%A7%88%EF%BC%9AeBPF%E7%9A%84%E5%8F%91%E5%B1%95%E5%8E%86%E7%A8%8B%E5%8F%8A%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01 技术概览：eBPF的发展历程及工作原理
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02%20-%20%E5%85%88%E5%88%A9%E5%85%B6%E5%99%A8%EF%BC%9A%E5%A6%82%E4%BD%95%E9%AB%98%E6%95%88%E5%AD%A6%E4%B9%A0eBPF%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    02   先利其器：如何高效学习eBPF？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03%20-%20%E5%88%9D%E7%AA%A5%E9%97%A8%E5%BE%84%EF%BC%9A%E5%BC%80%E5%8F%91%E5%B9%B6%E8%BF%90%E8%A1%8C%E4%BD%A0%E7%9A%84%E7%AC%AC%E4%B8%80%E4%B8%AAeBPF%E7%A8%8B%E5%BA%8F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    03   初窥门径：开发并运行你的第一个eBPF程序
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04   运行原理：eBPF是一个新的虚拟机吗？
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04   运行原理：eBPF是一个新的虚拟机吗？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#ebpf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        eBPF 虚拟机是如何工作的？
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bpf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BPF 指令是什么样的？
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ebpf_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        eBPF 程序是什么时候执行的？
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        小结
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        思考题
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05%20-%20%E7%BC%96%E7%A8%8B%E6%8E%A5%E5%8F%A3%EF%BC%9AeBPF%E7%A8%8B%E5%BA%8F%E6%98%AF%E6%80%8E%E4%B9%88%E8%B7%9F%E5%86%85%E6%A0%B8%E8%BF%9B%E8%A1%8C%E4%BA%A4%E4%BA%92%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05   编程接口：eBPF程序是怎么跟内核进行交互的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06%20-%20%E4%BA%8B%E4%BB%B6%E8%A7%A6%E5%8F%91%EF%BC%9A%E5%90%84%E7%B1%BBeBPF%E7%A8%8B%E5%BA%8F%E7%9A%84%E8%A7%A6%E5%8F%91%E6%9C%BA%E5%88%B6%E5%8F%8A%E5%85%B6%E5%BA%94%E7%94%A8%E5%9C%BA%E6%99%AF/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06   事件触发：各类eBPF程序的触发机制及其应用场景
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07%20-%20%E5%86%85%E6%A0%B8%E8%B7%9F%E8%B8%AA%EF%BC%88%E4%B8%8A%EF%BC%89%EF%BC%9A%E5%A6%82%E4%BD%95%E6%9F%A5%E8%AF%A2%E5%86%85%E6%A0%B8%E4%B8%AD%E7%9A%84%E8%B7%9F%E8%B8%AA%E7%82%B9%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    07   内核跟踪（上）：如何查询内核中的跟踪点？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08-%E5%86%85%E6%A0%B8%E8%B7%9F%E8%B8%AA%EF%BC%88%E4%B8%8B%EF%BC%89%EF%BC%9A%E5%BC%80%E5%8F%91%E5%86%85%E6%A0%B8%E8%B7%9F%E8%B8%AA%E7%A8%8B%E5%BA%8F%E7%9A%84%E8%BF%9B%E9%98%B6%E6%96%B9%E6%B3%95/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    08 内核跟踪（下）：开发内核跟踪程序的进阶方法
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09%20-%20%E7%94%A8%E6%88%B7%E6%80%81%E8%B7%9F%E8%B8%AA%EF%BC%9A%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A8eBPF%E6%8E%92%E6%9F%A5%E5%BA%94%E7%94%A8%E7%A8%8B%E5%BA%8F%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    09   用户态跟踪：如何使用eBPF排查应用程序？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10%20-%20%E7%BD%91%E7%BB%9C%E8%B7%9F%E8%B8%AA%EF%BC%9A%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A8eBPF%E6%8E%92%E6%9F%A5%E7%BD%91%E7%BB%9C%E9%97%AE%E9%A2%98%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10   网络跟踪：如何使用eBPF排查网络问题？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../11%20-%20%E5%AE%B9%E5%99%A8%E5%AE%89%E5%85%A8%EF%BC%9A%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A8eBPF%E5%A2%9E%E5%BC%BA%E5%AE%B9%E5%99%A8%E5%AE%89%E5%85%A8%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    11   容器安全：如何使用eBPF增强容器安全？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../12-%E9%AB%98%E6%80%A7%E8%83%BD%E7%BD%91%E7%BB%9C%E5%AE%9E%E6%88%98%EF%BC%88%E4%B8%8A%EF%BC%89%EF%BC%9A%E5%A6%82%E4%BD%95%E5%BC%80%E5%8F%91%E4%B8%80%E4%B8%AA%E8%B4%9F%E8%BD%BD%E5%9D%87%E8%A1%A1%E5%99%A8%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    12 高性能网络实战（上）：如何开发一个负载均衡器？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13-%E9%AB%98%E6%80%A7%E8%83%BD%E7%BD%91%E7%BB%9C%E5%AE%9E%E6%88%98%EF%BC%88%E4%B8%8B%EF%BC%89%EF%BC%9A%E5%A6%82%E4%BD%95%E5%AE%8C%E5%96%84%E8%B4%9F%E8%BD%BD%E5%9D%87%E8%A1%A1%E5%99%A8%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    13 高性能网络实战（下）：如何完善负载均衡器？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%A4%A7%E5%92%96%E5%8A%A9%E5%9C%BA-%E6%9D%8E%E7%A8%8B%E8%BF%9C%EF%BC%9A%E8%B0%88%E8%B0%88eBPF%E5%9C%A8%E4%BA%91%E5%8E%9F%E7%94%9F%E4%B8%AD%E7%9A%84%E7%BA%B5%E4%B8%8E%E6%A8%AA/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    大咖助场 李程远：谈谈eBPF在云原生中的纵与横
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E7%94%A8%E6%88%B7%E6%95%85%E4%BA%8B-eBPF%E4%BB%8E%E5%85%A5%E9%97%A8%E5%88%B0%E6%94%BE%E5%BC%83%EF%BC%9F%E5%9C%A8%E5%AE%9E%E8%B7%B5%E4%B8%AD%E6%89%BE%E5%88%B0%E7%AA%81%E7%A0%B4%E5%8F%A3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    用户故事 eBPF从入门到放弃？在实践中找到突破口
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../14-%E9%98%B6%E6%AE%B5%E6%80%BB%E7%BB%93%EF%BC%9A%E5%AE%9E%E7%94%A8eBPF%E5%B7%A5%E5%85%B7%E5%8F%8A%E6%9C%80%E6%96%B0%E5%BC%80%E6%BA%90%E9%A1%B9%E7%9B%AE%E6%80%BB%E7%BB%93/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    14 阶段总结：实用eBPF工具及最新开源项目总结
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../15-%E6%9C%AA%E6%9D%A5%E5%8F%AF%E6%9C%9F%EF%BC%9A%E9%82%80%E4%BD%A0%E4%B8%8EeBPF%E5%85%B1%E8%B5%B4%E4%B8%80%E5%9C%BA%E6%8A%80%E6%9C%AF%E9%9D%A9%E6%96%B0%E4%B9%8B%E7%BA%A6/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    15 未来可期：邀你与eBPF共赴一场技术革新之约
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../16-%E9%9A%BE%E7%82%B9%E8%A7%A3%E6%9E%90%EF%BC%9AeBPF%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA%E5%8F%8A%E5%86%85%E6%A0%B8%E7%BC%96%E8%AF%91%E8%AF%A6%E8%A7%A3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    16 难点解析：eBPF开发环境搭建及内核编译详解
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../17-%E9%9A%BE%E7%82%B9%E8%A7%A3%E6%9E%90%EF%BC%9AeBPF%E5%A4%9A%E5%86%85%E6%A0%B8%E7%89%88%E6%9C%AC%E5%85%BC%E5%AE%B9%E8%AF%A6%E8%A7%A3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    17 难点解析：eBPF多内核版本兼容详解
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../18-%E5%B9%B4%E5%BA%A6%E6%80%BB%E7%BB%93%EF%BC%9AeBPF%E7%9A%842022%E4%B9%8B%E6%97%85/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    18 年度总结：eBPF的2022之旅
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../19-%E6%A1%88%E4%BE%8B%E8%A7%A3%E6%9E%90%EF%BC%9A%E4%BA%91%E5%8E%9F%E7%94%9F%E7%BD%91%E7%BB%9CCilium%E8%AF%A6%E8%A7%A3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    19 案例解析：云原生网络Cilium详解
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../20-%E5%AD%A6%E4%B9%A0%E8%B7%AF%E5%BE%84%EF%BC%9A%E5%80%9F%E5%8A%A9ChatGPT%E5%AD%A6%E4%B9%A0%E5%92%8C%E5%AE%9E%E8%B7%B5eBPF/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    20 学习路径：借助ChatGPT学习和实践eBPF
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../21-%E5%B9%B3%E5%8F%B0%E7%A7%BB%E6%A4%8D%EF%BC%9AWindows%E5%B9%B3%E5%8F%B0%E4%B8%8A%E7%9A%84eBPF%E5%AE%9E%E7%8E%B0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    21 平台移植：Windows平台上的eBPF实现
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../22-%E6%8A%80%E6%9C%AF%E8%A7%A3%E6%9E%90%EF%BC%9A%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A8Go%E5%BC%80%E5%8F%91eBPF%E7%A8%8B%E5%BA%8F%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    22 技术解析：如何使用Go开发eBPF程序？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../23-%E5%B9%B4%E5%BA%A6%E6%80%BB%E7%BB%93%EF%BC%9AeBPF%E7%9A%842023%E4%B9%8B%E6%97%85/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    23 年度总结：eBPF的2023之旅
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../24-%E6%8A%80%E6%9C%AF%E8%A7%A3%E6%9E%90%EF%BC%9AHTTPS%E8%B7%9F%E8%B8%AA%E8%AF%A6%E8%A7%A3%EF%BC%88%E4%B8%8A%EF%BC%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    24 技术解析：HTTPS跟踪详解（上）
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../25-%E6%8A%80%E6%9C%AF%E8%A7%A3%E6%9E%90%EF%BC%9AHTTPS%E8%B7%9F%E8%B8%AA%E8%AF%A6%E8%A7%A3%EF%BC%88%E4%B8%8B%EF%BC%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    25 技术解析：HTTPS跟踪详解（下）
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../26-%E6%8A%80%E6%9C%AF%E8%A7%A3%E6%9E%90%EF%BC%9AeBPF%E7%A8%8B%E5%BA%8F%E5%8F%82%E6%95%B0%E5%8E%9F%E7%90%86%E8%AF%A6%E8%A7%A3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    26 技术解析：eBPF程序参数原理详解
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../27%20-%20%E9%9A%BE%E7%82%B9%E8%A7%A3%E6%9E%90%EF%BC%9A%E5%A6%82%E4%BD%95%E8%B0%83%E8%AF%95eBPF%E7%A8%8B%E5%BA%8F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    27   难点解析：如何调试eBPF程序
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../28%20-%20%E5%B9%B4%E5%BA%A6%E6%80%BB%E7%BB%93%EF%BC%9AeBPF%E7%9A%842024%E4%B9%8B%E6%97%85/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    28   年度总结：eBPF的2024之旅
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E4%BA%91%E5%8E%9F%E7%94%9F%E5%9F%BA%E7%A1%80%E6%9E%B6%E6%9E%84%E5%AE%9E%E6%88%98%E8%AF%BE/%E4%BA%91%E5%8E%9F%E7%94%9F%E5%9F%BA%E7%A1%80%E6%9E%B6%E6%9E%84%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    云原生基础架构实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E5%8F%8D%E7%88%AC%E8%99%AB%E5%85%B5%E6%B3%95%E6%BC%94%E7%BB%8E20%E8%AE%B2/%E5%8F%8D%E7%88%AC%E8%99%AB%E5%85%B5%E6%B3%95%E6%BC%94%E7%BB%8E20%E8%AE%B2/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    反爬虫兵法演绎20讲
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E5%AE%89%E5%85%A8%E6%94%BB%E9%98%B2%E6%8A%80%E8%83%BD30%E8%AE%B2/%E5%AE%89%E5%85%A8%E6%94%BB%E9%98%B2%E6%8A%80%E8%83%BD30%E8%AE%B2/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    安全攻防技能30讲
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E5%AE%B9%E5%99%A8%E5%AE%9E%E6%88%98%E9%AB%98%E6%89%8B%E8%AF%BE/%E5%AE%B9%E5%99%A8%E5%AE%9E%E6%88%98%E9%AB%98%E6%89%8B%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    容器实战高手课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E9%AB%98%E6%89%8B%E8%AF%BE/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E9%AB%98%E6%89%8B%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    性能优化高手课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%80%A7%E8%83%BD%E6%B5%8B%E8%AF%95%E5%AE%9E%E6%88%9830%E8%AE%B2/%E6%80%A7%E8%83%BD%E6%B5%8B%E8%AF%95%E5%AE%9E%E6%88%9830%E8%AE%B2/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    性能测试实战30讲
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%8C%81%E7%BB%AD%E4%BA%A4%E4%BB%9836%E8%AE%B2/%E6%8C%81%E7%BB%AD%E4%BA%A4%E4%BB%9836%E8%AE%B2/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    持续交付36讲
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%8E%A5%E5%8F%A3%E6%B5%8B%E8%AF%95%E5%85%A5%E9%97%A8%E8%AF%BE/%E6%8E%A5%E5%8F%A3%E6%B5%8B%E8%AF%95%E5%85%A5%E9%97%A8%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    接口测试入门课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%B7%B1%E5%85%A5%E5%89%96%E6%9E%90Kubernetes/%E6%B7%B1%E5%85%A5%E5%89%96%E6%9E%90Kubernetes/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    深入剖析Kubernetes
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%B7%B1%E5%85%A5%E6%B5%85%E5%87%BA%E4%BA%91%E8%AE%A1%E7%AE%97/%E6%B7%B1%E5%85%A5%E6%B5%85%E5%87%BA%E4%BA%91%E8%AE%A1%E7%AE%97/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    深入浅出云计算
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E7%A8%8B%E5%BA%8F%E5%91%98%E7%9A%84%E6%B5%8B%E8%AF%95%E8%AF%BE/%E7%A8%8B%E5%BA%8F%E5%91%98%E7%9A%84%E6%B5%8B%E8%AF%95%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    程序员的测试课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E7%BD%91%E7%BB%9C%E6%8E%92%E6%9F%A5%E6%A1%88%E4%BE%8B%E8%AF%BE/%E7%BD%91%E7%BB%9C%E6%8E%92%E6%9F%A5%E6%A1%88%E4%BE%8B%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    网络排查案例课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%87%AA%E5%8A%A8%E5%8C%96%E6%B5%8B%E8%AF%95%E9%AB%98%E6%89%8B%E8%AF%BE/%E8%87%AA%E5%8A%A8%E5%8C%96%E6%B5%8B%E8%AF%95%E9%AB%98%E6%89%8B%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    自动化测试高手课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%AF%B4%E9%80%8F%E6%95%8F%E6%8D%B7/%E8%AF%B4%E9%80%8F%E6%95%8F%E6%8D%B7/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    说透敏捷
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%B5%B5%E6%88%90%E7%9A%84%E8%BF%90%E7%BB%B4%E4%BD%93%E7%B3%BB%E7%AE%A1%E7%90%86%E8%AF%BE/%E8%B5%B5%E6%88%90%E7%9A%84%E8%BF%90%E7%BB%B4%E4%BD%93%E7%B3%BB%E7%AE%A1%E7%90%86%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    赵成的运维体系管理课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%BD%AF%E4%BB%B6%E6%B5%8B%E8%AF%9552%E8%AE%B2/%E8%BD%AF%E4%BB%B6%E6%B5%8B%E8%AF%9552%E8%AE%B2/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    软件测试52讲
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%BF%90%E7%BB%B4%E7%9B%91%E6%8E%A7%E7%B3%BB%E7%BB%9F%E5%AE%9E%E6%88%98%E7%AC%94%E8%AE%B0/%E8%BF%90%E7%BB%B4%E7%9B%91%E6%8E%A7%E7%B3%BB%E7%BB%9F%E5%AE%9E%E6%88%98%E7%AC%94%E8%AE%B0/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    运维监控系统实战笔记
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E9%9B%B6%E5%9F%BA%E7%A1%80%E6%8B%BF%E4%B8%8B%E4%BA%91%E5%8E%9F%E7%94%9FCKA%E8%AE%A4%E8%AF%81/%E9%9B%B6%E5%9F%BA%E7%A1%80%E6%8B%BF%E4%B8%8B%E4%BA%91%E5%8E%9F%E7%94%9FCKA%E8%AE%A4%E8%AF%81/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    零基础拿下云原生CKA认证
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E9%AB%98%E6%A5%BC%E7%9A%84%E6%80%A7%E8%83%BD%E5%B7%A5%E7%A8%8B%E5%AE%9E%E6%88%98%E8%AF%BE/%E9%AB%98%E6%A5%BC%E7%9A%84%E6%80%A7%E8%83%BD%E5%B7%A5%E7%A8%8B%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    高楼的性能工程实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#ebpf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        eBPF 虚拟机是如何工作的？
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bpf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BPF 指令是什么样的？
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ebpf_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        eBPF 程序是什么时候执行的？
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        小结
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        思考题
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+  <h1>04   运行原理：eBPF是一个新的虚拟机吗？</h1>
+
+<p>你好，我是倪朋飞。</p>
+<p>上一讲，我带你一起搭建了 eBPF 的开发环境，并从最简单的 Hello World 开始，带你借助 BCC 库从零开发了一个跟踪 <a href="https://man7.org/linux/man-pages/man2/open.2.html">openat()</a> 系统调用的 eBPF 程序。</p>
+<p>不过，虽然第一个 eBPF 程序已经成功运行起来了，你很可能还在想：这个 eBPF 程序到底是如何编译成内核可识别的格式的？又是如何在内核中运行起来的？还有，既然允许普通用户去修改内核的行为，它又是如何确保内核安全的呢？</p>
+<p>今天，我就带你一起深入看看 eBPF 虚拟机的原理，以及 eBPF 程序是如何执行的。</p>
+<h2 id="ebpf">eBPF 虚拟机是如何工作的？</h2>
+<p>eBPF 是一个运行在内核中的虚拟机，很多人在初次接触它时，会把它跟系统虚拟化（比如kvm）中的虚拟机弄混。其实，虽然都被称为“虚拟机”，系统虚拟化和 eBPF 虚拟机还是有着本质不同的。</p>
+<p>系统虚拟化基于 x86 或 arm64 等通用指令集，这些指令集足以完成完整计算机的所有功能。而为了确保在内核中安全地执行，eBPF 只提供了非常有限的指令集。这些指令集可用于完成一部分内核的功能，但却远不足以模拟完整的计算机。为了更高效地与内核进行交互，eBPF 指令还有意采用了 C 调用约定，其提供的辅助函数可以在 C 语言中直接调用，极大地方便了 eBPF 程序的开发。</p>
+<p>如下图（图片来自 <a href="https://www.usenix.org/conference/lisa21/presentation/gregg-bpf">BPF Internals</a>）所示，eBPF 在内核中的运行时主要由 5 个模块组成：</p>
+<p><img alt="图片" src="https://static001.geekbang.org/resource/image/45/d2/453f8d99cea1b35da8f6c57e552yy3d2.png?wh=915x503" title="eBPF 运行时" /></p>
+<ul>
+<li>第一个模块是 <strong>eBPF 辅助函数</strong>。它提供了一系列用于 eBPF 程序与内核其他模块进行交互的函数。这些函数并不是任意一个 eBPF 程序都可以调用的，具体可用的函数集由 BPF 程序类型决定。关于 BPF 程序类型，我会在 06 讲 中进行讲解。</li>
+<li>第二个模块是 <strong>eBPF 验证器</strong>。它用于确保 eBPF 程序的安全。验证器会将待执行的指令创建为一个有向无环图（DAG），确保程序中不包含不可达指令；接着再模拟指令的执行过程，确保不会执行无效指令。</li>
+<li>第三个模块是由 <strong>11 个 64 位寄存器、一个程序计数器和一个 512 字节的栈组成的存储模块</strong>。这个模块用于控制 eBPF 程序的执行。其中，R0 寄存器用于存储函数调用和 eBPF 程序的返回值，这意味着函数调用最多只能有一个返回值；R1-R5 寄存器用于函数调用的参数，因此函数调用的参数最多不能超过 5 个；而 R10 则是一个只读寄存器，用于从栈中读取数据。</li>
+<li>第四个模块是<strong>即时编译器</strong>，它将 eBPF 字节码编译成本地机器指令，以便更高效地在内核中执行。</li>
+<li>第五个模块是 <strong>BPF 映射（map）</strong>，它用于提供大块的存储。这些存储可被用户空间程序用来进行访问，进而控制 eBPF 程序的运行状态。</li>
+</ul>
+<p>关于 BPF 辅助函数和 BPF 映射的具体内容，我在后面的课程中还会为你详细介绍。接下来，我们先来看看 BPF 指令的具体格式，以及它是如何加载到内核中，又是何时运行的。</p>
+<h2 id="bpf">BPF 指令是什么样的？</h2>
+<p>只看图中的这些模块，你可能觉得它们并不是太直观。所以接下来，我们还是用上一讲的 Hello World 作为例子，一起看下 BPF 指令到底是什么样子的。</p>
+<p>首先，回顾一下上一讲的 eBPF 程序 Hello World 的源代码。它的逻辑其实很简单，先调用  <code>bpf_trace_printk</code> 输出一个 “Hello, World!” 字符串，然后就返回成功了：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kt">int</span><span class="w"> </span><span class="nf">hello_world</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">ctx</span><span class="p">)</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="p">{</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">bpf_trace_printk</span><span class="p">(</span><span class="s">&quot;Hello, World!&quot;</span><span class="p">);</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="p">}</span>
+</code></pre></div>
+<p>然后，我们通过 BCC 的 Python 库，加载并运行了这个 eBPF 程序：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="ch">#!/usr/bin/env python3</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="c1"># This is a Hello World example of BPF.</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">bcc</span><span class="w"> </span><span class="kn">import</span> <span class="n">BPF</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="c1"># load BPF program</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">b</span> <span class="o">=</span> <span class="n">BPF</span><span class="p">(</span><span class="n">src_file</span><span class="o">=</span><span class="s2">&quot;hello.c&quot;</span><span class="p">)</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="n">b</span><span class="o">.</span><span class="n">attach_kprobe</span><span class="p">(</span><span class="n">event</span><span class="o">=</span><span class="s2">&quot;do_sys_openat2&quot;</span><span class="p">,</span> <span class="n">fn_name</span><span class="o">=</span><span class="s2">&quot;hello_world&quot;</span><span class="p">)</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="n">b</span><span class="o">.</span><span class="n">trace_print</span><span class="p">()</span>
+</code></pre></div>
+<p>在终端中运行下面的命令，就可以启动这个 eBPF 程序（注意， BCC 帮你完成了编译和加载的过程）：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">sudo</span> <span class="n">python3</span> <span class="n">hello</span><span class="o">.</span><span class="n">py</span>
+</code></pre></div>
+<p><strong>接下来，我为你介绍一个新的工具 bpftool，用它可以查看 eBPF 程序的运行状态。</strong></p>
+<p>首先，打开一个新的终端，执行下面的命令，查询系统中正在运行的 eBPF 程序：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># sudo bpftool prog list</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="m">89</span>:<span class="w"> </span>kprobe<span class="w">  </span>name<span class="w"> </span>hello_world<span class="w">  </span>tag<span class="w"> </span>38dd440716c4900f<span class="w">  </span>gpl
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>loaded_at<span class="w"> </span><span class="m">2021</span>-11-27T13:20:45+0000<span class="w">  </span>uid<span class="w"> </span><span class="m">0</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>xlated<span class="w"> </span>104B<span class="w">  </span>jited<span class="w"> </span>70B<span class="w">  </span>memlock<span class="w"> </span>4096B
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>btf_id<span class="w"> </span><span class="m">131</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>pids<span class="w"> </span>python3<span class="o">(</span><span class="m">152027</span><span class="o">)</span>
+</code></pre></div>
+<p>输出中，89 是这个 eBPF 程序的编号，kprobe 是程序的类型，而 hello_world 是程序的名字。</p>
+<p>有了 eBPF 程序编号之后，执行下面的命令就可以导出这个 eBPF 程序的指令（注意把 89 替换成你查询到的编号）：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sudo<span class="w"> </span>bpftool<span class="w"> </span>prog<span class="w"> </span>dump<span class="w"> </span>xlated<span class="w"> </span>id<span class="w"> </span><span class="m">89</span>
+</code></pre></div>
+<p>你会看到如下所示的输出：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>int<span class="w"> </span>hello_world<span class="o">(</span>void<span class="w"> </span>*<span class="w"> </span>ctx<span class="o">)</span>:
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="p">;</span><span class="w"> </span>int<span class="w"> </span>hello_world<span class="o">(</span>void<span class="w"> </span>*ctx<span class="o">)</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="m">0</span>:<span class="w"> </span><span class="o">(</span>b7<span class="o">)</span><span class="w"> </span><span class="nv">r1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">33</span><span class="w">                  </span>/*<span class="w"> </span>!<span class="w"> </span>*/
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="p">;</span><span class="w"> </span><span class="o">({</span><span class="w"> </span>char<span class="w"> </span>_fmt<span class="o">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;Hello, World!&quot;</span><span class="p">;</span><span class="w"> </span>bpf_trace_printk_<span class="o">(</span>_fmt,<span class="w"> </span>sizeof<span class="o">(</span>_fmt<span class="o">))</span><span class="p">;</span><span class="w"> </span><span class="o">})</span><span class="p">;</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="m">1</span>:<span class="w"> </span><span class="o">(</span>6b<span class="o">)</span><span class="w"> </span>*<span class="o">(</span>u16<span class="w"> </span>*<span class="o">)(</span>r10<span class="w"> </span>-4<span class="o">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>r1
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="m">2</span>:<span class="w"> </span><span class="o">(</span>b7<span class="o">)</span><span class="w"> </span><span class="nv">r1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1684828783</span><span class="w">          </span>/*<span class="w"> </span>dlro<span class="w"> </span>*/
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="m">3</span>:<span class="w"> </span><span class="o">(</span><span class="m">63</span><span class="o">)</span><span class="w"> </span>*<span class="o">(</span>u32<span class="w"> </span>*<span class="o">)(</span>r10<span class="w"> </span>-8<span class="o">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>r1
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="m">4</span>:<span class="w"> </span><span class="o">(</span><span class="m">18</span><span class="o">)</span><span class="w"> </span><span class="nv">r1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>0x57202c6f6c6c6548<span class="w">  </span>/*<span class="w"> </span>W<span class="w"> </span>,olleH<span class="w"> </span>*/
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="m">6</span>:<span class="w"> </span><span class="o">(</span>7b<span class="o">)</span><span class="w"> </span>*<span class="o">(</span>u64<span class="w"> </span>*<span class="o">)(</span>r10<span class="w"> </span>-16<span class="o">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>r1
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="m">7</span>:<span class="w"> </span><span class="o">(</span>bf<span class="o">)</span><span class="w"> </span><span class="nv">r1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>r10
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="p">;</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="m">8</span>:<span class="w"> </span><span class="o">(</span><span class="m">07</span><span class="o">)</span><span class="w"> </span><span class="nv">r1</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span>-16
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="p">;</span><span class="w"> </span><span class="o">({</span><span class="w"> </span>char<span class="w"> </span>_fmt<span class="o">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;Hello, World!&quot;</span><span class="p">;</span><span class="w"> </span>bpf_trace_printk_<span class="o">(</span>_fmt,<span class="w"> </span>sizeof<span class="o">(</span>_fmt<span class="o">))</span><span class="p">;</span><span class="w"> </span><span class="o">})</span><span class="p">;</span>
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="m">9</span>:<span class="w"> </span><span class="o">(</span>b7<span class="o">)</span><span class="w"> </span><span class="nv">r2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">14</span>
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="m">10</span>:<span class="w"> </span><span class="o">(</span><span class="m">85</span><span class="o">)</span><span class="w"> </span>call<span class="w"> </span>bpf_trace_printk#-61616
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="p">;</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="m">0</span><span class="p">;</span>
+<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="m">11</span>:<span class="w"> </span><span class="o">(</span>b7<span class="o">)</span><span class="w"> </span><span class="nv">r0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span>
+<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a><span class="m">12</span>:<span class="w"> </span><span class="o">(</span><span class="m">95</span><span class="o">)</span><span class="w"> </span><span class="nb">exit</span>
+</code></pre></div>
+<p>其中，分号开头的部分，正是我们前面写的 C 代码，而其他行则是具体的 BPF 指令。具体每一行的 BPF 指令又分为三部分：</p>
+<ul>
+<li>第一部分，冒号前面的数字 0-12 ，代表 BPF 指令行数；</li>
+<li>第二部分，括号中的16进制数值，表示 BPF 指令码。它的具体含义你可以参考 <a href="https://github.com/iovisor/bpf-docs/blob/master/eBPF.md">IOVisor BPF 文档</a>，比如第 0 行的 0xb7 表示为 64 位寄存器赋值。</li>
+<li>第三部分，括号后面的部分，就是 BPF 指令的伪代码。</li>
+</ul>
+<p>结合前面讲述的各个寄存器的作用，不难理解这些 BPF 指令的含义：</p>
+<ul>
+<li>第0-8行，借助 R10 寄存器从栈中把字符串 “Hello, World!” 读出来，并放入 R1 寄存器中；</li>
+<li>第9行，向 R2 寄存器写入字符串的长度 14（即代码注释里面的 <code>sizeof(_fmt)</code> ）；</li>
+<li>第10行，调用 BPF 辅助函数 <code>bpf_trace_printk</code> 输出字符串；</li>
+<li>第11行，向 R0 寄存器写入0，表示程序的返回值是0；</li>
+<li>最后一行，程序执行成功退出。</li>
+</ul>
+<p>总结起来，<strong>这些指令先通过 R1 和 R2 寄存器设置了</strong> <code>bpf_trace_printk</code> <strong>的参数，然后调用</strong> <code>bpf_trace_printk</code> <strong>函数输出字符串，最后再通过 R0 寄存器返回成功。</strong></p>
+<p>实际上，你也可以通过类似的 <a href="https://man7.org/linux/man-pages/man2/bpf.2.html#EXAMPLES">BPF 指令</a>来开发 eBPF 程序（具体指令的定义，请参考 <a href="https://elixir.bootlin.com/linux/v5.4/source/include/uapi/linux/bpf_common.h">include/uapi/linux/bpf_common.h</a> 以及 <a href="https://elixir.bootlin.com/linux/v5.4/source/include/uapi/linux/bpf.h">include/uapi/linux/bpf.h</a>），不过通常并不推荐你这么做。跟一开始的 C 程序相比，你会发现 BPF 指令的可读性和可维护性明显要差得多。所以，我建议你还是使用 C 语言来开发 eBPF 程序，而只把 BPF 指令作为排查 eBPF 程序疑难杂症时的参考。</p>
+<p>这里，我来简单讲讲 BPF 指令加载后是如何运行的。当这些 BPF 指令加载到内核后， BPF 即时编译器会将其编译成本地机器指令，最后才会执行编译后的机器指令：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># bpftool prog dump jited id 89</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>int<span class="w"> </span>hello_world<span class="o">(</span>void<span class="w"> </span>*<span class="w"> </span>ctx<span class="o">)</span>:
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>bpf_prog_38dd440716c4900f_hello_world:
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="p">;</span><span class="w"> </span>int<span class="w"> </span>hello_world<span class="o">(</span>void<span class="w"> </span>*ctx<span class="o">)</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="m">0</span>:<span class="w">  </span>nopl<span class="w">   </span>0x0<span class="o">(</span>%rax,%rax,1<span class="o">)</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="m">5</span>:<span class="w">  </span>xchg<span class="w">   </span>%ax,%ax
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="m">7</span>:<span class="w">  </span>push<span class="w">   </span>%rbp
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="m">8</span>:<span class="w">  </span>mov<span class="w">    </span>%rsp,%rbp
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>b:<span class="w">  </span>sub<span class="w">    </span><span class="nv">$0</span>x10,%rsp
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="m">12</span>:<span class="w"> </span>mov<span class="w">    </span><span class="nv">$0</span>x21,%edi
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="p">;</span><span class="w"> </span><span class="o">({</span><span class="w"> </span>char<span class="w"> </span>_fmt<span class="o">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;Hello, World!&quot;</span><span class="p">;</span><span class="w"> </span>bpf_trace_printk_<span class="o">(</span>_fmt,<span class="w"> </span>sizeof<span class="o">(</span>_fmt<span class="o">))</span><span class="p">;</span><span class="w"> </span><span class="o">})</span><span class="p">;</span>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="m">17</span>:<span class="w"> </span>mov<span class="w">    </span>%di,-0x4<span class="o">(</span>%rbp<span class="o">)</span>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>1b:<span class="w"> </span>mov<span class="w">    </span><span class="nv">$0</span>x646c726f,%edi
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a><span class="m">20</span>:<span class="w"> </span>mov<span class="w">    </span>%edi,-0x8<span class="o">(</span>%rbp<span class="o">)</span>
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a><span class="m">23</span>:<span class="w"> </span>movabs<span class="w"> </span><span class="nv">$0</span>x57202c6f6c6c6548,%rdi
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>2d:<span class="w"> </span>mov<span class="w">    </span>%rdi,-0x10<span class="o">(</span>%rbp<span class="o">)</span>
+<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a><span class="m">31</span>:<span class="w"> </span>mov<span class="w">    </span>%rbp,%rdi
+<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a><span class="p">;</span>
+<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a><span class="m">34</span>:<span class="w"> </span>add<span class="w">    </span><span class="nv">$0</span>xfffffffffffffff0,%rdi
+<a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a><span class="p">;</span><span class="w"> </span><span class="o">({</span><span class="w"> </span>char<span class="w"> </span>_fmt<span class="o">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;Hello, World!&quot;</span><span class="p">;</span><span class="w"> </span>bpf_trace_printk_<span class="o">(</span>_fmt,<span class="w"> </span>sizeof<span class="o">(</span>_fmt<span class="o">))</span><span class="p">;</span><span class="w"> </span><span class="o">})</span><span class="p">;</span>
+<a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a><span class="m">38</span>:<span class="w"> </span>mov<span class="w">    </span><span class="nv">$0</span>xe,%esi
+<a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a>3d:<span class="w"> </span>call<span class="w">   </span>0xffffffffd8c7e834
+<a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a><span class="p">;</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="m">0</span><span class="p">;</span>
+<a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a><span class="m">42</span>:<span class="w"> </span>xor<span class="w">    </span>%eax,%eax
+<a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a><span class="m">44</span>:<span class="w"> </span>leave
+<a id="__codelineno-6-26" name="__codelineno-6-26" href="#__codelineno-6-26"></a><span class="m">45</span>:<span class="w"> </span>ret
+</code></pre></div>
+<p>这些机器指令的含义跟前面的 BPF 指令是类似的，但具体的指令和寄存器都换成了 x86 的格式。你不需要掌握这些机器指令的具体含义，只要知道查询的具体方法就足够了。这是因为，就像你曾接触过的其他高级语言一样，在实际的 eBPF 使用过程中，并不需要直接使用机器指令，而是 eBPF 虚拟机帮你自动完成了转换。</p>
+<h2 id="ebpf_1">eBPF 程序是什么时候执行的？</h2>
+<p>到这里，我想你已经理解了 BPF 指令的具体格式，以及它与 C 源代码之间的对应关系。不过，这个 eBPF 程序到底是什么时候执行的呢？接下来，我们再一起看看 BPF 指令的加载和执行过程。</p>
+<p>在上一讲中我提到，BCC 负责了 eBPF 程序的编译和加载过程。因而，要了解 BPF 指令的加载过程，就可以从 BCC 执行 eBPF 程序的过程入手。</p>
+<p>那么，怎么才能查看到 BCC 的执行过程呢？我想，你一定想到了，那就是跟踪它的系统调用过程。</p>
+<p>首先，我们打开一个终端，执行下面的命令：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># -ebpf表示只跟踪bpf系统调用</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>sudo<span class="w"> </span>strace<span class="w"> </span>-v<span class="w"> </span>-f<span class="w"> </span>-ebpf<span class="w"> </span>./hello.py
+</code></pre></div>
+<p>稍等一会，你会看到如下的输出：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>bpf<span class="o">(</span>BPF_PROG_LOAD,
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="o">{</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="nv">prog_type</span><span class="o">=</span>BPF_PROG_TYPE_KPROBE,
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="nv">insn_cnt</span><span class="o">=</span><span class="m">13</span>,
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="nv">insns</span><span class="o">=[</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="o">{</span><span class="nv">code</span><span class="o">=</span>BPF_ALU64<span class="p">|</span>BPF_K<span class="p">|</span>BPF_MOV,<span class="w"> </span><span class="nv">dst_reg</span><span class="o">=</span>BPF_REG_1,<span class="w"> </span><span class="nv">src_reg</span><span class="o">=</span>BPF_REG_0,<span class="w"> </span><span class="nv">off</span><span class="o">=</span><span class="m">0</span>,<span class="w"> </span><span class="nv">imm</span><span class="o">=</span>0x21<span class="o">}</span>,
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="o">{</span><span class="nv">code</span><span class="o">=</span>BPF_STX<span class="p">|</span>BPF_H<span class="p">|</span>BPF_MEM,<span class="w"> </span><span class="nv">dst_reg</span><span class="o">=</span>BPF_REG_10,<span class="w"> </span><span class="nv">src_reg</span><span class="o">=</span>BPF_REG_1,<span class="w"> </span><span class="nv">off</span><span class="o">=</span>-4,<span class="w"> </span><span class="nv">imm</span><span class="o">=</span><span class="m">0</span><span class="o">}</span>,
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="o">{</span><span class="nv">code</span><span class="o">=</span>BPF_ALU64<span class="p">|</span>BPF_K<span class="p">|</span>BPF_MOV,<span class="w"> </span><span class="nv">dst_reg</span><span class="o">=</span>BPF_REG_1,<span class="w"> </span><span class="nv">src_reg</span><span class="o">=</span>BPF_REG_0,<span class="w"> </span><span class="nv">off</span><span class="o">=</span><span class="m">0</span>,<span class="w"> </span><span class="nv">imm</span><span class="o">=</span>0x646c726f<span class="o">}</span>,
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="o">{</span><span class="nv">code</span><span class="o">=</span>BPF_STX<span class="p">|</span>BPF_W<span class="p">|</span>BPF_MEM,<span class="w"> </span><span class="nv">dst_reg</span><span class="o">=</span>BPF_REG_10,<span class="w"> </span><span class="nv">src_reg</span><span class="o">=</span>BPF_REG_1,<span class="w"> </span><span class="nv">off</span><span class="o">=</span>-8,<span class="w"> </span><span class="nv">imm</span><span class="o">=</span><span class="m">0</span><span class="o">}</span>,
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="o">{</span><span class="nv">code</span><span class="o">=</span>BPF_LD<span class="p">|</span>BPF_DW<span class="p">|</span>BPF_IMM,<span class="w"> </span><span class="nv">dst_reg</span><span class="o">=</span>BPF_REG_1,<span class="w"> </span><span class="nv">src_reg</span><span class="o">=</span>BPF_REG_0,<span class="w"> </span><span class="nv">off</span><span class="o">=</span><span class="m">0</span>,<span class="w"> </span><span class="nv">imm</span><span class="o">=</span>0x6c6c6548<span class="o">}</span>,
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="o">{</span><span class="nv">code</span><span class="o">=</span>BPF_LD<span class="p">|</span>BPF_W<span class="p">|</span>BPF_IMM,<span class="w"> </span><span class="nv">dst_reg</span><span class="o">=</span>BPF_REG_0,<span class="w"> </span><span class="nv">src_reg</span><span class="o">=</span>BPF_REG_0,<span class="w"> </span><span class="nv">off</span><span class="o">=</span><span class="m">0</span>,<span class="w"> </span><span class="nv">imm</span><span class="o">=</span>0x57202c6f<span class="o">}</span>,
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="o">{</span><span class="nv">code</span><span class="o">=</span>BPF_STX<span class="p">|</span>BPF_DW<span class="p">|</span>BPF_MEM,<span class="w"> </span><span class="nv">dst_reg</span><span class="o">=</span>BPF_REG_10,<span class="w"> </span><span class="nv">src_reg</span><span class="o">=</span>BPF_REG_1,<span class="w"> </span><span class="nv">off</span><span class="o">=</span>-16,<span class="w"> </span><span class="nv">imm</span><span class="o">=</span><span class="m">0</span><span class="o">}</span>,
+<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="o">{</span><span class="nv">code</span><span class="o">=</span>BPF_ALU64<span class="p">|</span>BPF_X<span class="p">|</span>BPF_MOV,<span class="w"> </span><span class="nv">dst_reg</span><span class="o">=</span>BPF_REG_1,<span class="w"> </span><span class="nv">src_reg</span><span class="o">=</span>BPF_REG_10,<span class="w"> </span><span class="nv">off</span><span class="o">=</span><span class="m">0</span>,<span class="w"> </span><span class="nv">imm</span><span class="o">=</span><span class="m">0</span><span class="o">}</span>,
+<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a><span class="o">{</span><span class="nv">code</span><span class="o">=</span>BPF_ALU64<span class="p">|</span>BPF_K<span class="p">|</span>BPF_ADD,<span class="w"> </span><span class="nv">dst_reg</span><span class="o">=</span>BPF_REG_1,<span class="w"> </span><span class="nv">src_reg</span><span class="o">=</span>BPF_REG_0,<span class="w"> </span><span class="nv">off</span><span class="o">=</span><span class="m">0</span>,<span class="w"> </span><span class="nv">imm</span><span class="o">=</span>0xfffffff0<span class="o">}</span>,
+<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a><span class="o">{</span><span class="nv">code</span><span class="o">=</span>BPF_ALU64<span class="p">|</span>BPF_K<span class="p">|</span>BPF_MOV,<span class="w"> </span><span class="nv">dst_reg</span><span class="o">=</span>BPF_REG_2,<span class="w"> </span><span class="nv">src_reg</span><span class="o">=</span>BPF_REG_0,<span class="w"> </span><span class="nv">off</span><span class="o">=</span><span class="m">0</span>,<span class="w"> </span><span class="nv">imm</span><span class="o">=</span>0xe<span class="o">}</span>,
+<a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a><span class="o">{</span><span class="nv">code</span><span class="o">=</span>BPF_JMP<span class="p">|</span>BPF_K<span class="p">|</span>BPF_CALL,<span class="w"> </span><span class="nv">dst_reg</span><span class="o">=</span>BPF_REG_0,<span class="w"> </span><span class="nv">src_reg</span><span class="o">=</span>BPF_REG_0,<span class="w"> </span><span class="nv">off</span><span class="o">=</span><span class="m">0</span>,<span class="w"> </span><span class="nv">imm</span><span class="o">=</span>0x6<span class="o">}</span>,
+<a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a><span class="o">{</span><span class="nv">code</span><span class="o">=</span>BPF_ALU64<span class="p">|</span>BPF_K<span class="p">|</span>BPF_MOV,<span class="w"> </span><span class="nv">dst_reg</span><span class="o">=</span>BPF_REG_0,<span class="w"> </span><span class="nv">src_reg</span><span class="o">=</span>BPF_REG_0,<span class="w"> </span><span class="nv">off</span><span class="o">=</span><span class="m">0</span>,<span class="w"> </span><span class="nv">imm</span><span class="o">=</span><span class="m">0</span><span class="o">}</span>,
+<a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a><span class="o">{</span><span class="nv">code</span><span class="o">=</span>BPF_JMP<span class="p">|</span>BPF_K<span class="p">|</span>BPF_EXIT,<span class="w"> </span><span class="nv">dst_reg</span><span class="o">=</span>BPF_REG_0,<span class="w"> </span><span class="nv">src_reg</span><span class="o">=</span>BPF_REG_0,<span class="w"> </span><span class="nv">off</span><span class="o">=</span><span class="m">0</span>,<span class="w"> </span><span class="nv">imm</span><span class="o">=</span><span class="m">0</span><span class="o">}</span>
+<a id="__codelineno-8-19" name="__codelineno-8-19" href="#__codelineno-8-19"></a><span class="o">]</span>,
+<a id="__codelineno-8-20" name="__codelineno-8-20" href="#__codelineno-8-20"></a><span class="nv">prog_name</span><span class="o">=</span><span class="s2">&quot;hello_world&quot;</span>,
+<a id="__codelineno-8-21" name="__codelineno-8-21" href="#__codelineno-8-21"></a>...
+<a id="__codelineno-8-22" name="__codelineno-8-22" href="#__codelineno-8-22"></a><span class="o">}</span>,
+<a id="__codelineno-8-23" name="__codelineno-8-23" href="#__codelineno-8-23"></a><span class="m">128</span><span class="o">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">4</span>
+</code></pre></div>
+<p>这些参数看起来很复杂，但实际上，如果你查询 <code>bpf</code> 系统调用的格式（执行 <code>man bpf</code> 命令），就可以发现，它实际上只需要三个参数：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>int<span class="w"> </span>bpf<span class="o">(</span>int<span class="w"> </span>cmd,<span class="w"> </span>union<span class="w"> </span>bpf_attr<span class="w"> </span>*attr,<span class="w"> </span>unsigned<span class="w"> </span>int<span class="w"> </span>size<span class="o">)</span><span class="p">;</span>
+</code></pre></div>
+<p>对应前面的 strace 输出结果，这三个参数的具体含义如下。</p>
+<ul>
+<li>第一个参数是 <code>BPF_PROG_LOAD</code> ， 表示加载 BPF 程序。</li>
+<li>
+<p>第二个参数是 <code>bpf_attr</code> 类型的结构体，表示 BPF 程序的属性。其中，有几个需要你留意的参数，比如：</p>
+</li>
+<li>
+<p><code>prog_type</code> 表示 BPF 程序的类型，这儿是 <code>BPF_PROG_TYPE_KPROBE</code> ，跟我们Python 代码中的 <code>attach_kprobe</code> 一致；</p>
+</li>
+<li><code>insn_cnt</code> (instructions count) 表示指令条数；</li>
+<li><code>insns</code> (instructions) 包含了具体的每一条指令，这儿的 13 条指令跟我们前面 <code>bpftool prog dump</code> 的结果是一致的（具体的指令格式，你可以参考内核中 <a href="https://elixir.bootlin.com/linux/v5.4/source/include/uapi/linux/bpf.h#L65">bpf_insn</a> 的定义）；</li>
+<li><code>prog_name</code> 则表示 BPF 程序的名字，即 <code>hello_world</code> 。</li>
+<li>第三个参数 128 表示属性的大小。</li>
+</ul>
+<p>到这里，我们已经了解了 bpf 系统调用的基本格式。对于 <code>bpf</code> 系统调用在内核中的实现原理，你并不需要详细了解。我们只要知道它的具体功能，就可以掌握 eBPF 的核心原理了。当然，如果你对它的实现方法有兴趣的话，可以参考内核源码 kernel/bpf/syscall.c 中 <a href="https://elixir.bootlin.com/linux/v5.4/source/kernel/bpf/syscall.c#L2837">SYSCALL_DEFINE3</a> 的实现。</p>
+<p>BPF 程序加载到内核后，并不会立刻执行，那么它什么时候才会执行呢？这里，回想一下我在 <a href="https://time.geekbang.org/column/article/479384">01 讲</a> 中提到的 eBPF 的基本原理：</p>
+<blockquote>
+<p>eBPF 程序并不像常规的线程那样，启动后就一直运行在那里，它需要事件触发后才会执行。这些事件包括系统调用、内核跟踪点、内核函数和用户态函数的调用退出、网络事件，等等。</p>
+</blockquote>
+<p>对于我们的 Hello World 来说，由于调用了 <code>attach_kprobe</code> 函数，很明显，这是一个内核跟踪事件：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>b.attach_kprobe<span class="o">(</span><span class="nv">event</span><span class="o">=</span><span class="s2">&quot;do_sys_openat2&quot;</span>,<span class="w"> </span><span class="nv">fn_name</span><span class="o">=</span><span class="s2">&quot;hello_world&quot;</span><span class="o">)</span>
+</code></pre></div>
+<p>所以，除了把 eBPF 程序加载到内核之外，还需要把加载后的程序跟具体的内核函数调用事件进行绑定。在 eBPF 的实现中，诸如内核跟踪（kprobe）、用户跟踪（uprobe）等的事件绑定，都是通过 <code>perf_event_open()</code> 来完成的。</p>
+<p>为什么这么说呢？我们再用 <code>strace</code> 来确认一下。把前面 <code>strace</code> 命令中的 <code>-ebpf</code> 参数去掉，重新执行：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>sudo<span class="w"> </span>strace<span class="w"> </span>-v<span class="w"> </span>-f<span class="w"> </span>./hello.py
+</code></pre></div>
+<p>忽略无关的输出后，你会发现如下的系统调用：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="p">...</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="cm">/* 1) 加载BPF程序 */</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">bpf</span><span class="p">(</span><span class="n">BPF_PROG_LOAD</span><span class="p">,...)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">4</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="p">...</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="cm">/* 2）查询事件类型 */</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="n">openat</span><span class="p">(</span><span class="n">AT_FDCWD</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;/sys/bus/event_source/devices/kprobe/type&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">O_RDONLY</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">5</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="n">read</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;6</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">4096</span><span class="p">)</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="n">close</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span><span class="w">                                </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="p">...</span>
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>
+<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a><span class="cm">/* 3）创建性能监控事件 */</span>
+<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a><span class="n">perf_event_open</span><span class="p">(</span>
+<a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a><span class="p">{</span>
+<a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a><span class="n">type</span><span class="o">=</span><span class="mh">0x6</span><span class="w"> </span><span class="cm">/* PERF_TYPE_??? */</span><span class="p">,</span>
+<a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a><span class="n">size</span><span class="o">=</span><span class="n">PERF_ATTR_SIZE_VER7</span><span class="p">,</span>
+<a id="__codelineno-12-17" name="__codelineno-12-17" href="#__codelineno-12-17"></a><span class="p">...</span>
+<a id="__codelineno-12-18" name="__codelineno-12-18" href="#__codelineno-12-18"></a><span class="n">wakeup_events</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-12-19" name="__codelineno-12-19" href="#__codelineno-12-19"></a><span class="n">config1</span><span class="o">=</span><span class="mh">0x7f275d195c50</span><span class="p">,</span>
+<a id="__codelineno-12-20" name="__codelineno-12-20" href="#__codelineno-12-20"></a><span class="p">...</span>
+<a id="__codelineno-12-21" name="__codelineno-12-21" href="#__codelineno-12-21"></a><span class="p">},</span>
+<a id="__codelineno-12-22" name="__codelineno-12-22" href="#__codelineno-12-22"></a><span class="mi">-1</span><span class="p">,</span>
+<a id="__codelineno-12-23" name="__codelineno-12-23" href="#__codelineno-12-23"></a><span class="mi">0</span><span class="p">,</span>
+<a id="__codelineno-12-24" name="__codelineno-12-24" href="#__codelineno-12-24"></a><span class="mi">-1</span><span class="p">,</span>
+<a id="__codelineno-12-25" name="__codelineno-12-25" href="#__codelineno-12-25"></a><span class="n">PERF_FLAG_FD_CLOEXEC</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">5</span>
+<a id="__codelineno-12-26" name="__codelineno-12-26" href="#__codelineno-12-26"></a>
+<a id="__codelineno-12-27" name="__codelineno-12-27" href="#__codelineno-12-27"></a><span class="cm">/* 4）绑定BPF到kprobe事件 */</span>
+<a id="__codelineno-12-28" name="__codelineno-12-28" href="#__codelineno-12-28"></a><span class="n">ioctl</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="n">PERF_EVENT_IOC_SET_BPF</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+<a id="__codelineno-12-29" name="__codelineno-12-29" href="#__codelineno-12-29"></a><span class="p">...</span>
+</code></pre></div>
+<p>从输出中，你可以看出 BPF 与性能事件的绑定过程分为以下几步：</p>
+<ul>
+<li>首先，借助 bpf 系统调用，加载 BPF 程序，并记住返回的文件描述符；</li>
+<li>然后，查询 kprobe 类型的事件编号。BCC 实际上是通过 <code>/sys/bus/event_source/devices/kprobe/type</code> 来查询的；</li>
+<li>接着，调用 <code>perf_event_open</code> 创建性能监控事件。比如，事件类型（type 是上一步查询到的 6）、事件的参数（ <code>config1 包含了内核函数 do_sys_openat2</code> ）等；</li>
+<li>最后，再通过 <code>ioctl</code> 的 <code>PERF_EVENT_IOC_SET_BPF</code> 命令，将 BPF 程序绑定到性能监控事件。</li>
+</ul>
+<p>对于绑定性能监控（perf event）的内核实现原理，你也不需要详细了解，只需要知道它的具体功能，就足够我们掌握 eBPF 了。如果你对它的实现方法有兴趣的话，可以参考内核源码 <a href="https://elixir.bootlin.com/linux/v5.4/source/kernel/events/core.c#L9039">perf_event_set_bpf_prog</a> 的实现；而最终性能监控调用 BPF 程序的实现，则可以参考内核源码 <a href="https://elixir.bootlin.com/linux/v5.4/source/kernel/trace/trace_kprobe.c#L1351">kprobe_perf_func</a> 的实现。</p>
+<h2 id="_1">小结</h2>
+<p>今天，我带你一起梳理了 eBPF 在内核中的实现原理，并以上一讲的 Hello World 程序为例，借助 bpftool、strace 等工具，带你观察了 BPF 指令的具体格式。</p>
+<p>然后，我们从 BCC 执行 eBPF 程序的过程入手，一起看了BPF 指令的加载和执行过程。用高级语言开发的 eBPF 程序，需要首先编译为 BPF 字节码（即 BPF 指令），然后借助 <code>bpf</code> 系统调用加载到内核中，最后再通过性能监控等接口，与具体的内核事件进行绑定。这样，内核的性能监控模块才会在内核事件发生时，自动执行我们开发的 eBPF 程序。</p>
+<h2 id="_2">思考题</h2>
+<p>最后，我想邀请你来聊一聊这两个问题。</p>
+<ol>
+<li>你通常是如何快速理解一门新技术的运行原理的？</li>
+<li>在今天的内容中，我使用 strace 跟踪 BCC 程序，进而找到了相关的系统调用。那么，有没有可能直接使用 BCC 来跟踪 <code>bpf</code> 系统调用呢？如果你的答案是肯定的，可以试着把它开发出来，并在评论区分享你的实践经验。</li>
+</ol>
+<p>欢迎在留言区和我讨论，也欢迎把这节课分享给你的同事、朋友。我们一起在实战中演练，在交流中进步。</p>
+<div><strong>精选留言（15）</strong></div>
+<ul>
+<li><span>莫名</span> 👍（23） 💬（3）<p>追踪 bpf 系统调用，借助 BCC 宏定义 TRACEPOINT_PROBE(category, event) 比较方便，例如：
+
+-------------- example.c ----------------
+
+TRACEPOINT_PROBE(syscalls, sys_enter_bpf)
+{
+bpf_trace_printk(&quot;%d\\n&quot;, args-&gt;cmd);
+return 0;
+}
+
+-------------- example.py -----------------
+
+#!&#47;usr&#47;bin&#47;env python3
+
+from bcc import BPF
+
+# load BPF program
+b = BPF(src_file=&quot;example.c&quot;)
+b.trace_print()
+
+</p>2022-01-24</li><br/><li><span>18646333118</span> 👍（12） 💬（7）<p>解决方法:
+{
+&quot;features&quot;: {
+&quot;libbfd&quot;: false
+}
+}
+
+uname -r
+5.13.0-19-generic
+
+apt-cache search linux-source
+apt install linux-source-5.13.0
+
+cd  &#47;usr&#47;src&#47;
+tar -jxvf linux-source-5.13.0.tar.bz2
+
+apt install libelf-dev
+cd linux-source-5.13.0&#47;tools
+make -C  bpf&#47;bpftool
+.&#47;bpf&#47;bpftool&#47;bpftool version -p
+{
+&quot;version&quot;: &quot;5.13.19&quot;,
+&quot;features&quot;: {
+&quot;libbfd&quot;: true,
+&quot;skeletons&quot;: true
+}
+}
+</p>2022-02-09</li><br/><li><span>不了峰</span> 👍（5） 💬（1）<p>你通常是如何快速理解一门新技术的运行原理的？
+--- 看一下官方文档，了解体系架构，多看几遍。买书看感觉也是一个快速入门的方法。
+但是对于没有编程经验，对于 字节码、cpu寄存器、jit ，编译器的理解还是很抽象，学到这里还是有点晕。感觉还是要把这课程从头再看一遍。</p>2022-01-28</li><br/><li><span>火火寻</span> 👍（3） 💬（1）<p>1、你通常是如何快速理解一门新技术的运行原理的？
+Get Essentials， ADEPT五步法：类比，画图，例子，文字说明，定义。
+
+剩下的就是根据需要侧重地深入到细节。</p>2022-02-26</li><br/><li><span>七里</span> 👍（1） 💬（1）<p>请问，不能执行&#39;bpftool prog dump jited id 78&#39;是怎么回事？bpf相关的包都按照上一讲的提示按照上了
+
+root@maqi-ubt:~# bpftool prog dump xlated id 78
+int hello_world(void * ctx):
+; int hello_world(void *ctx)
+0: (b7) r1 = 33
+; ({ char _fmt[] = &quot;Hello, World!&quot;; bpf_trace_printk_(_fmt, sizeof(_fmt)); });
+1: (6b) *(u16 *)(r10 -4) = r1
+2: (b7) r1 = 1684828783
+3: (63) *(u32 *)(r10 -8) = r1
+4: (18) r1 = 0x57202c6f6c6c6548
+6: (7b) *(u64 *)(r10 -16) = r1
+7: (bf) r1 = r10
+;
+8: (07) r1 += -16
+; ({ char _fmt[] = &quot;Hello, World!&quot;; bpf_trace_printk_(_fmt, sizeof(_fmt)); });
+9: (b7) r2 = 14
+10: (85) call bpf_trace_printk#-63952
+; return 0;
+11: (b7) r0 = 0
+12: (95) exit
+root@maqi-ubt:~#
+root@maqi-ubt:~# bpftool prog dump jited id 78
+Error: No libbfd support</p>2022-02-02</li><br/><li><span>写点啥呢</span> 👍（1） 💬（2）<p>请问老师，像上节课例子中 trace openat系统调用的这个函数int hello_world(struct pt_regs *ctx, int dfd, const char __user * filename, struct open_how *how)，bpf会自动把系统调用参数注入bpf函数执行中。本节课提到bpf虚拟机中对bpf函数的参数个数有限制，那如果碰到系统调用参数个数大于bpf限制了，该如何处理呢？
+
+谢谢老师</p>2022-01-29</li><br/><li><span>22</span> 👍（0） 💬（5）<p>老师，sudo strace -v -f -ebpf .&#47;hello.py
+strace: exec: 可执行文件格式错误
++++ exited with 1 +++
+想请问一下这是什么原因啊？</p>2023-02-25</li><br/><li><span>22</span> 👍（0） 💬（2）<p>追踪系统调用，显示没有权限该怎么解决啊
+sudo strace -v -f -ebpf .&#47;hello.py
+strace: exec: 权限不够
++++ exited with 1 +++
+</p>2023-02-25</li><br/><li><span>崔伟协</span> 👍（0） 💬（1）<p>ebpf是图灵完备的吗</p>2022-09-25</li><br/><li><span>woo</span> 👍（0） 💬（1）<p>为啥我的strace输出的不像老师那种json格式很漂亮，是以行为单位的显示，是装了什么工具吗？</p>2022-03-12</li><br/><li><span>不了峰</span> 👍（0） 💬（1）<p>root@ubuntu-impish:~# bpftool prog dump jited id 331
+Error: No libbfd support
+root@ubuntu-impish:~#
+----
+root@ubuntu-impish:~# bpftool -V
+&#47;usr&#47;lib&#47;linux-tools&#47;5.13.0-27-generic&#47;bpftool v5.13.19
+features:
+root@ubuntu-impish:~#
+-----
+是不是因为新版的bpftool  Remove bpf_jit_enable=2 debugging mode。
+
+-----
+root@ubuntu-impish:~#  bpftool prog profile
+Error: bpftool prog profile command is not supported. Please build bpftool with clang &gt;= 10.0.0
+root@ubuntu-impish:~# clang -v
+Ubuntu clang version 13.0.0-2
+Target: x86_64-pc-linux-gnu</p>2022-01-27</li><br/><li><span>ZR2021</span> 👍（0） 💬（3）<p>老师，我这边执行 bpftool prog dump jited id xxx，报&quot;Error: No libbfd support&quot; 错误，网上也没找到原因，系统是最新的ubuntu 21.10，vmvare的虚拟机，执行xlated是可以打印出指令的，不知道啥个情况</p>2022-01-27</li><br/><li><span>ZR2021</span> 👍（0） 💬（2）<p>老师，sudo bpftool prog dump xlated id 89，这条命令输出的指令是存储模块存储的指令吗，这个指令是在验证器里进行转换的吗，验证器用转换后的指令去模拟执行是否安全，对bpf 接触的比较少，可能问的有点低级……</p>2022-01-26</li><br/><li><span>Geek_b84e15</span> 👍（4） 💬（1）<p>倪老师您好，我看hello_world的参数列表是(void * ctx)，而有的例子里参数是这样的：int hello_world(struct pt_regs *ctx, int dfd, const char __user * filename, struct open_how *how)，请问怎么确定参数的个数和参数的类型呢？</p>2022-04-25</li><br/><li><span>Sudouble</span> 👍（2） 💬（0）<p>对于运行了sudo strace -v -f -ebpf .&#47;hello.py报了以下错误的小伙伴
+strace: exec: Exec format error
++++ exited with 1 +++
+
+替换成这个命令就可以出结果啦：sudo strace -v -f -ebpf python3 hello.py</p>2023-07-06</li><br/>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="页脚" >
+        
+          
+          <a href="../03%20-%20%E5%88%9D%E7%AA%A5%E9%97%A8%E5%BE%84%EF%BC%9A%E5%BC%80%E5%8F%91%E5%B9%B6%E8%BF%90%E8%A1%8C%E4%BD%A0%E7%9A%84%E7%AC%AC%E4%B8%80%E4%B8%AAeBPF%E7%A8%8B%E5%BA%8F/" class="md-footer__link md-footer__link--prev" aria-label="上一页: 03   初窥门径：开发并运行你的第一个eBPF程序">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                上一页
+              </span>
+              <div class="md-ellipsis">
+                03   初窥门径：开发并运行你的第一个eBPF程序
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../05%20-%20%E7%BC%96%E7%A8%8B%E6%8E%A5%E5%8F%A3%EF%BC%9AeBPF%E7%A8%8B%E5%BA%8F%E6%98%AF%E6%80%8E%E4%B9%88%E8%B7%9F%E5%86%85%E6%A0%B8%E8%BF%9B%E8%A1%8C%E4%BA%A4%E4%BA%92%E7%9A%84%EF%BC%9F/" class="md-footer__link md-footer__link--next" aria-label="下一页: 05   编程接口：eBPF程序是怎么跟内核进行交互的？">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                下一页
+              </span>
+              <div class="md-ellipsis">
+                05   编程接口：eBPF程序是怎么跟内核进行交互的？
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright © 2025-Present zkep
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["content.code.annotate", "content.code.copy", "content.tooltips", "toc.follow", "navigation.top", "navigation.tabs", "navigation.tabs.sticky", "navigation.prune", "navigation.footer", "navigation.tracking", "navigation.instant", "navigation.instant.progress", "navigation.indexes", "content.tabs.link"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../../javascript/extra.js"></script>
+      
+        <script src="../../../javascript/giscus.js"></script>
+      
+        <script src="../../../javascript/referrerpolicy.js"></script>
+      
+    
+  </body>
+</html>

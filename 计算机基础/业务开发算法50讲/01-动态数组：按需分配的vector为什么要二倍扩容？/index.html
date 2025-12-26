@@ -1,0 +1,6680 @@
+<!--geek time docs 🚀, MIT license-->
+
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="极客时间文档">
+      
+      
+        <meta name="author" content="zkep">
+      
+      
+        <link rel="canonical" href="https://github.com/uaxe/geektime-docs/%E8%AE%A1%E7%AE%97%E6%9C%BA%E5%9F%BA%E7%A1%80/%E4%B8%9A%E5%8A%A1%E5%BC%80%E5%8F%91%E7%AE%97%E6%B3%9550%E8%AE%B2/01-%E5%8A%A8%E6%80%81%E6%95%B0%E7%BB%84%EF%BC%9A%E6%8C%89%E9%9C%80%E5%88%86%E9%85%8D%E7%9A%84vector%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E4%BA%8C%E5%80%8D%E6%89%A9%E5%AE%B9%EF%BC%9F/">
+      
+      
+        <link rel="prev" href="../%E5%85%88%E5%AF%BC%E7%AF%87-%E8%AF%B6%EF%BC%8C%E8%BF%99%E4%B8%AA%20git%20diff%20%E5%A5%BD%E5%83%8F%E4%B8%8D%E6%98%AF%E5%BE%88%E7%9B%B4%E8%A7%82%EF%BC%9F/">
+      
+      
+        <link rel="next" href="../02-%E5%8F%8C%E5%90%91%E9%93%BE%E8%A1%A8%EF%BC%9Alist%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0%E9%AB%98%E6%95%88%E5%9C%B0%E6%8F%92%E5%85%A5%E4%B8%8E%E5%88%A0%E9%99%A4%EF%BC%9F/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../None">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>01 动态数组：按需分配的vector为什么要二倍扩容？ - 极客时间文档</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../../stylesheets/style.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#_1" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+        <aside class="md-banner">
+          <div class="md-banner__inner md-grid md-typeset">
+            
+            
+
+
+          </div>
+          
+        </aside>
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../../.." title="极客时间文档" class="md-header__button md-logo" aria-label="极客时间文档" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            极客时间文档
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              01 动态数组：按需分配的vector为什么要二倍扩容？
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="indigo"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/zkep/my-geektime" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    zkep/my-geektime
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="标签" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../AI-%E5%A4%A7%E6%95%B0%E6%8D%AE/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  AI-大数据
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E4%BA%A7%E5%93%81-%E8%BF%90%E8%90%A5/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  产品-运营
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E5%89%8D%E7%AB%AF-%E7%A7%BB%E5%8A%A8/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  前端-移动
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E5%90%8E%E7%AB%AF-%E6%9E%B6%E6%9E%84/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  后端-架构
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E7%AE%A1%E7%90%86-%E6%88%90%E9%95%BF/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  管理-成长
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  计算机基础
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E8%BF%90%E7%BB%B4-%E6%B5%8B%E8%AF%95/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  运维-测试
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="极客时间文档" class="md-nav__button md-logo" aria-label="极客时间文档" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    极客时间文档
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/zkep/my-geektime" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    zkep/my-geektime
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../AI-%E5%A4%A7%E6%95%B0%E6%8D%AE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI-大数据
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E4%BA%A7%E5%93%81-%E8%BF%90%E8%90%A5/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    产品-运营
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E5%89%8D%E7%AB%AF-%E7%A7%BB%E5%8A%A8/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    前端-移动
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E5%90%8E%E7%AB%AF-%E6%9E%B6%E6%9E%84/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    后端-架构
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E7%AE%A1%E7%90%86-%E6%88%90%E9%95%BF/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    管理-成长
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    计算机基础
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    计算机基础
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../MySQL%20%E5%BF%85%E7%9F%A5%E5%BF%85%E4%BC%9A/MySQL%20%E5%BF%85%E7%9F%A5%E5%BF%85%E4%BC%9A/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MySQL 必知必会
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Python%E8%87%AA%E5%8A%A8%E5%8C%96%E5%8A%9E%E5%85%AC%E5%AE%9E%E6%88%98%E8%AF%BE/Python%E8%87%AA%E5%8A%A8%E5%8C%96%E5%8A%9E%E5%85%AC%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python自动化办公实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Vim%20%E5%AE%9E%E7%94%A8%E6%8A%80%E5%B7%A7%E5%BF%85%E7%9F%A5%E5%BF%85%E4%BC%9A/Vim%20%E5%AE%9E%E7%94%A8%E6%8A%80%E5%B7%A7%E5%BF%85%E7%9F%A5%E5%BF%85%E4%BC%9A/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vim 实用技巧必知必会
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6_5" id="__nav_6_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    业务开发算法50讲
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    业务开发算法50讲
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E4%B8%9A%E5%8A%A1%E5%BC%80%E5%8F%91%E7%AE%97%E6%B3%9550%E8%AE%B2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    业务开发算法50讲
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%BC%80%E7%AF%87%E8%AF%8D-%E7%9C%9F%E5%AE%9E%E4%B8%96%E7%95%8C%E7%9A%84%E7%AE%97%E6%B3%95%EF%BC%8C%E5%92%8C%E4%BD%A0%E6%83%B3%E7%9A%84%E4%B8%8D%E4%B8%80%E6%A0%B7/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    开篇词 真实世界的算法，和你想的不一样
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%85%88%E5%AF%BC%E7%AF%87-%E8%AF%B6%EF%BC%8C%E8%BF%99%E4%B8%AA%20git%20diff%20%E5%A5%BD%E5%83%8F%E4%B8%8D%E6%98%AF%E5%BE%88%E7%9B%B4%E8%A7%82%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    先导篇 诶，这个 git diff 好像不是很直观？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01 动态数组：按需分配的vector为什么要二倍扩容？
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01 动态数组：按需分配的vector为什么要二倍扩容？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        数组和内存
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="数组和内存">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        静态数组的特性
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        动态数组
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        动态数组源码分析
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="动态数组源码分析">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#stl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        STL的扩容方法
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        总结
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        课后作业
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02-%E5%8F%8C%E5%90%91%E9%93%BE%E8%A1%A8%EF%BC%9Alist%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0%E9%AB%98%E6%95%88%E5%9C%B0%E6%8F%92%E5%85%A5%E4%B8%8E%E5%88%A0%E9%99%A4%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    02 双向链表：list如何实现高效地插入与删除？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03-%E5%8F%8C%E7%AB%AF%E9%98%9F%E5%88%97%EF%BC%9A%E5%B9%B6%E8%A1%8C%E8%AE%A1%E7%AE%97%E4%B8%AD%E7%9A%84%E5%B7%A5%E4%BD%9C%E7%AA%83%E5%8F%96%E7%AE%97%E6%B3%95%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    03 双端队列：并行计算中的工作窃取算法如何实现？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04-%E6%A0%88%EF%BC%9A%E5%87%BD%E6%95%B0%E8%B0%83%E7%94%A8%E7%9A%84%E7%A7%98%E5%AF%86%E7%A9%B6%E7%AB%9F%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04 栈：函数调用的秘密究竟是什么？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05-HashMap%EF%BC%9A%E4%B8%80%E4%B8%AA%E4%BC%98%E7%A7%80%E7%9A%84%E6%95%A3%E5%88%97%E8%A1%A8%E6%98%AF%E6%80%8E%E4%B9%88%E6%9D%A5%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05 HashMap：一个优秀的散列表是怎么来的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06-TreeMap%EF%BC%9A%E7%BA%A2%E9%BB%91%E6%A0%91%E7%9C%9F%E7%9A%84%E6%9C%89%E9%82%A3%E4%B9%88%E9%9A%BE%E5%90%97%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06 TreeMap：红黑树真的有那么难吗？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07-%E5%A0%86%EF%BC%9A%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0%E4%B8%80%E4%B8%AA%E9%AB%98%E6%95%88%E7%9A%84%E4%BC%98%E5%85%88%E9%98%9F%E5%88%97%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    07 堆：如何实现一个高效的优先队列？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08-%E5%A4%96%E9%83%A8%E6%8E%92%E5%BA%8F%EF%BC%9A%E5%A6%82%E4%BD%95%E4%B8%BATB%E7%BA%A7%E6%95%B0%E6%8D%AE%E6%8E%92%E5%BA%8F%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    08 外部排序：如何为TB级数据排序？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09-%E4%BA%8C%E5%88%86%EF%BC%9A%E5%A6%82%E4%BD%95%E9%AB%98%E6%95%88%E6%9F%A5%E8%AF%A2Kafka%E4%B8%AD%E7%9A%84%E6%B6%88%E6%81%AF%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    09 二分：如何高效查询Kafka中的消息？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10-%E6%90%9C%E7%B4%A2%E7%AE%97%E6%B3%95%EF%BC%9A%20%E4%B8%80%E8%B5%B7%E6%9D%A5%E5%86%99%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84%E7%88%AC%E8%99%AB%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10 搜索算法： 一起来写一个简单的爬虫？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../11-%E5%AD%97%E7%AC%A6%E4%B8%B2%E5%8C%B9%E9%85%8D%EF%BC%9A%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0%E6%9C%80%E5%BF%AB%E7%9A%84grep%E5%B7%A5%E5%85%B7/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    11 字符串匹配：如何实现最快的grep工具
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../12-%E6%8B%93%E6%89%91%E6%8E%92%E5%BA%8F%EF%BC%9AWebpack%E6%98%AF%E5%A6%82%E4%BD%95%E7%A1%AE%E5%AE%9A%E6%9E%84%E5%BB%BA%E9%A1%BA%E5%BA%8F%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    12 拓扑排序：Webpack是如何确定构建顺序的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13-%E5%93%88%E5%A4%AB%E6%9B%BC%E6%A0%91%EF%BC%9AHTTP2.0%E6%98%AF%E5%A6%82%E4%BD%95%E6%9B%B4%E5%BF%AB%E4%BC%A0%E8%BE%93%E5%8D%8F%E8%AE%AE%E5%A4%B4%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    13 哈夫曼树：HTTP2.0是如何更快传输协议头的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../14-%E8%B0%83%E5%BA%A6%E7%AE%97%E6%B3%95%EF%BC%9A%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F%E4%B8%AD%E7%9A%84%E8%BF%9B%E7%A8%8B%E6%98%AF%E5%A6%82%E4%BD%95%E8%B0%83%E5%BA%A6%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    14 调度算法：操作系统中的进程是如何调度的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../15-LRU%EF%BC%9A%E5%9C%A8%E8%99%9A%E6%8B%9F%E5%86%85%E5%AD%98%E4%B8%AD%E9%A1%B5%E9%9D%A2%E6%98%AF%E5%A6%82%E4%BD%95%E7%BD%AE%E6%8D%A2%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    15 LRU：在虚拟内存中页面是如何置换的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../16-%E6%97%A5%E5%BF%97%E5%9E%8B%E6%96%87%E4%BB%B6%E7%B3%BB%E7%BB%9F%EF%BC%9A%E5%86%99%E5%85%A5%E6%96%87%E4%BB%B6%E7%9A%84%E6%97%B6%E5%80%99%E6%96%AD%E7%94%B5%E4%BA%86%E4%BC%9A%E5%8F%91%E7%94%9F%E4%BB%80%E4%B9%88%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    16 日志型文件系统：写入文件的时候断电了会发生什么？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../17-%E9%80%89%E8%B7%AF%E7%AE%97%E6%B3%95%EF%BC%9ADijkstra%E6%98%AF%E5%A6%82%E4%BD%95%E8%A7%A3%E5%86%B3%E6%9C%80%E7%9F%AD%E8%B7%AF%E9%97%AE%E9%A2%98%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    17 选路算法：Dijkstra是如何解决最短路问题的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../18-%E9%80%89%E8%B7%AF%E7%AE%97%E6%B3%95%EF%BC%9A%E9%93%BE%E8%B7%AF%E7%8A%B6%E6%80%81%E7%AE%97%E6%B3%95%E6%98%AF%E5%A6%82%E4%BD%95%E5%88%86%E5%8F%91%E5%85%A8%E5%B1%80%E4%BF%A1%E6%81%AF%E7%9A%84/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    18 选路算法：链路状态算法是如何分发全局信息的
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../19-%E9%80%89%E8%B7%AF%E7%AE%97%E6%B3%95%EF%BC%9A%E8%B7%9D%E7%A6%BB%E7%9F%A2%E9%87%8F%E7%AE%97%E6%B3%95%E4%B8%BA%E4%BB%80%E4%B9%88%E4%BC%9A%E4%BA%A7%E7%94%9F%E6%97%A0%E7%A9%B7%E8%AE%A1%E7%AE%97%E9%97%AE%E9%A2%98%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    19 选路算法：距离矢量算法为什么会产生无穷计算问题？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../20-%E6%BB%91%E5%8A%A8%E7%AA%97%E5%8F%A3%EF%BC%9ATCP%E6%98%AF%E5%A6%82%E4%BD%95%E8%BF%9B%E8%A1%8C%E6%B5%81%E9%87%8F%E6%8E%A7%E5%88%B6%E5%92%8C%E6%8B%A5%E5%A1%9E%E6%8E%A7%E5%88%B6%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    20 滑动窗口：TCP是如何进行流量控制和拥塞控制的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../21-%E5%88%86%E8%80%8C%E6%B2%BB%E4%B9%8B%EF%BC%9AMapReduce%E5%A6%82%E4%BD%95%E8%A7%A3%E5%86%B3%E5%A4%A7%E8%A7%84%E6%A8%A1%E5%88%86%E5%B8%83%E5%BC%8F%E8%AE%A1%E7%AE%97%E9%97%AE%E9%A2%98/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    21 分而治之：MapReduce如何解决大规模分布式计算问题
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../22-PageRank%EF%BC%9A%E8%B0%B7%E6%AD%8C%E6%98%AF%E5%A6%82%E4%BD%95%E8%AE%A1%E7%AE%97%E7%BD%91%E9%A1%B5%E6%8E%92%E5%90%8D%E7%9A%84/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    22 PageRank：谷歌是如何计算网页排名的
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../23-Raft%EF%BC%9A%E5%88%86%E5%B8%83%E5%BC%8F%E7%B3%BB%E7%BB%9F%E9%97%B4%E5%A6%82%E4%BD%95%E8%BE%BE%E6%88%90%E5%85%B1%E8%AF%86%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    23 Raft：分布式系统间如何达成共识？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../24-UUID%EF%BC%9A%E5%A6%82%E4%BD%95%E9%AB%98%E6%95%88%E7%94%9F%E6%88%90%E5%85%A8%E5%B1%80%E7%9A%84%E5%94%AF%E4%B8%80ID%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    24 UUID：如何高效生成全局的唯一ID？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../25-%E4%B8%80%E8%87%B4%E6%80%A7%E5%93%88%E5%B8%8C%EF%BC%9A%E5%A6%82%E4%BD%95%E5%9C%A8%E9%9B%86%E7%BE%A4%E4%B8%8A%E5%90%88%E7%90%86%E5%88%86%E9%85%8D%E6%B5%81%E9%87%8F%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    25 一致性哈希：如何在集群上合理分配流量？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../26-B%2B%20Tree%EF%BC%9APostgreSQL%20%E7%9A%84%E7%B4%A2%E5%BC%95%E6%98%AF%E5%A6%82%E4%BD%95%E5%BB%BA%E7%AB%8B%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    26 B+ Tree：PostgreSQL 的索引是如何建立的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../27-LSM%20Tree%EF%BC%9ALevelDB%E7%9A%84%E7%B4%A2%E5%BC%95%E6%98%AF%E5%A6%82%E4%BD%95%E5%BB%BA%E7%AB%8B%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    27 LSM Tree：LevelDB的索引是如何建立的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../28-MVCC%EF%BC%9A%E5%A6%82%E4%BD%95%E7%AA%81%E7%A0%B4%E6%95%B0%E6%8D%AE%E5%BA%93%E5%B9%B6%E5%8F%91%E8%AF%BB%E5%86%99%E6%80%A7%E8%83%BD%E7%93%B6%E9%A2%88%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    28 MVCC：如何突破数据库并发读写性能瓶颈？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../29-%E4%BD%8D%E5%9B%BE%EF%BC%9A%E5%A6%82%E4%BD%95%E7%94%A8%E6%9B%B4%E5%B0%91%E7%A9%BA%E9%97%B4%E5%AF%B9%E5%A4%A7%E9%87%8F%E6%95%B0%E6%8D%AE%E8%BF%9B%E8%A1%8C%E5%8E%BB%E9%87%8D%E5%92%8C%E6%8E%92%E5%BA%8F%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    29 位图：如何用更少空间对大量数据进行去重和排序？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../30-%E5%B8%83%E9%9A%86%E8%BF%87%E6%BB%A4%E5%99%A8%EF%BC%9A%E5%A6%82%E4%BD%95%E8%A7%A3%E5%86%B3Redis%E7%BC%93%E5%AD%98%E7%A9%BF%E9%80%8F%E9%97%AE%E9%A2%98%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    30 布隆过滤器：如何解决Redis缓存穿透问题？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../31-%E8%B7%B3%E8%A1%A8%EF%BC%9ARedis%E6%98%AF%E5%A6%82%E4%BD%95%E5%AD%98%E5%82%A8%E6%9C%89%E5%BA%8F%E9%9B%86%E5%90%88%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    31 跳表：Redis是如何存储有序集合的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../32-%E6%97%B6%E9%97%B4%E8%BD%AE%EF%BC%9AKafka%E6%98%AF%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0%E5%AE%9A%E6%97%B6%E4%BB%BB%E5%8A%A1%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    32 时间轮：Kafka是如何实现定时任务的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../33-%E9%99%90%E6%B5%81%E7%AE%97%E6%B3%95%EF%BC%9A%E5%A6%82%E4%BD%95%E9%98%B2%E6%AD%A2%E7%B3%BB%E7%BB%9F%E8%BF%87%E8%BD%BD%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    33 限流算法：如何防止系统过载？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../34-%E5%89%8D%E7%BC%80%E6%A0%91%EF%BC%9AWeb%E6%A1%86%E6%9E%B6%E4%B8%AD%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0%E8%B7%AF%E7%94%B1%E5%8C%B9%E9%85%8D%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    34 前缀树：Web框架中如何实现路由匹配？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E7%89%B9%E5%88%AB%E7%AD%96%E5%88%92-%E9%9D%A2%E8%AF%95%EF%BC%9ABAT%E9%9D%A2%E8%AF%95%E4%B8%89%E5%85%B3%E5%87%86%E5%A4%87%E6%96%B9%E6%B3%95%E5%A4%A7%E6%8F%AD%E7%A7%98/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    特别策划 面试：BAT面试三关准备方法大揭秘
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%8D%B3%E5%AD%A6%E5%8D%B3%E7%BB%83-%E5%9F%BA%E7%A1%80%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E7%AF%87%EF%BC%9A%E5%A4%8D%E4%B9%A0%E5%8D%A1%20%26%20%E7%AE%97%E6%B3%95%E9%A2%98%E7%89%B9%E8%AE%AD/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    即学即练 基础数据结构篇：复习卡 & 算法题特训
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%8D%B3%E5%AD%A6%E5%8D%B3%E7%BB%83-%E5%9F%BA%E7%A1%80%E7%AE%97%E6%B3%95%E6%80%9D%E6%83%B3%E7%AF%87%EF%BC%9A%E5%A4%8D%E4%B9%A0%E5%8D%A1%20%26%20%E7%AE%97%E6%B3%95%E9%A2%98%E7%89%B9%E8%AE%AD/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    即学即练 基础算法思想篇：复习卡 & 算法题特训
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%8D%B3%E5%AD%A6%E5%8D%B3%E7%BB%83-%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F%E7%AF%87%EF%BC%9A%E5%A4%8D%E4%B9%A0%E5%8D%A1%20%26%20%E7%AE%97%E6%B3%95%E9%A2%98%E7%89%B9%E8%AE%AD/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    即学即练 操作系统篇：复习卡 & 算法题特训
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%8D%B3%E5%AD%A6%E5%8D%B3%E7%BB%83-%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C%E7%AF%87%EF%BC%9A%E5%A4%8D%E4%B9%A0%E5%8D%A1%20%26%20%E7%AE%97%E6%B3%95%E9%A2%98%E7%89%B9%E8%AE%AD/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    即学即练 计算机网络篇：复习卡 & 算法题特训
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%8D%B3%E5%AD%A6%E5%8D%B3%E7%BB%83-%E5%88%86%E5%B8%83%E5%BC%8F%E7%AF%87%EF%BC%9A%E5%A4%8D%E4%B9%A0%E5%8D%A1%E4%B8%80%E9%94%AE%E7%9B%B4%E8%BE%BE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    即学即练 分布式篇：复习卡一键直达
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%8D%B3%E5%AD%A6%E5%8D%B3%E7%BB%83-%E5%B7%A5%E7%A8%8B%E5%AE%9E%E6%88%98%E7%AF%87%EF%BC%9A%E5%A4%8D%E4%B9%A0%E5%8D%A1%E4%B8%80%E9%94%AE%E7%9B%B4%E8%BE%BE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    即学即练 工程实战篇：复习卡一键直达
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../35-%E6%B4%97%E7%89%8C%E7%AE%97%E6%B3%95%EF%BC%9A%E9%9A%8F%E6%9C%BA%E7%9A%84%E5%93%B2%E5%AD%A6%EF%BC%8C%E5%A6%82%E4%BD%95%E7%94%A8%E7%A8%8B%E5%BA%8F%E6%9D%A5%E6%B4%97%E4%B8%80%E5%89%AF%E7%89%8C%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    35 洗牌算法：随机的哲学，如何用程序来洗一副牌？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../36-%E5%88%86%E5%B8%83%E5%BC%8F%E4%BA%8B%E5%8A%A1%EF%BC%9A%E5%A6%82%E4%BD%95%E7%90%86%E8%A7%A3%E4%B8%A4%E9%98%B6%E6%AE%B5%E6%8F%90%E4%BA%A4%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    36 分布式事务：如何理解两阶段提交？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../37-Thrift%E7%BC%96%E7%A0%81%E6%96%B9%E6%B3%95%EF%BC%9A%E4%B8%BA%E4%BB%80%E4%B9%88RPC%E5%BE%80%E5%BE%80%E4%B8%8D%E9%87%87%E7%94%A8JSON%E4%BD%9C%E4%B8%BA%E7%BD%91%E7%BB%9C%E4%BC%A0%E8%BE%93%E6%A0%BC%E5%BC%8F%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    37 Thrift编码方法：为什么RPC往往不采用JSON作为网络传输格式？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../38-%E5%80%92%E6%8E%92%E7%B4%A2%E5%BC%95%EF%BC%9A%E6%90%9C%E7%B4%A2%E5%BC%95%E6%93%8E%E6%98%AF%E5%A6%82%E4%BD%95%E5%81%9A%E5%85%A8%E6%96%87%E6%A3%80%E7%B4%A2%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    38 倒排索引：搜索引擎是如何做全文检索的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../39-Geohash%EF%BC%9A%E7%82%B9%E5%A4%96%E5%8D%96%E6%97%B6%E6%88%91%E4%BB%AC%E6%98%AF%E5%A6%82%E4%BD%95%E6%9F%A5%E6%89%BE%E5%88%B0%E9%99%84%E8%BF%91%E9%A4%90%E5%8E%85%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    39 Geohash：点外卖时我们是如何查找到附近餐厅的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../40-%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%EF%BC%9A%E7%8E%B0%E4%BB%A3%E8%AF%AD%E8%A8%80%E6%98%AF%E5%A6%82%E4%BD%95%E8%87%AA%E5%8A%A8%E7%AE%A1%E7%90%86%E5%9B%9E%E6%94%B6%E5%86%85%E5%AD%98%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    40 垃圾回收：现代语言是如何自动管理回收内存的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E7%BB%93%E6%9D%9F%E8%AF%AD-%E5%9C%A8%E6%8A%80%E6%9C%AF%E7%9A%84%E4%B8%96%E7%95%8C%E9%87%8C%E4%BA%AB%E5%8F%97%E6%80%9D%E7%BB%B4%E7%9A%84%E4%B9%90%E8%B6%A3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    结束语 在技术的世界里享受思维的乐趣
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E6%9C%9F%E6%9C%AB%E6%B5%8B%E8%AF%95-%E6%9D%A5%E8%B5%B4%E4%B8%80%E5%9C%BA%E6%BB%A1%E5%88%86%E4%B9%8B%E7%BA%A6%EF%BC%81/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    期末测试 来赴一场满分之约！
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E4%BB%A3%E7%A0%81%E4%B9%8B%E4%B8%91/%E4%BB%A3%E7%A0%81%E4%B9%8B%E4%B8%91/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    代码之丑
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E4%BB%A3%E7%A0%81%E7%B2%BE%E8%BF%9B%E4%B9%8B%E8%B7%AF/%E4%BB%A3%E7%A0%81%E7%B2%BE%E8%BF%9B%E4%B9%8B%E8%B7%AF/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    代码精进之路
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E5%BF%AB%E9%80%9F%E4%B8%8A%E6%89%8BC%2B%2B%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E4%B8%8E%E7%AE%97%E6%B3%95/%E5%BF%AB%E9%80%9F%E4%B8%8A%E6%89%8BC%2B%2B%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E4%B8%8E%E7%AE%97%E6%B3%95/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    快速上手C++数据结构与算法
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%89%8B%E6%8A%8A%E6%89%8B%E5%B8%A6%E4%BD%A0%E5%86%99%E4%B8%80%E9%97%A8%E7%BC%96%E7%A8%8B%E8%AF%AD%E8%A8%80/%E6%89%8B%E6%8A%8A%E6%89%8B%E5%B8%A6%E4%BD%A0%E5%86%99%E4%B8%80%E9%97%A8%E7%BC%96%E7%A8%8B%E8%AF%AD%E8%A8%80/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    手把手带你写一门编程语言
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F%E5%AE%9E%E6%88%9845%E8%AE%B2/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F%E5%AE%9E%E6%88%9845%E8%AE%B2/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    操作系统实战45讲
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E4%B8%8E%E7%AE%97%E6%B3%95%E4%B9%8B%E7%BE%8E/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E4%B8%8E%E7%AE%97%E6%B3%95%E4%B9%8B%E7%BE%8E/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    数据结构与算法之美
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%AD%A3%E5%88%99%E8%A1%A8%E8%BE%BE%E5%BC%8F%E5%85%A5%E9%97%A8%E8%AF%BE/%E6%AD%A3%E5%88%99%E8%A1%A8%E8%BE%BE%E5%BC%8F%E5%85%A5%E9%97%A8%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    正则表达式入门课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%B7%B1%E5%85%A5%E6%B5%85%E5%87%BA%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BB%84%E6%88%90%E5%8E%9F%E7%90%86/%E6%B7%B1%E5%85%A5%E6%B5%85%E5%87%BA%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BB%84%E6%88%90%E5%8E%9F%E7%90%86/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    深入浅出计算机组成原理
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E7%A8%8B%E5%BA%8F%E5%91%98%E7%9A%84%E6%95%B0%E5%AD%A6%E5%9F%BA%E7%A1%80%E8%AF%BE/%E7%A8%8B%E5%BA%8F%E5%91%98%E7%9A%84%E6%95%B0%E5%AD%A6%E5%9F%BA%E7%A1%80%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    程序员的数学基础课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E7%BC%96%E8%AF%91%E5%8E%9F%E7%90%86%E4%B9%8B%E7%BE%8E/%E7%BC%96%E8%AF%91%E5%8E%9F%E7%90%86%E4%B9%8B%E7%BE%8E/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    编译原理之美
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E7%BC%96%E8%AF%91%E5%8E%9F%E7%90%86%E5%AE%9E%E6%88%98%E8%AF%BE/%E7%BC%96%E8%AF%91%E5%8E%9F%E7%90%86%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    编译原理实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%AE%A1%E7%AE%97%E6%9C%BA%E5%9F%BA%E7%A1%80%E5%AE%9E%E6%88%98%E8%AF%BE/%E8%AE%A1%E7%AE%97%E6%9C%BA%E5%9F%BA%E7%A1%80%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    计算机基础实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%B6%A3%E8%B0%88Linux%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/%E8%B6%A3%E8%B0%88Linux%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    趣谈Linux操作系统
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%B6%A3%E8%B0%88%E7%BD%91%E7%BB%9C%E5%8D%8F%E8%AE%AE/%E8%B6%A3%E8%B0%88%E7%BD%91%E7%BB%9C%E5%8D%8F%E8%AE%AE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    趣谈网络协议
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%BD%AF%E4%BB%B6%E5%B7%A5%E7%A8%8B%E4%B9%8B%E7%BE%8E/%E8%BD%AF%E4%BB%B6%E5%B7%A5%E7%A8%8B%E4%B9%8B%E7%BE%8E/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    软件工程之美
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%BD%AF%E4%BB%B6%E8%AE%BE%E8%AE%A1%E4%B9%8B%E7%BE%8E/%E8%BD%AF%E4%BB%B6%E8%AE%BE%E8%AE%A1%E4%B9%8B%E7%BE%8E/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    软件设计之美
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E9%80%8F%E8%A7%86HTTP%E5%8D%8F%E8%AE%AE/%E9%80%8F%E8%A7%86HTTP%E5%8D%8F%E8%AE%AE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    透视HTTP协议
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E9%87%8D%E5%AD%A6%E7%BA%BF%E6%80%A7%E4%BB%A3%E6%95%B0/%E9%87%8D%E5%AD%A6%E7%BA%BF%E6%80%A7%E4%BB%A3%E6%95%B0/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    重学线性代数
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E8%BF%90%E7%BB%B4-%E6%B5%8B%E8%AF%95/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    运维-测试
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        数组和内存
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="数组和内存">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        静态数组的特性
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        动态数组
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        动态数组源码分析
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="动态数组源码分析">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#stl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        STL的扩容方法
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        总结
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        课后作业
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+  <h1>01 动态数组：按需分配的vector为什么要二倍扩容？</h1>
+
+<p>你好，我是微扰君。今天我们进入第一章基础数据结构的学习。</p>
+<p>计算机程序一直以来最根本的作用就是处理数据。即使在早期的计算机中，计算就已经不仅仅是几个数字之间的加减乘除那么简单了，经常需要处理大量线性存储的数据，一个很好的例子就是向量乘法。显然，我们需要找到一种合适的方式在计算机中存储这些信息，并能让我们可以快速地进行向量运算。</p>
+<p>再举一个更工程化的例子。假设有个需求，我们希望只借助内存实现一个简易的银行账户管理系统，每个账号里包括两个基本信息：账户ID及余额。用户首次开户的时候，会被分配一个账户ID；系统要支持用户通过ID快速查询余额，也可以存款/取款改变自己的余额。</p>
+<p>你可能会觉得这有什么难的？用数组就可以解决。建立一个整型动态数组，每来一个用户就给存到数组的某个位置，用该位置的数组下标来当用户的ID就行。查询起来更快，数组大小是动态的，也不用考虑用户数量超过容量上限的问题。</p>
+<p>但是，<strong>基于下标随机访问数组元素为什么这么高效？动态数组是怎么做到看起来可以有无限容量？扩容机制的时间复杂度是多少，是不是会带来额外的内存浪费呢</strong>？不知道你有没有思考过这些问题。</p>
+<p>今天，我们就带着这些问题一起学习第一种序列式容器vector，也就是动态数组。相信你学完之后，对这些问题的理解就深刻啦。</p>
+<h2 id="_1">数组和内存</h2>
+<p>讲解动态数组的实现之前，首先要回顾一下数组是什么，不过为了和动态数组区分开来，我们常常也称之为静态数组。可以这样定义：静态数组是由相同类型的元素线性排列的数据结构，在计算机上会分配一段连续的内存，对元素进行顺序存储。</p>
+<p>其中有三个关键词，<strong>相同类型、连续内存、顺序存储</strong>。之所以这样设计，本质就是为了能做到基于下标，对数组进行O(1)时间复杂度的快速随机访问。</p>
+<p>存储数组时，会事先分配一段连续的内存空间，将数组元素依次存入内存。因为数组元素的类型都是一样的，所以每个元素占用的空间大小也是一样的，这样我们就很容易用“数组的开始地址+index*元素大小”的计算方式，快速定位到指定索引位置的元素，这也是数组基于下标随机访问的复杂度为O(1)的原因。</p>
+<p><img alt="图片" src="https://static001.geekbang.org/resource/image/0b/ca/0bee9102709e8539119f7feae7592bca.jpg?wh=1920x1145" /></p>
+<p>为什么要事先分配一段内存呢？答案也很简单，因为内存空间并不是无限的。一段程序里可能有很多地方都需要分配内存，我们必然要为分配的连续内存寻找一个边界。</p>
+<p>事先确定数组大小并分配相应的内存给数组，就是告诉程序，这块地方已经是某个数组的地盘了，就不要再来使用了。同样，访问该数组的时候，下标也不应该超过地盘的范围，在大部分语言里这样的非法操作都会引起越界的错误，但在一些没有越界保护实现的语言（比如C语言）中，这就是一个很大的问题，需要开发者非常谨慎。有时这甚至会成为软件被黑客攻击的漏洞。</p>
+<h3 id="_2">静态数组的特性</h3>
+<p>当然，在内存里这样的顺序存储也不是没有代价，这直接导致了数组的插入和删除会低效很多，平均的复杂度是O(N)。因为数组，和集合不同，<strong>元素在数组中的位置</strong>是我们关心的。</p>
+<p>在长度为N的数组中，要在下标为T的位置插入数据时，原数组中下标为T到N-1的元素都需要向后顺移一位，这需要遍历数组中共计N-T个元素，当然，如果希望插入到数组的末端，只需要做插入而不需要做任何移动操作。但同样，如果我们希望将新元素插入到数组最开始的位置，就要将原数组所有元素都向后移动了，这需要移动共计N个元素。</p>
+<p><img alt="图片" src="https://static001.geekbang.org/resource/image/b0/fb/b00ac71fc8a6a0aa23c988782854dcfb.jpg?wh=1920x1145" /></p>
+<p>所以平均而言，数组的插入操作的时间复杂度为O(N)。删除操作基于类似的原因，复杂度当然也是O(N)。</p>
+<p>总的来说，静态数组的特性就是<strong>数组中元素的个数是事先确定的，每个元素都有对应的索引，第一个元素的索引为0</strong>。因为每个元素在内存占用的空间是一样的，我们可以基于首元素的地址和目标元素的下标，直接定位到目标元素的位置。</p>
+<h2 id="_3">动态数组</h2>
+<p>很显然，使用静态数组的时候需要事先指定空间大小，这并不是很让人们满意。因为静态数组的使用者分配完内存之后，数组空间就不再能扩展（或收缩）了。比如在开头的简易银行系统中，确定固定的数组大小带来的风险就是：当用户数不断上涨直至超过数组容量范围时，我们的系统就不能继续工作了。</p>
+<p>唯一的解决方案只能是重新申请一个更大的数组。这个过程，如果自己手动实现，有相当多琐碎的操作，至少包括配置一整块更大的连续内存空间、将元素逐一拷贝至新空间，以及释放原本的空间。</p>
+<p><strong>而动态数组的意义就在于将这些繁琐的细节封装起来，给用户良好使用体验的同时，也兼顾效率</strong>。这就是为什么我们在大部分业务开发场景下，更多地采用动态数组容器，而不是原生的静态数组。</p>
+<p>STL的Vector就是这样一种经过严格测试和实战检验的动态数组容器，我们下面来分析一下它的原理和实现。其他高级语言的动态数组容器的实现思路其实也是类似的，比如Java中的ArrayList等（后续我们也会用Java中的实现来讲解）。你搞清楚一个，其他的就很好理解了。</p>
+<h2 id="_4">动态数组源码分析</h2>
+<p>当然，STL的源码涉及了许多高深的C++技巧，我们并不会展开讨论，会对源码做一些简单的调整方便你理解原理。这里也给你一个看源码的小建议，不要死抠细节。我个人看源码比较喜欢<strong>自顶而下的方式，先从大的模块暴露的方法和接口看起，而不是上来就开始研究小模块的实现细节</strong>。</p>
+<p>比如学习STL源码中vector实现的时候，你会经常发现allocator相关的方法，如果你揪着它不放一路溯源，会发现allocator的底层实现也非常复杂，但是，大多数时候我们不需要这么做，只要理解清楚了allocator的哪些方法用来申请内存、哪些方法用于释放内存，具体实现细节暂时当作黑箱，把精力集中在当下要搞清楚的问题上就可以了。</p>
+<p>首先，来看vector在内存中的表示。它有两个指标，大小和容量。</p>
+<p>大小，表示现在存了多少数据。存数据的部分其实和静态数组是一样的，都是一段连续的内存空间顺序排列这若干类型相同、大小一致的元素，但不同的地方在于，数组的大小是可以动态调整的。</p>
+<p>我们知道，<strong>向计算机申请空间连续的内存空间是一个成本比较高的操作</strong>，不只需要扫描出堆区内存的空闲内存块，可能还需要向操作系统申请更大的堆空间，并产生用户态-内核态的切换成本。</p>
+<p>所以为了减少二次分配的次数，初次配置空间的时候，可以分配比vector目前所需空间更多一些，后续的若干次插入就不再需要触发昂贵的扩容操作了。这样的可用空间，我们称为vector的容量，是vector在创建时需要的第二个可选参数。</p>
+<p><img alt="图片" src="https://static001.geekbang.org/resource/image/a2/7b/a2ac8df120dc92e55a96bec923fc3c7b.jpg?wh=1920x1145" /></p>
+<p>所以我们可以用三个指针来标记vector空间的使用情况，分别是：</p>
+<ol>
+<li>_start 指针，指向vector第一个元素</li>
+<li>_finish 指针，指向vector最后一个元素</li>
+<li>_end 指针，指向vector预留容量的边界</li>
+</ol>
+<p>当然，动态数组的两个核心指标就很容易计算出来了：</p>
+<ol>
+<li>容量，capacity = _end - _first，表示目前的数组最多能存储多少个元素</li>
+<li>大小，size = _finish - _first，表示数组当前已经存储的元素个数
+对应的代码如下：</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">template</span><span class="w"> </span><span class="o">&lt;</span><span class="k">class</span><span class="w"> </span><span class="nc">_Tp</span><span class="p">,</span><span class="w"> </span><span class="k">class</span><span class="w"> </span><span class="nc">_Alloc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">__STL_DEFAULT_ALLOCATOR</span><span class="p">(</span><span class="n">_Tp</span><span class="p">)</span><span class="w"> </span><span class="o">&gt;</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">vector</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">protected</span><span class="w"> </span><span class="n">_Vector_base</span><span class="o">&lt;</span><span class="n">_Tp</span><span class="p">,</span><span class="w"> </span><span class="n">_Alloc</span><span class="o">&gt;</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">{</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="p">...</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="k">protected</span><span class="o">:</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">_Tp</span><span class="o">*</span><span class="w"> </span><span class="n">_M_start</span><span class="p">;</span><span class="w"> </span><span class="c1">//表示目前使用空间的头</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">_Tp</span><span class="o">*</span><span class="w"> </span><span class="n">_M_finish</span><span class="p">;</span><span class="w"> </span><span class="c1">//表示目前使用空间的尾</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">_Tp</span><span class="o">*</span><span class="w"> </span><span class="n">_M_end_of_storage</span><span class="p">;</span><span class="w"> </span><span class="c1">//表示目前可用空间的尾</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">...</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">};</span>
+</code></pre></div>
+<p>你不用太关注模版相关的语法，只需要知道这里protected的三个变量就是前面提到的3个指针。</p>
+<p>有了这些，我们就可以判断什么时候需要触发扩容操作，以及扩容的方式。因为vector创建的时候会给一个容量，但随着我们不断往数组中插入元素，数组的大小终究会超过当前分配的容量，于是需要重新分配更大的内存，那具体分配多少是一个比较合理的值呢？</p>
+<h3 id="stl">STL的扩容方法</h3>
+<p>来看一下STL怎么做的。除了查询已有资料之外，我个人比较推荐动手实验，不仅能随时检验自己脑海里的想法，通过动手实践对原理的理解和印象也更深刻一些。所以我们来编写一些测试方法，观察Vector在测试过程中的行为，再和官方文档及资料进行对比验证。</p>
+<p>要做的实验也很简单，就是往一个数组里不断的插入元素，并观察size和capacity的变化。完整的代码可以在<a href="https://github.com/wfnuser/Algorithms/blob/main/STL/Vector/experiment.cpp">这里</a>找到。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">v</span><span class="p">;</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">20</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;size: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">v</span><span class="p">.</span><span class="n">size</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; capacity &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">v</span><span class="p">.</span><span class="n">capacity</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">endl</span><span class="p">;</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">v</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">i</span><span class="p">);</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="p">}</span>
+</code></pre></div>
+<p><img alt="图片" src="https://static001.geekbang.org/resource/image/04/f4/04dff9a4235e57328c101d8b521f4af4.png?wh=512x714" /></p>
+<p>通过实验我们能发现一个很明显的规律：如果每次只插入一个元素，当vector的大小小于容量时，容量不会发生变化，数组大小不断递增。而当vector的大小即将超过容量的时候，插入之后，容量大小会翻番。</p>
+<p>所以，倍增就是vector的扩容方式，这种类似倍增的策略也会出现在许多其他使用场景中。</p>
+<p>这里很自然会有一个问题，为什么每次扩容时候都是以倍增的方式扩容，而不是增加固定大小的容量呢？</p>
+<p>在回答这个问题之前，我们先看一看STL扩容逻辑的实现。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kt">void</span><span class="w"> </span><span class="nf">push_back</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">_Tp</span><span class="o">&amp;</span><span class="w"> </span><span class="n">__x</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="c1">//在最尾端插入元素</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">_M_finish</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">_M_end_of_storage</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="c1">//若有可用的内存空间</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">construct</span><span class="p">(</span><span class="n">_M_finish</span><span class="p">,</span><span class="w"> </span><span class="n">__x</span><span class="p">);</span><span class="c1">//构造对象</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="o">++</span><span class="n">_M_finish</span><span class="p">;</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="p">}</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="k">else</span><span class="c1">//若没有可用的内存空间,调用以下函数，把x插入到指定位置</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="n">_M_insert_aux</span><span class="p">(</span><span class="n">end</span><span class="p">(),</span><span class="w"> </span><span class="n">__x</span><span class="p">);</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="p">}</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="k">template</span><span class="w"> </span><span class="o">&lt;</span><span class="k">class</span><span class="w"> </span><span class="nc">_Tp</span><span class="p">,</span><span class="w"> </span><span class="k">class</span><span class="w"> </span><span class="nc">_Alloc</span><span class="o">&gt;</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="kt">void</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="n">vector</span><span class="o">&lt;</span><span class="n">_Tp</span><span class="p">,</span><span class="w"> </span><span class="n">_Alloc</span><span class="o">&gt;::</span><span class="n">_M_insert_aux</span><span class="p">(</span><span class="n">iterator</span><span class="w"> </span><span class="n">__position</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">_Tp</span><span class="o">&amp;</span><span class="w"> </span><span class="n">__x</span><span class="p">)</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="p">{</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">_M_finish</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">_M_end_of_storage</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="n">construct</span><span class="p">(</span><span class="n">_M_finish</span><span class="p">,</span><span class="w"> </span><span class="o">*</span><span class="p">(</span><span class="n">_M_finish</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">));</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="o">++</span><span class="n">_M_finish</span><span class="p">;</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="n">_Tp</span><span class="w"> </span><span class="n">__x_copy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">__x</span><span class="p">;</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="n">copy_backward</span><span class="p">(</span><span class="n">__position</span><span class="p">,</span><span class="w"> </span><span class="n">_M_finish</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="n">_M_finish</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="o">*</span><span class="n">__position</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">__x_copy</span><span class="p">;</span>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="p">}</span>
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="k">const</span><span class="w"> </span><span class="n">size_type</span><span class="w"> </span><span class="n">__old_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">size</span><span class="p">();</span>
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a><span class="k">const</span><span class="w"> </span><span class="n">size_type</span><span class="w"> </span><span class="n">__len</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">__old_size</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">__old_size</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a><span class="n">iterator</span><span class="w"> </span><span class="n">__new_start</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_M_allocate</span><span class="p">(</span><span class="n">__len</span><span class="p">);</span>
+<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a><span class="n">iterator</span><span class="w"> </span><span class="n">__new_finish</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">__new_start</span><span class="p">;</span>
+<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a><span class="n">__STL_TRY</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a><span class="n">__new_finish</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">uninitialized_copy</span><span class="p">(</span><span class="n">_M_start</span><span class="p">,</span><span class="w"> </span><span class="n">__position</span><span class="p">,</span><span class="w"> </span><span class="n">__new_start</span><span class="p">);</span>
+<a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a><span class="n">construct</span><span class="p">(</span><span class="n">__new_finish</span><span class="p">,</span><span class="w"> </span><span class="n">__x</span><span class="p">);</span>
+<a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a><span class="o">++</span><span class="n">__new_finish</span><span class="p">;</span>
+<a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a><span class="n">__new_finish</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">uninitialized_copy</span><span class="p">(</span><span class="n">__position</span><span class="p">,</span><span class="w"> </span><span class="n">_M_finish</span><span class="p">,</span><span class="w"> </span><span class="n">__new_finish</span><span class="p">);</span>
+<a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a><span class="p">}</span>
+<a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a><span class="n">__STL_UNWIND</span><span class="p">((</span><span class="n">destroy</span><span class="p">(</span><span class="n">__new_start</span><span class="p">,</span><span class="n">__new_finish</span><span class="p">),</span>
+<a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a><span class="n">_M_deallocate</span><span class="p">(</span><span class="n">__new_start</span><span class="p">,</span><span class="n">__len</span><span class="p">)));</span>
+<a id="__codelineno-2-34" name="__codelineno-2-34" href="#__codelineno-2-34"></a><span class="n">destroy</span><span class="p">(</span><span class="n">begin</span><span class="p">(),</span><span class="w"> </span><span class="n">end</span><span class="p">());</span>
+<a id="__codelineno-2-35" name="__codelineno-2-35" href="#__codelineno-2-35"></a><span class="n">_M_deallocate</span><span class="p">(</span><span class="n">_M_start</span><span class="p">,</span><span class="w"> </span><span class="n">_M_end_of_storage</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">_M_start</span><span class="p">);</span>
+<a id="__codelineno-2-36" name="__codelineno-2-36" href="#__codelineno-2-36"></a><span class="n">_M_start</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">__new_start</span><span class="p">;</span>
+<a id="__codelineno-2-37" name="__codelineno-2-37" href="#__codelineno-2-37"></a><span class="n">_M_finish</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">__new_finish</span><span class="p">;</span>
+<a id="__codelineno-2-38" name="__codelineno-2-38" href="#__codelineno-2-38"></a><span class="n">_M_end_of_storage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">__new_start</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">__len</span><span class="p">;</span>
+<a id="__codelineno-2-39" name="__codelineno-2-39" href="#__codelineno-2-39"></a><span class="p">}</span>
+<a id="__codelineno-2-40" name="__codelineno-2-40" href="#__codelineno-2-40"></a><span class="p">}</span>
+</code></pre></div>
+<p>这段扩容操作在push_back和insert操作中都会触发，我们以简单一点的push_back，也就是往数组尾部插入元素的操作为例，来解释扩容的逻辑。</p>
+<p>可以看到，push_back的时候会先做一个判断，看当前的容量是不是不够用了。如果够用，我们只要直接往后插入一个元素；<strong>不够用，才进行_M_insert_aux扩容并插入的操作，插入后需要把finish指针往后移动</strong>。这里在容量够用的时候，插入逻辑用的是construct函数，是STL容器中通用的构造方法。</p>
+<p>我们来重点分析扩容逻辑所在的_M_insert_aux方法：</p>
+<ul>
+<li>13-20行，实际上是因为还有其他函数会调用这个方法，我们已经确定容量不足，所以不会进入这段逻辑。</li>
+<li>22-25行，主要做的事情就是读取原有的vector大小old_size，再从内存里申请一段新的空间，大小为2*old_size，创建新的首尾指针并指向新的空间。</li>
+<li>26-31行，将老空间里的数据逐一搬到新的空间里，并在最后添加新的元素。这样就完成了扩容的主要目的，这是一个O(n)复杂度的操作，因为你需要对原数组进行逐一的深拷贝。</li>
+<li>最后，在32-38行，我们需要做一些清理和收尾工作，释放掉老的数组空间和指针，将容器的首尾及容量指针都更新到对应的位置。</li>
+</ul>
+<p>这样Vector就完成了对扩容操作的封装，是不是其实并不复杂呢？</p>
+<p>现在清楚扩容的具体实现之后，来解答前面的问题：为什么扩容是采用倍增的方式，而不是每次扩展固定大小？这背后其实是有严密数学依据的，非常有趣，我们一起来探索一下。</p>
+<p>用极端法来考虑这个问题。</p>
+<p>先假设是不是可以不倍增，而是每次只扩展一个元素呢？直觉上这当然是不合理的，这会导致每一次插入都会触发扩容，而每次扩容都会进行所有元素的复制操作。所以如果我们要插入n个元素，需要进行的拷贝次数：</p>
+<p>$1+2+3+… +n=n^{2}$</p>
+<p>复杂度为O(n^2)，均摊下来每次操作时间复杂度就是O(n)。</p>
+<p>那如果我们不是每次只拓展一个元素，而是每次扩展C的容量，对复杂度的计算会产生多大的影响呢？同样来计算一下，每插入C次就需要进行一次扩展操作，每次扩展仍然需要复制全部元素，所以总的拷贝次数是：</p>
+<p>$C + 2C + 3C + … + ceiling(n/C)*C$</p>
+<p>复杂度同样为O(n^2) 。均摊下来每次操作时间复杂度还是O(n)。 虽然次数少了C倍，但仍然不令人满意。</p>
+<p>更好的做法就是和STL一样采用倍增的思想，每次都将容量扩展为当前的一倍，它往往能让我们的时间复杂度下降很多。</p>
+<p>算一下倍增这种策略下需要拷贝的次数：假设一共还是插入N次，那总拷贝次数，就是从1加到2的X次，其中x是logn向上取整；这是因为容量每次都在翻番，所以每次触发拷贝的时候，容量分别是1、2、4、8 … 一直到logn向上取整。</p>
+<p>$1+2+4+8+… +2<sup _x_1_="(x+1)">{x}=2</sup>-1$</p>
+<p>这样插入N个元素的复杂度就一下减少为O(N)了。均摊到每次插入的扩容复杂度就为O(1)，这当然是一个令人满意的结果啦。</p>
+<h2 id="_5">总结</h2>
+<p>相信经过今天的学习，你一定已经对开头的几个问题有答案了吧，简单总结一下。数组，是支持O(1)基于下标随机访问的数据结构，在内存中是连续存储的。基于下标高效访问元素的核心就在于“相同类型”和“连续存储”的特性，当然，也带来了高昂的插入和删除的时间复杂度。</p>
+<p>动态数组之所以能看起来像是无限容量，也仅仅是因为它内置了倍增的扩容策略，每次数组大小超过容量的时候，就会触发数组的扩容机制，封装了繁琐的拷贝细节。</p>
+<p>也正是因为上述特性，动态数组广泛应用在需要经常查询、变更，但是很少插入/删除的场景，比如我们在实现一个简单的Web服务器的时候，可以用vector来存储handler的线程，达到线程复用的效果。</p>
+<p>你应该感受到了今天的内容比上一讲的文本差分要简单一些，是的，<strong>接下来我们会先把数据结构实现的基础打好，了解清楚背后的实现原理</strong>，这样在日常开发中，不同的数据结构可能造成什么样的性能瓶颈，你都能烂熟于心。</p>
+<h2 id="_6">课后作业</h2>
+<p>我们已经细致地分析了在vector中插入元素的方法，如果要删除一个元素应该怎么实现呢？在删除元素的时候需不需要缩容呢？如果需要的话，你会怎么做。</p>
+<p>这是一个开放问题，欢迎你在留言区与我讨论。我们下节课见。</p>
+<div><strong>精选留言（15）</strong></div>
+<ul>
+<li><span>qinsi</span> 👍（56） 💬（10）<p>两倍扩容的问题在于无法利用已释放的空间，因为假设第n次扩容分配了2^n的空间（省略常数C），那么之前释放掉的空间总和为：
+
+1 + 2 + 2^2 + ... + 2^(n-1) = 2^n - 1
+
+正好放不下2^n的空间。这样导致的结果就是需要操作系统不断分配新的内存页，并且数组的首地址也在不断变大，造成缓存缺失。
+
+假设扩容倍率为x，首次分配的空间为1（同样省略常数C），则第一次扩容分配的空间为x，第二次扩容分配的空间为x^2。如果希望第二次扩容正好能用上之前申请过的空间，则有：
+
+1 + x = x^2
+
+解得x=(1+sqrt(5))&#47;2，约1.618
+
+当然这是简化的分析，因为第二次扩容时要需要把第一次扩容的空间中的数据拷贝出来，所以至少要等到第三次扩容才行，也就是：
+
+1 + x = x^3
+
+更一般的：
+
+1 + x + ... + x^(n - 2) = x^n
+
+当n-&gt;∞时，x-&gt;1.618。所以实际会用比1.618小的值，否则n太大就没意义了。比如Java的ArrayList用的是1.5，那么第5次扩容时就可以利用旧的空间了。
+
+当然这些也只是理论上的分析，实际情况要根据内存分配器的实现具体分析。</p>2021-12-15</li><br/><li><span>sc</span> 👍（15） 💬（1）<p>在 Java 的 ArrayList 中，没有自动缩容，但是提供了一个  trimToSize() 的方法可以让使用者手动缩容；如果要设计自动缩容的话，可以简单设计成 size 减少到到 capacity&#47;4 的时候，将容量缩减成原来的一半</p>2021-12-12</li><br/><li><span>Paul Shan</span> 👍（6） 💬（1）<p>如果在存储空间占比低于一半的时候就缩容，会导致反复插入删除回到单步操作O(n)的复杂度，以前见过的实现是存储的空间占总空间的1&#47;4的时候开始缩容一半，可以做到单步均摊复杂度O(1)。数组看似简单，实则精妙，平均浪费一半空间的时候，才能取得较好的性能，也算一种空间换时间的方法。</p>2021-12-13</li><br/><li><span>木汀</span> 👍（3） 💬（1）<p>类似 golang 中的 slice，但是在 golang 中，当 slice 的大小&lt;1024时，是2的指数幂次增加长度，但是在&gt; 1024之后就是1.25倍，并做内存对齐操作。</p>2022-04-12</li><br/><li><span>Aliliin</span> 👍（2） 💬（3）<p>go 语言中提供的 slice 是不是就是动态数组呢，定义的时候，长度并不固定，可以向切片中追加元素，它会在容量不足时自动扩容。也提供了 len 和 cap 函数来获取长度和容量。
+当然 go 中的 slice 扩容的方案，不是倍增的方式，而是他自己的算法，小于 1024 才会将容量翻倍，大于 1024 每次只是增加 25% 的容量。但 go 的 slice 扩容之后，会新申请一段内存，拷贝过去，你即便删除了扩容的部分，内容大小也不会变。这时候，因为你是新申请了一段内存，原来的数组用到的内容，一旦没地方引用，就自动释放了。。至于如何再通过缩小原有的内存空间，就不知道怎么搞了。😂，不过比起先导篇中，跟上数学课，笔掉地上再捡起来后就听不懂了的情况来说，这节课至少没分心。</p>2021-12-13</li><br/><li><span>Space</span> 👍（1） 💬（1）<p>均摊下来是O(1)?? 怎么算出来的的？(2^(x+1) - 1 ) &#47; x == O(1)???? 别逗我</p>2022-03-24</li><br/><li><span>奋青。</span> 👍（1） 💬（3）<p>所以如果我们要插入 n 个元素，需要进行的拷贝次数：1+2+3+…+n=n2复杂度为 O(n^2)，均摊下来每次操作时间复杂度就是 O(n)。 这句话里面的 o(n^2) 是怎么计算得到的呀.</p>2021-12-15</li><br/><li><span>丶</span> 👍（0） 💬（1）<p>二倍扩容后，插入数据的均摊时间复杂度不应该是log（n）吗？？？整体均摊扩容也应该是log（n）吧？？计算如下：插入n个数据，需要需要log（n）次扩容，每次扩容需要转移元素时间复杂度为O（n）。这样插入数据总的时间复杂度就是 n + nlog（n），然后均摊到每一次就是 1 + log（n），最后时间复杂度不应该是log（n）吗？？？类似的插入元素时间复杂度为O（logn）。上面是我的理解，如果有错误，希望指正</p>2021-12-23</li><br/><li><span>友</span> 👍（0） 💬（1）<p>自己总结一下：按照1扩容 那么 1+2+3+4 &gt; 8 其实越往后拷贝的越来越多 每次扩容要拷贝的越来越多，但是之前我疑惑我把数值调大不就行了吗，第一浪费空间不说，可以继续算一下从1-&gt;4 那么每次就是 1+5+9+13+17+21+25 扩容到25需要6次,如果是按1扩容那么就是24次  那么就是减少了C倍而已 当数值越来越大 在 扩容到17的时候应该复杂度就上去了 如果是翻倍扩容  那么 公式就是 1 + 2 + 4 ... +n &lt; 2*n 均摊下来扩容就是O（1）了
+以上是自己的一些小总结 有错误希望各位矫正</p>2021-12-14</li><br/><li><span>kimoti</span> 👍（0） 💬（1）<p>看完这节感觉可以不至于从入门到放弃</p>2021-12-14</li><br/><li><span>DaveZ</span> 👍（0） 💬（1）<p>扩展C那里，平均应该是O(n)而不是O(1)</p>2021-12-14</li><br/><li><span>Dreamer</span> 👍（0） 💬（1）<p>自动代表不可控，线上很多时候，cpu资源和内存资源，更关注cpu资源多一些，其次缩容的阈值不好定。</p>2021-12-13</li><br/><li><span>雷霹雳的爸爸</span> 👍（0） 💬（1）<p>缩容这个我个人感觉是，可以有，但是不要搞什么自动缩…因为删除这个操作和增加这个还真不一样，增加时候满了你不扩就玩儿不转了，因此自动扩容属于必须要实现的能力吧，要不我自己直接用数组不就完事了，但是删除不自动缩更合理，参考本文讲解的每次扩容就加一那个脑补一下就很容易理解了，至于那是不是低到一定水位就可以执行自动缩？这个应该也不能这么玩儿，一个是缩了之后留多少空位的问题，更重要的还是这个执行时机很难选，因为也不知道接下来使用者（甚至还有可能是攻击者？）马上又要作什么妖，所以综上所述，我觉得就不要想在类似标准库里搞什么自动缩容这种事，假设使用者真有这个需要，自己考虑重新再初始化一个…</p>2021-12-13</li><br/><li><span>Geek_as</span> 👍（0） 💬（1）<p>java的arraylist的扩容策论是增加原有容量的一半，即容量为10，扩容就为5，arraylist在做删除的时候我记得是调用了jdk提供的api将删除节点的后面往前面移动。假如让我来实现，我可能考虑的是这个数组是否需要保证插入顺序，假如不用的话，可能用数组最后的数来替换删除数</p>2021-12-12</li><br/><li><span>qinsi</span> 👍（0） 💬（3）<p>真实世界的算法，远不是时间复杂度这么简单。考虑到最大化利用已释放的内存，最优的扩容比率是1.618</p>2021-12-11</li><br/>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="页脚" >
+        
+          
+          <a href="../%E5%85%88%E5%AF%BC%E7%AF%87-%E8%AF%B6%EF%BC%8C%E8%BF%99%E4%B8%AA%20git%20diff%20%E5%A5%BD%E5%83%8F%E4%B8%8D%E6%98%AF%E5%BE%88%E7%9B%B4%E8%A7%82%EF%BC%9F/" class="md-footer__link md-footer__link--prev" aria-label="上一页: 先导篇 诶，这个 git diff 好像不是很直观？">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                上一页
+              </span>
+              <div class="md-ellipsis">
+                先导篇 诶，这个 git diff 好像不是很直观？
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../02-%E5%8F%8C%E5%90%91%E9%93%BE%E8%A1%A8%EF%BC%9Alist%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0%E9%AB%98%E6%95%88%E5%9C%B0%E6%8F%92%E5%85%A5%E4%B8%8E%E5%88%A0%E9%99%A4%EF%BC%9F/" class="md-footer__link md-footer__link--next" aria-label="下一页: 02 双向链表：list如何实现高效地插入与删除？">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                下一页
+              </span>
+              <div class="md-ellipsis">
+                02 双向链表：list如何实现高效地插入与删除？
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright © 2025-Present zkep
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["content.code.annotate", "content.code.copy", "content.tooltips", "toc.follow", "navigation.top", "navigation.tabs", "navigation.tabs.sticky", "navigation.prune", "navigation.footer", "navigation.tracking", "navigation.instant", "navigation.instant.progress", "navigation.indexes", "content.tabs.link"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../../javascript/extra.js"></script>
+      
+        <script src="../../../javascript/giscus.js"></script>
+      
+        <script src="../../../javascript/referrerpolicy.js"></script>
+      
+    
+  </body>
+</html>

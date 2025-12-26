@@ -1,0 +1,7041 @@
+<!--geek time docs 🚀, MIT license-->
+
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="极客时间文档">
+      
+      
+        <meta name="author" content="zkep">
+      
+      
+        <link rel="canonical" href="https://github.com/uaxe/geektime-docs/%E8%AE%A1%E7%AE%97%E6%9C%BA%E5%9F%BA%E7%A1%80/%E5%BF%AB%E9%80%9F%E4%B8%8A%E6%89%8BC%2B%2B%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E4%B8%8E%E7%AE%97%E6%B3%95/44-%E8%B7%B3%E8%A1%A8%EF%BC%9A%E4%B8%BA%E4%BB%80%E4%B9%88Redis%E7%94%A8%E8%B7%B3%E8%A1%A8%E5%AE%9E%E7%8E%B0%E8%80%8CMySQL%E7%94%A8B%2B%E6%A0%91%EF%BC%9F/">
+      
+      
+        <link rel="prev" href="../43-%E4%B8%B2%E7%9A%84KMP%E6%A8%A1%E5%BC%8F%E5%8C%B9%E9%85%8D%E7%AE%97%E6%B3%95%E4%B9%8B%E6%94%B9%E8%BF%9B%EF%BC%9A%E9%80%9A%E8%BF%87%E4%BC%98%E5%8C%96%E4%BB%A3%E7%A0%81%E8%A7%A3%E5%86%B3%E5%A4%9A%E6%AC%A1%E9%87%8D%E5%A4%8D%E6%AF%94%E8%BE%83%E9%97%AE%E9%A2%98/">
+      
+      
+        <link rel="next" href="../45-%E5%93%88%E5%B8%8C%E8%A1%A8%E4%B8%8E%E5%93%88%E5%B8%8C%E7%AE%97%E6%B3%95%EF%BC%9A%E5%93%88%E5%B8%8C%E8%A1%A8%E9%80%82%E5%90%88%E7%94%A8%E5%9C%A8%E4%BB%80%E4%B9%88%E6%A0%B7%E7%9A%84%E6%83%85%E6%99%AF%EF%BC%9F/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../None">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>44 跳表：为什么Redis用跳表实现而MySQL用B+树？ - 极客时间文档</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../../stylesheets/style.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#_1" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+        <aside class="md-banner">
+          <div class="md-banner__inner md-grid md-typeset">
+            
+            
+
+
+          </div>
+          
+        </aside>
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../../.." title="极客时间文档" class="md-header__button md-logo" aria-label="极客时间文档" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            极客时间文档
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              44 跳表：为什么Redis用跳表实现而MySQL用B+树？
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="indigo"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/zkep/my-geektime" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    zkep/my-geektime
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="标签" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../AI-%E5%A4%A7%E6%95%B0%E6%8D%AE/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  AI-大数据
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E4%BA%A7%E5%93%81-%E8%BF%90%E8%90%A5/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  产品-运营
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E5%89%8D%E7%AB%AF-%E7%A7%BB%E5%8A%A8/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  前端-移动
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E5%90%8E%E7%AB%AF-%E6%9E%B6%E6%9E%84/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  后端-架构
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E7%AE%A1%E7%90%86-%E6%88%90%E9%95%BF/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  管理-成长
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  计算机基础
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../%E8%BF%90%E7%BB%B4-%E6%B5%8B%E8%AF%95/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  运维-测试
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="极客时间文档" class="md-nav__button md-logo" aria-label="极客时间文档" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    极客时间文档
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/zkep/my-geektime" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    zkep/my-geektime
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../AI-%E5%A4%A7%E6%95%B0%E6%8D%AE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI-大数据
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E4%BA%A7%E5%93%81-%E8%BF%90%E8%90%A5/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    产品-运营
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E5%89%8D%E7%AB%AF-%E7%A7%BB%E5%8A%A8/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    前端-移动
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E5%90%8E%E7%AB%AF-%E6%9E%B6%E6%9E%84/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    后端-架构
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E7%AE%A1%E7%90%86-%E6%88%90%E9%95%BF/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    管理-成长
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    计算机基础
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    计算机基础
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../MySQL%20%E5%BF%85%E7%9F%A5%E5%BF%85%E4%BC%9A/MySQL%20%E5%BF%85%E7%9F%A5%E5%BF%85%E4%BC%9A/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MySQL 必知必会
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Python%E8%87%AA%E5%8A%A8%E5%8C%96%E5%8A%9E%E5%85%AC%E5%AE%9E%E6%88%98%E8%AF%BE/Python%E8%87%AA%E5%8A%A8%E5%8C%96%E5%8A%9E%E5%85%AC%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python自动化办公实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../Vim%20%E5%AE%9E%E7%94%A8%E6%8A%80%E5%B7%A7%E5%BF%85%E7%9F%A5%E5%BF%85%E4%BC%9A/Vim%20%E5%AE%9E%E7%94%A8%E6%8A%80%E5%B7%A7%E5%BF%85%E7%9F%A5%E5%BF%85%E4%BC%9A/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vim 实用技巧必知必会
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E4%B8%9A%E5%8A%A1%E5%BC%80%E5%8F%91%E7%AE%97%E6%B3%9550%E8%AE%B2/%E4%B8%9A%E5%8A%A1%E5%BC%80%E5%8F%91%E7%AE%97%E6%B3%9550%E8%AE%B2/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    业务开发算法50讲
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E4%BB%A3%E7%A0%81%E4%B9%8B%E4%B8%91/%E4%BB%A3%E7%A0%81%E4%B9%8B%E4%B8%91/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    代码之丑
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E4%BB%A3%E7%A0%81%E7%B2%BE%E8%BF%9B%E4%B9%8B%E8%B7%AF/%E4%BB%A3%E7%A0%81%E7%B2%BE%E8%BF%9B%E4%B9%8B%E8%B7%AF/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    代码精进之路
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6_8" id="__nav_6_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    快速上手C++数据结构与算法
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    快速上手C++数据结构与算法
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%BF%AB%E9%80%9F%E4%B8%8A%E6%89%8BC%2B%2B%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E4%B8%8E%E7%AE%97%E6%B3%95/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    快速上手C++数据结构与算法
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E5%BC%80%E7%AF%87%E8%AF%8D-%E5%AD%A6%E4%B9%A0%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E4%B8%8E%E7%AE%97%E6%B3%95%EF%BC%8C%E4%B9%9F%E5%8F%AF%E4%BB%A5%E6%98%AF%E4%BB%B6%E5%B0%8F%E4%BA%8B/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    开篇词 学习数据结构与算法，也可以是件小事
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01-%E7%BC%96%E7%A8%8B%E7%8E%AF%E5%A2%83%EF%BC%9A%E5%B7%A5%E6%AC%B2%E5%96%84%E5%85%B6%E4%BA%8B%EF%BC%8C%E5%BF%85%E5%85%88%E5%88%A9%E5%85%B6%E5%99%A8/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01 编程环境：工欲善其事，必先利其器
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02-%E9%A1%BA%E5%BA%8F%E8%A1%A8%EF%BC%88%E4%B8%8A%EF%BC%89%EF%BC%9A%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0%E5%BF%AB%E9%80%9F%E5%9C%B0%E9%9A%8F%E6%9C%BA%E8%AE%BF%E9%97%AE%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    02 顺序表（上）：如何实现快速地随机访问？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03-%E9%A1%BA%E5%BA%8F%E8%A1%A8%EF%BC%88%E4%B8%8B%EF%BC%89%EF%BC%9A%E5%B8%B8%E7%94%A8%E6%93%8D%E4%BD%9C%E5%90%88%E9%9B%86%E4%B8%8E%E5%A4%8D%E6%9D%82%E5%BA%A6%E5%88%86%E6%9E%90/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    03 顺序表（下）：常用操作合集与复杂度分析
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04-%E5%8D%95%E9%93%BE%E8%A1%A8%EF%BC%9A%E5%A6%82%E4%BD%95%E9%80%9A%E8%BF%87%E6%8C%87%E9%92%88%E6%8F%90%E5%8D%87%E6%8F%92%E5%85%A5%E3%80%81%E5%88%A0%E9%99%A4%E6%95%B0%E6%8D%AE%E7%9A%84%E9%80%9F%E5%BA%A6%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04 单链表：如何通过指针提升插入、删除数据的速度？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05-%E5%8F%8C%E9%93%BE%E8%A1%A8%EF%BC%9A%E6%90%9C%E7%B4%A2%E9%93%BE%E8%A1%A8%E4%B8%AD%E8%8A%82%E7%82%B9%E7%9A%84%E9%80%9F%E5%BA%A6%E8%BF%98%E5%8F%AF%E4%BB%A5%E6%9B%B4%E5%BF%AB%E5%90%97%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05 双链表：搜索链表中节点的速度还可以更快吗？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06-%E5%BE%AA%E7%8E%AF%E9%93%BE%E8%A1%A8%EF%BC%9A%E5%A6%82%E4%BD%95%E6%9B%B4%E6%96%B9%E4%BE%BF%E5%9C%B0%E5%AF%BB%E6%89%BE%E6%95%B0%E6%8D%AE%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06 循环链表：如何更方便地寻找数据？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07-%E9%9D%99%E6%80%81%E9%93%BE%E8%A1%A8%EF%BC%9A%E7%94%A8%E4%B8%80%E7%BB%B4%E6%95%B0%E7%BB%84%E8%A1%A8%E8%BE%BE%E7%9A%84%E9%93%BE%E8%A1%A8/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    07 静态链表：用一维数组表达的链表
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08-%E6%A0%88%EF%BC%9A%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0%E6%95%B0%E6%8D%AE%E7%9A%84%E5%90%8E%E8%BF%9B%E5%85%88%E5%87%BA%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    08 栈：如何实现数据的后进先出？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09-%E9%98%9F%E5%88%97%EF%BC%9A%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0%E6%95%B0%E6%8D%AE%E7%9A%84%E5%85%88%E8%BF%9B%E5%85%88%E5%87%BA%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    09 队列：如何实现数据的先进先出？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10-%E4%BA%8C%E5%8F%89%E6%A0%91%EF%BC%9A%E4%BA%8C%E5%8F%89%E6%A0%91%E5%88%B0%E5%BA%95%E9%95%BF%E4%BB%80%E4%B9%88%E6%A0%B7%E5%AD%90%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10 二叉树：二叉树到底长什么样子？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../11-%E4%BA%8C%E5%8F%89%E6%A0%91%EF%BC%9A%E6%B7%B1%E5%BA%A6%E4%BC%98%E5%85%88%E5%92%8C%E5%B9%BF%E5%BA%A6%E4%BC%98%E5%85%88%E9%81%8D%E5%8E%86%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    11 二叉树：深度优先和广度优先遍历是什么？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../12-%E4%BA%8C%E5%8F%89%E6%A0%91%EF%BC%9A%E5%A6%82%E4%BD%95%E5%AD%98%E5%82%A8%E4%BA%8C%E5%8F%89%E6%A0%91%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    12 二叉树：如何存储二叉树？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13-%E7%BA%BF%E7%B4%A2%E4%BA%8C%E5%8F%89%E6%A0%91%EF%BC%9A%E5%A6%82%E4%BD%95%E7%BA%BF%E7%B4%A2%E5%8C%96%E4%BA%8C%E5%8F%89%E6%A0%91%E4%BB%A5%E6%8F%90%E5%8D%87%E8%AE%BF%E9%97%AE%E9%80%9F%E5%BA%A6%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    13 线索二叉树：如何线索化二叉树以提升访问速度？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../14-%E4%BA%8C%E5%8F%89%E6%9F%A5%E6%89%BE%E6%A0%91%EF%BC%88BST%EF%BC%89%EF%BC%9A%E6%9F%A5%E6%89%BE%E9%80%9F%E5%BA%A6%E4%BD%A0%E6%9C%80%E8%A1%8C/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    14 二叉查找树（BST）：查找速度你最行
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../15-%E5%B9%B3%E8%A1%A1%E4%BA%8C%E5%8F%89%E6%A0%91%EF%BC%88AVL%EF%BC%89%EF%BC%9A%E5%B9%B3%E8%A1%A1%E5%A6%82%E6%AD%A4%E9%87%8D%E8%A6%81%EF%BC%8C%E6%80%8E%E4%B9%88%E5%81%9A%E5%88%B0%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    15 平衡二叉树（AVL）：平衡如此重要，怎么做到的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../16-%E5%B9%B3%E8%A1%A1%E4%BA%8C%E5%8F%89%E6%A0%91%EF%BC%88AVL%EF%BC%89%EF%BC%9A%E8%8A%82%E7%82%B9%E5%88%A0%E9%99%A4%E5%90%8E%E7%9A%84%E5%B9%B3%E8%A1%A1%E6%80%A7%E8%B0%83%E6%95%B4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    16 平衡二叉树（AVL）：节点删除后的平衡性调整
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../17-%E7%BA%A2%E9%BB%91%EF%BC%88R-B%EF%BC%89%E6%A0%91%EF%BC%9A%E5%92%8C%E5%B9%B3%E8%A1%A1%E4%BA%8C%E5%8F%89%E6%A0%91%E6%9C%89%E4%BB%80%E4%B9%88%E4%B8%8D%E5%90%8C%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    17 红黑（R B）树：和平衡二叉树有什么不同？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../18-%E7%BA%A2%E9%BB%91%EF%BC%88R-B%EF%BC%89%E6%A0%91%EF%BC%9A%E8%8A%82%E7%82%B9%E6%8F%92%E5%85%A5%E5%90%8E%E7%9A%84%E5%B9%B3%E8%A1%A1%E6%80%A7%E8%B0%83%E6%95%B4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    18 红黑（R B）树：节点插入后的平衡性调整
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../19-%E7%BA%A2%E9%BB%91%EF%BC%88R-B%EF%BC%89%E6%A0%91%EF%BC%9A%E8%8A%82%E7%82%B9%E5%88%A0%E9%99%A4%E5%90%8E%E7%9A%84%E5%B9%B3%E8%A1%A1%E6%80%A7%E8%B0%83%E6%95%B4%EF%BC%88%E4%B8%80%EF%BC%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    19 红黑（R B）树：节点删除后的平衡性调整（一）
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../20-%E7%BA%A2%E9%BB%91%EF%BC%88R-B%EF%BC%89%E6%A0%91%EF%BC%9A%E8%8A%82%E7%82%B9%E5%88%A0%E9%99%A4%E5%90%8E%E7%9A%84%E5%B9%B3%E8%A1%A1%E6%80%A7%E8%B0%83%E6%95%B4%EF%BC%88%E4%BA%8C%EF%BC%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    20 红黑（R B）树：节点删除后的平衡性调整（二）
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../21-%E5%93%88%E5%A4%AB%E6%9B%BC%EF%BC%88Huffman%EF%BC%89%E6%A0%91%EF%BC%9A%E5%B0%86%E6%95%B0%E6%8D%AE%E5%8E%8B%E7%BC%A9%E5%90%8E%E5%86%8D%E4%BC%A0%E8%BE%93%E6%9B%B4%E7%9C%81%E5%B8%A6%E5%AE%BD/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    21 哈夫曼（Huffman）树：将数据压缩后再传输更省带宽
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../22-%E6%A0%91%E3%80%81%E6%A3%AE%E6%9E%97%E3%80%81%E4%BA%8C%E5%8F%89%E6%A0%91%EF%BC%9A%E7%9B%B8%E4%BA%92%E4%B9%8B%E9%97%B4%E7%9A%84%E8%BD%AC%E6%8D%A2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    22 树、森林、二叉树：相互之间的转换
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../23-%E5%9B%BE%EF%BC%9A%E5%A6%82%E4%BD%95%E7%94%A8%E5%9B%BE%E8%A1%A8%E8%BE%BE%E9%94%99%E7%BB%BC%E5%A4%8D%E6%9D%82%E7%9A%84%E6%95%B0%E6%8D%AE%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    23 图：如何用图表达错综复杂的数据？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../24-%E5%9B%BE%E7%9A%84%E5%AD%98%E5%82%A8%EF%BC%88%E4%B8%8A%EF%BC%89%EF%BC%9A%E9%82%BB%E6%8E%A5%E7%9F%A9%E9%98%B5%E3%80%81%E9%82%BB%E6%8E%A5%E8%A1%A8%E5%92%8C%E5%8D%81%E5%AD%97%E9%93%BE%E8%A1%A8%E6%9C%89%E4%BB%80%E4%B9%88%E4%B8%8D%E5%90%8C%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    24 图的存储（上）：邻接矩阵、邻接表和十字链表有什么不同？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../25-%E5%9B%BE%E7%9A%84%E5%AD%98%E5%82%A8%EF%BC%88%E4%B8%8B%EF%BC%89%EF%BC%9A%E4%B8%BA%E4%BB%80%E4%B9%88%E6%88%91%E4%BB%AC%E8%BF%98%E9%9C%80%E8%A6%81%E9%82%BB%E6%8E%A5%E5%A4%9A%E9%87%8D%E8%A1%A8%E5%92%8C%E8%BE%B9%E9%9B%86%E6%95%B0%E7%BB%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    25 图的存储（下）：为什么我们还需要邻接多重表和边集数组？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../26-%E5%9B%BE%EF%BC%9A%E6%B7%B1%E5%BA%A6%E4%BC%98%E5%85%88%E9%81%8D%E5%8E%86%EF%BC%88DFS%EF%BC%89%E4%B8%8E%E5%B9%BF%E5%BA%A6%E4%BC%98%E5%85%88%E9%81%8D%E5%8E%86%EF%BC%88BFS%EF%BC%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    26 图：深度优先遍历（DFS）与广度优先遍历（BFS）
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../27-%E6%9C%80%E5%B0%8F%E7%94%9F%E6%88%90%E6%A0%91%EF%BC%9A%E5%A6%82%E4%BD%95%E7%94%A8%E6%99%AE%E9%87%8C%E5%A7%86%EF%BC%88Prim%EF%BC%89%E7%AE%97%E6%B3%95%E8%A7%A3%E5%86%B3%E4%BF%AE%E8%B7%AF%E8%B4%B9%E7%94%A8%E6%9C%80%E5%B0%91%E7%9A%84%E9%97%AE%E9%A2%98%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    27 最小生成树：如何用普里姆（Prim）算法解决修路费用最少的问题？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../28-%E6%9C%80%E5%B0%8F%E7%94%9F%E6%88%90%E6%A0%91%EF%BC%9A%E5%85%8B%E9%B2%81%E6%96%AF%E5%8D%A1%E5%B0%94%EF%BC%88Kruskal%EF%BC%89%E7%AE%97%E6%B3%95%E4%B8%8E%E4%BF%AE%E8%B7%AF%E8%B4%B9%E7%94%A8%E6%9C%80%E5%B0%91%E7%9A%84%E9%97%AE%E9%A2%98%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    28 最小生成树：克鲁斯卡尔（Kruskal）算法与修路费用最少的问题？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../29-%E6%9C%80%E7%9F%AD%E8%B7%AF%E5%BE%84%EF%BC%9A%E8%BF%AA%E6%9D%B0%E6%96%AF%E7%89%B9%E6%8B%89%EF%BC%88Dijkstra%EF%BC%89%E7%AE%97%E6%B3%95%E4%B8%8E%E9%80%89%E6%8B%A9%E6%9C%80%E8%8A%82%E7%9C%81%E6%97%B6%E9%97%B4%E7%9A%84%E8%A1%8C%E8%B5%B0%E8%B7%AF%E7%BA%BF%E9%97%AE%E9%A2%98/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    29 最短路径：迪杰斯特拉（Dijkstra）算法与选择最节省时间的行走路线问题
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../30-%E6%9C%80%E7%9F%AD%E8%B7%AF%E5%BE%84%EF%BC%9A%E5%BC%97%E6%B4%9B%E4%BC%8A%E5%BE%B7%EF%BC%88Floyd%EF%BC%89%E7%AE%97%E6%B3%95%E4%B8%8E%E4%B9%98%E8%BD%A6%E8%B4%B9%E7%94%A8%E6%9C%80%E5%B0%91%E7%9A%84%E9%97%AE%E9%A2%98/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    30 最短路径：弗洛伊德（Floyd）算法与乘车费用最少的问题
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../31-%E5%9B%BE%E7%9A%84%E5%BA%94%E7%94%A8%EF%BC%9A%E5%A6%82%E4%BD%95%E9%80%9A%E8%BF%87%E6%8B%93%E6%89%91%E6%8E%92%E5%BA%8F%E6%89%BE%E5%88%B0%E5%90%88%E7%90%86%E7%9A%84%E5%85%88%E5%90%8E%E9%A1%BA%E5%BA%8F%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    31 图的应用：如何通过拓扑排序找到合理的先后顺序？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../32-%E5%9B%BE%E7%9A%84%E5%BA%94%E7%94%A8%EF%BC%9A%E5%A6%82%E4%BD%95%E9%80%9A%E8%BF%87%E5%85%B3%E9%94%AE%E8%B7%AF%E5%BE%84%E4%BC%B0%E7%AE%97%E5%AE%8C%E6%88%90%E5%B7%A5%E7%A8%8B%E9%9C%80%E8%A6%81%E7%9A%84%E6%9C%80%E7%9F%AD%E6%97%B6%E9%97%B4%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    32 图的应用：如何通过关键路径估算完成工程需要的最短时间？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../33-%E7%9B%B4%E6%8E%A5%E6%8F%92%E5%85%A5%E6%8E%92%E5%BA%8F%EF%BC%9A%E4%B8%BA%E4%BB%80%E4%B9%88%E6%95%B0%E6%8D%AE%E8%B6%8A%E6%9C%89%E5%BA%8F%EF%BC%8C%E6%8E%92%E5%BA%8F%E9%80%9F%E5%BA%A6%E8%B6%8A%E5%BF%AB%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    33 直接插入排序：为什么数据越有序，排序速度越快？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../34-%E5%B8%8C%E5%B0%94%E6%8E%92%E5%BA%8F%EF%BC%9A%E9%80%9A%E8%BF%87%E9%83%A8%E5%88%86%E6%9C%89%E5%BA%8F%E9%80%BC%E8%BF%91%E5%85%A8%E5%B1%80%E6%9C%89%E5%BA%8F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    34 希尔排序：通过部分有序逼近全局有序
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../35-%E5%86%92%E6%B3%A1%E6%8E%92%E5%BA%8F%EF%BC%9A%E5%A4%A7%E6%95%B0%E4%B8%8B%E6%B2%89%EF%BC%8C%E5%B0%8F%E6%95%B0%E4%B8%8A%E6%B5%AE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    35 冒泡排序：大数下沉，小数上浮
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../36-%E5%BF%AB%E9%80%9F%E6%8E%92%E5%BA%8F%EF%BC%9A%E5%A6%82%E4%BD%95%E9%80%9A%E8%BF%87%E5%9F%BA%E5%87%86%E5%85%83%E7%B4%A0%E6%94%B9%E8%BF%9B%E5%86%92%E6%B3%A1%E6%8E%92%E5%BA%8F%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    36 快速排序：如何通过基准元素改进冒泡排序？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../37-%E7%AE%80%E5%8D%95%E9%80%89%E6%8B%A9%E6%8E%92%E5%BA%8F%E4%B8%8E%E5%A0%86%E6%8E%92%E5%BA%8F%EF%BC%9A%E5%A4%9A%E8%B6%9F%E6%8E%92%E5%BA%8F%E4%B8%8E%E5%88%A9%E7%94%A8%E6%9C%89%E5%BA%8F%E5%AE%8C%E5%85%A8%E4%BA%8C%E5%8F%89%E6%A0%91%E8%BF%9B%E8%A1%8C%E6%8E%92%E5%BA%8F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    37 简单选择排序与堆排序：多趟排序与利用有序完全二叉树进行排序
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../38-%E5%BD%92%E5%B9%B6%E6%8E%92%E5%BA%8F%EF%BC%9A%E5%B0%86%E5%A4%9A%E4%B8%AA%E6%9C%89%E5%BA%8F%E5%BA%8F%E5%88%97%E6%8C%89%E5%85%B6%E4%B8%AD%E7%9A%84%E5%85%83%E7%B4%A0%E5%80%BC%E5%A4%A7%E5%B0%8F%E4%B8%A4%E4%B8%A4%E5%90%88%E5%B9%B6/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    38 归并排序：将多个有序序列按其中的元素值大小两两合并
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../39-%E4%B8%B2%E7%9A%84%E9%A1%BA%E5%BA%8F%E5%92%8C%E9%93%BE%E5%BC%8F%E5%AD%98%E5%82%A8%E7%BB%93%E6%9E%84%EF%BC%9A%E5%AE%9A%E9%95%BF%E6%95%B0%E7%BB%84%E4%B8%8E%E5%8A%A8%E6%80%81%E6%95%B0%E7%BB%84/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    39 串的顺序和链式存储结构：定长数组与动态数组
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../40-%E4%B8%B2%E7%9A%84%E6%9C%B4%E7%B4%A0%E6%A8%A1%E5%BC%8F%E5%8C%B9%E9%85%8D%E7%AE%97%E6%B3%95%EF%BC%9A%E6%9A%B4%E5%8A%9B%E4%BD%86%E5%AE%B9%E6%98%93%E7%90%86%E8%A7%A3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    40 串的朴素模式匹配算法：暴力但容易理解
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../41-%E4%B8%B2%E7%9A%84KMP%E6%A8%A1%E5%BC%8F%E5%8C%B9%E9%85%8D%E7%AE%97%E6%B3%95%E8%A7%82%E5%AF%9F%EF%BC%9A%E7%90%86%E8%A7%A3%E5%9B%B0%E9%9A%BE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    41 串的KMP模式匹配算法观察：理解困难
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../42-%E4%B8%B2%E7%9A%84KMP%E6%A8%A1%E5%BC%8F%E5%8C%B9%E9%85%8D%E7%AE%97%E6%B3%95%E4%B9%8B%E5%AE%9E%E7%8E%B0%E4%B8%8E%E6%80%A7%E8%83%BD%E5%88%86%E6%9E%90%EF%BC%9A%E4%BB%A3%E7%A0%81%E5%AE%9E%E7%8E%B0%E7%AE%80%E5%8D%95/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    42 串的KMP模式匹配算法之实现与性能分析：代码实现简单
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../43-%E4%B8%B2%E7%9A%84KMP%E6%A8%A1%E5%BC%8F%E5%8C%B9%E9%85%8D%E7%AE%97%E6%B3%95%E4%B9%8B%E6%94%B9%E8%BF%9B%EF%BC%9A%E9%80%9A%E8%BF%87%E4%BC%98%E5%8C%96%E4%BB%A3%E7%A0%81%E8%A7%A3%E5%86%B3%E5%A4%9A%E6%AC%A1%E9%87%8D%E5%A4%8D%E6%AF%94%E8%BE%83%E9%97%AE%E9%A2%98/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    43 串的KMP模式匹配算法之改进：通过优化代码解决多次重复比较问题
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    44 跳表：为什么Redis用跳表实现而MySQL用B+树？
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    44 跳表：为什么Redis用跳表实现而MySQL用B+树？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        在跳表中查询及复杂度分析
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        在跳表中插入数据
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        从跳表中删除数据
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        实现代码
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#b" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        跳表、红黑树、B+树
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="跳表、红黑树、B+树">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mysqlb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MySQL为什么用B+树实现索引而不用跳表
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#redisb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Redis为什么用跳表实现有序集合而不是用红黑树/B+树/二叉树实现？
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        小结
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        思考题
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../45-%E5%93%88%E5%B8%8C%E8%A1%A8%E4%B8%8E%E5%93%88%E5%B8%8C%E7%AE%97%E6%B3%95%EF%BC%9A%E5%93%88%E5%B8%8C%E8%A1%A8%E9%80%82%E5%90%88%E7%94%A8%E5%9C%A8%E4%BB%80%E4%B9%88%E6%A0%B7%E7%9A%84%E6%83%85%E6%99%AF%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    45 哈希表与哈希算法：哈希表适合用在什么样的情景？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../46-%E5%93%88%E5%B8%8C%E8%A1%A8%E4%B8%8E%E5%93%88%E5%B8%8C%E7%AE%97%E6%B3%95%EF%BC%9A%E5%AD%97%E7%AC%A6%E4%B8%B2%E7%9A%84MD5%E5%80%BC%E6%98%AF%E9%80%9A%E8%BF%87%E5%93%88%E5%B8%8C%E7%AE%97%E6%B3%95%E5%BE%97%E5%88%B0%E7%9A%84%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    46 哈希表与哈希算法：字符串的MD5值是通过哈希算法得到的？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../47-%E5%A4%9A%E8%B7%AF%E6%9F%A5%E6%89%BE%E6%A0%91%EF%BC%9AB%E6%A0%91%E5%9C%A8%E6%95%B0%E6%8D%AE%E5%BA%93%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    47 多路查找树：B树在数据库中的应用
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../48-%E5%A4%9A%E8%B7%AF%E6%9F%A5%E6%89%BE%E6%A0%91%EF%BC%9AB%2B%E6%A0%91%E7%9A%84%E6%8F%92%E5%85%A5%E4%B8%8E%E5%88%A0%E9%99%A4%E6%93%8D%E4%BD%9C%E8%AF%A6%E8%A7%A3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    48 多路查找树：B+树的插入与删除操作详解
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../49-%E5%A4%9A%E8%B7%AF%E6%9F%A5%E6%89%BE%E6%A0%91%EF%BC%9AB%E6%A0%91%E3%80%81B%2B%E6%A0%91%E5%9C%A8%E6%95%B0%E6%8D%AE%E5%BA%93%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8%E6%9C%89%E4%BD%95%E4%B8%8D%E5%90%8C%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    49 多路查找树：B树、B+树在数据库中的应用有何不同？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../50-%E6%8A%98%E5%8D%8A%E6%8F%92%E5%85%A5%E3%80%812%E8%B7%AF%E6%8F%92%E5%85%A5%E3%80%81%E8%A1%A8%E6%8F%92%E5%85%A5%EF%BC%9A3%E7%A7%8D%E6%8F%92%E5%85%A5%E7%B1%BB%E6%8E%92%E5%BA%8F%E7%B1%BB%E6%8E%92%E5%BA%8F%E6%9C%89%E5%93%AA%E4%BA%9B%E5%BC%82%E5%90%8C%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    50 折半插入、2路插入、表插入：3种插入类排序类排序有哪些异同？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../51-%E6%A0%91%E5%BD%A2%E9%80%89%E6%8B%A9%E6%8E%92%E5%BA%8F%EF%BC%9A%E6%8C%89%E7%85%A7%E9%94%A6%E6%A0%87%E8%B5%9B%E7%9A%84%E6%80%9D%E6%83%B3%E8%BF%9B%E8%A1%8C%E6%8E%92%E5%BA%8F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    51 树形选择排序：按照锦标赛的思想进行排序
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../52-%E8%AE%A1%E6%95%B0%E6%8E%92%E5%BA%8F%EF%BC%9A%E4%B8%8D%E9%80%9A%E8%BF%87%E6%AF%94%E8%BE%83%E4%B9%9F%E5%8F%AF%E4%BB%A5%E8%BF%9B%E8%A1%8C%E6%8E%92%E5%BA%8F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    52 计数排序：不通过比较也可以进行排序
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../53-%E5%9F%BA%E6%95%B0%E6%8E%92%E5%BA%8F%E4%B8%8E%E6%A1%B6%E6%8E%92%E5%BA%8F%EF%BC%9A%E5%A6%82%E4%BD%95%E9%80%9A%E8%BF%87%E5%88%86%E9%85%8D%E5%92%8C%E6%94%B6%E9%9B%86%E8%BF%9B%E8%A1%8C%E6%8E%92%E5%BA%8F%EF%BC%9F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    53 基数排序与桶排序：如何通过分配和收集进行排序？
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../%E7%BB%93%E6%9D%9F%E8%AF%AD-%E6%97%A5%E6%8B%B1%E4%B8%80%E5%8D%92%EF%BC%8C%E5%8A%9F%E4%B8%8D%E5%94%90%E6%8D%90/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    结束语 日拱一卒，功不唐捐
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%89%8B%E6%8A%8A%E6%89%8B%E5%B8%A6%E4%BD%A0%E5%86%99%E4%B8%80%E9%97%A8%E7%BC%96%E7%A8%8B%E8%AF%AD%E8%A8%80/%E6%89%8B%E6%8A%8A%E6%89%8B%E5%B8%A6%E4%BD%A0%E5%86%99%E4%B8%80%E9%97%A8%E7%BC%96%E7%A8%8B%E8%AF%AD%E8%A8%80/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    手把手带你写一门编程语言
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F%E5%AE%9E%E6%88%9845%E8%AE%B2/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F%E5%AE%9E%E6%88%9845%E8%AE%B2/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    操作系统实战45讲
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E4%B8%8E%E7%AE%97%E6%B3%95%E4%B9%8B%E7%BE%8E/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E4%B8%8E%E7%AE%97%E6%B3%95%E4%B9%8B%E7%BE%8E/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    数据结构与算法之美
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%AD%A3%E5%88%99%E8%A1%A8%E8%BE%BE%E5%BC%8F%E5%85%A5%E9%97%A8%E8%AF%BE/%E6%AD%A3%E5%88%99%E8%A1%A8%E8%BE%BE%E5%BC%8F%E5%85%A5%E9%97%A8%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    正则表达式入门课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E6%B7%B1%E5%85%A5%E6%B5%85%E5%87%BA%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BB%84%E6%88%90%E5%8E%9F%E7%90%86/%E6%B7%B1%E5%85%A5%E6%B5%85%E5%87%BA%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BB%84%E6%88%90%E5%8E%9F%E7%90%86/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    深入浅出计算机组成原理
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E7%A8%8B%E5%BA%8F%E5%91%98%E7%9A%84%E6%95%B0%E5%AD%A6%E5%9F%BA%E7%A1%80%E8%AF%BE/%E7%A8%8B%E5%BA%8F%E5%91%98%E7%9A%84%E6%95%B0%E5%AD%A6%E5%9F%BA%E7%A1%80%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    程序员的数学基础课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E7%BC%96%E8%AF%91%E5%8E%9F%E7%90%86%E4%B9%8B%E7%BE%8E/%E7%BC%96%E8%AF%91%E5%8E%9F%E7%90%86%E4%B9%8B%E7%BE%8E/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    编译原理之美
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E7%BC%96%E8%AF%91%E5%8E%9F%E7%90%86%E5%AE%9E%E6%88%98%E8%AF%BE/%E7%BC%96%E8%AF%91%E5%8E%9F%E7%90%86%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    编译原理实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%AE%A1%E7%AE%97%E6%9C%BA%E5%9F%BA%E7%A1%80%E5%AE%9E%E6%88%98%E8%AF%BE/%E8%AE%A1%E7%AE%97%E6%9C%BA%E5%9F%BA%E7%A1%80%E5%AE%9E%E6%88%98%E8%AF%BE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    计算机基础实战课
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%B6%A3%E8%B0%88Linux%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/%E8%B6%A3%E8%B0%88Linux%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    趣谈Linux操作系统
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%B6%A3%E8%B0%88%E7%BD%91%E7%BB%9C%E5%8D%8F%E8%AE%AE/%E8%B6%A3%E8%B0%88%E7%BD%91%E7%BB%9C%E5%8D%8F%E8%AE%AE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    趣谈网络协议
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%BD%AF%E4%BB%B6%E5%B7%A5%E7%A8%8B%E4%B9%8B%E7%BE%8E/%E8%BD%AF%E4%BB%B6%E5%B7%A5%E7%A8%8B%E4%B9%8B%E7%BE%8E/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    软件工程之美
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E8%BD%AF%E4%BB%B6%E8%AE%BE%E8%AE%A1%E4%B9%8B%E7%BE%8E/%E8%BD%AF%E4%BB%B6%E8%AE%BE%E8%AE%A1%E4%B9%8B%E7%BE%8E/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    软件设计之美
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E9%80%8F%E8%A7%86HTTP%E5%8D%8F%E8%AE%AE/%E9%80%8F%E8%A7%86HTTP%E5%8D%8F%E8%AE%AE/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    透视HTTP协议
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../%E9%87%8D%E5%AD%A6%E7%BA%BF%E6%80%A7%E4%BB%A3%E6%95%B0/%E9%87%8D%E5%AD%A6%E7%BA%BF%E6%80%A7%E4%BB%A3%E6%95%B0/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    重学线性代数
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../%E8%BF%90%E7%BB%B4-%E6%B5%8B%E8%AF%95/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    运维-测试
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        在跳表中查询及复杂度分析
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        在跳表中插入数据
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        从跳表中删除数据
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        实现代码
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#b" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        跳表、红黑树、B+树
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="跳表、红黑树、B+树">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mysqlb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MySQL为什么用B+树实现索引而不用跳表
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#redisb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Redis为什么用跳表实现有序集合而不是用红黑树/B+树/二叉树实现？
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        小结
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        思考题
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+  <h1>44 跳表：为什么Redis用跳表实现而MySQL用B+树？</h1>
+
+<p>你好，我是王健伟。</p>
+<p>字符串方面知识的讲解告一段落后，这次，我们讲一讲跳表相关的知识，也讲一讲大家所关心的一个问题——为什么Redis用跳表实现而MySQL用B+树实现。</p>
+<h2 id="_1">在跳表中查询及复杂度分析</h2>
+<p>回顾以往学习过的数组（线性表的顺序存储）和链表（线性表的链式存储）这两种数据结构，它们各有特点。数组查找速度非常快，但插入、删除速度很慢（要挪动数据）。而链表插入、删除速度快，但查找数据慢。</p>
+<p>假设在一个数组中的数据是有序（比如从小到大）排列的，此时若需要快速查询某个元素，那么进行折半（二分）查找是很快就可以找到该元素或者确认该元素不存在的。但如果这组有序的数据并不是用数组而是用链表保存的，那么如何快速查找数据呢？</p>
+<p>于是在1989年，美国的一位计算机科学家发明了一种新的数据结构——跳跃表，简称跳表。跳表本身基于链表，是对链表的优化（改进版的链表）。跳表这种数据结构因为出现得比较晚，所以很多老项目中并没有采用。</p>
+<p>跳表是只能在链表中元素有序的情况下使用的数据结构，即跳表中的元素必须有序。其插入、删除、搜索的时间复杂度都是O($log_{2}^{n}$)。它的最大特点是实现相对简单，效率更高，在一些流行项目比如Redis、LevelDB中常被用来代替平衡二叉树（AVL树）或二分查找。</p>
+<p>咱们说一点具体的。图1是一个普通的有序单链表，查询元素所需要的时间复杂度为O(n)，插入和删除元素这两个动作如果排除寻找插入或删除位置所需要的时间，那么它的时间复杂度为O(1)。</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/a3/13/a3834958a328e869e4df4119e3dbb513.jpg?wh=2452x252" title="图1 普通的有序单链表" /></p>
+<p>对于图1，如何进行优化来减少它的时间复杂度呢？我们给上述链表添加一级索引，如图2所示：</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/55/d8/55f83d407534c61c61bc2456ba0658d8.jpg?wh=2438x552" title="图2 增加了第一级索引的单链表" /></p>
+<p>在图2中，最下面是原始的有序链表，在原始有序链表上面增加一层索引——第一级索引。可以看到，第一级索引中的数据当然同时也在原始链表中，但第一级索引中的数据分布要比原始链表中的数据稀疏——比如可以是原始链表中数据数量的一半。</p>
+<p>我们把增加了索引的原始有序链表称为跳表，跳表基于原始的有序链表，是在原始的有序链表之上增加了一级或者多级索引而构成。</p>
+<p>增加了第一级索引后，查询元素就不再是从原始链表开始查，而是从第一级索引开始查。比如查找元素7，先找第一级索引看有没有7存在，找到了，说明元素7在原始链表中存在。再比如查找元素9，还是先找第一级索引，看看具体步骤：</p>
+<ul>
+<li>9 &gt; 1，所以继续在第一级索引中向后找。</li>
+<li>9 &gt; 5，所以继续在第一级索引中向后找。</li>
+<li>9 &gt; 7，所以继续在第一级索引中向后找。</li>
+<li>9 &lt; 12，这就说明元素9是在7和12这两个第一级索引元素之间，那么从第一级索引向下寻找，这样就寻找到了原始链表，因为第一级索引中的元素7正好指向原始链表中的元素7，所以从原始链表中的元素7开始向后找，最终会找到元素9。</li>
+</ul>
+<p>试想一下，如果原始链表中的元素非常多，数以千万计，即便创建的第一级索引比原始链表的数据（或节点数）少了一半，但仍旧会有不少数据。所以，我们可以在第一级索引基础上再创建第二级索引、第三级索引甚至更多级索引。</p>
+<p>每一级索引当然会比上一级索引更稀疏，比如是上一级元素/节点数量的一半，这意味着在该级索引中查找元素需要进行的对比更少。给图2增加了第二级索引后如图3。</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/13/43/138eff4408bfc92a28382b4488c2f843.jpg?wh=2452x836" title="图3 增加了第二级索引的单链表" /></p>
+<p>在图3中，查询元素当然就要从第二级（最高级）索引开始，第二级索引没有就向下辗转到第一级索引继续搜索，第一级索引没有就继续向下辗转到原始链表继续搜索。在第二级索引走一步，相当于在第一级索引走二步，相当于在原始链表走四步。这样查询元素时移动的步伐就更大了，需要对比的元素数目就更少了。</p>
+<p>比如，创建了第二级索引后，查找元素9就如下图4所示的路径了：</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/7e/31/7eb3ef9766a63e48002a40c560131031.jpg?wh=2498x867" title="图4 增加了第二级索引后查找元素9所要经过的路径（加粗）" /></p>
+<p>显然，原始链表中的元素越多，通过增加多级索引就可以大量减少查询元素的比较次数。</p>
+<p>可以看到，如果原始链表中元素有n个，如果按每级索引节点数减半，也就是每两个节点变为更高级索引中的一个节点来计算，那么第一级索引的元素数量就是n/2个，第二级索引的元素数量就是n/4个，第k级索引的元素数量（节点数量）就是n/($2^{k}$)。</p>
+<p>总结下来，如果索引一共有h级，而第h级（最高级）有2个节点，即n/($2^{h}$) = 2，那么h =($log_{2}^{n}$) -1。这表示查询的时间复杂度是O($log_{2}<sup n="n">{n}$)。请想一想，由从原始链表中查询数据所需要的O(n)时间复杂度变为O($log_{2}</sup>$)，这肯定是非常大的改进吧！</p>
+<p>此外，因为原始链表中的数据可能会不断地增加和删除，这就会导致各级索引中的数据也要进行相应的增加和删除，所以各级索引中数据的分布也肯定会是不均匀的。这样，对于<strong>增加和删除元素的操作，跳表的时间复杂度会变为O(</strong>$log_{2}^{n}$<strong>)</strong>。因为增加数据需要寻找插入位置以保证数据有序，删除数据需要在各个层级寻找要删除的元素。</p>
+<p>说完时间复杂度，再看一看跳表的空间复杂度。</p>
+<p>我们设原始链表的大小为n，如果按每级索引节点数减半，也就是每两个节点变为更高级索引中的一个节点，最高级索引有两个节点来计算，则每级索引的节点数应该是n/2,n/4,n/8,……,8,4,2，这其实是一个等比数列。每级索引的节点总和是n/2+n/4+n/8+……+8+4+2=n-2。</p>
+<p>可以看得出来，元素数为n的跳表中，原始链表有n个元素，大概还需要额外接近n个元素的存储空间来保存各级索引中的节点。如果按每三个节点变为更高级索引中的一个节点，最高级索引有一个节点来计算，则每级索引的节点数应该是n/3,n/9,n/27,……,9,3,1，这也是个等比数列。每级索引的节点总和是n/3+n/9+n/27+……+9+3+1≈n/2，相比于每两个节点变为一个节点，少了大概一半的索引节点存储空间。</p>
+<p>无论是n/2+n/4+n/8+……+8+4+2，还是n/3+n/9+n/27+……+9+3+1，其实空间复杂度最终还是O(n)，但当然还是比原始链表所占用的空间更多。所以<strong>跳表也体现了空间换时间来提高效率的开发思想。</strong></p>
+<p>不过，在实际开发中，我们一般都不用计较索引中节点所占用的空间。因为原始链表中存储的不一定是整数，可能是较大的对象，而相关的索引节点并不需要保存对象，只需要保存关键字和必须的指针，对象当然一般都会比索引中的节点大很多，所以索引中的节点所占的额外的空间更是可以忽略不计了。</p>
+<h2 id="_2">在跳表中插入数据</h2>
+<p>在跳表中插入数据需要先向跳表的原始链表中插入数据（从下到上插入）。当向原始链表中插入数据时，索引也要动态更新。那么如何进行动态更新呢？</p>
+<p>可以采用一个概率算法——每一层节点被提取到上一层的概率是1/2（50%），即：</p>
+<ul>
+<li>原始链表节点被提取到第一级索引的概率是1/2。</li>
+<li>原始链表节点被提取到第二级索引的概率是1/4。</li>
+<li>原始链表节点被提取到第三级索引的概率是1/8。</li>
+</ul>
+<p>那么为什么要进行动态更新呢？因为原始链表中的节点多了，索引节点也应该相应地增加一些，以避免因为时间复杂度的退化导致插入、删除、查找效率变低。</p>
+<p>OK，我们看一看具体操作。现在，针对一个开始为空的跳表，希望将这么一组乱序数据插入到跳表中：3、1、7、6、9、5、15、12。</p>
+<p>在跳表最底层的原始链表中，准备采用带头节点的单链表。所以刚开始的跳表应该仅仅只有一个头节点，用一个被称为“头节点指针”的指针来指向该头节点。如图5所示：</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/bd/23/bd3cc57acac90c373fc9f4e4a3d03423.jpg?wh=1458x524" title="图5  只包含头结点的跳表（相当于空跳表或者可以认为目前只是个空链表）" /></p>
+<p>当分别插入数据3、1、7、6时，跳表就会如下图6的子图1到子图4所示：</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/d7/94/d75be98bd8afcda30ae7db219e221a94.jpg?wh=2691x1506" title="图6  插入了节点3、1、7、6后的跳表表现" /></p>
+<p>图片信息量很大，我们一点一点拆解。观察图6：</p>
+<ul>
+<li>插入节点3时，原始链表头节点的右指针直接指向节点3，如子图1所示。</li>
+<li>继续插入节点1，节点1自然排在节点3前面（左侧），但因为有一定概率节点被提到上一级索引，此时概率发生了，因此创建第一级索引。该级索引也需要创建个头节点，被称为“第一级索引头节点”。接着创建一个第一级索引中的节点1，第一级索引头节点的向右指针指向这个新建立的节点1，新建立的节点1的下指针指向原始链表的节点1。第一级索引头节点的下指针指向原始链表头节点。而原来的<strong>头节点指针</strong>指向了新建立的第一级索引头节点，如子图2所示。</li>
+<li>接着插入节点7，自然排在原始链表节点3后面，由于概率没发生，因此该节点没有被提到上一级，如子图3所示。</li>
+<li>接着插入节点6，自然排在原始链表节点3后面，节点7前面，由于概率没发生，因此该节点没有被提到上一级，如子图4所示。</li>
+</ul>
+<p>接着看图7：</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/42/93/425a22f0c7dc2e352637636395230593.jpg?wh=2207x855" title="图7  继续插入节点9后的跳表表现" /></p>
+<ul>
+<li>观察这张图片，接着插入节点9，自然排在原始链表节点7后面（右侧）。此时概率发生了，节点9被提取到第一级索引中。因此在第一级索引中创建节点9，新建立的第一级索引中的节点9的下指针指向原始链表中的节点9，第一级索引中的节点1的右指针指向第一级索引中的节点9。</li>
+</ul>
+<p>接着看下面的图8：</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/c0/ef/c0eeb31bce7ea12630da6ffa6f9469ef.jpg?wh=2524x1184" title="图8 继续插入节点5后的跳表表现" /></p>
+<ul>
+<li>如上图。接着插入节点5，自然排在原始链表节点3之后，节点6之前。</li>
+<li>此时概率发生了，节点5被提取到第一级索引中。因此在第一级索引中创建节点5，新建立的第一级索引中的节点5的向右指针指向同级的节点9，下指针指向原始链表的节点5，第一级索引中的节点1的向右指针指向新建立的同级节点5。</li>
+<li>因为节点5被提取到了当前已经存在的最高一级索引中，因此有概率创建一级新索引。此时概率果然发生了，结果因此创建第二级索引（该级索引也和第一级索引一样需要创建个头节点，被称为“第二级索引头节点”），接着创建一个第二级索引中的节点5，第二级索引头节点的向右指针指向这个新建立的节点5，新建立的节点5的下指针指向第一级索引的节点5。第二级索引头节点的下指针指向第一级索引头节点。而原来的头节点指针指向了新建立的第二级索引头节点。</li>
+</ul>
+<p>重复上述步骤，就可以向跳表中继续插入数据，你可以尝试完善这次的操作，这里我就不再赘述了。</p>
+<h2 id="_3">从跳表中删除数据</h2>
+<p>另一方面，从跳表中删除节点并不复杂，只需要在各个层级，包括原始链表，也包括各级索引都将该节点删除即可。我们把要删除的节点称为节点A，如果用通用一点的语言可以像下面这样描述删除节点。</p>
+<ul>
+<li>从上到下在每级索引中找节点A，找到则删除，找不到就找比A小但与A最接近的节点。这里不要忘记跳表是排好序的，这个节点其实是A的前趋节点。</li>
+<li>沿着比A小的这个节点向下找到下一级索引中数值相同的节点，在这级中继续找节点A，找到则删除，找不到则继续找比A小但与A最接近的节点。</li>
+<li>沿着比A小的这个节点继续向下，如此反复……
+这里以前面的图8为例，假如要删除节点5，该怎么做呢？</li>
+<li>从最上面的索引即第二级索引头节点开始向右查找，发现节点5在该级索引中，因此删掉该节点并设置相应的指针指向。删除该节点之前，一定要注意保存该节点左侧的节点，这样才能方便向下遍历和设置删除节点后的指针指向。注意，节点5左侧的节点其实就是第二级索引头节点。虽然此时第二级索引只剩“第二级索引头节点”，但并没有关系，不用做额外处理。</li>
+<li>沿着第二级索引头节点向下找，找到第一级索引头节点，沿着该头节点向右找，找到了该级索引中的节点5，删除掉该节点并设置相应的指针指向。这里注意，删除该节点之前要保存该节点左侧的节点以方便向下遍历和设置删除节点后的指针指向，而节点5左侧的节点其实就是节点1。</li>
+<li>继续沿着第一级索引中的节点1，这个我们之前保存了。找到了原始链表中的节点1，沿着该节点向右找，找到了其中的节点5，删除掉该节点并设置相应的指针指向。</li>
+</ul>
+<p>删除节点5后的结果如图9所示：</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/3a/bd/3a3e68bd18b4e47222f3d0558da4c1bd.jpg?wh=2292x1158" title="图9 删除节点5后的跳表外观（注意粗线代表寻找节点的路线）" /></p>
+<p>不过，一个例子可能不太好理解，我们这次还是以前面图8为例，假如要删除的不是节点5，而是节点7：</p>
+<ul>
+<li>从最上面的索引即第二级索引头节点开始向右查找，因为5&lt;7而节点5之后再没节点了，所以找到了节点5。</li>
+<li>沿着第二级索引中的节点5向下找，找到了第一级索引中的节点5。沿着第一级索引中的节点5向右找，发现是节点9，因为7&lt;9，这说明第一级索引中没有节点7。</li>
+<li>沿着第一级索引中的节点5向下找，找到了原始链表中的节点5，沿着该节点向右找，找到了其中的节点7，删除掉该节点并设置相应的指针指向。</li>
+</ul>
+<p>删除节点7后的结果如图10所示：</p>
+<p><img alt="" src="https://static001.geekbang.org/resource/image/2c/2f/2cea850c63f75953f73b84c24fe0f32f.jpg?wh=2280x1137" title="图10 删除节点7后的跳表外观（注意粗线代表寻找节点的路线）" /></p>
+<p>当然，你也可以尝试自己选择一个删除的节点，想一想应该经历哪些步骤。如果有哪里不理解，也欢迎你随时和我交流。</p>
+<h2 id="_4">实现代码</h2>
+<p>所有的思路理解透彻之后，你就可以尝试理解一下跳表的实现源码了。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>#include &quot;MersenneTwister.h&quot; //从外面找的一个文件，用来产生更随机的数字
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>//每个节点的定义
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>template &lt;typename T&gt;
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>struct Node
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>{
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>T  data;
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>Node* right;  //向右指向的指针
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>Node* down;   //向下指向的指针
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>};
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>#define MAX_LEVEL 100
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>MTRand g_ac; //全局量以产生更加随机的随机数，#include &quot;MersenneTwister.h&quot;
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>//跳表定义
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>template &lt;typename T&gt;
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>class SkipList
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>{
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>public:
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>SkipList()  //构造函数
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>{
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>pathList.reserve(MAX_LEVEL); //保留空间提升性能
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>m_head = new Node&lt;T&gt;; //先创建一个头结点
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>m_head-&gt;right = nullptr;
+<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>m_head-&gt;down = nullptr;
+<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>m_head-&gt;data = -1; //可以随便给个值，方便调试时观察和区分
+<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>}
+<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>~SkipList() //析构函数
+<a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>{
+<a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>while (m_head != nullptr)
+<a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>{
+<a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>Node&lt;T&gt;* pnode = m_head-&gt;right;
+<a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>Node&lt;T&gt;* ptmp;
+<a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>while (pnode != nullptr) //该循环负责释放数据节点
+<a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>{
+<a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>ptmp = pnode;
+<a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>pnode = pnode-&gt;right;
+<a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a>delete ptmp;
+<a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>}
+<a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a>
+<a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a>Node&lt;T&gt;* tmphead = m_head;
+<a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a>m_head = m_head-&gt;down;
+<a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a>delete tmphead;
+<a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a>tmphead = nullptr;
+<a id="__codelineno-0-45" name="__codelineno-0-45" href="#__codelineno-0-45"></a>}
+<a id="__codelineno-0-46" name="__codelineno-0-46" href="#__codelineno-0-46"></a>return;
+<a id="__codelineno-0-47" name="__codelineno-0-47" href="#__codelineno-0-47"></a>}
+<a id="__codelineno-0-48" name="__codelineno-0-48" href="#__codelineno-0-48"></a>
+<a id="__codelineno-0-49" name="__codelineno-0-49" href="#__codelineno-0-49"></a>//插入数据
+<a id="__codelineno-0-50" name="__codelineno-0-50" href="#__codelineno-0-50"></a>template &lt;typename T&gt;
+<a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a>void Insert(const T&amp; e)
+<a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a>{
+<a id="__codelineno-0-53" name="__codelineno-0-53" href="#__codelineno-0-53"></a>pathList.clear(); //记得每次清理，以免使用上次遗留的旧数据
+<a id="__codelineno-0-54" name="__codelineno-0-54" href="#__codelineno-0-54"></a>Node&lt;T&gt;* p = m_head;
+<a id="__codelineno-0-55" name="__codelineno-0-55" href="#__codelineno-0-55"></a>
+<a id="__codelineno-0-56" name="__codelineno-0-56" href="#__codelineno-0-56"></a>//先往右找再往下找(跨过多级索引，找到原始链表)，目的就是找到原始链表中的插入位置
+<a id="__codelineno-0-57" name="__codelineno-0-57" href="#__codelineno-0-57"></a>while (p)
+<a id="__codelineno-0-58" name="__codelineno-0-58" href="#__codelineno-0-58"></a>{
+<a id="__codelineno-0-59" name="__codelineno-0-59" href="#__codelineno-0-59"></a>//向右找合适的节点位置
+<a id="__codelineno-0-60" name="__codelineno-0-60" href="#__codelineno-0-60"></a>while (p-&gt;right != nullptr &amp;&amp; p-&gt;right-&gt;data &lt; e)
+<a id="__codelineno-0-61" name="__codelineno-0-61" href="#__codelineno-0-61"></a>{
+<a id="__codelineno-0-62" name="__codelineno-0-62" href="#__codelineno-0-62"></a>p = p-&gt;right; //先往右走
+<a id="__codelineno-0-63" name="__codelineno-0-63" href="#__codelineno-0-63"></a>}
+<a id="__codelineno-0-64" name="__codelineno-0-64" href="#__codelineno-0-64"></a>
+<a id="__codelineno-0-65" name="__codelineno-0-65" href="#__codelineno-0-65"></a>pathList.push_back(p);  //尾部插入元素，最终原始链表在最尾部
+<a id="__codelineno-0-66" name="__codelineno-0-66" href="#__codelineno-0-66"></a>p = p-&gt;down; //再往下走
+<a id="__codelineno-0-67" name="__codelineno-0-67" href="#__codelineno-0-67"></a>} //end while
+<a id="__codelineno-0-68" name="__codelineno-0-68" href="#__codelineno-0-68"></a>
+<a id="__codelineno-0-69" name="__codelineno-0-69" href="#__codelineno-0-69"></a>bool insertupsign = true; //向上层插入节点的概率，刚开始是原始链表，肯定是要将数据插入其中的
+<a id="__codelineno-0-70" name="__codelineno-0-70" href="#__codelineno-0-70"></a>Node&lt;T&gt;* downNode = nullptr; //创建一个新节点时，新节点的down指针指向的就是这个downNode所代表的节点
+<a id="__codelineno-0-71" name="__codelineno-0-71" href="#__codelineno-0-71"></a>
+<a id="__codelineno-0-72" name="__codelineno-0-72" href="#__codelineno-0-72"></a>//下面这个while能够从最底下往上回溯处理
+<a id="__codelineno-0-73" name="__codelineno-0-73" href="#__codelineno-0-73"></a>while (insertupsign == true &amp;&amp; pathList.size() &gt; 0)
+<a id="__codelineno-0-74" name="__codelineno-0-74" href="#__codelineno-0-74"></a>{
+<a id="__codelineno-0-75" name="__codelineno-0-75" href="#__codelineno-0-75"></a>//insert指向插入位置的节点
+<a id="__codelineno-0-76" name="__codelineno-0-76" href="#__codelineno-0-76"></a>Node&lt;T&gt;* insert = pathList.back(); //返回最底部的数据——第一次返回的是原始链表
+<a id="__codelineno-0-77" name="__codelineno-0-77" href="#__codelineno-0-77"></a>pathList.pop_back(); //干掉最底部的数据
+<a id="__codelineno-0-78" name="__codelineno-0-78" href="#__codelineno-0-78"></a>
+<a id="__codelineno-0-79" name="__codelineno-0-79" href="#__codelineno-0-79"></a>//创建新节点
+<a id="__codelineno-0-80" name="__codelineno-0-80" href="#__codelineno-0-80"></a>Node&lt;T&gt;* newnode = new Node&lt;T&gt;();
+<a id="__codelineno-0-81" name="__codelineno-0-81" href="#__codelineno-0-81"></a>newnode-&gt;data = e;
+<a id="__codelineno-0-82" name="__codelineno-0-82" href="#__codelineno-0-82"></a>newnode-&gt;right = insert-&gt;right; //原来insert节点指向的元素现在让newnode指向
+<a id="__codelineno-0-83" name="__codelineno-0-83" href="#__codelineno-0-83"></a>newnode-&gt;down = downNode;
+<a id="__codelineno-0-84" name="__codelineno-0-84" href="#__codelineno-0-84"></a>
+<a id="__codelineno-0-85" name="__codelineno-0-85" href="#__codelineno-0-85"></a>insert-&gt;right = newnode; //insert指向这个新节点
+<a id="__codelineno-0-86" name="__codelineno-0-86" href="#__codelineno-0-86"></a>downNode = newnode;
+<a id="__codelineno-0-87" name="__codelineno-0-87" href="#__codelineno-0-87"></a>
+<a id="__codelineno-0-88" name="__codelineno-0-88" href="#__codelineno-0-88"></a>//每一层节点被提取到上一层的概率是1/2（50%)
+<a id="__codelineno-0-89" name="__codelineno-0-89" href="#__codelineno-0-89"></a>unsigned int tmpvalue = g_ac.randInt(); //产生随机数
+<a id="__codelineno-0-90" name="__codelineno-0-90" href="#__codelineno-0-90"></a>if (tmpvalue % 2 == 0)
+<a id="__codelineno-0-91" name="__codelineno-0-91" href="#__codelineno-0-91"></a>{
+<a id="__codelineno-0-92" name="__codelineno-0-92" href="#__codelineno-0-92"></a>insertupsign = true;
+<a id="__codelineno-0-93" name="__codelineno-0-93" href="#__codelineno-0-93"></a>}
+<a id="__codelineno-0-94" name="__codelineno-0-94" href="#__codelineno-0-94"></a>else
+<a id="__codelineno-0-95" name="__codelineno-0-95" href="#__codelineno-0-95"></a>{
+<a id="__codelineno-0-96" name="__codelineno-0-96" href="#__codelineno-0-96"></a>insertupsign = false;
+<a id="__codelineno-0-97" name="__codelineno-0-97" href="#__codelineno-0-97"></a>}
+<a id="__codelineno-0-98" name="__codelineno-0-98" href="#__codelineno-0-98"></a>} //end while
+<a id="__codelineno-0-99" name="__codelineno-0-99" href="#__codelineno-0-99"></a>
+<a id="__codelineno-0-100" name="__codelineno-0-100" href="#__codelineno-0-100"></a>//标志要新加一级索引（新加一级索引意味着肯定要在这个索引中加入一个节点）
+<a id="__codelineno-0-101" name="__codelineno-0-101" href="#__codelineno-0-101"></a>if (pathList.size() &lt;= 0 &amp;&amp; g_ac.randInt() % 2 == 0)  //后一个条件表示是否增加新一级索引
+<a id="__codelineno-0-102" name="__codelineno-0-102" href="#__codelineno-0-102"></a>{
+<a id="__codelineno-0-103" name="__codelineno-0-103" href="#__codelineno-0-103"></a>//表示新节点被增加到了最上层索引并且增加新一级索引
+<a id="__codelineno-0-104" name="__codelineno-0-104" href="#__codelineno-0-104"></a>Node&lt;T&gt;* newnode = new Node&lt;T&gt;();
+<a id="__codelineno-0-105" name="__codelineno-0-105" href="#__codelineno-0-105"></a>newnode-&gt;right = nullptr;
+<a id="__codelineno-0-106" name="__codelineno-0-106" href="#__codelineno-0-106"></a>newnode-&gt;down = downNode;
+<a id="__codelineno-0-107" name="__codelineno-0-107" href="#__codelineno-0-107"></a>newnode-&gt;data = e;
+<a id="__codelineno-0-108" name="__codelineno-0-108" href="#__codelineno-0-108"></a>
+<a id="__codelineno-0-109" name="__codelineno-0-109" href="#__codelineno-0-109"></a>//既然是新加一级索引，那么索引也要个头节点，所以如下是增加头节点
+<a id="__codelineno-0-110" name="__codelineno-0-110" href="#__codelineno-0-110"></a>Node&lt;T&gt;* tmpheadnode = new Node&lt;T&gt;();
+<a id="__codelineno-0-111" name="__codelineno-0-111" href="#__codelineno-0-111"></a>tmpheadnode-&gt;right = newnode;
+<a id="__codelineno-0-112" name="__codelineno-0-112" href="#__codelineno-0-112"></a>tmpheadnode-&gt;down = m_head;
+<a id="__codelineno-0-113" name="__codelineno-0-113" href="#__codelineno-0-113"></a>tmpheadnode-&gt;data = -1;
+<a id="__codelineno-0-114" name="__codelineno-0-114" href="#__codelineno-0-114"></a>m_head = tmpheadnode; //m_head指向最上级索引的头节点
+<a id="__codelineno-0-115" name="__codelineno-0-115" href="#__codelineno-0-115"></a>}
+<a id="__codelineno-0-116" name="__codelineno-0-116" href="#__codelineno-0-116"></a>return;
+<a id="__codelineno-0-117" name="__codelineno-0-117" href="#__codelineno-0-117"></a>}
+<a id="__codelineno-0-118" name="__codelineno-0-118" href="#__codelineno-0-118"></a>
+<a id="__codelineno-0-119" name="__codelineno-0-119" href="#__codelineno-0-119"></a>//删除数据，返回true表示找到并删除了数据，返回false表示没找到数据
+<a id="__codelineno-0-120" name="__codelineno-0-120" href="#__codelineno-0-120"></a>template &lt;typename T&gt;
+<a id="__codelineno-0-121" name="__codelineno-0-121" href="#__codelineno-0-121"></a>bool Delete(const T&amp; e)
+<a id="__codelineno-0-122" name="__codelineno-0-122" href="#__codelineno-0-122"></a>{
+<a id="__codelineno-0-123" name="__codelineno-0-123" href="#__codelineno-0-123"></a>Node&lt;T&gt;* p = m_head;
+<a id="__codelineno-0-124" name="__codelineno-0-124" href="#__codelineno-0-124"></a>bool iffind = false; //是否找到
+<a id="__codelineno-0-125" name="__codelineno-0-125" href="#__codelineno-0-125"></a>while (p)
+<a id="__codelineno-0-126" name="__codelineno-0-126" href="#__codelineno-0-126"></a>{
+<a id="__codelineno-0-127" name="__codelineno-0-127" href="#__codelineno-0-127"></a>//向右找合适的节点位置
+<a id="__codelineno-0-128" name="__codelineno-0-128" href="#__codelineno-0-128"></a>while (p-&gt;right != nullptr &amp;&amp; p-&gt;right-&gt;data &lt; e)
+<a id="__codelineno-0-129" name="__codelineno-0-129" href="#__codelineno-0-129"></a>{
+<a id="__codelineno-0-130" name="__codelineno-0-130" href="#__codelineno-0-130"></a>p = p-&gt;right; //先往右走
+<a id="__codelineno-0-131" name="__codelineno-0-131" href="#__codelineno-0-131"></a>}
+<a id="__codelineno-0-132" name="__codelineno-0-132" href="#__codelineno-0-132"></a>
+<a id="__codelineno-0-133" name="__codelineno-0-133" href="#__codelineno-0-133"></a>//右边没节点了，或者右边的节点过大，则需要向下找
+<a id="__codelineno-0-134" name="__codelineno-0-134" href="#__codelineno-0-134"></a>if (p-&gt;right == nullptr || p-&gt;right-&gt;data &gt; e)
+<a id="__codelineno-0-135" name="__codelineno-0-135" href="#__codelineno-0-135"></a>{
+<a id="__codelineno-0-136" name="__codelineno-0-136" href="#__codelineno-0-136"></a>p = p-&gt;down; //向下
+<a id="__codelineno-0-137" name="__codelineno-0-137" href="#__codelineno-0-137"></a>}
+<a id="__codelineno-0-138" name="__codelineno-0-138" href="#__codelineno-0-138"></a>else
+<a id="__codelineno-0-139" name="__codelineno-0-139" href="#__codelineno-0-139"></a>{
+<a id="__codelineno-0-140" name="__codelineno-0-140" href="#__codelineno-0-140"></a>//找到了要删除的节点
+<a id="__codelineno-0-141" name="__codelineno-0-141" href="#__codelineno-0-141"></a>Node&lt;T&gt;* pdelnode = p-&gt;right; //pdelnode是要删除的节点，而p是要删除的节点左侧的节点
+<a id="__codelineno-0-142" name="__codelineno-0-142" href="#__codelineno-0-142"></a>iffind = true;
+<a id="__codelineno-0-143" name="__codelineno-0-143" href="#__codelineno-0-143"></a>p-&gt;right = p-&gt;right-&gt;right; //要删除节点左侧的节点指向要删除节点右侧的节点
+<a id="__codelineno-0-144" name="__codelineno-0-144" href="#__codelineno-0-144"></a>delete pdelnode; //释放要删除的节点的内存，注意删除位置放这里比较合适
+<a id="__codelineno-0-145" name="__codelineno-0-145" href="#__codelineno-0-145"></a>p = p-&gt;down;
+<a id="__codelineno-0-146" name="__codelineno-0-146" href="#__codelineno-0-146"></a>}
+<a id="__codelineno-0-147" name="__codelineno-0-147" href="#__codelineno-0-147"></a>} //end while
+<a id="__codelineno-0-148" name="__codelineno-0-148" href="#__codelineno-0-148"></a>
+<a id="__codelineno-0-149" name="__codelineno-0-149" href="#__codelineno-0-149"></a>//如果某级索引只有一个节点，删除该节点后，可能会导致该该级索引一个节点也不存在，只有索引头节点存在，不过这并不要紧，无需处理
+<a id="__codelineno-0-150" name="__codelineno-0-150" href="#__codelineno-0-150"></a>return iffind;
+<a id="__codelineno-0-151" name="__codelineno-0-151" href="#__codelineno-0-151"></a>}
+<a id="__codelineno-0-152" name="__codelineno-0-152" href="#__codelineno-0-152"></a>
+<a id="__codelineno-0-153" name="__codelineno-0-153" href="#__codelineno-0-153"></a>//查找数据
+<a id="__codelineno-0-154" name="__codelineno-0-154" href="#__codelineno-0-154"></a>template &lt;typename T&gt;
+<a id="__codelineno-0-155" name="__codelineno-0-155" href="#__codelineno-0-155"></a>bool Find(const T&amp; e)
+<a id="__codelineno-0-156" name="__codelineno-0-156" href="#__codelineno-0-156"></a>{
+<a id="__codelineno-0-157" name="__codelineno-0-157" href="#__codelineno-0-157"></a>Node&lt;T&gt;* p = m_head;
+<a id="__codelineno-0-158" name="__codelineno-0-158" href="#__codelineno-0-158"></a>int jumptimes = 0; //寻找进行的指针跳跃次数统计
+<a id="__codelineno-0-159" name="__codelineno-0-159" href="#__codelineno-0-159"></a>
+<a id="__codelineno-0-160" name="__codelineno-0-160" href="#__codelineno-0-160"></a>while (p)
+<a id="__codelineno-0-161" name="__codelineno-0-161" href="#__codelineno-0-161"></a>{
+<a id="__codelineno-0-162" name="__codelineno-0-162" href="#__codelineno-0-162"></a>//向右找合适的节点位置
+<a id="__codelineno-0-163" name="__codelineno-0-163" href="#__codelineno-0-163"></a>while (p-&gt;right != nullptr &amp;&amp; p-&gt;right-&gt;data &lt; e)
+<a id="__codelineno-0-164" name="__codelineno-0-164" href="#__codelineno-0-164"></a>{
+<a id="__codelineno-0-165" name="__codelineno-0-165" href="#__codelineno-0-165"></a>jumptimes++;
+<a id="__codelineno-0-166" name="__codelineno-0-166" href="#__codelineno-0-166"></a>p = p-&gt;right; //先往右走
+<a id="__codelineno-0-167" name="__codelineno-0-167" href="#__codelineno-0-167"></a>}
+<a id="__codelineno-0-168" name="__codelineno-0-168" href="#__codelineno-0-168"></a>
+<a id="__codelineno-0-169" name="__codelineno-0-169" href="#__codelineno-0-169"></a>//右边没节点了，或者右边的节点过大，则需要向下找
+<a id="__codelineno-0-170" name="__codelineno-0-170" href="#__codelineno-0-170"></a>if (p-&gt;right == nullptr || p-&gt;right-&gt;data &gt; e)
+<a id="__codelineno-0-171" name="__codelineno-0-171" href="#__codelineno-0-171"></a>{
+<a id="__codelineno-0-172" name="__codelineno-0-172" href="#__codelineno-0-172"></a>jumptimes++;
+<a id="__codelineno-0-173" name="__codelineno-0-173" href="#__codelineno-0-173"></a>p = p-&gt;down; //向下
+<a id="__codelineno-0-174" name="__codelineno-0-174" href="#__codelineno-0-174"></a>}
+<a id="__codelineno-0-175" name="__codelineno-0-175" href="#__codelineno-0-175"></a>else
+<a id="__codelineno-0-176" name="__codelineno-0-176" href="#__codelineno-0-176"></a>{
+<a id="__codelineno-0-177" name="__codelineno-0-177" href="#__codelineno-0-177"></a>//找到了
+<a id="__codelineno-0-178" name="__codelineno-0-178" href="#__codelineno-0-178"></a>cout &lt;&lt;&quot;Find成功找到元素:&quot;&lt;&lt; e &lt;&lt;&quot;共进行:&quot;&lt;&lt; jumptimes &lt;&lt;&quot;次跳跃。&quot;&lt;&lt; endl;
+<a id="__codelineno-0-179" name="__codelineno-0-179" href="#__codelineno-0-179"></a>return true;
+<a id="__codelineno-0-180" name="__codelineno-0-180" href="#__codelineno-0-180"></a>}
+<a id="__codelineno-0-181" name="__codelineno-0-181" href="#__codelineno-0-181"></a>} //end while
+<a id="__codelineno-0-182" name="__codelineno-0-182" href="#__codelineno-0-182"></a>cout &lt;&lt;&quot;Find寻找元素:&quot;&lt;&lt; e &lt;&lt;&quot;失败!&quot;&lt;&lt; endl;
+<a id="__codelineno-0-183" name="__codelineno-0-183" href="#__codelineno-0-183"></a>return false;
+<a id="__codelineno-0-184" name="__codelineno-0-184" href="#__codelineno-0-184"></a>}
+<a id="__codelineno-0-185" name="__codelineno-0-185" href="#__codelineno-0-185"></a>
+<a id="__codelineno-0-186" name="__codelineno-0-186" href="#__codelineno-0-186"></a>//输出跳表中的所有元素，从上到下，从左到右输出
+<a id="__codelineno-0-187" name="__codelineno-0-187" href="#__codelineno-0-187"></a>void DispSkipList()
+<a id="__codelineno-0-188" name="__codelineno-0-188" href="#__codelineno-0-188"></a>{
+<a id="__codelineno-0-189" name="__codelineno-0-189" href="#__codelineno-0-189"></a>if (m_head-&gt;right == nullptr &amp;&amp; m_head-&gt;down == nullptr)
+<a id="__codelineno-0-190" name="__codelineno-0-190" href="#__codelineno-0-190"></a>return; //空表没啥可输出的
+<a id="__codelineno-0-191" name="__codelineno-0-191" href="#__codelineno-0-191"></a>
+<a id="__codelineno-0-192" name="__codelineno-0-192" href="#__codelineno-0-192"></a>cout &lt;&lt;&quot;--------------begin----------------&quot;&lt;&lt; endl;
+<a id="__codelineno-0-193" name="__codelineno-0-193" href="#__codelineno-0-193"></a>Node&lt;T&gt;* tmphead = m_head;
+<a id="__codelineno-0-194" name="__codelineno-0-194" href="#__codelineno-0-194"></a>int level = 0; //统计下有多少级索引
+<a id="__codelineno-0-195" name="__codelineno-0-195" href="#__codelineno-0-195"></a>while (true)
+<a id="__codelineno-0-196" name="__codelineno-0-196" href="#__codelineno-0-196"></a>{
+<a id="__codelineno-0-197" name="__codelineno-0-197" href="#__codelineno-0-197"></a>Node&lt;T&gt;* currp = tmphead-&gt;right;
+<a id="__codelineno-0-198" name="__codelineno-0-198" href="#__codelineno-0-198"></a>while (currp != nullptr)
+<a id="__codelineno-0-199" name="__codelineno-0-199" href="#__codelineno-0-199"></a>{
+<a id="__codelineno-0-200" name="__codelineno-0-200" href="#__codelineno-0-200"></a>cout &lt;&lt; currp-&gt;data &lt;&lt;&quot;&quot;;
+<a id="__codelineno-0-201" name="__codelineno-0-201" href="#__codelineno-0-201"></a>currp = currp-&gt;right;
+<a id="__codelineno-0-202" name="__codelineno-0-202" href="#__codelineno-0-202"></a>} //end while
+<a id="__codelineno-0-203" name="__codelineno-0-203" href="#__codelineno-0-203"></a>cout &lt;&lt; endl;
+<a id="__codelineno-0-204" name="__codelineno-0-204" href="#__codelineno-0-204"></a>level++;
+<a id="__codelineno-0-205" name="__codelineno-0-205" href="#__codelineno-0-205"></a>tmphead = tmphead-&gt;down; //下走
+<a id="__codelineno-0-206" name="__codelineno-0-206" href="#__codelineno-0-206"></a>if (tmphead == nullptr)
+<a id="__codelineno-0-207" name="__codelineno-0-207" href="#__codelineno-0-207"></a>break;
+<a id="__codelineno-0-208" name="__codelineno-0-208" href="#__codelineno-0-208"></a>} //end while
+<a id="__codelineno-0-209" name="__codelineno-0-209" href="#__codelineno-0-209"></a>cout &lt;&lt;&quot;--------------end----------------&quot;&lt;&lt; endl;
+<a id="__codelineno-0-210" name="__codelineno-0-210" href="#__codelineno-0-210"></a>cout &lt;&lt;&quot;共产生了:&quot;&lt;&lt; level-1 &lt;&lt;&quot;级索引。&quot;&lt;&lt; endl;
+<a id="__codelineno-0-211" name="__codelineno-0-211" href="#__codelineno-0-211"></a>return;
+<a id="__codelineno-0-212" name="__codelineno-0-212" href="#__codelineno-0-212"></a>}
+<a id="__codelineno-0-213" name="__codelineno-0-213" href="#__codelineno-0-213"></a>//获取跳表的高度（有多少级索引），不计算原始链表高度
+<a id="__codelineno-0-214" name="__codelineno-0-214" href="#__codelineno-0-214"></a>int getlevel()
+<a id="__codelineno-0-215" name="__codelineno-0-215" href="#__codelineno-0-215"></a>{
+<a id="__codelineno-0-216" name="__codelineno-0-216" href="#__codelineno-0-216"></a>if (m_head-&gt;down == nullptr)
+<a id="__codelineno-0-217" name="__codelineno-0-217" href="#__codelineno-0-217"></a>return 0;
+<a id="__codelineno-0-218" name="__codelineno-0-218" href="#__codelineno-0-218"></a>
+<a id="__codelineno-0-219" name="__codelineno-0-219" href="#__codelineno-0-219"></a>Node&lt;T&gt;* p = m_head;
+<a id="__codelineno-0-220" name="__codelineno-0-220" href="#__codelineno-0-220"></a>int level = 0;
+<a id="__codelineno-0-221" name="__codelineno-0-221" href="#__codelineno-0-221"></a>while (p)
+<a id="__codelineno-0-222" name="__codelineno-0-222" href="#__codelineno-0-222"></a>{
+<a id="__codelineno-0-223" name="__codelineno-0-223" href="#__codelineno-0-223"></a>level++;
+<a id="__codelineno-0-224" name="__codelineno-0-224" href="#__codelineno-0-224"></a>p = p-&gt;down; //下走
+<a id="__codelineno-0-225" name="__codelineno-0-225" href="#__codelineno-0-225"></a>}
+<a id="__codelineno-0-226" name="__codelineno-0-226" href="#__codelineno-0-226"></a>return level - 1;
+<a id="__codelineno-0-227" name="__codelineno-0-227" href="#__codelineno-0-227"></a>}
+<a id="__codelineno-0-228" name="__codelineno-0-228" href="#__codelineno-0-228"></a>private:
+<a id="__codelineno-0-229" name="__codelineno-0-229" href="#__codelineno-0-229"></a>Node&lt;T&gt;* m_head; //头指针，指向最上级索引的头节点
+<a id="__codelineno-0-230" name="__codelineno-0-230" href="#__codelineno-0-230"></a>vector&lt;Node&lt;T&gt; *&gt; pathList; //#include &lt;vector&gt;，记录这从索引到最底下的原始链表的向下行走路径
+<a id="__codelineno-0-231" name="__codelineno-0-231" href="#__codelineno-0-231"></a>};
+</code></pre></div>
+<p>在main主函数中，加入如下测试代码来测试插入、删除、查找操作：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>SkipList&lt;int&gt; myskiplist;
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>myskiplist.Insert(3);
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>myskiplist.Insert(1);
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>myskiplist.Insert(7);
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>myskiplist.Insert(6);
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>myskiplist.Insert(9);
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>myskiplist.Insert(5);
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>myskiplist.Insert(15);
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>myskiplist.Insert(2);
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>myskiplist.DispSkipList();
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>myskiplist.Delete(1);
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>myskiplist.DispSkipList();
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>for (int i = 0; i &lt;21000000; ++i) //搞大量数据进行插入和查找测试
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>{
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>myskiplist.Insert(i);
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>}
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>myskiplist.Find(1);
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>cout &lt;&lt;&quot;当前跳表索引高度：&quot;&lt;&lt; myskiplist.getlevel() &lt;&lt; endl;
+</code></pre></div>
+<p>代码执行了大概110秒（如果在Visual Studio中选择编译和执行Release版则执行的速度会快很多），因为循环次数较大。代码每次的执行结果可能不同，某一次代码的执行结果如下：
+<img alt="" src="https://static001.geekbang.org/resource/image/f7/dd/f7318de9002b73e2416ca3d2f9ff81dd.jpg?wh=1894x1082" /></p>
+<p>当然，跳表的实现代码可以非常灵活。跳表中的原始链表也不一定非是普通链表，用双向链表实现也完全可以，只要能更好地实现需求，就是好代码。</p>
+<p>在跳表中插入数据时，我这里的代码采用的是概率算法——每一层节点被提取到上一层的概率是1/2（50%），来决定插入的数据是否向上一层索引提取。当然也可以采用其他算法，比如根据一定的条件产生一个随机数k，把新插入的节点添加到第1到第k级索引中，这方面你有兴趣可以发挥自己的想象力来进一步丰富代码。</p>
+<h2 id="b">跳表、红黑树、B+树</h2>
+<p>面试中经常有这样的问题：MySQL为什么用 B+树实现索引而不用跳表？Redis为什么用跳表实现有序集合而不是用红黑树实现？</p>
+<h3 id="mysqlb">MySQL为什么用B+树实现索引而不用跳表</h3>
+<p>前面的课程，我们讲解过MySQL中的索引是采用B+树实现的，实现方法和这里所讲述的跳表其实很类似——都是增加多级索引来实现。</p>
+<p>我们可以客观分析一下B+树和跳表在数据查询和写操作上的优劣。</p>
+<ul>
+<li><strong>B+树</strong></li>
+</ul>
+<p>B+树一般都是叶子满了且索引节点也满了才会增加B+树的高度，MySQL中的B+树一般三层高就能够保存2100多万条记录。</p>
+<p>对于数据查询，即便这些要查询的数据保存在磁盘中，那么也只需要进行3次磁盘IO操作就可以拿到数据。</p>
+<p>对于写操作，也就是B+树的插入操作，涉及B+树节点的拆分、合并，相对比较复杂。</p>
+<ul>
+<li><strong>跳表</strong></li>
+</ul>
+<p>向跳表中增加数据时，跳表的高度是否增加是靠随机值——一个新数据插入到原始链表后，有50%的概率在第二层索引中加入该数据，有25%的概率在第三层索引中加入该数据，以此类推，直到最顶层索引。</p>
+<p>对于数据查询，如果要在原始链表中存储2100多万条记录（$2^{24}$），跳表的高度大概要达到24层，这意味着查询一次数据，如果运气比较坏可能要进行24次磁盘IO操作才可以拿到数据。和B+树比，跳表的查询效率显然慢很多。</p>
+<p>对于写操作，跳表的插入操作和B+树相比要简单很多，所以跳表的写入方面性能要优于B+树。</p>
+<p>MySQL中最常用的InnoDB和MyISAM存储引擎的底层索引用的都是B+树。其实，MySQL的存储引擎是可以更换的。如果你有兴趣，完全可以自己设计一个存储引擎底层索引采用跳表来实现。估计写入数据的性能会不错，但查询数据的性能应该会比InnoDB和MyISAM引擎差不少。此外，跳表这种数据结构出现得比较晚也是在很多应用场景中没有采用跳表的主要原因之一。</p>
+<h3 id="redisb">Redis为什么用跳表实现有序集合而不是用红黑树/B+树/二叉树实现？</h3>
+<p>Redis是内存数据库，因为不存在操作磁盘的问题，所以层的高度比较高并不是大问题。</p>
+<p>Redis有序集合支持的核心操作一般也就是数据的插入、删除、查询，当然这些动作用红黑树、B+都可以完成。</p>
+<p>对于数据的插入、删除、查询等操作：</p>
+<ul>
+<li>二叉树（包括AVL树、红黑树）需要对节点调整平衡（旋转、变色操作）。</li>
+<li>B+树存在一系列节点的拆分、合并操作。</li>
+<li>跳表插入和删除数据时不需要考虑平衡性，也不需要拆分合并等。</li>
+<li>另外，对于按照某个区间查找数据这个操作，AVL树、红黑树的效率没有跳表高。因为跳表能以O($log_{2}^{n}$)的时间复杂度定位到区间的起点，然后在原始链表中顺序向后遍历即可。</li>
+</ul>
+<p>此外，跳表的实现代码相对更简单，通过改变创建索引的算法，可以很有效地平衡代码的执行效率和内存的消耗问题。</p>
+<p>所以，Redis选择了跳表这种数据结构，因为实现简单，代码易读易懂，开销小（效率高）。</p>
+<h2 id="_5">小结</h2>
+<p>本节我带你学习了跳表这种数据结构，跳表本身基于链表，是对链表的优化。在原始的有序链表之上增加一级或者多级索引而构成。</p>
+<p>跳表中的元素必须有序。跳表实现相对简单，效率更高，在一些流行项目比如Redis、LevelDB中常被用来代替平衡二叉树（AVL树）或二分查找。其插入、删除、搜索的时间复杂度都是O($log_{2}^{n}$)。</p>
+<p>文中我详细向你阐述了通过跳表查找、插入、删除数据元素所要经过的步骤并给出了详尽的实现代码。</p>
+<p>最后，我向你详细解释了两个面试的经典问题。MySQL为什么用B+树实现索引而不用跳表？</p>
+<p>一句话总结，就是为了有效减少磁盘操作次数，从而提升数据查询效率。另一方面，Redis为什么使用跳表来实现有序集合呢？是因为实现简单，代码易读易懂，效率高。</p>
+<h2 id="_6">思考题</h2>
+<p>给定一个有序链表，尝试采用画图的方式将其转换为一个跳表。</p>
+<p>欢迎你在留言区和我互动。如果觉得有所收获，也可以把课程分享给更多的朋友一起学习。我们下节课见！</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="页脚" >
+        
+          
+          <a href="../43-%E4%B8%B2%E7%9A%84KMP%E6%A8%A1%E5%BC%8F%E5%8C%B9%E9%85%8D%E7%AE%97%E6%B3%95%E4%B9%8B%E6%94%B9%E8%BF%9B%EF%BC%9A%E9%80%9A%E8%BF%87%E4%BC%98%E5%8C%96%E4%BB%A3%E7%A0%81%E8%A7%A3%E5%86%B3%E5%A4%9A%E6%AC%A1%E9%87%8D%E5%A4%8D%E6%AF%94%E8%BE%83%E9%97%AE%E9%A2%98/" class="md-footer__link md-footer__link--prev" aria-label="上一页: 43 串的KMP模式匹配算法之改进：通过优化代码解决多次重复比较问题">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                上一页
+              </span>
+              <div class="md-ellipsis">
+                43 串的KMP模式匹配算法之改进：通过优化代码解决多次重复比较问题
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../45-%E5%93%88%E5%B8%8C%E8%A1%A8%E4%B8%8E%E5%93%88%E5%B8%8C%E7%AE%97%E6%B3%95%EF%BC%9A%E5%93%88%E5%B8%8C%E8%A1%A8%E9%80%82%E5%90%88%E7%94%A8%E5%9C%A8%E4%BB%80%E4%B9%88%E6%A0%B7%E7%9A%84%E6%83%85%E6%99%AF%EF%BC%9F/" class="md-footer__link md-footer__link--next" aria-label="下一页: 45 哈希表与哈希算法：哈希表适合用在什么样的情景？">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                下一页
+              </span>
+              <div class="md-ellipsis">
+                45 哈希表与哈希算法：哈希表适合用在什么样的情景？
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright © 2025-Present zkep
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["content.code.annotate", "content.code.copy", "content.tooltips", "toc.follow", "navigation.top", "navigation.tabs", "navigation.tabs.sticky", "navigation.prune", "navigation.footer", "navigation.tracking", "navigation.instant", "navigation.instant.progress", "navigation.indexes", "content.tabs.link"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../../javascript/extra.js"></script>
+      
+        <script src="../../../javascript/giscus.js"></script>
+      
+        <script src="../../../javascript/referrerpolicy.js"></script>
+      
+    
+  </body>
+</html>
